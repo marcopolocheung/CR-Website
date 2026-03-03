@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import menuData from '@/data/menu.json'
+import { toId } from '@/lib/menuUtils'
 
 export const metadata: Metadata = {
   title: 'Menu | China Rose',
@@ -13,9 +14,6 @@ type Category = { category: string; sections: Section[] }
 
 const data = menuData as Category[]
 
-function toId(s: string) {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-}
 
 function ItemCard({ item }: { item: MenuItem }) {
   return (
