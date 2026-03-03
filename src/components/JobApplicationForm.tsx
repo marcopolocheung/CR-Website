@@ -99,9 +99,31 @@ export default function JobApplicationForm() {
   const [form, setForm] = useState<FormData>(initForm())
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [resumeFile, setResumeFile] = useState<File | null>(null)
+  const [resumeError, setResumeError] = useState('')
 
   const set = (field: keyof FormData, value: string) =>
     setForm(f => ({ ...f, [field]: value }))
+
+  const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    if (!file) { setResumeFile(null); setResumeError(''); return }
+    const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic']
+    if (!allowed.includes(file.type)) {
+      setResumeError('Please upload a PDF or image file (JPG, PNG, WEBP, GIF, HEIC).')
+      setResumeFile(null)
+      e.target.value = ''
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setResumeError('File must be under 10 MB.')
+      setResumeFile(null)
+      e.target.value = ''
+      return
+    }
+    setResumeError('')
+    setResumeFile(file)
+  }
 
   const setEdu = (i: number, field: keyof FormData['education'][0], value: string) =>
     setForm(f => {
@@ -120,8 +142,8 @@ export default function JobApplicationForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
-    // for now this just logs the form to console we should hook upp an actual email service before launch
-    console.log('Application submitted:', form)
+    // for now this just logs the form to console we should hook up an actual email service before launch
+    console.log('Application submitted:', form, 'Resume:', resumeFile)
     await new Promise(r => setTimeout(r, 800))
     setSubmitting(false)
     setSubmitted(true)
@@ -176,6 +198,38 @@ export default function JobApplicationForm() {
           <input className={inputCls} type="email" value={form.email} onChange={e => set('email', e.target.value)} required />
         </Field>
       </div>
+      <Field label="Resume (optional)">
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="resume-upload"
+            className="flex items-center gap-3 border-2 border-dashed border-gray-300 hover:border-red-400 rounded-lg px-4 py-4 cursor-pointer transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            <span className="text-sm text-gray-500">
+              {resumeFile ? resumeFile.name : 'Upload resume — PDF or image (JPG, PNG, WEBP, HEIC) · max 10 MB'}
+            </span>
+          </label>
+          <input
+            id="resume-upload"
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,application/pdf,image/*"
+            className="sr-only"
+            onChange={handleResumeChange}
+          />
+          {resumeError && <p className="text-xs text-red-600">{resumeError}</p>}
+          {resumeFile && (
+            <button
+              type="button"
+              className="text-xs text-gray-500 hover:text-red-600 self-start"
+              onClick={() => { setResumeFile(null); setResumeError('') }}
+            >
+              Remove file
+            </button>
+          )}
+        </div>
+      </Field>
 
       {/* section 2 job interest */}
       <SectionHeader n={2} title="Job Interest" />
