@@ -11,7 +11,8 @@ interface Props {
   menuNote?: string
 }
 
-const MENU_IMAGES = ['/imgs/menu1.jpg', '/imgs/menu2.jpg', '/imgs/menu3.jpg']
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
+const MENU_IMAGES = [`${BASE}/imgs/menu1.jpg`, `${BASE}/imgs/menu2.jpg`, `${BASE}/imgs/menu3.jpg`]
 
 export default function LocationPageContent({
   name, addressLines, phone, phoneHref, toastUrl, uberUrl, mapImage, menuNote,
@@ -46,7 +47,7 @@ export default function LocationPageContent({
 
         <div className="rounded-xl overflow-hidden shadow-md">
           <Image
-            src={mapImage}
+            src={`${BASE}${mapImage}`}
             alt={`${name} location map`}
             width={800}
             height={600}

@@ -20,6 +20,8 @@ const locations = [
   },
 ]
 
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
+
 export default function Home() {
   return (
     <>
@@ -27,7 +29,7 @@ export default function Home() {
       <section className="relative bg-red-900 text-white overflow-hidden">
         <div className="absolute inset-0 opacity-20">
           <Image
-            src="/imgs/crbanner.webp"
+            src={`${BASE}/imgs/crbanner.webp`}
             alt="China Rose banner"
             fill
             className="object-cover"
