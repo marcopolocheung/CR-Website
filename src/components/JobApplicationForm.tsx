@@ -28,6 +28,7 @@ type FormData = {
   is16OrOlder: string
   authorizedToWork: string
   canProvideProof: string
+  foodHandlerCert: string
 
   // education history up to three schools
   education: Array<{
@@ -54,6 +55,7 @@ type FormData = {
   // the felony disclosure part
   felonyConviction: string
   felonyExplanation: string
+  felonyWhen: string
 }
 
 const emptyEdu = () => ({ school: '', city: '', state: '', major: '', yearsAttended: '', degree: '', lastYear: '' })
@@ -64,12 +66,12 @@ const initForm = (): FormData => ({
   street: '', city: '', state: '', zip: '', phone: '', email: '',
   positionDesired: '', wageDesired: '', startDate: '', referredBy: '',
   hasRelatives: '', relativesWho: '', workedHereBefore: '', preferredLocation: '',
-  is16OrOlder: '', authorizedToWork: '', canProvideProof: '',
+  is16OrOlder: '', authorizedToWork: '', canProvideProof: '', foodHandlerCert: '',
   education: [emptyEdu()],
   workHistory: [emptyWork()],
   militaryServed: '', militaryBranch: '', militaryRank: '', militaryDuties: '',
   militaryFrom: '', militaryTo: '', militaryReasonLeaving: '', militarySupervisor: '',
-  felonyConviction: '', felonyExplanation: '',
+  felonyConviction: '', felonyExplanation: '', felonyWhen: '',
 })
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
@@ -95,35 +97,72 @@ function SectionHeader({ n, title }: { n: number; title: string }) {
   )
 }
 
+const FILE_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,application/pdf,image/*'
+const ALLOWED_MIME = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic']
+
+function validateFile(file: File): string {
+  if (!ALLOWED_MIME.includes(file.type)) return 'Please upload a PDF or image file (JPG, PNG, WEBP, GIF, HEIC).'
+  if (file.size > 10 * 1024 * 1024) return 'File must be under 10 MB.'
+  return ''
+}
+
+function FileUpload({
+  id, file, error, onChange, onClear, label,
+}: {
+  id: string; file: File | null; error: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onClear: () => void; label: string
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label
+        htmlFor={id}
+        className="flex items-center gap-3 border-2 border-dashed border-gray-300 hover:border-red-400 rounded-lg px-4 py-4 cursor-pointer transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+        </svg>
+        <span className="text-sm text-gray-500">
+          {file ? file.name : label}
+        </span>
+      </label>
+      <input id={id} type="file" accept={FILE_ACCEPT} className="sr-only" onChange={onChange} />
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      {file && (
+        <button type="button" className="text-xs text-gray-500 hover:text-red-600 self-start" onClick={onClear}>
+          Remove file
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function JobApplicationForm() {
   const [form, setForm] = useState<FormData>(initForm())
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [resumeError, setResumeError] = useState('')
+  const [foodHandlerFile, setFoodHandlerFile] = useState<File | null>(null)
+  const [foodHandlerFileError, setFoodHandlerFileError] = useState('')
 
   const set = (field: keyof FormData, value: string) =>
     setForm(f => ({ ...f, [field]: value }))
 
-  const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const makeFileHandler = (
+    setFile: (f: File | null) => void,
+    setError: (s: string) => void,
+  ) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null
-    if (!file) { setResumeFile(null); setResumeError(''); return }
-    const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic']
-    if (!allowed.includes(file.type)) {
-      setResumeError('Please upload a PDF or image file (JPG, PNG, WEBP, GIF, HEIC).')
-      setResumeFile(null)
-      e.target.value = ''
-      return
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setResumeError('File must be under 10 MB.')
-      setResumeFile(null)
-      e.target.value = ''
-      return
-    }
-    setResumeError('')
-    setResumeFile(file)
+    if (!file) { setFile(null); setError(''); return }
+    const err = validateFile(file)
+    if (err) { setError(err); setFile(null); e.target.value = ''; return }
+    setError('')
+    setFile(file)
   }
+
+  const handleResumeChange = makeFileHandler(setResumeFile, setResumeError)
+  const handleFoodHandlerFileChange = makeFileHandler(setFoodHandlerFile, setFoodHandlerFileError)
 
   const setEdu = (i: number, field: keyof FormData['education'][0], value: string) =>
     setForm(f => {
@@ -143,7 +182,7 @@ export default function JobApplicationForm() {
     e.preventDefault()
     setSubmitting(true)
     // for now this just logs the form to console we should hook up an actual email service before launch
-    console.log('Application submitted:', form, 'Resume:', resumeFile)
+    console.log('Application submitted:', form, 'Resume:', resumeFile, 'Food Handler Cert:', foodHandlerFile)
     await new Promise(r => setTimeout(r, 800))
     setSubmitting(false)
     setSubmitted(true)
@@ -194,41 +233,19 @@ export default function JobApplicationForm() {
         <Field label="Phone Number" required>
           <input className={inputCls} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} required />
         </Field>
-        <Field label="Email Address" required>
-          <input className={inputCls} type="email" value={form.email} onChange={e => set('email', e.target.value)} required />
+        <Field label="Email Address">
+          <input className={inputCls} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
         </Field>
       </div>
       <Field label="Resume (optional)">
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="resume-upload"
-            className="flex items-center gap-3 border-2 border-dashed border-gray-300 hover:border-red-400 rounded-lg px-4 py-4 cursor-pointer transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-            </svg>
-            <span className="text-sm text-gray-500">
-              {resumeFile ? resumeFile.name : 'Upload resume — PDF or image (JPG, PNG, WEBP, HEIC) · max 10 MB'}
-            </span>
-          </label>
-          <input
-            id="resume-upload"
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,application/pdf,image/*"
-            className="sr-only"
-            onChange={handleResumeChange}
-          />
-          {resumeError && <p className="text-xs text-red-600">{resumeError}</p>}
-          {resumeFile && (
-            <button
-              type="button"
-              className="text-xs text-gray-500 hover:text-red-600 self-start"
-              onClick={() => { setResumeFile(null); setResumeError('') }}
-            >
-              Remove file
-            </button>
-          )}
-        </div>
+        <FileUpload
+          id="resume-upload"
+          file={resumeFile}
+          error={resumeError}
+          onChange={handleResumeChange}
+          onClear={() => { setResumeFile(null); setResumeError('') }}
+          label="Upload resume — PDF or image (JPG, PNG, WEBP, HEIC) · max 10 MB"
+        />
       </Field>
 
       {/* section 2 job interest */}
@@ -298,6 +315,26 @@ export default function JobApplicationForm() {
           <option value="no">No</option>
         </select>
       </Field>
+      <Field label="Do you have a valid Texas Food Handler Certification?" required>
+        <select className={selectCls} value={form.foodHandlerCert} onChange={e => set('foodHandlerCert', e.target.value)} required>
+          <option value="">Select</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </Field>
+      {form.foodHandlerCert === 'yes' && (
+        <div className="border border-green-200 bg-green-50 rounded-xl p-4 space-y-2">
+          <p className="text-sm font-medium text-green-800">Upload your Texas Food Handler Certificate (optional but helpful)</p>
+          <FileUpload
+            id="food-handler-upload"
+            file={foodHandlerFile}
+            error={foodHandlerFileError}
+            onChange={handleFoodHandlerFileChange}
+            onClear={() => { setFoodHandlerFile(null); setFoodHandlerFileError('') }}
+            label="Upload certificate — PDF or image (JPG, PNG, WEBP, HEIC) · max 10 MB"
+          />
+        </div>
+      )}
 
       {/* section 4 education not sure evveryone will have multiple schools but we allow up to three */}
       <SectionHeader n={4} title="Education History" />
@@ -379,10 +416,10 @@ export default function JobApplicationForm() {
         </button>
       )}
 
-      {/* section 6 military service this whole part is optional */}
-      <SectionHeader n={6} title="Military Service (Optional)" />
-      <Field label="Have you served in the U.S. military?">
-        <select className={selectCls} value={form.militaryServed} onChange={e => set('militaryServed', e.target.value)}>
+      {/* section 6 military service now required */}
+      <SectionHeader n={6} title="Military Service" />
+      <Field label="Have you served in the U.S. military?" required>
+        <select className={selectCls} value={form.militaryServed} onChange={e => set('militaryServed', e.target.value)} required>
           <option value="">Select</option>
           <option value="no">No</option>
           <option value="yes">Yes</option>
@@ -426,9 +463,28 @@ export default function JobApplicationForm() {
         </select>
       </Field>
       {form.felonyConviction === 'yes' && (
-        <Field label="Please explain (optional)">
-          <textarea className={inputCls} rows={3} value={form.felonyExplanation} onChange={e => set('felonyExplanation', e.target.value)} />
-        </Field>
+        <div className="border border-amber-200 bg-amber-50 rounded-xl p-4 space-y-3">
+          <p className="text-sm text-amber-800">Please provide the following details. A conviction does not automatically disqualify you from employment.</p>
+          <Field label="What were you convicted of, and what were the circumstances?" required>
+            <textarea
+              className={inputCls}
+              rows={3}
+              value={form.felonyExplanation}
+              onChange={e => set('felonyExplanation', e.target.value)}
+              required
+              placeholder="Please describe the nature of the conviction…"
+            />
+          </Field>
+          <Field label="When did this occur?" required>
+            <input
+              className={inputCls}
+              value={form.felonyWhen}
+              onChange={e => set('felonyWhen', e.target.value)}
+              required
+              placeholder="e.g. January 2015"
+            />
+          </Field>
+        </div>
       )}
 
       {/* equal employment opportunity statement at the bottom */}
