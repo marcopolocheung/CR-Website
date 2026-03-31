@@ -26,10 +26,11 @@ jobs:
           cache: npm
 
       - name: Configure Pages
-        id: pages
         uses: actions/configure-pages@v5
         with:
-          enablement: true
+          static_site_generator: next
+        env:
+          NEXT_PUBLIC_BASE_PATH: ''
 
       - run: npm ci
 
