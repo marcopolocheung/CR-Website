@@ -12,7 +12,7 @@ interface Props {
 }
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
-const MENU_IMAGES = [`${BASE}/imgs/menu1.jpg`, `${BASE}/imgs/menu2.jpg`, `${BASE}/imgs/menu3.jpg`]
+const MENU_IMAGES = [`${BASE}/imgs/menu1.jpg`, `${BASE}/imgs/menu2.jpg`, `${BASE}/imgs/menu3.jpg`, `${BASE}/imgs/menu4.jpg`]
 
 export default function LocationPageContent({
   name, addressLines, phone, phoneHref, toastUrl, uberUrl, mapImage, menuNote,

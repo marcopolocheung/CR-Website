@@ -1,1 +1,0 @@
-Deployment for chinarosesa.com
