@@ -27,7 +27,7 @@ export default function LocationCard({ name, address, phone, toastUrl, uberUrl, 
           rel="noopener noreferrer"
           className="block text-center bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
         >
-          Order Pick-Up
+          Order Pick-Up on Toast
         </a>
         <a
           href={uberUrl}
@@ -35,8 +35,11 @@ export default function LocationCard({ name, address, phone, toastUrl, uberUrl, 
           rel="noopener noreferrer"
           className="block text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
         >
-          Order Delivery
+          Order Delivery on Uber Eats
         </a>
+        <p className="text-xs text-gray-500 text-center">
+          Ordering opens through third-party services. Availability and fees may vary.
+        </p>
       </div>
 
       <Link href={href} className="text-center text-red-700 hover:text-red-900 font-medium underline text-sm">

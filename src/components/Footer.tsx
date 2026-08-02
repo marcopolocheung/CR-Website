@@ -29,9 +29,22 @@ export default function Footer() {
         </div>
         <div>
           <h3 className="font-bold text-yellow-300 mb-2">Links</h3>
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             <li><Link href="/careers" className="hover:text-yellow-300 transition-colors">Careers</Link></li>
+            <li>
+              <a href="tel:2106753226" className="hover:text-yellow-300 transition-colors">
+                W Military: (210) 675-3226
+              </a>
+            </li>
+            <li>
+              <a href="tel:2109277339" className="hover:text-yellow-300 transition-colors">
+                SW Military: (210) 927-7339
+              </a>
+            </li>
           </ul>
+          <p className="mt-3 text-xs text-red-200">
+            For accessibility help, call either location.
+          </p>
         </div>
       </div>
       <div className="border-t border-red-700 text-center py-3 text-xs text-red-300">

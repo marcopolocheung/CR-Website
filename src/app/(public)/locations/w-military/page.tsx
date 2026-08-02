@@ -15,7 +15,7 @@ export default function WMilitaryPage() {
       phoneHref="tel:2106753226"
       toastUrl="https://order.toasttab.com/online/china-rose-w-military-7046-w-military-dr"
       uberUrl="https://www.order.store/store/china-rose-7046-military/FrlPQ762VI6wc3eQe4ThOQ"
-      mapImage="/imgs/WMilitaryLocation.png"
+      mapUrl="https://www.google.com/maps/search/?api=1&query=7046%20W%20Military%20Dr%2C%20San%20Antonio%2C%20TX%2078227"
       menuNote="Menu images from SW Military Dr location. Items may vary. Prices subject to change."
     />
   )
