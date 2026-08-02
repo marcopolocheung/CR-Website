@@ -39,9 +39,7 @@ export default function LocationPageContent({
           </div>
           <div>
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-1">Hours</h2>
-            <p className="text-gray-600 text-sm">Mon – Thu: 10:30 AM – 9:30 PM</p>
-            <p className="text-gray-600 text-sm">Fri – Sat: 10:30 AM – 10:00 PM</p>
-            <p className="text-gray-600 text-sm">Sunday: 11:00 AM – 9:30 PM</p>
+            <p className="text-gray-600 text-sm">Daily: 11:00 AM – 9:00 PM</p>
           </div>
         </div>
 

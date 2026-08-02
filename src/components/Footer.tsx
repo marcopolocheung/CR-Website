@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import LocationOpenStatus from './LocationOpenStatus'
 
 export default function Footer() {
   return (
@@ -11,9 +12,19 @@ export default function Footer() {
         </div>
         <div>
           <h3 className="font-bold text-yellow-300 mb-2">Locations</h3>
-          <ul className="space-y-1">
-            <li><Link href="/locations/w-military" className="hover:text-yellow-300 transition-colors">W Military Dr</Link></li>
-            <li><Link href="/locations/sw-military" className="hover:text-yellow-300 transition-colors">SW Military Dr</Link></li>
+          <ul className="space-y-3">
+            <li>
+              <Link href="/locations/w-military" className="inline-flex flex-col hover:text-yellow-300 transition-colors">
+                <span>W Military Dr</span>
+                <LocationOpenStatus />
+              </Link>
+            </li>
+            <li>
+              <Link href="/locations/sw-military" className="inline-flex flex-col hover:text-yellow-300 transition-colors">
+                <span>SW Military Dr</span>
+                <LocationOpenStatus />
+              </Link>
+            </li>
           </ul>
         </div>
         <div>
