@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: 'Browse the full China Rose menu with photos, prices, and descriptions.',
 }
 
-type MenuItem = { name: string; image: string; price: string | null; description: string | null }
+type MenuItem = { name: string; image?: string; price: string | null; description: string | null }
 type Section  = { subcategory: string; items: MenuItem[] }
 type Category = { category: string; sections: Section[] }
 
@@ -18,16 +18,18 @@ const data = menuData as Category[]
 function ItemCard({ item }: { item: MenuItem }) {
   return (
     <div className="flex gap-4 items-start bg-white rounded-xl shadow-sm border border-gray-100 p-3 hover:shadow-md transition-shadow">
-      <div className="relative w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-gray-100">
-        <Image
-          src={item.image}
-          alt={item.name}
-          fill
-          sizes="96px"
-          className="object-cover"
-          loading="lazy"
-        />
-      </div>
+      {item.image && (
+        <div className="relative w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-gray-100">
+          <Image
+            src={item.image}
+            alt={item.name}
+            fill
+            sizes="96px"
+            className="object-cover"
+            loading="lazy"
+          />
+        </div>
+      )}
       <div className="flex-1 min-w-0 py-1">
         <p className="font-semibold text-gray-900 text-sm leading-snug capitalize">
           {item.name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}

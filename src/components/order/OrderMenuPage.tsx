@@ -8,7 +8,7 @@ import MenuItemCard from './MenuItemCard'
 import CartIcon from './CartIcon'
 import CartDrawer from './CartDrawer'
 
-type MenuItem = { name: string; image: string; price: string | null; description: string | null }
+type MenuItem = { name: string; image?: string; price: string | null; description: string | null }
 type Section  = { subcategory: string; items: MenuItem[] }
 type Category = { category: string; sections: Section[] }
 

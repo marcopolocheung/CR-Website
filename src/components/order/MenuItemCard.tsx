@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useCart } from './CartProvider'
 import { toId, parsePrice } from '@/lib/menuUtils'
 
-type MenuItem = { name: string; image: string; price: string | null; description: string | null }
+type MenuItem = { name: string; image?: string; price: string | null; description: string | null }
 
 interface MenuItemCardProps {
   item: MenuItem
@@ -38,16 +38,18 @@ export default function MenuItemCard({ item, category }: MenuItemCardProps) {
 
   return (
     <div className="flex gap-3 items-start bg-white rounded-xl shadow-sm border border-gray-100 p-3 hover:shadow-md transition-shadow">
-      <div className="relative w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-gray-100">
-        <Image
-          src={item.image}
-          alt={item.name}
-          fill
-          sizes="96px"
-          className="object-cover"
-          loading="lazy"
-        />
-      </div>
+      {item.image && (
+        <div className="relative w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-gray-100">
+          <Image
+            src={item.image}
+            alt={item.name}
+            fill
+            sizes="96px"
+            className="object-cover"
+            loading="lazy"
+          />
+        </div>
+      )}
       <div className="flex-1 min-w-0 py-1 flex flex-col gap-1">
         <p className="font-semibold text-gray-900 text-sm leading-snug">{displayName}</p>
         {item.description && (
