@@ -1,3 +1,5 @@
+import { featuredDishes } from './featuredDishes'
+
 export type LocationSlug = 'w-military' | 'sw-military'
 
 export type RestaurantLocation = {
@@ -18,12 +20,6 @@ export type RestaurantLocation = {
   featuredDishes: string[]
   menuNote?: string
 }
-
-const featuredDishes = [
-  'Lemon Chicken Combo Meal',
-  'Sesame Chicken Combo Meal',
-  'Beef Broc Combo Meal',
-]
 
 export const locations: Record<LocationSlug, RestaurantLocation> = {
   'w-military': {
