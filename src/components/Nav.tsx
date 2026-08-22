@@ -41,6 +41,7 @@ export default function Nav() {
               className={`cursor-pointer select-none ${linkCls}`}
               aria-expanded={locOpen}
               aria-controls="locations-menu"
+              aria-haspopup="menu"
               onClick={() => setLocOpen(open => !open)}
             >
               Locations ▾

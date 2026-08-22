@@ -13,9 +13,13 @@ export default function LocationCard({ name, address, phone, toastUrl, uberUrl, 
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 flex flex-col gap-4">
       <div>
-        <h2 className="text-xl font-bold text-red-800">{name}</h2>
+        <h3 className="text-xl font-bold text-red-800">{name}</h3>
         <p className="text-gray-600 mt-1">{address}</p>
-        <a href={`tel:${phone.replace(/\D/g, '')}`} className="text-red-700 font-medium hover:underline mt-1 inline-block">
+        <a
+          href={`tel:${phone.replace(/\D/g, '')}`}
+          aria-label={`Call ${name} at ${phone}`}
+          className="text-red-700 font-medium hover:underline mt-1 inline-block"
+        >
           {phone}
         </a>
       </div>
@@ -25,6 +29,7 @@ export default function LocationCard({ name, address, phone, toastUrl, uberUrl, 
           href={toastUrl}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={`Order pick-up from ${name} on Toast`}
           className="block text-center bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
         >
           Order Pick-Up on Toast
@@ -33,6 +38,7 @@ export default function LocationCard({ name, address, phone, toastUrl, uberUrl, 
           href={uberUrl}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={`Order delivery from ${name} on Uber Eats`}
           className="block text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
         >
           Order Delivery on Uber Eats
@@ -42,7 +48,11 @@ export default function LocationCard({ name, address, phone, toastUrl, uberUrl, 
         </p>
       </div>
 
-      <Link href={href} className="text-center text-red-700 hover:text-red-900 font-medium underline text-sm">
+      <Link
+        href={href}
+        aria-label={`View location details and menu for ${name}`}
+        className="text-center text-red-700 hover:text-red-900 font-medium underline text-sm"
+      >
         View Location & Menu →
       </Link>
     </div>
