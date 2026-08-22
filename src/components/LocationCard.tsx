@@ -29,7 +29,7 @@ export default function LocationCard({ name, address, phone, toastUrl, uberUrl, 
           href={toastUrl}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`Order pick-up from ${name} on Toast`}
+          aria-label={`Order Pick-Up on Toast - ${name}`}
           className="block text-center bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
         >
           Order Pick-Up on Toast
@@ -38,7 +38,7 @@ export default function LocationCard({ name, address, phone, toastUrl, uberUrl, 
           href={uberUrl}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`Order delivery from ${name} on Uber Eats`}
+          aria-label={`Order Delivery on Uber Eats - ${name}`}
           className="block text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
         >
           Order Delivery on Uber Eats
@@ -50,7 +50,7 @@ export default function LocationCard({ name, address, phone, toastUrl, uberUrl, 
 
       <Link
         href={href}
-        aria-label={`View location details and menu for ${name}`}
+        aria-label={`View Location & Menu - ${name}`}
         className="text-center text-red-700 hover:text-red-900 font-medium underline text-sm"
       >
         View Location & Menu →
