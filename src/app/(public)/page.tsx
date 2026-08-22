@@ -1,6 +1,14 @@
 import Image from 'next/image'
+import type { Metadata } from 'next'
 import LocationCard from '@/components/LocationCard'
 import { formatLocationAddress, locations } from '@/data/locations'
+import { DEFAULT_DESCRIPTION, publicPageMetadata } from '@/lib/seo'
+
+export const metadata: Metadata = publicPageMetadata({
+  title: 'China Rose | Authentic Chinese Cuisine in San Antonio',
+  description: DEFAULT_DESCRIPTION,
+  path: '/',
+})
 
 const homepageLocations = Object.values(locations).map((location) => ({
   name: location.displayName,
@@ -41,6 +49,20 @@ export default function Home() {
           {homepageLocations.map((loc) => (
             <LocationCard key={loc.href} {...loc} />
           ))}
+        </div>
+      </section>
+
+      <section className="max-w-5xl mx-auto px-4 pb-12">
+        <div className="space-y-3 text-center text-gray-700">
+          <h2 className="text-2xl font-bold text-gray-800">Chinese Restaurant with Two San Antonio Locations</h2>
+          <p className="mx-auto max-w-3xl">
+            China Rose serves authentic Chinese cuisine from locations on W Military Dr and SW Military Dr.
+            Both restaurants are open daily from 11:00 AM to 9:00 PM with dine-in, pick-up, delivery,
+            curbside pickup, catering, and lunch specials.
+          </p>
+          <p className="mx-auto max-w-3xl text-sm text-gray-600">
+            The same menu is available at both locations. The W Military Dr location also has a drive-thru.
+          </p>
         </div>
       </section>
     </>

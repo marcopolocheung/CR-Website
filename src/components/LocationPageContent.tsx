@@ -64,6 +64,7 @@ export default function LocationPageContent({
             href={mapUrl}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`View on Google Maps - ${name}`}
             className="inline-flex justify-center rounded-xl bg-red-700 px-4 py-3 text-sm font-bold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 transition-colors"
           >
             View on Google Maps
@@ -89,6 +90,7 @@ export default function LocationPageContent({
             href={toastUrl}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`Order Pick-Up on Toast - ${name}`}
             className="text-center bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-4 rounded-xl transition-colors"
           >
             Order Pick-Up on Toast
@@ -97,6 +99,7 @@ export default function LocationPageContent({
             href={uberUrl}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`Order Delivery on Uber Eats - ${name}`}
             className="text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
           >
             Order Delivery on Uber Eats
@@ -130,6 +133,7 @@ export default function LocationPageContent({
               href={toastUrl}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label={`Order Pick-Up on Toast - ${name}`}
               className="text-center bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-3 rounded-xl transition-colors text-sm"
             >
               Order Pick-Up on Toast
@@ -138,6 +142,7 @@ export default function LocationPageContent({
               href={uberUrl}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label={`Order Delivery on Uber Eats - ${name}`}
               className="text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-3 rounded-xl transition-colors text-sm"
             >
               Order Delivery on Uber Eats

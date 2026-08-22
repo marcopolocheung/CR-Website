@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
+import { publicPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
-  title: 'Careers | China Rose',
+export const metadata: Metadata = publicPageMetadata({
+  title: 'Careers',
   description: 'Careers information for China Rose restaurants in San Antonio, TX.',
-}
+  path: '/careers',
+})
 
 export default function CareersPage() {
   return (
