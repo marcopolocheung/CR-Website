@@ -22,17 +22,21 @@ export function publicPageMetadata({
   title,
   description,
   path,
+  absoluteTitle = false,
 }: {
   title: string
   description: string
   path: string
+  // Set when `title` is already a complete title and should not receive the
+  // `| China Rose` suffix from the layout template.
+  absoluteTitle?: boolean
 }): Metadata {
   const url = absoluteUrl(path)
-  const isHome = path === '/'
-  const fullTitle = isHome ? title : `${title} | ${SITE_NAME}`
+  const useAbsoluteTitle = absoluteTitle || path === '/'
+  const fullTitle = useAbsoluteTitle ? title : `${title} | ${SITE_NAME}`
 
   return {
-    title: isHome ? { absolute: title } : title,
+    title: useAbsoluteTitle ? { absolute: title } : title,
     description,
     alternates: {
       canonical: url,
