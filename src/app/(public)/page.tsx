@@ -1,5 +1,13 @@
 import Image from 'next/image'
+import type { Metadata } from 'next'
 import LocationCard from '@/components/LocationCard'
+import { DEFAULT_DESCRIPTION, publicPageMetadata } from '@/lib/seo'
+
+export const metadata: Metadata = publicPageMetadata({
+  title: 'China Rose | Authentic Chinese Cuisine in San Antonio',
+  description: DEFAULT_DESCRIPTION,
+  path: '/',
+})
 
 const locations = [
   {

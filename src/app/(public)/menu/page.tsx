@@ -2,11 +2,13 @@ import type { Metadata } from 'next'
 import Image from 'next/image'
 import menuData from '@/data/menu.json'
 import { toId } from '@/lib/menuUtils'
+import { publicPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
-  title: 'Menu | China Rose',
+export const metadata: Metadata = publicPageMetadata({
+  title: 'Menu',
   description: 'Browse the full China Rose menu with photos, prices, and descriptions.',
-}
+  path: '/menu',
+})
 
 type MenuItem = { name: string; image?: string; price: string | null; description: string | null }
 type Section  = { subcategory: string; items: MenuItem[] }
