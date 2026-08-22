@@ -43,6 +43,20 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="max-w-5xl mx-auto px-4 pt-10">
+        <div className="space-y-3 text-center text-gray-700">
+          <h2 className="text-2xl font-bold text-gray-800">Chinese Restaurant with Two San Antonio Locations</h2>
+          <p className="mx-auto max-w-3xl">
+            China Rose serves authentic Chinese cuisine from locations on W Military Dr and SW Military Dr.
+            Both restaurants are open daily from 11:00 AM to 9:00 PM with dine-in, pick-up, delivery,
+            curbside pickup, catering, and lunch specials.
+          </p>
+          <p className="mx-auto max-w-3xl text-sm text-gray-600">
+            The same menu is available at both locations. The W Military Dr location also has a drive-thru.
+          </p>
+        </div>
+      </section>
+
       {/* location cardds both restaurants shown here */}
       <section className="max-w-5xl mx-auto px-4 py-12">
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-8">Choose a Location</h2>
