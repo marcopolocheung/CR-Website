@@ -4,11 +4,14 @@ import Link from 'next/link'
 import { featuredDishes } from '@/data/featuredDishes'
 import menuData from '@/data/menu.json'
 import { toId } from '@/lib/menuUtils'
+import { publicPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: 'China Rose Menu | San Antonio Chinese Restaurant',
   description: 'Browse the China Rose menu for both San Antonio locations, including combo meals, bowls, fried rice, lo mein, soups, sides, and drinks.',
-}
+  path: '/menu',
+  absoluteTitle: true,
+})
 
 type MenuItem = { name: string; image?: string; price: string | null; description: string | null }
 type Section  = { subcategory: string; items: MenuItem[] }

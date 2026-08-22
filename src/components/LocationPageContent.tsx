@@ -8,6 +8,8 @@ interface Props {
   toastUrl: string
   uberUrl: string
   mapUrl: string
+  services: string[]
+  featuredDishes: string[]
   menuNote?: string
 }
 
@@ -15,7 +17,7 @@ const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 const MENU_IMAGES = [`${BASE}/imgs/menu1.jpg`, `${BASE}/imgs/menu2.jpg`, `${BASE}/imgs/menu3.jpg`, `${BASE}/imgs/menu4.jpg`]
 
 export default function LocationPageContent({
-  name, addressLines, phone, phoneHref, toastUrl, uberUrl, mapUrl, menuNote,
+  name, addressLines, phone, phoneHref, toastUrl, uberUrl, mapUrl, services, featuredDishes, menuNote,
 }: Props) {
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-10">
@@ -41,6 +43,16 @@ export default function LocationPageContent({
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-1">Hours</h2>
             <p className="text-gray-600 text-sm">Daily: 11:00 AM – 9:00 PM</p>
           </div>
+          <div>
+            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-1">Services</h2>
+            <ul className="flex flex-wrap gap-2 text-sm text-gray-600">
+              {services.map((service) => (
+                <li key={service} className="rounded-full bg-gray-100 px-3 py-1">
+                  {service}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         <div className="rounded-xl border border-red-100 bg-red-50 p-6 flex flex-col justify-center">
@@ -52,6 +64,7 @@ export default function LocationPageContent({
             href={mapUrl}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`View on Google Maps - ${name}`}
             className="inline-flex justify-center rounded-xl bg-red-700 px-4 py-3 text-sm font-bold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 transition-colors"
           >
             View on Google Maps
@@ -62,6 +75,14 @@ export default function LocationPageContent({
       {/* menu section with images and the order buttons */}
       <section>
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Menu</h2>
+        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4">
+          <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-2">Featured dishes</h3>
+          <ul className="grid gap-2 text-sm text-gray-700 sm:grid-cols-3">
+            {featuredDishes.map((dish) => (
+              <li key={dish}>{dish}</li>
+            ))}
+          </ul>
+        </div>
 
         {/* on mobile the order buttons go above the menu so they dont get buried */}
         <div className="flex flex-col gap-3 mb-4 md:hidden">
@@ -69,6 +90,7 @@ export default function LocationPageContent({
             href={toastUrl}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`Order Pick-Up on Toast - ${name}`}
             className="text-center bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-4 rounded-xl transition-colors"
           >
             Order Pick-Up on Toast
@@ -77,6 +99,7 @@ export default function LocationPageContent({
             href={uberUrl}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`Order Delivery on Uber Eats - ${name}`}
             className="text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
           >
             Order Delivery on Uber Eats
@@ -110,6 +133,7 @@ export default function LocationPageContent({
               href={toastUrl}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label={`Order Pick-Up on Toast - ${name}`}
               className="text-center bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-3 rounded-xl transition-colors text-sm"
             >
               Order Pick-Up on Toast
@@ -118,6 +142,7 @@ export default function LocationPageContent({
               href={uberUrl}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label={`Order Delivery on Uber Eats - ${name}`}
               className="text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-3 rounded-xl transition-colors text-sm"
             >
               Order Delivery on Uber Eats

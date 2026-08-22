@@ -1,24 +1,23 @@
 import Image from 'next/image'
+import type { Metadata } from 'next'
 import LocationCard from '@/components/LocationCard'
+import { formatLocationAddress, locations } from '@/data/locations'
+import { DEFAULT_DESCRIPTION, publicPageMetadata } from '@/lib/seo'
 
-const locations = [
-  {
-    name: 'China Rose – W Military Dr',
-    address: '7046 W Military Dr, San Antonio, TX 78227',
-    phone: '(210) 675-3226',
-    toastUrl: 'https://order.toasttab.com/online/china-rose-w-military-7046-w-military-dr',
-    uberUrl: 'https://www.order.store/store/china-rose-7046-military/FrlPQ762VI6wc3eQe4ThOQ',
-    href: '/locations/w-military',
-  },
-  {
-    name: 'China Rose – SW Military Dr',
-    address: '2535 SW Military Dr, San Antonio, TX 78224',
-    phone: '(210) 927-7339',
-    toastUrl: 'https://order.toasttab.com/online/china-rose-sw-military-2535-sw-military-dr',
-    uberUrl: 'https://www.order.store/store/china-rose-sw-military/GYiGnH3mQSSS1iKIi2uHjw',
-    href: '/locations/sw-military',
-  },
-]
+export const metadata: Metadata = publicPageMetadata({
+  title: 'China Rose | Authentic Chinese Cuisine in San Antonio',
+  description: DEFAULT_DESCRIPTION,
+  path: '/',
+})
+
+const homepageLocations = Object.values(locations).map((location) => ({
+  name: location.displayName,
+  address: formatLocationAddress(location),
+  phone: location.phone,
+  toastUrl: location.toastUrl,
+  uberUrl: location.uberUrl,
+  href: location.path,
+}))
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 
@@ -47,9 +46,23 @@ export default function Home() {
       <section className="max-w-5xl mx-auto px-4 py-12">
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-8">Choose a Location</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {locations.map((loc) => (
+          {homepageLocations.map((loc) => (
             <LocationCard key={loc.href} {...loc} />
           ))}
+        </div>
+      </section>
+
+      <section className="max-w-5xl mx-auto px-4 pb-12">
+        <div className="space-y-3 text-center text-gray-700">
+          <h2 className="text-2xl font-bold text-gray-800">Chinese Restaurant with Two San Antonio Locations</h2>
+          <p className="mx-auto max-w-3xl">
+            China Rose serves authentic Chinese cuisine from locations on W Military Dr and SW Military Dr.
+            Both restaurants are open daily from 11:00 AM to 9:00 PM with dine-in, pick-up, delivery,
+            curbside pickup, catering, and lunch specials.
+          </p>
+          <p className="mx-auto max-w-3xl text-sm text-gray-600">
+            The same menu is available at both locations. The W Military Dr location also has a drive-thru.
+          </p>
         </div>
       </section>
     </>

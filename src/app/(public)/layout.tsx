@@ -2,10 +2,19 @@ import type { Metadata } from 'next'
 import '../globals.css'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
+import { DEFAULT_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/seo'
 
 export const metadata: Metadata = {
-  title: 'China Rose | Authentic Chinese Cuisine in San Antonio',
-  description: 'China Rose – Authentic Chinese cuisine with two locations in San Antonio, TX. Order Pick-Up or Delivery online.',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} | Authentic Chinese Cuisine in San Antonio`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: DEFAULT_DESCRIPTION,
+  applicationName: SITE_NAME,
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
