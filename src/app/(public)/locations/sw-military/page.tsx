@@ -1,23 +1,33 @@
 import type { Metadata } from 'next'
 import LocationPageContent from '@/components/LocationPageContent'
+import { getLocation } from '@/data/locations'
+import { JsonLd, restaurantJsonLd } from '@/lib/structuredData'
 import { publicPageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = publicPageMetadata({
   title: 'SW Military Dr',
-  description: 'China Rose at 2535 SW Military Dr, San Antonio TX. Order Pick-Up or Delivery, view our menu.',
+  description: 'China Rose at 2535 SW Military Dr in San Antonio, TX. View hours, menu, pickup, delivery, and directions.',
   path: '/locations/sw-military',
 })
 
+const location = getLocation('sw-military')
+
 export default function SWMilitaryPage() {
   return (
-    <LocationPageContent
-      name="China Rose – SW Military Dr"
-      addressLines={['2535 SW Military Dr', 'San Antonio, TX 78224']}
-      phone="(210) 927-7339"
-      phoneHref="tel:2109277339"
-      toastUrl="https://order.toasttab.com/online/china-rose-sw-military-2535-sw-military-dr"
-      uberUrl="https://www.order.store/store/china-rose-sw-military/GYiGnH3mQSSS1iKIi2uHjw"
-      mapUrl="https://www.google.com/maps/search/?api=1&query=2535%20SW%20Military%20Dr%2C%20San%20Antonio%2C%20TX%2078224"
-    />
+    <>
+      <JsonLd data={restaurantJsonLd(location)} />
+      <LocationPageContent
+        name={location.displayName}
+        addressLines={location.addressLines}
+        phone={location.phone}
+        phoneHref={location.phoneHref}
+        toastUrl={location.toastUrl}
+        uberUrl={location.uberUrl}
+        mapUrl={location.mapUrl}
+        services={location.services}
+        featuredDishes={location.featuredDishes}
+        menuNote={location.menuNote}
+      />
+    </>
   )
 }

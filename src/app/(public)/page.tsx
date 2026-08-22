@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import type { Metadata } from 'next'
 import LocationCard from '@/components/LocationCard'
+import { formatLocationAddress, locations } from '@/data/locations'
 import { DEFAULT_DESCRIPTION, publicPageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = publicPageMetadata({
@@ -9,24 +10,14 @@ export const metadata: Metadata = publicPageMetadata({
   path: '/',
 })
 
-const locations = [
-  {
-    name: 'China Rose – W Military Dr',
-    address: '7046 W Military Dr, San Antonio, TX 78227',
-    phone: '(210) 675-3226',
-    toastUrl: 'https://order.toasttab.com/online/china-rose-w-military-7046-w-military-dr',
-    uberUrl: 'https://www.order.store/store/china-rose-7046-military/FrlPQ762VI6wc3eQe4ThOQ',
-    href: '/locations/w-military',
-  },
-  {
-    name: 'China Rose – SW Military Dr',
-    address: '2535 SW Military Dr, San Antonio, TX 78224',
-    phone: '(210) 927-7339',
-    toastUrl: 'https://order.toasttab.com/online/china-rose-sw-military-2535-sw-military-dr',
-    uberUrl: 'https://www.order.store/store/china-rose-sw-military/GYiGnH3mQSSS1iKIi2uHjw',
-    href: '/locations/sw-military',
-  },
-]
+const homepageLocations = Object.values(locations).map((location) => ({
+  name: location.displayName,
+  address: formatLocationAddress(location),
+  phone: location.phone,
+  toastUrl: location.toastUrl,
+  uberUrl: location.uberUrl,
+  href: location.path,
+}))
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 
@@ -55,7 +46,7 @@ export default function Home() {
       <section className="max-w-5xl mx-auto px-4 py-12">
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-8">Choose a Location</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {locations.map((loc) => (
+          {homepageLocations.map((loc) => (
             <LocationCard key={loc.href} {...loc} />
           ))}
         </div>
