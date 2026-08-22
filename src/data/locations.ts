@@ -67,3 +67,7 @@ export const locations: Record<LocationSlug, RestaurantLocation> = {
 export function getLocation(slug: LocationSlug) {
   return locations[slug]
 }
+
+export function formatLocationAddress(location: RestaurantLocation) {
+  return `${location.streetAddress}, San Antonio, TX ${location.postalCode}`
+}
