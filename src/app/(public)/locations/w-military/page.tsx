@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import LocationPageContent from '@/components/LocationPageContent'
+import { publicPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
-  title: 'W Military Dr | China Rose',
+export const metadata: Metadata = publicPageMetadata({
+  title: 'W Military Dr',
   description: 'China Rose at 7046 W Military Dr, San Antonio TX. Order Pick-Up or Delivery, view our menu.',
-}
+  path: '/locations/w-military',
+})
 
 export default function WMilitaryPage() {
   return (
