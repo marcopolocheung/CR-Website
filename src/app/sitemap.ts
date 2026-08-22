@@ -3,9 +3,9 @@ import { absoluteUrl, indexableRoutes } from '@/lib/seo'
 
 export const dynamic = 'force-static'
 
-const lastModified = new Date('2026-08-22')
-
 export default function sitemap(): MetadataRoute.Sitemap {
+  const lastModified = new Date()
+
   return indexableRoutes.map((route) => ({
     url: absoluteUrl(route.path),
     lastModified,
