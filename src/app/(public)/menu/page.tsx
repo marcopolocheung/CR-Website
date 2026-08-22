@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
+import { featuredDishes } from '@/data/featuredDishes'
 import menuData from '@/data/menu.json'
 import { toId } from '@/lib/menuUtils'
 
@@ -14,12 +15,6 @@ type Section  = { subcategory: string; items: MenuItem[] }
 type Category = { category: string; sections: Section[] }
 
 const data = menuData as Category[]
-
-const featuredDishes = [
-  'Lemon Chicken Combo Meal',
-  'Sesame Chicken Combo Meal',
-  'Beef Broc Combo Meal',
-]
 
 function formatItemName(name: string) {
   return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
@@ -66,14 +61,18 @@ export default function MenuPage() {
           Browse the China Rose menu for both San Antonio locations. The same menu is available at
           W Military Dr and SW Military Dr.
         </p>
-        <p className="text-sm">Prices are current as provided by the restaurant and availability may change.</p>
+        <p className="text-sm">Prices and availability are subject to change.</p>
       </div>
 
       <section className="mb-8">
         <h2 className="text-lg font-bold text-gray-900 mb-3">Featured dishes</h2>
         <ul className="grid gap-2 text-sm text-gray-700 sm:grid-cols-3">
           {featuredDishes.map((dish) => (
-            <li key={dish}>{dish}</li>
+            <li key={dish}>
+              <a href="#combo-meals" className="text-red-700 hover:text-red-900 underline">
+                {dish}
+              </a>
+            </li>
           ))}
         </ul>
       </section>
@@ -104,7 +103,7 @@ export default function MenuPage() {
             href={`#${toId(cat.category)}`}
             className="bg-red-50 hover:bg-red-100 text-red-800 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors border border-red-200"
           >
-            {cat.category}
+            {formatItemName(cat.category)}
           </a>
         ))}
       </nav>
@@ -114,14 +113,14 @@ export default function MenuPage() {
         {data.map(cat => (
           <section key={cat.category} id={toId(cat.category)}>
             <h2 className="text-xl font-bold text-gray-900 border-b-2 border-red-700 pb-2 mb-6">
-              {cat.category}
+              {formatItemName(cat.category)}
             </h2>
 
             {cat.sections.map(sec => (
               <div key={sec.subcategory} className="mb-8">
                 {sec.subcategory && (
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-4">
-                    {sec.subcategory}
+                  <h3 className="text-sm font-semibold text-gray-500 tracking-wide mb-4">
+                    {formatItemName(sec.subcategory)}
                   </h3>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
