@@ -5,11 +5,13 @@ const root = process.cwd()
 const outDir = path.join(root, 'out')
 const siteUrl = 'https://chinarosesa.com'
 
+// requiresJsonLd marks the pages whose entity data we depend on for rich
+// results; every page's JSON-LD is validated when present either way.
 const publicPages = [
-  { route: '/', file: 'index.html' },
+  { route: '/', file: 'index.html', requiresJsonLd: true },
   { route: '/menu', file: 'menu.html' },
-  { route: '/locations/w-military', file: 'locations/w-military.html' },
-  { route: '/locations/sw-military', file: 'locations/sw-military.html' },
+  { route: '/locations/w-military', file: 'locations/w-military.html', requiresJsonLd: true },
+  { route: '/locations/sw-military', file: 'locations/sw-military.html', requiresJsonLd: true },
   { route: '/careers', file: 'careers.html' },
 ]
 
@@ -44,6 +46,58 @@ function checkHeadings(file, html) {
     if (levels[i] > levels[i - 1] + 1) {
       fail(`${file} skips from h${levels[i - 1]} to h${levels[i]}`)
       break
+    }
+  }
+}
+
+// Walks every nested value so references buried in arrays are checked too.
+function walkNodes(value, visit) {
+  if (Array.isArray(value)) {
+    for (const entry of value) walkNodes(entry, visit)
+  } else if (value && typeof value === 'object') {
+    visit(value)
+    for (const entry of Object.values(value)) walkNodes(entry, visit)
+  }
+}
+
+function checkJsonLd(file, html, required) {
+  const blocks = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)]
+  if (blocks.length === 0) {
+    if (required) fail(`${file} has no JSON-LD`)
+    return
+  }
+
+  for (const [, raw] of blocks) {
+    let data
+    try {
+      data = JSON.parse(raw.replaceAll('\\u003c', '<'))
+    } catch {
+      fail(`${file} has unparseable JSON-LD`)
+      continue
+    }
+
+    const graph = data['@graph'] ?? [data]
+    const defined = new Set(graph.map((node) => node['@id']).filter(Boolean))
+
+    for (const node of graph) {
+      if (!node['@type']) fail(`${file} JSON-LD has a top-level node with no @type`)
+    }
+
+    // A bare {"@id": ...} pointing outside this page resolves to nothing: search
+    // engines read structured data one page at a time.
+    walkNodes(graph, (node) => {
+      const id = node['@id']
+      if (!id || node['@type'] || defined.has(id)) return
+      fail(`${file} JSON-LD references ${id}, which is untyped and not defined on this page`)
+    })
+
+    for (const node of graph) {
+      if (node['@type'] !== 'Restaurant') continue
+      for (const field of ['name', 'address', 'telephone', 'openingHoursSpecification', 'url']) {
+        if (!node[field]) fail(`${file} Restaurant JSON-LD missing ${field}`)
+      }
+      if (node.menu) fail(`${file} Restaurant JSON-LD uses superseded "menu"; use hasMenu`)
+      if (node.branchOf) fail(`${file} Restaurant JSON-LD uses superseded "branchOf"; use parentOrganization`)
     }
   }
 }
@@ -90,6 +144,7 @@ if (!fs.existsSync(outDir)) {
     if (!html.includes('property="og:title"')) fail(`${page.file} missing Open Graph title`)
     if (!html.includes('property="og:description"')) fail(`${page.file} missing Open Graph description`)
     if (html.includes('content="noindex')) fail(`${page.file} is accidentally noindexed`)
+    checkJsonLd(page.file, html, page.requiresJsonLd)
     checkHeadings(page.file, html)
   }
 
