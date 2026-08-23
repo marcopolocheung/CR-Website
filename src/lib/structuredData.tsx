@@ -1,15 +1,13 @@
 import type { RestaurantLocation } from '@/data/locations'
-import { absoluteUrl, DEFAULT_DESCRIPTION, SITE_NAME } from '@/lib/seo'
+import {
+  absoluteUrl,
+  DEFAULT_DESCRIPTION,
+  OG_IMAGE_PATH,
+  SITE_NAME,
+} from '@/lib/seo'
 
-const days = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-]
+// Every item on the menu is under $15, which is the "$" band Google renders.
+const PRICE_RANGE = '$'
 
 function restaurantNode(location: RestaurantLocation) {
   const url = absoluteUrl(location.path)
@@ -34,14 +32,16 @@ function restaurantNode(location: RestaurantLocation) {
     openingHoursSpecification: [
       {
         '@type': 'OpeningHoursSpecification',
-        dayOfWeek: days,
-        opens: '11:00',
-        closes: '21:00',
+        dayOfWeek: location.hours.days,
+        opens: location.hours.opens,
+        closes: location.hours.closes,
       },
     ],
-    menu: absoluteUrl('/menu'),
+    priceRange: PRICE_RANGE,
+    image: absoluteUrl(OG_IMAGE_PATH),
     hasMenu: absoluteUrl('/menu'),
     hasMap: location.mapUrl,
+    hasDriveThroughService: location.services.includes('Drive-thru'),
     parentOrganization: {
       '@type': 'Organization',
       '@id': `${absoluteUrl('/')}#organization`,

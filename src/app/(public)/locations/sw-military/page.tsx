@@ -24,6 +24,7 @@ export default function SWMilitaryPage() {
         toastUrl={location.toastUrl}
         uberUrl={location.uberUrl}
         mapUrl={location.mapUrl}
+        hours={location.hours}
         services={location.services}
         featuredDishes={location.featuredDishes}
         menuNote={location.menuNote}
