@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { featuredDishes } from '@/data/featuredDishes'
 import menuData from '@/data/menu.json'
 import { formatMenuItemName, type MenuCategory, type MenuItem, toId } from '@/lib/menuUtils'
+import { menuJsonLd } from '@/lib/menuStructuredData'
 import { publicPageMetadata } from '@/lib/seo'
+import { JsonLd } from '@/lib/structuredData'
 
 export const metadata: Metadata = publicPageMetadata({
   title: 'China Rose Menu | San Antonio Chinese Restaurant',
@@ -50,6 +52,7 @@ function ItemCard({ item }: { item: MenuItem }) {
 export default function MenuPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
+      <JsonLd data={menuJsonLd(data)} />
       <h1 className="text-3xl font-bold text-red-800 mb-2">China Rose Menu</h1>
       <div className="space-y-3 text-gray-600 mb-8">
         <p>

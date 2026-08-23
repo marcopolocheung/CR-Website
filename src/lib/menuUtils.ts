@@ -29,17 +29,48 @@ export function formatMenuItemName(name: string) {
   return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
 }
 
-export function getMenuPreviewSections(menu: MenuCategory[]): MenuPreviewSection[] {
-  const featuredCategories = ['COMBO MEALS', 'RICE / NOODLES', 'CHINA ROSE BOWLS']
+const FEATURED_CATEGORIES = ['COMBO MEALS', 'RICE / NOODLES', 'CHINA ROSE BOWLS']
 
-  return featuredCategories
-    .map((categoryName) => menu.find((category) => category.category === categoryName))
-    .filter((category): category is MenuCategory => Boolean(category))
-    .map((category) => ({
+const PREVIEW_ITEM_LIMIT = 4
+
+// Takes the first item of each subcategory before the second of any, so
+// RICE / NOODLES previews rice, lo mein and pad thai rather than four kinds of
+// fried rice. Flattening first would show only whichever subcategory sorts
+// earliest, which is what the adjacent copy promises against.
+function sampleAcrossSections(sections: MenuSection[], limit: number): MenuItem[] {
+  const deepest = Math.max(0, ...sections.map((section) => section.items.length))
+  const picked: MenuItem[] = []
+
+  for (let index = 0; index < deepest && picked.length < limit; index += 1) {
+    for (const section of sections) {
+      if (picked.length >= limit) break
+      const item = section.items[index]
+      if (item) picked.push(item)
+    }
+  }
+
+  return picked
+}
+
+export function getMenuPreviewSections(menu: MenuCategory[]): MenuPreviewSection[] {
+  return FEATURED_CATEGORIES.map((categoryName) => {
+    const category = menu.find((entry) => entry.category === categoryName)
+
+    // menu.json is generated. Silently dropping a renamed category would ship
+    // an empty preview, so break the build instead.
+    if (!category) {
+      throw new Error(
+        `Menu preview category "${categoryName}" is not in menu.json. ` +
+          `Available: ${menu.map((entry) => entry.category).join(', ')}`,
+      )
+    }
+
+    return {
       category: category.category,
       href: `/menu#${toId(category.category)}`,
-      items: category.sections.flatMap((section) => section.items).slice(0, 4),
-    }))
+      items: sampleAcrossSections(category.sections, PREVIEW_ITEM_LIMIT),
+    }
+  })
 }
 
 export function parsePrice(price: string | null): number | null {
