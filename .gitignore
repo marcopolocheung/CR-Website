@@ -78,9 +78,6 @@ web_modules/
 .next
 out
 
-# Local Codex agent workspace files
-.codex/
-
 # Nuxt.js build / generate output
 .nuxt
 dist
