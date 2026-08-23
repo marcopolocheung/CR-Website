@@ -42,6 +42,13 @@ export default function OrderMenuPage() {
 
       {/* Menu content */}
       <main className="max-w-4xl mx-auto px-4 py-6 pb-28 space-y-12">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Order Menu</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Choose menu items for this table.
+          </p>
+        </div>
+
         {data.map(cat => (
           <section key={cat.category} id={toId(cat.category)}>
             <h2 className="text-xl font-bold text-gray-900 border-b-2 border-red-700 pb-2 mb-6">
