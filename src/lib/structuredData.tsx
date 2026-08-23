@@ -42,9 +42,11 @@ function restaurantNode(location: RestaurantLocation) {
     menu: absoluteUrl('/menu'),
     hasMenu: absoluteUrl('/menu'),
     hasMap: location.mapUrl,
-    branchOf: {
+    parentOrganization: {
+      '@type': 'Organization',
       '@id': `${absoluteUrl('/')}#organization`,
       name: SITE_NAME,
+      url: absoluteUrl('/'),
     },
     potentialAction: [
       {
