@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { formatOpeningDays, formatOpeningHours, type OpeningHours } from '@/data/locations'
 import menuData from '@/data/menu.json'
 import { formatMenuItemName, getMenuPreviewSections, type MenuCategory } from '@/lib/menuUtils'
 
@@ -11,6 +12,7 @@ interface Props {
   toastUrl: string
   uberUrl: string
   mapUrl: string
+  hours: OpeningHours
   services: string[]
   featuredDishes: string[]
   menuNote?: string
@@ -21,7 +23,7 @@ const MENU_IMAGES = [`${BASE}/imgs/menu1.jpg`, `${BASE}/imgs/menu2.jpg`, `${BASE
 const MENU_PREVIEW_SECTIONS = getMenuPreviewSections(menuData as MenuCategory[])
 
 export default function LocationPageContent({
-  name, addressLines, phone, phoneHref, toastUrl, uberUrl, mapUrl, services, featuredDishes, menuNote,
+  name, addressLines, phone, phoneHref, toastUrl, uberUrl, mapUrl, hours, services, featuredDishes, menuNote,
 }: Props) {
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-10">
@@ -45,7 +47,7 @@ export default function LocationPageContent({
           </div>
           <div>
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-1">Hours</h2>
-            <p className="text-gray-600 text-sm">Daily: 11:00 AM – 9:00 PM</p>
+            <p className="text-gray-600 text-sm">{formatOpeningDays(hours)}: {formatOpeningHours(hours)}</p>
           </div>
           <div>
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-1">Services</h2>

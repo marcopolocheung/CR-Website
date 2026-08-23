@@ -59,7 +59,7 @@ export default function MenuPage() {
           Browse the China Rose menu for both San Antonio locations. The same menu is available at
           W Military Dr and SW Military Dr.
         </p>
-        <p className="text-sm">Prices and availability are subject to change.</p>
+        <p className="text-sm">Prices are subject to change. Availability may vary.</p>
       </div>
 
       <section className="mb-8">

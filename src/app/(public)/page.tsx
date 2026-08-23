@@ -1,14 +1,37 @@
 import Image from 'next/image'
 import type { Metadata } from 'next'
 import LocationCard from '@/components/LocationCard'
-import { formatLocationAddress, locations } from '@/data/locations'
+import {
+  formatLocationAddress,
+  formatOpeningDays,
+  formatOpeningHours,
+  locations,
+} from '@/data/locations'
 import { DEFAULT_DESCRIPTION, publicPageMetadata } from '@/lib/seo'
+import { homepageJsonLd, JsonLd } from '@/lib/structuredData'
 
 export const metadata: Metadata = publicPageMetadata({
   title: 'China Rose | Authentic Chinese Cuisine in San Antonio',
   description: DEFAULT_DESCRIPTION,
   path: '/',
 })
+
+const allLocations = Object.values(locations)
+
+// The "both restaurants" sentence may only state one schedule while the two
+// locations actually share one. If they ever diverge, drop the claim rather
+// than publishing hours that contradict a location page's JSON-LD.
+const sharedHours = allLocations.every(
+  (location) =>
+    formatOpeningDays(location.hours) === formatOpeningDays(allLocations[0].hours) &&
+    formatOpeningHours(location.hours) === formatOpeningHours(allLocations[0].hours),
+)
+  ? allLocations[0].hours
+  : null
+
+const driveThruLocations = Object.values(locations)
+  .filter((location) => location.services.includes('Drive-thru'))
+  .map((location) => location.displayName.replace('China Rose - ', ''))
 
 const homepageLocations = Object.values(locations).map((location) => ({
   name: location.displayName,
@@ -24,6 +47,7 @@ const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 export default function Home() {
   return (
     <>
+      <JsonLd data={homepageJsonLd(Object.values(locations))} />
       {/* hero section the bigg red banner at the top with the restaurant namme */}
       <section className="relative bg-red-900 text-white overflow-hidden">
         <div className="absolute inset-0 opacity-20">
@@ -57,11 +81,13 @@ export default function Home() {
           <h2 className="text-2xl font-bold text-gray-800">Chinese Restaurant with Two San Antonio Locations</h2>
           <p className="mx-auto max-w-3xl">
             China Rose serves authentic Chinese cuisine from locations on W Military Dr and SW Military Dr.
-            Both restaurants are open daily from 11:00 AM to 9:00 PM with dine-in, pick-up, delivery,
-            curbside pickup, catering, and lunch specials.
+            {sharedHours
+              ? ` Both restaurants are open ${formatOpeningDays(sharedHours).toLowerCase()}, ${formatOpeningHours(sharedHours)},`
+              : ' Each restaurant lists its own hours on its location page'}
+            {' '}with dine-in, pick-up, delivery, curbside pickup, catering, and lunch specials.
           </p>
           <p className="mx-auto max-w-3xl text-sm text-gray-600">
-            The same menu is available at both locations. The W Military Dr location also has a drive-thru.
+            The same menu is available at both locations.{driveThruLocations.length > 0 && ` The ${driveThruLocations.join(' and ')} location also has a drive-thru.`}
           </p>
         </div>
       </section>
