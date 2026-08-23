@@ -36,6 +36,20 @@ function readOut(relativePath) {
   return fs.readFileSync(fullPath, 'utf8')
 }
 
+function checkHeadings(file, html) {
+  const levels = [...html.matchAll(/<h([1-6])\b/g)].map((match) => Number(match[1]))
+  const h1Count = levels.filter((level) => level === 1).length
+
+  if (h1Count !== 1) fail(`${file} has ${h1Count} h1 elements, expected exactly 1`)
+
+  for (let i = 1; i < levels.length; i += 1) {
+    if (levels[i] > levels[i - 1] + 1) {
+      fail(`${file} skips from h${levels[i - 1]} to h${levels[i]}`)
+      break
+    }
+  }
+}
+
 // Walks every nested value so references buried in arrays are checked too.
 function walkNodes(value, visit) {
   if (Array.isArray(value)) {
@@ -131,6 +145,7 @@ if (!fs.existsSync(outDir)) {
     if (!html.includes('property="og:description"')) fail(`${page.file} missing Open Graph description`)
     if (html.includes('content="noindex')) fail(`${page.file} is accidentally noindexed`)
     checkJsonLd(page.file, html, page.requiresJsonLd)
+    checkHeadings(page.file, html)
   }
 
   for (const file of noindexPages) {

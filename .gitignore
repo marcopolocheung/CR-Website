@@ -70,6 +70,12 @@ web_modules/
 .env.*
 !.env.example
 
+# Local agent workflow files
+.codex/
+# AGENTS.md is generated and re-added by `next dev`; CLAUDE.md just points at it
+AGENTS.md
+CLAUDE.md
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
