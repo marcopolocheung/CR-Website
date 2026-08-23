@@ -3,7 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { featuredDishes } from '@/data/featuredDishes'
 import menuData from '@/data/menu.json'
-import { toId } from '@/lib/menuUtils'
+import { formatMenuItemName, type MenuCategory, type MenuItem, toId } from '@/lib/menuUtils'
 import { publicPageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = publicPageMetadata({
@@ -13,18 +13,10 @@ export const metadata: Metadata = publicPageMetadata({
   absoluteTitle: true,
 })
 
-type MenuItem = { name: string; image?: string; price: string | null; description: string | null }
-type Section  = { subcategory: string; items: MenuItem[] }
-type Category = { category: string; sections: Section[] }
-
-const data = menuData as Category[]
-
-function formatItemName(name: string) {
-  return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
-}
+const data = menuData as MenuCategory[]
 
 function ItemCard({ item }: { item: MenuItem }) {
-  const itemName = formatItemName(item.name)
+  const itemName = formatMenuItemName(item.name)
 
   return (
     <div className="flex gap-4 items-start bg-white rounded-xl shadow-sm border border-gray-100 p-3 hover:shadow-md transition-shadow">
@@ -106,7 +98,7 @@ export default function MenuPage() {
             href={`#${toId(cat.category)}`}
             className="bg-red-50 hover:bg-red-100 text-red-800 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors border border-red-200"
           >
-            {formatItemName(cat.category)}
+            {formatMenuItemName(cat.category)}
           </a>
         ))}
       </nav>
@@ -116,14 +108,14 @@ export default function MenuPage() {
         {data.map(cat => (
           <section key={cat.category} id={toId(cat.category)}>
             <h2 className="text-xl font-bold text-gray-900 border-b-2 border-red-700 pb-2 mb-6">
-              {formatItemName(cat.category)}
+              {formatMenuItemName(cat.category)}
             </h2>
 
             {cat.sections.map(sec => (
               <div key={sec.subcategory} className="mb-8">
                 {sec.subcategory && (
                   <h3 className="text-sm font-semibold text-gray-500 tracking-wide mb-4">
-                    {formatItemName(sec.subcategory)}
+                    {formatMenuItemName(sec.subcategory)}
                   </h3>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

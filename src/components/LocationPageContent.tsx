@@ -1,4 +1,7 @@
 import Image from 'next/image'
+import Link from 'next/link'
+import menuData from '@/data/menu.json'
+import { formatMenuItemName, getMenuPreviewSections, type MenuCategory } from '@/lib/menuUtils'
 
 interface Props {
   name: string
@@ -15,6 +18,7 @@ interface Props {
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 const MENU_IMAGES = [`${BASE}/imgs/menu1.jpg`, `${BASE}/imgs/menu2.jpg`, `${BASE}/imgs/menu3.jpg`, `${BASE}/imgs/menu4.jpg`]
+const MENU_PREVIEW_SECTIONS = getMenuPreviewSections(menuData as MenuCategory[])
 
 export default function LocationPageContent({
   name, addressLines, phone, phoneHref, toastUrl, uberUrl, mapUrl, services, featuredDishes, menuNote,
@@ -75,6 +79,21 @@ export default function LocationPageContent({
       {/* menu section with images and the order buttons */}
       <section>
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Menu</h2>
+        <div className="mb-5 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold text-gray-900">Same China Rose menu at both San Antonio locations</p>
+            <p className="mt-1 text-sm text-gray-600">
+              Browse combo meals, bowls, fried rice, lo mein, soups, sides, and drinks in HTML.
+            </p>
+          </div>
+          <Link
+            href="/menu"
+            className="inline-flex justify-center rounded-xl bg-red-700 px-4 py-3 text-sm font-bold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 transition-colors"
+          >
+            View Full Menu
+          </Link>
+        </div>
+
         <div className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4">
           <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-2">Featured dishes</h3>
           <ul className="grid gap-2 text-sm text-gray-700 sm:grid-cols-3">
@@ -82,6 +101,27 @@ export default function LocationPageContent({
               <li key={dish}>{dish}</li>
             ))}
           </ul>
+        </div>
+
+        <div className="mb-5">
+          <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-3">Menu preview</h3>
+          <div className="grid gap-3 md:grid-cols-3">
+            {MENU_PREVIEW_SECTIONS.map((section) => (
+              <div key={section.category} className="rounded-xl border border-gray-200 bg-white p-4">
+                <Link href={section.href} className="font-bold text-red-800 hover:text-red-900 hover:underline">
+                  {formatMenuItemName(section.category)}
+                </Link>
+                <ul className="mt-3 space-y-2 text-sm text-gray-700">
+                  {section.items.map((item) => (
+                    <li key={item.name} className="flex gap-3">
+                      <span className="min-w-0 flex-1">{formatMenuItemName(item.name)}</span>
+                      {item.price && <span className="shrink-0 font-semibold text-gray-900">{item.price}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* on mobile the order buttons go above the menu so they dont get buried */}
@@ -109,6 +149,7 @@ export default function LocationPageContent({
           </p>
         </div>
 
+        <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-3">Menu images</h3>
         {/* on larger screens the menu and buttons are side by side i thinkk its easier that way */}
         <div className="flex gap-5 items-start">
           {/* the scrollable columm where all the menu images stack up */}
