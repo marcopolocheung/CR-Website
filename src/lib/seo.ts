@@ -7,11 +7,11 @@ export const DEFAULT_DESCRIPTION =
 export const OG_IMAGE_PATH = '/imgs/crbanner.webp'
 
 export const indexableRoutes = [
-  { path: '/', changeFrequency: 'weekly', priority: 1 },
-  { path: '/menu', changeFrequency: 'weekly', priority: 0.9 },
-  { path: '/locations/w-military', changeFrequency: 'weekly', priority: 0.9 },
-  { path: '/locations/sw-military', changeFrequency: 'weekly', priority: 0.9 },
-  { path: '/careers', changeFrequency: 'monthly', priority: 0.3 },
+  { path: '/', changeFrequency: 'weekly', priority: 1, lastModified: '2026-08-22' },
+  { path: '/menu', changeFrequency: 'weekly', priority: 0.9, lastModified: '2026-08-22' },
+  { path: '/locations/w-military', changeFrequency: 'weekly', priority: 0.9, lastModified: '2026-08-22' },
+  { path: '/locations/sw-military', changeFrequency: 'weekly', priority: 0.9, lastModified: '2026-08-22' },
+  { path: '/careers', changeFrequency: 'monthly', priority: 0.3, lastModified: '2026-08-22' },
 ] as const
 
 export function absoluteUrl(path = '/') {

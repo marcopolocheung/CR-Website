@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import LocationCard from '@/components/LocationCard'
 import { formatLocationAddress, locations } from '@/data/locations'
 import { DEFAULT_DESCRIPTION, publicPageMetadata } from '@/lib/seo'
+import { homepageJsonLd, JsonLd } from '@/lib/structuredData'
 
 export const metadata: Metadata = publicPageMetadata({
   title: 'China Rose | Authentic Chinese Cuisine in San Antonio',
@@ -24,6 +25,7 @@ const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 export default function Home() {
   return (
     <>
+      <JsonLd data={homepageJsonLd(Object.values(locations))} />
       {/* hero section the bigg red banner at the top with the restaurant namme */}
       <section className="relative bg-red-900 text-white overflow-hidden">
         <div className="absolute inset-0 opacity-20">
