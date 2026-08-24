@@ -29,6 +29,12 @@ const standardHours: OpeningHours = {
   closes: '21:00',
 }
 
+/** Decimal degrees, taken from the location's own Google Business Profile link. */
+export type GeoPoint = {
+  latitude: number
+  longitude: number
+}
+
 export type RestaurantLocation = {
   slug: LocationSlug
   displayName: string
@@ -43,6 +49,15 @@ export type RestaurantLocation = {
   toastUrl: string
   uberUrl: string
   mapUrl: string
+  /**
+   * Owner-supplied Google Business Profile share link, one per location. This is
+   * the strongest entity-reconciliation signal we publish: it is what ties this
+   * page to the listing Google already ranks. Do not substitute a maps search URL.
+   */
+  googleBusinessUrl: string
+  /** Confirmed listings only — an unverified guess here does real harm. */
+  yelpUrl?: string
+  geo: GeoPoint
   hours: OpeningHours
   services: string[]
   featuredDishes: string[]
@@ -64,6 +79,8 @@ export const locations: Record<LocationSlug, RestaurantLocation> = {
     toastUrl: 'https://order.toasttab.com/online/china-rose-w-military-7046-w-military-dr',
     uberUrl: 'https://www.order.store/store/china-rose-7046-military/FrlPQ762VI6wc3eQe4ThOQ',
     mapUrl: 'https://www.google.com/maps/search/?api=1&query=7046%20W%20Military%20Dr%2C%20San%20Antonio%2C%20TX%2078227',
+    googleBusinessUrl: 'https://maps.app.goo.gl/kK1yVv9hXpFeDyT89',
+    geo: { latitude: 29.4086111, longitude: -98.6288889 },
     hours: standardHours,
     services: ['Dine-in', 'Pick-up', 'Delivery', 'Drive-thru', 'Curbside pickup', 'Catering', 'Lunch specials'],
     featuredDishes,
@@ -83,6 +100,8 @@ export const locations: Record<LocationSlug, RestaurantLocation> = {
     toastUrl: 'https://order.toasttab.com/online/china-rose-sw-military-2535-sw-military-dr',
     uberUrl: 'https://www.order.store/store/china-rose-sw-military/GYiGnH3mQSSS1iKIi2uHjw',
     mapUrl: 'https://www.google.com/maps/search/?api=1&query=2535%20SW%20Military%20Dr%2C%20San%20Antonio%2C%20TX%2078224',
+    googleBusinessUrl: 'https://maps.app.goo.gl/q5wycf6qVD7nBrCu7',
+    geo: { latitude: 29.3580453, longitude: -98.535154 },
     hours: standardHours,
     services: ['Dine-in', 'Pick-up', 'Delivery', 'Curbside pickup', 'Catering', 'Lunch specials'],
     featuredDishes,

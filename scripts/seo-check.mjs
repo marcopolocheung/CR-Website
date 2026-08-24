@@ -93,11 +93,15 @@ function checkJsonLd(file, html, required) {
 
     for (const node of graph) {
       if (node['@type'] !== 'Restaurant') continue
-      for (const field of ['name', 'address', 'telephone', 'openingHoursSpecification', 'url']) {
+      for (const field of ['name', 'address', 'telephone', 'openingHoursSpecification', 'url', 'geo', 'sameAs']) {
         if (!node[field]) fail(`${file} Restaurant JSON-LD missing ${field}`)
       }
       if (node.menu) fail(`${file} Restaurant JSON-LD uses superseded "menu"; use hasMenu`)
       if (node.branchOf) fail(`${file} Restaurant JSON-LD uses superseded "branchOf"; use parentOrganization`)
+      // A maps *search* URL is not a profile identifier and reconciles to nothing.
+      for (const url of node.sameAs ?? []) {
+        if (url.includes('/maps/search/')) fail(`${file} Restaurant sameAs uses a maps search URL: ${url}`)
+      }
     }
   }
 }
