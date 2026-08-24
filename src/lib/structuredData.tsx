@@ -29,6 +29,11 @@ function restaurantNode(location: RestaurantLocation) {
       postalCode: location.postalCode,
       addressCountry: 'US',
     },
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: location.geo.latitude,
+      longitude: location.geo.longitude,
+    },
     openingHoursSpecification: [
       {
         '@type': 'OpeningHoursSpecification',
@@ -41,6 +46,9 @@ function restaurantNode(location: RestaurantLocation) {
     image: absoluteUrl(OG_IMAGE_PATH),
     hasMenu: absoluteUrl('/menu'),
     hasMap: location.mapUrl,
+    // The profile links Google already ranks. Each location reconciles to its own
+    // listing, so these are per-location and never shared between the two.
+    sameAs: [location.googleBusinessUrl, location.yelpUrl].filter(Boolean),
     hasDriveThroughService: location.services.includes('Drive-thru'),
     parentOrganization: {
       '@type': 'Organization',
