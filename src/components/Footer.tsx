@@ -15,13 +15,13 @@ export default function Footer() {
           <ul className="space-y-3">
             <li>
               <Link href="/locations/w-military" className="inline-flex flex-col hover:text-yellow-300 transition-colors">
-                <span>W Military Dr</span>
+                <span>Military Location</span>
                 <LocationOpenStatus />
               </Link>
             </li>
             <li>
               <Link href="/locations/sw-military" className="inline-flex flex-col hover:text-yellow-300 transition-colors">
-                <span>SW Military Dr</span>
+                <span>Zarzamora Location</span>
                 <LocationOpenStatus />
               </Link>
             </li>
@@ -33,12 +33,12 @@ export default function Footer() {
             <li><Link href="/careers" className="hover:text-yellow-300 transition-colors">Careers</Link></li>
             <li>
               <a href="tel:2106753226" className="hover:text-yellow-300 transition-colors">
-                W Military: (210) 675-3226
+                Military Location: (210) 675-3226
               </a>
             </li>
             <li>
               <a href="tel:2109277339" className="hover:text-yellow-300 transition-colors">
-                SW Military: (210) 927-7339
+                Zarzamora Location: (210) 927-7339
               </a>
             </li>
           </ul>

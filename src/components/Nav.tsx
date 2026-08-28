@@ -53,7 +53,7 @@ export default function Nav() {
                     className={dropdownLinkCls}
                     onClick={() => setLocOpen(false)}
                   >
-                    W Military Dr
+                    Military Location
                   </Link>
                 </li>
                 <li>
@@ -62,7 +62,7 @@ export default function Nav() {
                     className={dropdownLinkCls}
                     onClick={() => setLocOpen(false)}
                   >
-                    SW Military Dr
+                    Zarzamora Location
                   </Link>
                 </li>
               </ul>
@@ -90,8 +90,8 @@ export default function Nav() {
       {mobileOpen && (
         <ul className="md:hidden bg-red-900 px-4 pb-4 flex flex-col gap-2 text-sm font-medium">
           <li><Link href="/" className="block py-2 hover:text-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-300" onClick={() => setMobileOpen(false)}>Home</Link></li>
-          <li><Link href="/locations/w-military" className="block py-2 hover:text-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-300" onClick={() => setMobileOpen(false)}>W Military Dr</Link></li>
-          <li><Link href="/locations/sw-military" className="block py-2 hover:text-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-300" onClick={() => setMobileOpen(false)}>SW Military Dr</Link></li>
+          <li><Link href="/locations/w-military" className="block py-2 hover:text-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-300" onClick={() => setMobileOpen(false)}>Military Location</Link></li>
+          <li><Link href="/locations/sw-military" className="block py-2 hover:text-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-300" onClick={() => setMobileOpen(false)}>Zarzamora Location</Link></li>
           <li><Link href="/menu" className="block py-2 hover:text-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-300" onClick={() => setMobileOpen(false)}>Menu</Link></li>
           <li><Link href="/careers" className="block py-2 hover:text-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-300" onClick={() => setMobileOpen(false)}>Careers</Link></li>
         </ul>
