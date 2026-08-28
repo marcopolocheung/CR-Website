@@ -80,14 +80,14 @@ export default function Home() {
         <div className="space-y-3 text-center text-gray-700">
           <h2 className="text-2xl font-bold text-gray-800">Chinese Restaurant with Two San Antonio Locations</h2>
           <p className="mx-auto max-w-3xl">
-            China Rose serves authentic Chinese cuisine from locations on W Military Dr and SW Military Dr.
+            China Rose serves authentic Chinese cuisine from the Military Location and Zarzamora Location.
             {sharedHours
               ? ` Both restaurants are open ${formatOpeningDays(sharedHours).toLowerCase()}, ${formatOpeningHours(sharedHours)},`
               : ' Each restaurant lists its own hours on its location page'}
-            {' '}with dine-in, pick-up, delivery, curbside pickup, catering, and lunch specials.
+            {' '}with dine-in, pick-up, delivery, catering, and lunch specials.
           </p>
           <p className="mx-auto max-w-3xl text-sm text-gray-600">
-            The same menu is available at both locations.{driveThruLocations.length > 0 && ` The ${driveThruLocations.join(' and ')} location also has a drive-thru.`}
+            The same menu is available at both locations.{driveThruLocations.length > 0 && ` Drive-thru is available at ${driveThruLocations.join(' and ')}.`}
           </p>
         </div>
       </section>

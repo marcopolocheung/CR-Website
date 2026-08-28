@@ -5,7 +5,7 @@ import { JsonLd, restaurantJsonLd } from '@/lib/structuredData'
 import { publicPageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = publicPageMetadata({
-  title: 'SW Military Dr',
+  title: 'Zarzamora Location',
   description: 'China Rose at 2535 SW Military Dr in San Antonio, TX. View hours, menu, pickup, delivery, and directions.',
   path: '/locations/sw-military',
 })

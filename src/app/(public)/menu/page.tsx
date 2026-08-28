@@ -57,7 +57,7 @@ export default function MenuPage() {
       <div className="space-y-3 text-gray-600 mb-8">
         <p>
           Browse the China Rose menu for both San Antonio locations. The same menu is available at
-          W Military Dr and SW Military Dr.
+          Military Location and Zarzamora Location.
         </p>
         <p className="text-sm">Prices are subject to change. Availability may vary.</p>
       </div>
@@ -82,13 +82,13 @@ export default function MenuPage() {
             href="/locations/w-military"
             className="text-center bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
           >
-            W Military Dr
+            Military Location
           </Link>
           <Link
             href="/locations/sw-military"
             className="text-center bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
           >
-            SW Military Dr
+            Zarzamora Location
           </Link>
         </div>
       </section>

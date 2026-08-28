@@ -67,7 +67,7 @@ export type RestaurantLocation = {
 export const locations: Record<LocationSlug, RestaurantLocation> = {
   'w-military': {
     slug: 'w-military',
-    displayName: 'China Rose - W Military Dr',
+    displayName: 'China Rose - Military Location',
     schemaName: 'China Rose',
     path: '/locations/w-military',
     streetAddress: '7046 W Military Dr',
@@ -82,13 +82,13 @@ export const locations: Record<LocationSlug, RestaurantLocation> = {
     googleBusinessUrl: 'https://maps.app.goo.gl/kK1yVv9hXpFeDyT89',
     geo: { latitude: 29.4086111, longitude: -98.6288889 },
     hours: standardHours,
-    services: ['Dine-in', 'Pick-up', 'Delivery', 'Drive-thru', 'Curbside pickup', 'Catering', 'Lunch specials'],
+    services: ['Dine-in', 'Pick-up', 'Delivery', 'Drive-thru', 'Catering', 'Lunch specials'],
     featuredDishes,
     menuNote: 'Menus are the same at both China Rose locations. Prices subject to change.',
   },
   'sw-military': {
     slug: 'sw-military',
-    displayName: 'China Rose - SW Military Dr',
+    displayName: 'China Rose - Zarzamora Location',
     schemaName: 'China Rose',
     path: '/locations/sw-military',
     streetAddress: '2535 SW Military Dr',
@@ -103,7 +103,7 @@ export const locations: Record<LocationSlug, RestaurantLocation> = {
     googleBusinessUrl: 'https://maps.app.goo.gl/q5wycf6qVD7nBrCu7',
     geo: { latitude: 29.3580453, longitude: -98.535154 },
     hours: standardHours,
-    services: ['Dine-in', 'Pick-up', 'Delivery', 'Curbside pickup', 'Catering', 'Lunch specials'],
+    services: ['Dine-in', 'Pick-up', 'Delivery', 'Catering', 'Lunch specials'],
     featuredDishes,
     menuNote: 'Menus are the same at both China Rose locations. Prices subject to change.',
   },
