@@ -23,6 +23,7 @@ import {
   type Employee,
   type Role,
   type ScheduleAssignment,
+  type ScheduleStats,
   type ScheduleStrategy,
   type ShiftPeriod,
   type StaffingSlot,
@@ -1018,20 +1019,7 @@ export default function SchedulerDemo() {
           )}
 
           <Disclosure summary="Hours for each person">
-            <div className="space-y-2">
-              {stats.map((stat) => (
-                <div key={stat.employeeId} className="grid grid-cols-[1fr_auto] gap-3 border-b border-zinc-100 pb-2 text-sm last:border-0">
-                  <div>
-                    <div className="font-medium text-zinc-900">{stat.name}</div>
-                    <div className="text-zinc-500">{stat.shifts} shift{stat.shifts === 1 ? '' : 's'}</div>
-                  </div>
-                  <div className="text-right text-zinc-700">
-                    <div>{stat.days} day{stat.days === 1 ? '' : 's'}</div>
-                    <div>{stat.hours.toFixed(1)} hrs</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <HoursSummary stats={stats} />
           </Disclosure>
 
           <ScheduleRules slots={slots} />
@@ -1426,6 +1414,43 @@ function VariantControls({
         </button>
       ))}
       </div>
+    </div>
+  )
+}
+
+function HoursSummary({ stats }: { stats: ScheduleStats[] }) {
+  const working = stats.filter((stat) => stat.shifts > 0)
+  if (working.length === 0) {
+    return <p className="text-sm text-zinc-600">Make a schedule to see how the hours land.</p>
+  }
+
+  const mostHours = Math.max(...working.map((stat) => stat.hours))
+  const idle = stats.filter((stat) => stat.shifts === 0)
+
+  return (
+    <div>
+      <ul className="divide-y divide-zinc-100">
+        {working.map((stat) => (
+          <li key={stat.employeeId} className="flex items-center gap-3 py-1.5 text-sm">
+            <span className="w-24 shrink-0 truncate font-medium text-zinc-900">{stat.name}</span>
+            <span aria-hidden="true" className="h-1.5 min-w-0 flex-1 rounded-full bg-zinc-100">
+              <span
+                className="block h-full rounded-full bg-zinc-400"
+                style={{ width: `${Math.round((stat.hours / mostHours) * 100)}%` }}
+              />
+            </span>
+            <span className="w-14 shrink-0 text-right font-semibold text-zinc-900">{stat.hours.toFixed(1)}h</span>
+            <span className="w-20 shrink-0 text-right text-xs text-zinc-500">
+              {stat.days}d · {stat.shifts} shift{stat.shifts === 1 ? '' : 's'}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {idle.length > 0 && (
+        <p className="mt-2 text-xs text-zinc-500">
+          Not working this week: {idle.map((stat) => stat.name).join(', ')}
+        </p>
+      )}
     </div>
   )
 }
