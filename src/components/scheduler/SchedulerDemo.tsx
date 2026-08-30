@@ -169,6 +169,7 @@ export default function SchedulerDemo() {
   const [employeePanelOpen, setEmployeePanelOpen] = useState(false)
   const [openShiftKey, setOpenShiftKey] = useState<ShiftKey | null>(null)
   const [dragState, setDragState] = useState<DragState | null>(null)
+  const [dragOverSlotId, setDragOverSlotId] = useState<string | null>(null)
   const [dropFeedback, setDropFeedback] = useState<DropFeedback>(null)
   const slots = useMemo(() => expandTemplate(seedTemplate), [])
   const readinessProblems = useMemo(() => preflightDiagnostics(employees, slots), [employees, slots])
@@ -242,6 +243,7 @@ export default function SchedulerDemo() {
   }
 
   function moveAssignment(targetSlotId: string) {
+    setDragOverSlotId(null)
     if (!dragState || dragState.fromSlotId === targetSlotId) return
     const targetSlot = slots.find((slot) => slot.id === targetSlotId)
     const sourceSlot = slots.find((slot) => slot.id === dragState.fromSlotId)
@@ -295,6 +297,26 @@ export default function SchedulerDemo() {
 
     setAssignments(proposedAssignments)
     setDropFeedback(null)
+  }
+
+  function startAssignmentDrag(nextDragState: DragState) {
+    setDropFeedback(null)
+    setDragOverSlotId(null)
+    setDragState(nextDragState)
+  }
+
+  function endAssignmentDrag() {
+    setDragState(null)
+    setDragOverSlotId(null)
+  }
+
+  function previewDropSlot(slotId: string) {
+    if (!dragState || dragState.fromSlotId === slotId) return
+    setDragOverSlotId(slotId)
+  }
+
+  function clearDropPreview(slotId: string) {
+    setDragOverSlotId((current) => (current === slotId ? null : current))
   }
 
   function updateEmployee(employeeId: string, update: Partial<Employee>) {
@@ -473,12 +495,15 @@ export default function SchedulerDemo() {
               violations={violations}
               openShiftKey={openShiftKey}
               dragState={dragState}
+              dragOverSlotId={dragOverSlotId}
               dropFeedback={dropFeedback}
               onOpenShift={setOpenShiftKey}
               onAssign={setEmployeeAssignment}
               onLock={setLocked}
-              onDragStart={setDragState}
-              onDragEnd={() => setDragState(null)}
+              onDragStart={startAssignmentDrag}
+              onDragEnd={endAssignmentDrag}
+              onDragOverSlot={previewDropSlot}
+              onDragLeaveSlot={clearDropPreview}
               onDropAssignment={moveAssignment}
             />
           </section>
@@ -761,12 +786,15 @@ function WeeklyScheduleBoard({
   violations,
   openShiftKey,
   dragState,
+  dragOverSlotId,
   dropFeedback,
   onOpenShift,
   onAssign,
   onLock,
   onDragStart,
   onDragEnd,
+  onDragOverSlot,
+  onDragLeaveSlot,
   onDropAssignment,
 }: {
   slots: StaffingSlot[]
@@ -775,12 +803,15 @@ function WeeklyScheduleBoard({
   violations: ValidationViolation[]
   openShiftKey: ShiftKey | null
   dragState: DragState | null
+  dragOverSlotId: string | null
   dropFeedback: DropFeedback
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
   onDragStart: (dragState: DragState) => void
   onDragEnd: () => void
+  onDragOverSlot: (slotId: string) => void
+  onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
 }) {
   return (
@@ -806,12 +837,15 @@ function WeeklyScheduleBoard({
                     violations={violations}
                     open={openShiftKey === shiftKey}
                     dragState={dragState}
+                    dragOverSlotId={dragOverSlotId}
                     dropFeedback={dropFeedback}
                     onOpenShift={onOpenShift}
                     onAssign={onAssign}
                     onLock={onLock}
                     onDragStart={onDragStart}
                     onDragEnd={onDragEnd}
+                    onDragOverSlot={onDragOverSlot}
+                    onDragLeaveSlot={onDragLeaveSlot}
                     onDropAssignment={onDropAssignment}
                   />
                 )
@@ -846,12 +880,15 @@ function ShiftRow({
   violations,
   open,
   dragState,
+  dragOverSlotId,
   dropFeedback,
   onOpenShift,
   onAssign,
   onLock,
   onDragStart,
   onDragEnd,
+  onDragOverSlot,
+  onDragLeaveSlot,
   onDropAssignment,
 }: {
   shiftKey: ShiftKey
@@ -863,12 +900,15 @@ function ShiftRow({
   violations: ValidationViolation[]
   open: boolean
   dragState: DragState | null
+  dragOverSlotId: string | null
   dropFeedback: DropFeedback
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
   onDragStart: (dragState: DragState) => void
   onDragEnd: () => void
+  onDragOverSlot: (slotId: string) => void
+  onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
 }) {
   const shiftViolations = violations.filter((violation) => slots.some((slot) => slot.id === violation.slotId))
@@ -896,9 +936,12 @@ function ShiftRow({
               assignment={assignmentMap.get(slot.id)}
               employee={employees.find((candidate) => candidate.id === assignmentMap.get(slot.id)?.employeeId)}
               hasIssue={violations.some((violation) => violation.slotId === slot.id)}
-              dragActive={Boolean(dragState)}
+              dragState={dragState}
+              dragOverSlotId={dragOverSlotId}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
+              onDragOverSlot={onDragOverSlot}
+              onDragLeaveSlot={onDragLeaveSlot}
               onDropAssignment={onDropAssignment}
             />
           ))}
@@ -926,9 +969,13 @@ function ShiftRow({
                 employees={employees}
                 assignment={assignmentMap.get(slot.id)}
                 violations={violations.filter((violation) => violation.slotId === slot.id)}
+                dragState={dragState}
+                dragOverSlotId={dragOverSlotId}
                 dropFeedback={dropFeedback?.slotId === slot.id ? dropFeedback.message : null}
                 onAssign={onAssign}
                 onLock={onLock}
+                onDragOverSlot={onDragOverSlot}
+                onDragLeaveSlot={onDragLeaveSlot}
                 onDropAssignment={onDropAssignment}
               />
             ))}
@@ -944,31 +991,40 @@ function AssignmentChip({
   assignment,
   employee,
   hasIssue,
-  dragActive,
+  dragState,
+  dragOverSlotId,
   onDragStart,
   onDragEnd,
+  onDragOverSlot,
+  onDragLeaveSlot,
   onDropAssignment,
 }: {
   slot: StaffingSlot
   assignment?: ScheduleAssignment
   employee?: Employee
   hasIssue: boolean
-  dragActive: boolean
+  dragState: DragState | null
+  dragOverSlotId: string | null
   onDragStart: (dragState: DragState) => void
   onDragEnd: () => void
+  onDragOverSlot: (slotId: string) => void
+  onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
 }) {
   const canDrag = Boolean(assignment?.employeeId && employee)
+  const isSource = dragState?.fromSlotId === slot.id
+  const isDropTarget = dragOverSlotId === slot.id && Boolean(dragState) && !isSource
+  const isDragging = Boolean(dragState)
 
   return (
     <span
-      className={`inline-flex min-h-8 max-w-full items-center gap-2 rounded border px-2 py-1 text-xs font-medium ${
-        hasIssue || !assignment?.employeeId
-          ? 'border-amber-300 bg-amber-50 text-amber-950'
-          : dragActive
-            ? 'border-zinc-300 bg-white text-zinc-900 ring-1 ring-zinc-200'
-            : roleChipClasses[slot.role]
-      }`}
+      className={assignmentChipClass(slot.role, {
+        hasIssue,
+        isDragging,
+        isDropTarget,
+        isEmpty: !assignment?.employeeId,
+        isSource,
+      })}
       draggable={canDrag}
       onDragStart={(event) => {
         if (!assignment?.employeeId) return
@@ -979,9 +1035,17 @@ function AssignmentChip({
       }}
       onDragEnd={onDragEnd}
       onDragOver={(event) => {
-        if (!dragActive) return
+        if (!dragState) return
         event.preventDefault()
         event.dataTransfer.dropEffect = 'move'
+        onDragOverSlot(slot.id)
+      }}
+      onDragEnter={() => {
+        onDragOverSlot(slot.id)
+      }}
+      onDragLeave={(event) => {
+        if (!leftDropTarget(event)) return
+        onDragLeaveSlot(slot.id)
       }}
       onDrop={(event) => {
         event.preventDefault()
@@ -993,6 +1057,8 @@ function AssignmentChip({
       <span className="font-semibold">{slot.label}</span>
       <span className="truncate">{employee?.name ?? 'Open'}</span>
       {assignment?.locked && <Icon name="lock" />}
+      {isSource && <span className="rounded bg-white/80 px-1 text-[10px] font-bold uppercase tracking-wide text-red-900">Moving</span>}
+      {isDropTarget && <span className="rounded bg-white/80 px-1 text-[10px] font-bold uppercase tracking-wide text-green-900">Drop here</span>}
     </span>
   )
 }
@@ -1002,29 +1068,55 @@ function SlotEditor({
   employees,
   assignment,
   violations,
+  dragState,
+  dragOverSlotId,
   dropFeedback,
   onAssign,
   onLock,
+  onDragOverSlot,
+  onDragLeaveSlot,
   onDropAssignment,
 }: {
   slot: StaffingSlot
   employees: Employee[]
   assignment?: ScheduleAssignment
   violations: ValidationViolation[]
+  dragState: DragState | null
+  dragOverSlotId: string | null
   dropFeedback: string | null
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
+  onDragOverSlot: (slotId: string) => void
+  onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
 }) {
   const eligibleEmployees = employees.filter((employee) => employee.active && isEmployeeQualified(employee, slot) && isEmployeeAvailableForSlot(employee, slot))
   const otherEmployees = employees.filter((employee) => !eligibleEmployees.includes(employee))
+  const isSource = dragState?.fromSlotId === slot.id
+  const isDropTarget = dragOverSlotId === slot.id && Boolean(dragState) && !isSource
+  const panelTone =
+    isDropTarget
+      ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+      : isSource
+        ? 'border-red-300 bg-red-50 ring-2 ring-red-100'
+        : violations.length > 0 || dropFeedback
+          ? 'border-amber-300 bg-amber-50'
+          : 'border-zinc-200 bg-white'
 
   return (
     <div
-      className={`rounded border p-3 ${violations.length > 0 || dropFeedback ? 'border-amber-300 bg-amber-50' : 'border-zinc-200 bg-white'}`}
+      className={`rounded border p-3 transition duration-150 ${panelTone}`}
       onDragOver={(event) => {
         event.preventDefault()
         event.dataTransfer.dropEffect = 'move'
+        onDragOverSlot(slot.id)
+      }}
+      onDragEnter={() => {
+        onDragOverSlot(slot.id)
+      }}
+      onDragLeave={(event) => {
+        if (!leftDropTarget(event)) return
+        onDragLeaveSlot(slot.id)
       }}
       onDrop={(event) => {
         event.preventDefault()
@@ -1074,6 +1166,16 @@ function SlotEditor({
         />
         Keep this person here
       </label>
+      {isSource && (
+        <div className="mt-2 rounded border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-950">
+          Moving from this spot
+        </div>
+      )}
+      {isDropTarget && (
+        <div className="mt-2 rounded border border-green-300 bg-white px-2 py-1 text-xs font-medium text-green-950">
+          Drop here to try this spot
+        </div>
+      )}
       {dropFeedback && (
         <div className="mt-2 rounded border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-950">
           {dropFeedback}
@@ -1088,6 +1190,48 @@ function SlotEditor({
       )}
     </div>
   )
+}
+
+function assignmentChipClass(
+  role: Role,
+  {
+    hasIssue,
+    isDragging,
+    isDropTarget,
+    isEmpty,
+    isSource,
+  }: {
+    hasIssue: boolean
+    isDragging: boolean
+    isDropTarget: boolean
+    isEmpty: boolean
+    isSource: boolean
+  },
+) {
+  const base = 'inline-flex min-h-8 max-w-full items-center gap-2 rounded border px-2 py-1 text-xs font-medium transition duration-150'
+
+  if (isSource) {
+    return `${base} border-red-300 bg-red-50 text-red-950 opacity-75 ring-2 ring-red-200`
+  }
+
+  if (isDropTarget) {
+    return `${base} border-green-500 bg-green-50 text-green-950 ring-2 ring-green-300`
+  }
+
+  if (hasIssue || isEmpty) {
+    return `${base} border-amber-300 bg-amber-50 text-amber-950`
+  }
+
+  if (isDragging) {
+    return `${base} border-zinc-300 bg-white text-zinc-900 ring-1 ring-zinc-200`
+  }
+
+  return `${base} ${roleChipClasses[role]}`
+}
+
+function leftDropTarget(event: React.DragEvent<HTMLElement>) {
+  const nextTarget = event.relatedTarget
+  return !(nextTarget instanceof Node && event.currentTarget.contains(nextTarget))
 }
 
 type IconName = 'check' | 'close' | 'lock' | 'plus' | 'print' | 'reset' | 'spark' | 'warning'
