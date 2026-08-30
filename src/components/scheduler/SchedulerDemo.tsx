@@ -102,7 +102,7 @@ type SpotStatus = 'good' | 'review' | 'missing' | 'idle'
 const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: string; row: string; shiftLabel: string }> = {
   good: {
     icon: 'check',
-    chip: 'border-green-500 bg-white text-green-950',
+    chip: 'border-zinc-200 bg-white text-zinc-900',
     badge: 'border-green-300 bg-green-50 text-green-900',
     row: 'border-zinc-200 border-l-4 border-l-green-600',
     shiftLabel: 'Ready',
@@ -123,7 +123,7 @@ const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: stri
   },
   idle: {
     icon: 'plus',
-    chip: 'border-dashed border-zinc-400 bg-white text-zinc-600',
+    chip: 'border-dashed border-zinc-300 bg-white text-zinc-500',
     badge: 'border-zinc-200 bg-zinc-50 text-zinc-600',
     row: 'border-zinc-200 border-l-4 border-l-zinc-300',
     shiftLabel: 'Not made yet',
@@ -135,6 +135,12 @@ const roleInitials: Record<Role, string> = {
   cashier: 'C',
   lead: 'L',
   manager: 'M',
+}
+
+/** "Cashier 2" becomes C2, so the position fits in a badge and the name gets the room. */
+function slotBadge(slot: StaffingSlot) {
+  const position = slot.label.match(/(\d+)$/)?.[1] ?? ''
+  return `${roleInitials[slot.role]}${position}`
 }
 
 function spotStatus({
@@ -1607,7 +1613,7 @@ function WeeklyScheduleBoard({
             key={day}
             className="rounded-lg border border-zinc-200 bg-zinc-50 p-2 md:grid md:grid-cols-[92px_minmax(0,1fr)] md:items-start md:gap-2"
           >
-            <h3 className="px-1 py-2 font-semibold text-zinc-950">{day}</h3>
+            <h3 className="px-1 py-2 text-base font-bold text-zinc-900">{day}</h3>
             <div className="mt-2 space-y-2 md:mt-0">
               {PERIODS.map((period) => {
                 const shiftKey = `${day}-${period}` as ShiftKey
@@ -1747,7 +1753,7 @@ function ShiftRow({
 
   return (
     <div className={`rounded border bg-white ${statusMeta[status].row}`}>
-      <div className="grid w-full gap-3 px-3 py-3 md:grid-cols-[112px_minmax(0,1fr)_auto]">
+      <div className="grid w-full gap-3 px-3 py-3 md:grid-cols-[84px_minmax(0,1fr)_auto]">
         <button
           type="button"
           className="flex items-center gap-2 rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
@@ -1756,10 +1762,7 @@ function ShiftRow({
           aria-controls={`${shiftKey}-detail`}
         >
           <Icon name={open ? 'chevronDown' : 'chevronRight'} />
-          <span>
-            <span className="block text-sm font-semibold text-zinc-950">{periodLabels[period]}</span>
-            <span className="block text-xs text-zinc-500">{open ? 'Close' : 'Change this shift'}</span>
-          </span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{periodLabels[period]}</span>
         </button>
         <div className="flex flex-wrap gap-2">
           {slots.map((slot, index) => (
@@ -1782,16 +1785,18 @@ function ShiftRow({
             />
           ))}
         </div>
-        <button
-          type="button"
-          className={`inline-flex items-center gap-1.5 self-start rounded border px-2 py-1 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${statusMeta[status].badge}`}
-          onClick={() => onOpenShift(open ? null : shiftKey)}
-          aria-expanded={open}
-          aria-controls={`${shiftKey}-detail`}
-        >
-          <Icon name={statusMeta[status].icon} />
-          {statusLabel}
-        </button>
+        {status !== 'good' && (
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1.5 self-start rounded border px-2 py-1 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${statusMeta[status].badge}`}
+            onClick={() => onOpenShift(open ? null : shiftKey)}
+            aria-expanded={open}
+            aria-controls={`${shiftKey}-detail`}
+          >
+            <Icon name={statusMeta[status].icon} />
+            {statusLabel}
+          </button>
+        )}
       </div>
 
       {open && (
@@ -1872,12 +1877,15 @@ function AssignmentChip({
   const isGhosted = isHovered && preview?.status === 'valid'
   const movingName = activeMove ? preview?.employeeName : undefined
 
-  let secondaryText = employee?.name ?? (status === 'missing' ? 'Nobody yet' : 'Open')
+  // Whatever matters most for this spot gets the big text: a name when there is one,
+  // otherwise the position that still needs filling.
+  let primaryText = employee?.name ?? slot.label
   if (isSource) {
-    secondaryText = 'Open'
+    primaryText = 'Open'
   } else if (isGhosted && preview) {
-    secondaryText = preview.employeeName
+    primaryText = preview.employeeName
   }
+  const primaryTone = employee && !isSource ? 'font-semibold text-zinc-900' : 'font-medium'
 
   const label = isSource
     ? `Stop moving ${employee?.name ?? 'this person'}`
@@ -1890,7 +1898,7 @@ function AssignmentChip({
   return (
     <button
       type="button"
-      className={assignmentChipClass(slot.role, {
+      className={assignmentChipClass({
         status,
         isMoveActive,
         isSource,
@@ -1942,12 +1950,11 @@ function AssignmentChip({
     >
       <span
         aria-hidden="true"
-        className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border text-[10px] font-bold ${roleChipClasses[slot.role]}`}
+        className={`inline-flex h-5 shrink-0 items-center justify-center rounded-sm border px-1 text-[10px] font-bold leading-none ${roleChipClasses[slot.role]}`}
       >
-        {roleInitials[slot.role]}
+        {slotBadge(slot)}
       </span>
-      <span className="font-semibold">{slot.label}</span>
-      <span className={`truncate${isGhosted ? ' italic opacity-80' : ''}`}>{secondaryText}</span>
+      <span className={`truncate text-sm ${primaryTone}${isGhosted ? ' italic opacity-80' : ''}`}>{primaryText}</span>
       {!isMoveActive && isChanged && (
         <>
           <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500" />
@@ -1957,7 +1964,7 @@ function AssignmentChip({
       {!isMoveActive && status !== 'good' && status !== 'idle' && <Icon name={statusMeta[status].icon} />}
       {isMoveActive && !isSource && preview && <Icon name={preview.status === 'valid' ? 'check' : 'close'} />}
       {assignment?.locked && <Icon name="lock" />}
-      <span className="sr-only">{`${roleLabels[slot.role]}. ${statusMeta[status].shiftLabel}.`}</span>
+      <span className="sr-only">{`${slot.label}. ${statusMeta[status].shiftLabel}.`}</span>
     </button>
   )
 }
@@ -2109,9 +2116,7 @@ function SlotEditor({
   )
 }
 
-function assignmentChipClass(
-  role: Role,
-  {
+function assignmentChipClass({
     status,
     isMoveActive,
     isSource,
@@ -2128,7 +2133,7 @@ function assignmentChipClass(
   },
 ) {
   const base =
-    'inline-flex min-h-8 max-w-full items-center gap-2 rounded border px-2 py-1 text-left text-xs font-medium transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+    'inline-flex min-h-9 max-w-full items-center gap-2 rounded border px-2 py-1.5 text-left transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
 
   if (isSource) {
     return `${base} border-dashed border-zinc-400 bg-zinc-50 text-zinc-500 opacity-70`
@@ -2149,11 +2154,7 @@ function assignmentChipClass(
     return `${base} border-zinc-200 bg-white text-zinc-500 opacity-70`
   }
 
-  if (status !== 'good') {
-    return `${base} ${statusMeta[status].chip}`
-  }
-
-  return `${base} ${roleChipClasses[role]}`
+  return `${base} ${statusMeta[status].chip}`
 }
 
 function leftDropTarget(event: React.DragEvent<HTMLElement>) {
