@@ -40,6 +40,16 @@ type EmployeeDraft = {
 
 type ShiftKey = `${DayOfWeek}-${ShiftPeriod}`
 
+type DragState = {
+  employeeId: string
+  fromSlotId: string
+}
+
+type DropFeedback = {
+  slotId: string
+  message: string
+} | null
+
 const roleLabels: Record<Role, string> = {
   server: 'Server',
   cashier: 'Cashier',
@@ -135,6 +145,22 @@ function diagnosticLabel(diagnostic: Diagnostic) {
   return diagnostic.message
 }
 
+function dragErrorMessage(employee: Employee, slot: StaffingSlot, violations: ValidationViolation[]) {
+  const first = violations[0]
+  if (!first) return `${employee.name} cannot work ${slot.day} ${periodLabels[slot.period]}.`
+
+  if (first.code === 'unqualified_employee') return `${employee.name} is not set up for ${slot.label}.`
+  if (first.code === 'unavailable_employee') return `${employee.name} cannot work ${slot.day} ${periodLabels[slot.period]}.`
+  if (first.code === 'inactive_employee') return `${employee.name} is inactive.`
+  if (first.code === 'overlapping_assignment') return `${employee.name} is already working at that time.`
+  if (first.code === 'max_days_exceeded') return `${employee.name} would go over the weekly day limit.`
+  if (first.code === 'max_shifts_exceeded') return `${employee.name} would go over the weekly shift limit.`
+  if (first.code === 'prohibited_double') return `${employee.name} cannot work both shifts that day.`
+  if (first.code === 'incompatible_pair') return first.message
+
+  return first.message
+}
+
 export default function SchedulerDemo() {
   const [employees, setEmployees] = useState<Employee[]>(cloneEmployees)
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([])
@@ -142,6 +168,8 @@ export default function SchedulerDemo() {
   const [draft, setDraft] = useState<EmployeeDraft>(() => blankDraft())
   const [employeePanelOpen, setEmployeePanelOpen] = useState(false)
   const [openShiftKey, setOpenShiftKey] = useState<ShiftKey | null>(null)
+  const [dragState, setDragState] = useState<DragState | null>(null)
+  const [dropFeedback, setDropFeedback] = useState<DropFeedback>(null)
   const slots = useMemo(() => expandTemplate(seedTemplate), [])
   const readinessProblems = useMemo(() => preflightDiagnostics(employees, slots), [employees, slots])
   const firstGap = readinessProblems.find((problem) => problem.day && problem.period && problem.role)
@@ -194,6 +222,7 @@ export default function SchedulerDemo() {
   }
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
+    setDropFeedback(null)
     setAssignments((current) => {
       const existing = current.find((assignment) => assignment.slotId === slotId)
       if (!employeeId) return current.filter((assignment) => assignment.slotId !== slotId)
@@ -210,6 +239,62 @@ export default function SchedulerDemo() {
     setAssignments((current) =>
       current.map((assignment) => (assignment.slotId === slotId ? { ...assignment, locked } : assignment)),
     )
+  }
+
+  function moveAssignment(targetSlotId: string) {
+    if (!dragState || dragState.fromSlotId === targetSlotId) return
+    const targetSlot = slots.find((slot) => slot.id === targetSlotId)
+    const sourceSlot = slots.find((slot) => slot.id === dragState.fromSlotId)
+    const employee = employees.find((candidate) => candidate.id === dragState.employeeId)
+    if (!targetSlot || !sourceSlot || !employee) return
+
+    const sourceAssignment = assignmentMap.get(dragState.fromSlotId)
+    const targetAssignment = assignmentMap.get(targetSlotId)
+    if (sourceAssignment?.locked) {
+      setOpenShiftKey(`${sourceSlot.day}-${sourceSlot.period}`)
+      setDropFeedback({ slotId: dragState.fromSlotId, message: `${employee.name} is marked Keep and was not moved.` })
+      return
+    }
+    if (targetAssignment?.locked) {
+      setOpenShiftKey(`${targetSlot.day}-${targetSlot.period}`)
+      setDropFeedback({ slotId: targetSlotId, message: `${targetSlot.label} is marked Keep and was not changed.` })
+      return
+    }
+
+    const proposed = assignments
+      .map((assignment) => {
+        if (assignment.slotId === targetSlotId) {
+          return { ...assignment, employeeId: dragState.employeeId, locked: false }
+        }
+        if (assignment.slotId === dragState.fromSlotId) {
+          return targetAssignment?.employeeId
+            ? { ...assignment, employeeId: targetAssignment.employeeId, locked: false }
+            : { ...assignment, employeeId: '' }
+        }
+        return assignment
+      })
+      .filter((assignment) => assignment.employeeId)
+
+    const targetExists = proposed.some((assignment) => assignment.slotId === targetSlotId)
+    const proposedAssignments = targetExists ? proposed : [...proposed, { slotId: targetSlotId, employeeId: dragState.employeeId }]
+    const moveViolations = validateSchedule({
+      employees,
+      slots,
+      assignments: proposedAssignments,
+      requireCoverage: false,
+    }).filter((violation) => violation.slotId === targetSlotId || violation.employeeId === dragState.employeeId)
+
+    if (moveViolations.length > 0) {
+      setOpenShiftKey(`${targetSlot.day}-${targetSlot.period}`)
+      setDropFeedback({
+        slotId: targetSlotId,
+        message: dragErrorMessage(employee, targetSlot, moveViolations),
+      })
+      return
+    }
+
+    setAssignments(proposedAssignments)
+    setDropFeedback(null)
   }
 
   function updateEmployee(employeeId: string, update: Partial<Employee>) {
@@ -375,7 +460,7 @@ export default function SchedulerDemo() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Weekly schedule</h2>
-                <p className="mt-1 text-sm text-zinc-600">Colors show each position. Open a shift only when you need to change it.</p>
+                <p className="mt-1 text-sm text-zinc-600">Colors show each position. Open a shift to edit, or drag a name to move it.</p>
               </div>
               <Button onClick={makeInfeasible} icon="warning">
                 Show gap example
@@ -387,9 +472,14 @@ export default function SchedulerDemo() {
               assignmentMap={assignmentMap}
               violations={violations}
               openShiftKey={openShiftKey}
+              dragState={dragState}
+              dropFeedback={dropFeedback}
               onOpenShift={setOpenShiftKey}
               onAssign={setEmployeeAssignment}
               onLock={setLocked}
+              onDragStart={setDragState}
+              onDragEnd={() => setDragState(null)}
+              onDropAssignment={moveAssignment}
             />
           </section>
 
@@ -670,18 +760,28 @@ function WeeklyScheduleBoard({
   assignmentMap,
   violations,
   openShiftKey,
+  dragState,
+  dropFeedback,
   onOpenShift,
   onAssign,
   onLock,
+  onDragStart,
+  onDragEnd,
+  onDropAssignment,
 }: {
   slots: StaffingSlot[]
   employees: Employee[]
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
   openShiftKey: ShiftKey | null
+  dragState: DragState | null
+  dropFeedback: DropFeedback
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
+  onDragStart: (dragState: DragState) => void
+  onDragEnd: () => void
+  onDropAssignment: (targetSlotId: string) => void
 }) {
   return (
     <div className="mt-4 space-y-4">
@@ -705,9 +805,14 @@ function WeeklyScheduleBoard({
                     assignmentMap={assignmentMap}
                     violations={violations}
                     open={openShiftKey === shiftKey}
+                    dragState={dragState}
+                    dropFeedback={dropFeedback}
                     onOpenShift={onOpenShift}
                     onAssign={onAssign}
                     onLock={onLock}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                    onDropAssignment={onDropAssignment}
                   />
                 )
               })}
@@ -740,9 +845,14 @@ function ShiftRow({
   assignmentMap,
   violations,
   open,
+  dragState,
+  dropFeedback,
   onOpenShift,
   onAssign,
   onLock,
+  onDragStart,
+  onDragEnd,
+  onDropAssignment,
 }: {
   shiftKey: ShiftKey
   day: DayOfWeek
@@ -752,9 +862,14 @@ function ShiftRow({
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
   open: boolean
+  dragState: DragState | null
+  dropFeedback: DropFeedback
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
+  onDragStart: (dragState: DragState) => void
+  onDragEnd: () => void
+  onDropAssignment: (targetSlotId: string) => void
 }) {
   const shiftViolations = violations.filter((violation) => slots.some((slot) => slot.id === violation.slotId))
   const filledSlots = slots.filter((slot) => assignmentMap.get(slot.id)?.employeeId).length
@@ -781,6 +896,10 @@ function ShiftRow({
               assignment={assignmentMap.get(slot.id)}
               employee={employees.find((candidate) => candidate.id === assignmentMap.get(slot.id)?.employeeId)}
               hasIssue={violations.some((violation) => violation.slotId === slot.id)}
+              dragActive={Boolean(dragState)}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              onDropAssignment={onDropAssignment}
             />
           ))}
         </div>
@@ -807,8 +926,10 @@ function ShiftRow({
                 employees={employees}
                 assignment={assignmentMap.get(slot.id)}
                 violations={violations.filter((violation) => violation.slotId === slot.id)}
+                dropFeedback={dropFeedback?.slotId === slot.id ? dropFeedback.message : null}
                 onAssign={onAssign}
                 onLock={onLock}
+                onDropAssignment={onDropAssignment}
               />
             ))}
           </div>
@@ -823,17 +944,51 @@ function AssignmentChip({
   assignment,
   employee,
   hasIssue,
+  dragActive,
+  onDragStart,
+  onDragEnd,
+  onDropAssignment,
 }: {
   slot: StaffingSlot
   assignment?: ScheduleAssignment
   employee?: Employee
   hasIssue: boolean
+  dragActive: boolean
+  onDragStart: (dragState: DragState) => void
+  onDragEnd: () => void
+  onDropAssignment: (targetSlotId: string) => void
 }) {
+  const canDrag = Boolean(assignment?.employeeId && employee)
+
   return (
     <span
       className={`inline-flex min-h-8 max-w-full items-center gap-2 rounded border px-2 py-1 text-xs font-medium ${
-        hasIssue || !assignment?.employeeId ? 'border-amber-300 bg-amber-50 text-amber-950' : roleChipClasses[slot.role]
+        hasIssue || !assignment?.employeeId
+          ? 'border-amber-300 bg-amber-50 text-amber-950'
+          : dragActive
+            ? 'border-zinc-300 bg-white text-zinc-900 ring-1 ring-zinc-200'
+            : roleChipClasses[slot.role]
       }`}
+      draggable={canDrag}
+      onDragStart={(event) => {
+        if (!assignment?.employeeId) return
+        event.stopPropagation()
+        event.dataTransfer.effectAllowed = 'move'
+        event.dataTransfer.setData('text/plain', assignment.employeeId)
+        onDragStart({ employeeId: assignment.employeeId, fromSlotId: slot.id })
+      }}
+      onDragEnd={onDragEnd}
+      onDragOver={(event) => {
+        if (!dragActive) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onDropAssignment(slot.id)
+      }}
+      title={canDrag ? 'Drag to another position' : 'Open position'}
     >
       <span className="font-semibold">{slot.label}</span>
       <span className="truncate">{employee?.name ?? 'Open'}</span>
@@ -847,21 +1002,35 @@ function SlotEditor({
   employees,
   assignment,
   violations,
+  dropFeedback,
   onAssign,
   onLock,
+  onDropAssignment,
 }: {
   slot: StaffingSlot
   employees: Employee[]
   assignment?: ScheduleAssignment
   violations: ValidationViolation[]
+  dropFeedback: string | null
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
+  onDropAssignment: (targetSlotId: string) => void
 }) {
   const eligibleEmployees = employees.filter((employee) => employee.active && isEmployeeQualified(employee, slot) && isEmployeeAvailableForSlot(employee, slot))
   const otherEmployees = employees.filter((employee) => !eligibleEmployees.includes(employee))
 
   return (
-    <div className={`rounded border p-3 ${violations.length > 0 ? 'border-amber-300 bg-amber-50' : 'border-zinc-200 bg-white'}`}>
+    <div
+      className={`rounded border p-3 ${violations.length > 0 || dropFeedback ? 'border-amber-300 bg-amber-50' : 'border-zinc-200 bg-white'}`}
+      onDragOver={(event) => {
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        onDropAssignment(slot.id)
+      }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-zinc-900">{slot.label}</div>
@@ -905,6 +1074,11 @@ function SlotEditor({
         />
         Keep this person here
       </label>
+      {dropFeedback && (
+        <div className="mt-2 rounded border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-950">
+          {dropFeedback}
+        </div>
+      )}
       {violations.length > 0 && (
         <ul className="mt-2 space-y-1 text-xs leading-4 text-amber-900">
           {violations.map((violation) => (
