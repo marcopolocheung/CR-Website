@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "scheduler:test": "node --import jiti/register --test src/lib/scheduler/scheduler.test.ts",
+    "scheduler:test": "node --import jiti/register --test src/lib/scheduler/scheduler.test.ts src/lib/schedule-share.test.ts",
     "seo:check": "node scripts/seo-check.mjs"
   },
   "dependencies": {
