@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   DAYS,
   PERIODS,
@@ -72,6 +72,7 @@ type MovePreview = {
   message: string
   employeeName: string
   replacedName?: string
+  isEmptyTarget: boolean
 }
 
 const roleLabels: Record<Role, string> = {
@@ -295,6 +296,65 @@ function proposeMovedAssignments(
   return targetExists ? proposed : [...proposed, { slotId: targetSlotId, employeeId: dragState.employeeId }]
 }
 
+function buildMovePreview({
+  move,
+  targetSlotId,
+  employees,
+  slots,
+  assignments,
+  assignmentMap,
+}: {
+  move: DragState
+  targetSlotId: string
+  employees: Employee[]
+  slots: StaffingSlot[]
+  assignments: ScheduleAssignment[]
+  assignmentMap: Map<string, ScheduleAssignment>
+}): MovePreview | null {
+  if (move.fromSlotId === targetSlotId) return null
+  const targetSlot = slots.find((slot) => slot.id === targetSlotId)
+  const employee = employees.find((candidate) => candidate.id === move.employeeId)
+  if (!targetSlot || !employee) return null
+
+  const targetAssignment = assignmentMap.get(targetSlotId)
+  const replacedEmployee = employees.find((candidate) => candidate.id === targetAssignment?.employeeId)
+  const isEmptyTarget = !targetAssignment?.employeeId
+
+  if (assignmentMap.get(move.fromSlotId)?.locked) {
+    return { status: 'invalid', employeeName: employee.name, isEmptyTarget, message: `${employee.name} is marked Keep and cannot move yet.` }
+  }
+  if (targetAssignment?.locked) {
+    return { status: 'invalid', employeeName: employee.name, isEmptyTarget, message: `${targetSlot.label} is marked Keep.` }
+  }
+
+  const moveViolations = validateSchedule({
+    employees,
+    slots,
+    assignments: proposeMovedAssignments(move, assignments, targetSlotId),
+    requireCoverage: false,
+  }).filter((violation) => violation.slotId === targetSlotId || violation.employeeId === move.employeeId)
+
+  if (moveViolations.length > 0) {
+    return {
+      status: 'invalid',
+      employeeName: employee.name,
+      replacedName: replacedEmployee?.name,
+      isEmptyTarget,
+      message: dragErrorMessage(employee, targetSlot, moveViolations),
+    }
+  }
+
+  return {
+    status: 'valid',
+    employeeName: employee.name,
+    replacedName: replacedEmployee?.name,
+    isEmptyTarget,
+    message: replacedEmployee
+      ? `${employee.name} would replace ${replacedEmployee.name}.`
+      : `${employee.name} fits here.`,
+  }
+}
+
 function reviewLabel(violation: ValidationViolation, slots: StaffingSlot[], employees: Employee[]) {
   const slot = slots.find((candidate) => candidate.id === violation.slotId)
   const employee = employees.find((candidate) => candidate.id === violation.employeeId)
@@ -359,6 +419,7 @@ export default function SchedulerDemo() {
   const [employeePanelOpen, setEmployeePanelOpen] = useState(false)
   const [openShiftKey, setOpenShiftKey] = useState<ShiftKey | null>(null)
   const [dragState, setDragState] = useState<DragState | null>(null)
+  const [moveSource, setMoveSource] = useState<DragState | null>(null)
   const [dragOverSlotId, setDragOverSlotId] = useState<string | null>(null)
   const [dropFeedback, setDropFeedback] = useState<DropFeedback>(null)
   const [history, setHistory] = useState<HistorySnapshot[]>([])
@@ -389,6 +450,18 @@ export default function SchedulerDemo() {
     () => new Map(assignments.map((assignment) => [assignment.slotId, assignment])),
     [assignments],
   )
+  const activeMove = dragState ?? moveSource
+  const movePreviews = useMemo(() => {
+    const previews = new Map<string, MovePreview>()
+    if (!activeMove) return previews
+    for (const slot of slots) {
+      const preview = buildMovePreview({ move: activeMove, targetSlotId: slot.id, employees, slots, assignments, assignmentMap })
+      if (preview) previews.set(slot.id, preview)
+    }
+    return previews
+  }, [activeMove, assignmentMap, assignments, employees, slots])
+  const movingEmployee = employees.find((employee) => employee.id === moveSource?.employeeId)
+
   const fixIssues = useMemo(
     () => buildFixIssues(readinessProblems, violations, slots, employees),
     [employees, readinessProblems, slots, violations],
@@ -401,6 +474,15 @@ export default function SchedulerDemo() {
   const schedulePassing = assignments.length > 0 && violations.length === 0
   const selectedRoles = ROLES.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && selectedRoles.length > 0
+
+  useEffect(() => {
+    if (!moveSource) return
+    function cancelOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setMoveSource(null)
+    }
+    window.addEventListener('keydown', cancelOnEscape)
+    return () => window.removeEventListener('keydown', cancelOnEscape)
+  }, [moveSource])
 
   function remember(label: string) {
     setHistory((current) => [
@@ -512,98 +594,60 @@ export default function SchedulerDemo() {
     )
   }
 
-  function getMovePreview(targetSlotId: string): MovePreview | null {
-    if (!dragState || dragState.fromSlotId === targetSlotId) return null
-    const targetSlot = slots.find((slot) => slot.id === targetSlotId)
-    const sourceSlot = slots.find((slot) => slot.id === dragState.fromSlotId)
-    const employee = employees.find((candidate) => candidate.id === dragState.employeeId)
-    if (!targetSlot || !sourceSlot || !employee) return null
-
-    const sourceAssignment = assignmentMap.get(dragState.fromSlotId)
-    const targetAssignment = assignmentMap.get(targetSlotId)
-    const replacedEmployee = employees.find((candidate) => candidate.id === targetAssignment?.employeeId)
-    if (sourceAssignment?.locked) {
-      return { status: 'invalid', employeeName: employee.name, message: `${employee.name} is marked Keep and cannot move yet.` }
-    }
-    if (targetAssignment?.locked) {
-      return { status: 'invalid', employeeName: employee.name, message: `${targetSlot.label} is marked Keep.` }
-    }
-
-    const proposedAssignments = proposeMovedAssignments(dragState, assignments, targetSlotId)
-    const moveViolations = validateSchedule({
-      employees,
-      slots,
-      assignments: proposedAssignments,
-      requireCoverage: false,
-    }).filter((violation) => violation.slotId === targetSlotId || violation.employeeId === dragState.employeeId)
-
-    if (moveViolations.length > 0) {
-      return {
-        status: 'invalid',
-        employeeName: employee.name,
-        replacedName: replacedEmployee?.name,
-        message: dragErrorMessage(employee, targetSlot, moveViolations),
-      }
-    }
-
-    return {
-      status: 'valid',
-      employeeName: employee.name,
-      replacedName: replacedEmployee?.name,
-      message: replacedEmployee
-        ? `${employee.name} would replace ${replacedEmployee.name}.`
-        : `${employee.name} fits here.`,
-    }
-  }
-
-  function moveAssignment(targetSlotId: string) {
+  function moveAssignmentTo(targetSlotId: string) {
+    const move = activeMove
     setDragOverSlotId(null)
-    if (!dragState || dragState.fromSlotId === targetSlotId) return
+    setMoveSource(null)
+    if (!move || move.fromSlotId === targetSlotId) return
     const targetSlot = slots.find((slot) => slot.id === targetSlotId)
-    const sourceSlot = slots.find((slot) => slot.id === dragState.fromSlotId)
-    const employee = employees.find((candidate) => candidate.id === dragState.employeeId)
-    if (!targetSlot || !sourceSlot || !employee) return
+    const employee = employees.find((candidate) => candidate.id === move.employeeId)
+    if (!targetSlot || !employee) return
 
-    const sourceAssignment = assignmentMap.get(dragState.fromSlotId)
-    const targetAssignment = assignmentMap.get(targetSlotId)
-    if (sourceAssignment?.locked) {
-      setOpenShiftKey(`${sourceSlot.day}-${sourceSlot.period}`)
-      setDropFeedback({ slotId: dragState.fromSlotId, message: `${employee.name} is marked Keep and was not moved.` })
-      return
-    }
-    if (targetAssignment?.locked) {
+    const preview = movePreviews.get(targetSlotId)
+    if (!preview || preview.status === 'invalid') {
       setOpenShiftKey(`${targetSlot.day}-${targetSlot.period}`)
-      setDropFeedback({ slotId: targetSlotId, message: `${targetSlot.label} is marked Keep and was not changed.` })
-      return
-    }
-
-    const proposedAssignments = proposeMovedAssignments(dragState, assignments, targetSlotId)
-    const moveViolations = validateSchedule({
-      employees,
-      slots,
-      assignments: proposedAssignments,
-      requireCoverage: false,
-    }).filter((violation) => violation.slotId === targetSlotId || violation.employeeId === dragState.employeeId)
-
-    if (moveViolations.length > 0) {
-      setOpenShiftKey(`${targetSlot.day}-${targetSlot.period}`)
-      setDropFeedback({
-        slotId: targetSlotId,
-        message: dragErrorMessage(employee, targetSlot, moveViolations),
-      })
+      setDropFeedback({ slotId: targetSlotId, message: preview?.message ?? `${employee.name} cannot move here.` })
       return
     }
 
     remember(`moved ${employee.name}`)
     setIgnoredIssueIds([])
-    setAssignments(proposedAssignments)
+    setAssignments(proposeMovedAssignments(move, assignments, targetSlotId))
     setDropFeedback(null)
+  }
+  function activateSlot(slotId: string) {
+    const assignment = assignmentMap.get(slotId)
+    if (activeMove) {
+      if (activeMove.fromSlotId === slotId) {
+        cancelMove()
+        return
+      }
+      moveAssignmentTo(slotId)
+      return
+    }
+    if (assignment?.employeeId) {
+      toggleMoveSource({ employeeId: assignment.employeeId, fromSlotId: slotId })
+      return
+    }
+    const slot = slots.find((candidate) => candidate.id === slotId)
+    if (slot) setOpenShiftKey(`${slot.day}-${slot.period}`)
   }
 
   function startAssignmentDrag(nextDragState: DragState) {
     setDropFeedback(null)
     setDragOverSlotId(null)
+    setMoveSource(null)
     setDragState(nextDragState)
+  }
+
+  function toggleMoveSource(nextMoveSource: DragState) {
+    setDropFeedback(null)
+    setMoveSource((current) => (current?.fromSlotId === nextMoveSource.fromSlotId ? null : nextMoveSource))
+  }
+
+  function cancelMove() {
+    setMoveSource(null)
+    setDropFeedback(null)
   }
 
   function endAssignmentDrag() {
@@ -612,7 +656,7 @@ export default function SchedulerDemo() {
   }
 
   function previewDropSlot(slotId: string) {
-    if (!dragState || dragState.fromSlotId === slotId) return
+    if (!activeMove || activeMove.fromSlotId === slotId) return
     setDragOverSlotId(slotId)
   }
 
@@ -719,8 +763,23 @@ export default function SchedulerDemo() {
           <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
               <h2 className="text-lg font-semibold">This week</h2>
-              <p className="text-sm text-zinc-600">Tap a shift to change it. Drag a name to move it.</p>
+              <p className="text-sm text-zinc-600">Tap a name to move it, then tap where it goes. Dragging works too.</p>
             </div>
+
+            {movingEmployee && (
+              <div
+                className="mt-3 flex flex-col gap-2 rounded border border-green-300 bg-green-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                role="status"
+              >
+                <p className="flex items-center gap-2 text-sm font-semibold text-green-950">
+                  <Icon name="move" />
+                  Moving {movingEmployee.name}. Tap a green spot to put them there.
+                </p>
+                <Button onClick={cancelMove} icon="close">
+                  Cancel move
+                </Button>
+              </div>
+            )}
             <WeeklyScheduleBoard
               slots={slots}
               hasSchedule={assignments.length > 0}
@@ -728,10 +787,10 @@ export default function SchedulerDemo() {
               assignmentMap={assignmentMap}
               violations={violations}
               openShiftKey={openShiftKey}
-              dragState={dragState}
+              activeMove={activeMove}
               dragOverSlotId={dragOverSlotId}
               dropFeedback={dropFeedback}
-              getMovePreview={getMovePreview}
+              movePreviews={movePreviews}
               onOpenShift={setOpenShiftKey}
               onAssign={setEmployeeAssignment}
               onLock={setLocked}
@@ -739,7 +798,8 @@ export default function SchedulerDemo() {
               onDragEnd={endAssignmentDrag}
               onDragOverSlot={previewDropSlot}
               onDragLeaveSlot={clearDropPreview}
-              onDropAssignment={moveAssignment}
+              onDropAssignment={moveAssignmentTo}
+              onActivateSlot={activateSlot}
             />
             <VariantControls selectedVariant={selectedVariant} onGenerate={generate} />
           </section>
@@ -1215,10 +1275,10 @@ function WeeklyScheduleBoard({
   assignmentMap,
   violations,
   openShiftKey,
-  dragState,
   dragOverSlotId,
   dropFeedback,
-  getMovePreview,
+  movePreviews,
+  activeMove,
   onOpenShift,
   onAssign,
   onLock,
@@ -1227,6 +1287,7 @@ function WeeklyScheduleBoard({
   onDragOverSlot,
   onDragLeaveSlot,
   onDropAssignment,
+  onActivateSlot,
 }: {
   slots: StaffingSlot[]
   hasSchedule: boolean
@@ -1234,10 +1295,10 @@ function WeeklyScheduleBoard({
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
   openShiftKey: ShiftKey | null
-  dragState: DragState | null
   dragOverSlotId: string | null
   dropFeedback: DropFeedback
-  getMovePreview: (slotId: string) => MovePreview | null
+  movePreviews: Map<string, MovePreview>
+  activeMove: DragState | null
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
@@ -1246,6 +1307,7 @@ function WeeklyScheduleBoard({
   onDragOverSlot: (slotId: string) => void
   onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
+  onActivateSlot: (slotId: string) => void
 }) {
   return (
     <div className="mt-4 space-y-3">
@@ -1271,10 +1333,10 @@ function WeeklyScheduleBoard({
                     assignmentMap={assignmentMap}
                     violations={violations}
                     open={openShiftKey === shiftKey}
-                    dragState={dragState}
                     dragOverSlotId={dragOverSlotId}
                     dropFeedback={dropFeedback}
-                    getMovePreview={getMovePreview}
+                    movePreviews={movePreviews}
+                    activeMove={activeMove}
                     onOpenShift={onOpenShift}
                     onAssign={onAssign}
                     onLock={onLock}
@@ -1283,6 +1345,7 @@ function WeeklyScheduleBoard({
                     onDragOverSlot={onDragOverSlot}
                     onDragLeaveSlot={onDragLeaveSlot}
                     onDropAssignment={onDropAssignment}
+                    onActivateSlot={onActivateSlot}
                   />
                 )
               })}
@@ -1333,10 +1396,10 @@ function ShiftRow({
   assignmentMap,
   violations,
   open,
-  dragState,
   dragOverSlotId,
   dropFeedback,
-  getMovePreview,
+  movePreviews,
+  activeMove,
   onOpenShift,
   onAssign,
   onLock,
@@ -1345,6 +1408,7 @@ function ShiftRow({
   onDragOverSlot,
   onDragLeaveSlot,
   onDropAssignment,
+  onActivateSlot,
 }: {
   shiftKey: ShiftKey
   period: ShiftPeriod
@@ -1354,10 +1418,10 @@ function ShiftRow({
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
   open: boolean
-  dragState: DragState | null
   dragOverSlotId: string | null
   dropFeedback: DropFeedback
-  getMovePreview: (slotId: string) => MovePreview | null
+  movePreviews: Map<string, MovePreview>
+  activeMove: DragState | null
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
@@ -1366,6 +1430,7 @@ function ShiftRow({
   onDragOverSlot: (slotId: string) => void
   onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
+  onActivateSlot: (slotId: string) => void
 }) {
   const slotStatuses = slots.map((slot) =>
     spotStatus({
@@ -1386,16 +1451,20 @@ function ShiftRow({
 
   return (
     <div className={`rounded border bg-white ${statusMeta[status].row}`}>
-      <button
-        type="button"
-        className="grid w-full gap-3 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 md:grid-cols-[96px_minmax(0,1fr)_auto]"
-        onClick={() => onOpenShift(open ? null : shiftKey)}
-        aria-expanded={open}
-      >
-        <div>
-          <div className="text-sm font-semibold text-zinc-950">{periodLabels[period]}</div>
-          <div className="text-xs text-zinc-500">{open ? 'Tap to close' : 'Tap to change'}</div>
-        </div>
+      <div className="grid w-full gap-3 px-3 py-3 md:grid-cols-[112px_minmax(0,1fr)_auto]">
+        <button
+          type="button"
+          className="flex items-center gap-2 rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          onClick={() => onOpenShift(open ? null : shiftKey)}
+          aria-expanded={open}
+          aria-controls={`${shiftKey}-detail`}
+        >
+          <Icon name={open ? 'chevronDown' : 'chevronRight'} />
+          <span>
+            <span className="block text-sm font-semibold text-zinc-950">{periodLabels[period]}</span>
+            <span className="block text-xs text-zinc-500">{open ? 'Close' : 'Change this shift'}</span>
+          </span>
+        </button>
         <div className="flex flex-wrap gap-2">
           {slots.map((slot, index) => (
             <AssignmentChip
@@ -1404,39 +1473,44 @@ function ShiftRow({
               assignment={assignmentMap.get(slot.id)}
               employee={employees.find((candidate) => candidate.id === assignmentMap.get(slot.id)?.employeeId)}
               status={slotStatuses[index]}
-              dragState={dragState}
+              activeMove={activeMove}
               dragOverSlotId={dragOverSlotId}
-              movePreview={getMovePreview(slot.id)}
+              movePreview={movePreviews.get(slot.id) ?? null}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
               onDragOverSlot={onDragOverSlot}
               onDragLeaveSlot={onDragLeaveSlot}
               onDropAssignment={onDropAssignment}
+              onActivateSlot={onActivateSlot}
             />
           ))}
         </div>
-        <span
-          className={`inline-flex items-center gap-1.5 self-start rounded border px-2 py-1 text-xs font-semibold ${statusMeta[status].badge}`}
+        <button
+          type="button"
+          className={`inline-flex items-center gap-1.5 self-start rounded border px-2 py-1 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${statusMeta[status].badge}`}
+          onClick={() => onOpenShift(open ? null : shiftKey)}
+          aria-expanded={open}
+          aria-controls={`${shiftKey}-detail`}
         >
           <Icon name={statusMeta[status].icon} />
           {statusLabel}
-        </span>
-      </button>
+        </button>
+      </div>
 
       {open && (
-        <div className="border-t border-zinc-200 bg-zinc-50 p-3">
+        <div id={`${shiftKey}-detail`} className="border-t border-zinc-200 bg-zinc-50 p-3">
           <div className="grid gap-3 md:grid-cols-2">
             {slots.map((slot, index) => (
               <SlotEditor
                 key={slot.id}
                 slot={slot}
                 status={slotStatuses[index]}
+                activeMove={activeMove}
                 employees={employees}
                 assignment={assignmentMap.get(slot.id)}
                 violations={violations.filter((violation) => violation.slotId === slot.id)}
-                dragState={dragState}
                 dragOverSlotId={dragOverSlotId}
-                movePreview={getMovePreview(slot.id)}
+                movePreview={movePreviews.get(slot.id) ?? null}
                 dropFeedback={dropFeedback?.slotId === slot.id ? dropFeedback.message : null}
                 onAssign={onAssign}
                 onLock={onLock}
@@ -1457,7 +1531,7 @@ function AssignmentChip({
   assignment,
   employee,
   status,
-  dragState,
+  activeMove,
   dragOverSlotId,
   movePreview,
   onDragStart,
@@ -1465,12 +1539,13 @@ function AssignmentChip({
   onDragOverSlot,
   onDragLeaveSlot,
   onDropAssignment,
+  onActivateSlot,
 }: {
   slot: StaffingSlot
   assignment?: ScheduleAssignment
   employee?: Employee
   status: SpotStatus
-  dragState: DragState | null
+  activeMove: DragState | null
   dragOverSlotId: string | null
   movePreview: MovePreview | null
   onDragStart: (dragState: DragState) => void
@@ -1478,30 +1553,50 @@ function AssignmentChip({
   onDragOverSlot: (slotId: string) => void
   onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
+  onActivateSlot: (slotId: string) => void
 }) {
   const canDrag = Boolean(assignment?.employeeId && employee)
-  const isSource = dragState?.fromSlotId === slot.id
-  const isDropTarget = dragOverSlotId === slot.id && Boolean(dragState) && !isSource
-  const isDragging = Boolean(dragState)
+  const isMoveActive = Boolean(activeMove)
+  const isSource = activeMove?.fromSlotId === slot.id
+  const isHovered = dragOverSlotId === slot.id && isMoveActive && !isSource
+  const preview = isSource ? null : movePreview
+  const isGhosted = isHovered && preview?.status === 'valid'
+  const movingName = activeMove ? preview?.employeeName : undefined
+
   let secondaryText = employee?.name ?? (status === 'missing' ? 'Nobody yet' : 'Open')
-  const isGhosted = isDropTarget && movePreview?.status === 'valid'
   if (isSource) {
     secondaryText = 'Open'
-  } else if (isGhosted && movePreview) {
-    secondaryText = movePreview.employeeName
+  } else if (isGhosted && preview) {
+    secondaryText = preview.employeeName
   }
-  const replacingClass = isDropTarget && movePreview?.status === 'valid' && employee ? ' animate-pulse' : ''
+
+  const label = isSource
+    ? `Stop moving ${employee?.name ?? 'this person'}`
+    : isMoveActive && preview
+      ? `Move ${movingName} to ${slot.day} ${periodLabels[slot.period]} ${slot.label}. ${preview.message}`
+      : canDrag
+        ? `Move ${employee?.name} out of ${slot.day} ${periodLabels[slot.period]} ${slot.label}`
+        : `Open ${slot.day} ${periodLabels[slot.period]} to fill ${slot.label}`
 
   return (
-    <span
-      className={`${assignmentChipClass(slot.role, {
+    <button
+      type="button"
+      className={assignmentChipClass(slot.role, {
         status,
-        isDragging,
-        isDropTarget,
-        isInvalidDropTarget: isDropTarget && movePreview?.status === 'invalid',
+        isMoveActive,
         isSource,
-      })}${replacingClass}`}
+        isHovered,
+        preview,
+        wouldReplace: Boolean(employee),
+      })}
       draggable={canDrag}
+      aria-label={label}
+      aria-pressed={isSource}
+      title={preview?.message ?? label}
+      onClick={(event) => {
+        event.stopPropagation()
+        onActivateSlot(slot.id)
+      }}
       onDragStart={(event) => {
         if (!assignment?.employeeId) return
         event.stopPropagation()
@@ -1511,7 +1606,7 @@ function AssignmentChip({
       }}
       onDragEnd={onDragEnd}
       onDragOver={(event) => {
-        if (!dragState) return
+        if (!isMoveActive) return
         event.preventDefault()
         event.dataTransfer.dropEffect = 'move'
         onDragOverSlot(slot.id)
@@ -1523,12 +1618,18 @@ function AssignmentChip({
         if (!leftDropTarget(event)) return
         onDragLeaveSlot(slot.id)
       }}
+      onFocus={() => {
+        if (isMoveActive) onDragOverSlot(slot.id)
+      }}
+      onMouseEnter={() => {
+        if (isMoveActive) onDragOverSlot(slot.id)
+      }}
+      onMouseLeave={() => onDragLeaveSlot(slot.id)}
       onDrop={(event) => {
         event.preventDefault()
         event.stopPropagation()
         onDropAssignment(slot.id)
       }}
-      title={movePreview?.message ?? (canDrag ? 'Drag to another position' : 'Open position')}
     >
       <span
         aria-hidden="true"
@@ -1538,20 +1639,21 @@ function AssignmentChip({
       </span>
       <span className="font-semibold">{slot.label}</span>
       <span className={`truncate${isGhosted ? ' italic opacity-80' : ''}`}>{secondaryText}</span>
-      {status !== 'good' && status !== 'idle' && <Icon name={statusMeta[status].icon} />}
+      {!isMoveActive && status !== 'good' && status !== 'idle' && <Icon name={statusMeta[status].icon} />}
+      {isMoveActive && !isSource && preview && <Icon name={preview.status === 'valid' ? 'check' : 'close'} />}
       {assignment?.locked && <Icon name="lock" />}
       <span className="sr-only">{`${roleLabels[slot.role]}. ${statusMeta[status].shiftLabel}.`}</span>
-    </span>
+    </button>
   )
 }
 
 function SlotEditor({
   slot,
   status,
+  activeMove,
   employees,
   assignment,
   violations,
-  dragState,
   dragOverSlotId,
   movePreview,
   dropFeedback,
@@ -1563,10 +1665,10 @@ function SlotEditor({
 }: {
   slot: StaffingSlot
   status: SpotStatus
+  activeMove: DragState | null
   employees: Employee[]
   assignment?: ScheduleAssignment
   violations: ValidationViolation[]
-  dragState: DragState | null
   dragOverSlotId: string | null
   movePreview: MovePreview | null
   dropFeedback: string | null
@@ -1578,8 +1680,8 @@ function SlotEditor({
 }) {
   const eligibleEmployees = employees.filter((employee) => employee.active && isEmployeeQualified(employee, slot) && isEmployeeAvailableForSlot(employee, slot))
   const otherEmployees = employees.filter((employee) => !eligibleEmployees.includes(employee))
-  const isSource = dragState?.fromSlotId === slot.id
-  const isDropTarget = dragOverSlotId === slot.id && Boolean(dragState) && !isSource
+  const isSource = activeMove?.fromSlotId === slot.id
+  const isDropTarget = dragOverSlotId === slot.id && Boolean(activeMove) && !isSource
   const panelTone =
     isDropTarget
       ? movePreview?.status === 'invalid'
@@ -1694,37 +1796,44 @@ function assignmentChipClass(
   role: Role,
   {
     status,
-    isDragging,
-    isDropTarget,
-    isInvalidDropTarget,
+    isMoveActive,
     isSource,
+    isHovered,
+    preview,
+    wouldReplace,
   }: {
     status: SpotStatus
-    isDragging: boolean
-    isDropTarget: boolean
-    isInvalidDropTarget: boolean
+    isMoveActive: boolean
     isSource: boolean
+    isHovered: boolean
+    preview: MovePreview | null
+    wouldReplace: boolean
   },
 ) {
-  const base = 'inline-flex min-h-8 max-w-full items-center gap-2 rounded border px-2 py-1 text-xs font-medium transition duration-150'
+  const base =
+    'inline-flex min-h-8 max-w-full items-center gap-2 rounded border px-2 py-1 text-left text-xs font-medium transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
 
   if (isSource) {
-    return `${base} border-dashed border-zinc-400 bg-zinc-50 text-zinc-600 opacity-75`
+    return `${base} border-dashed border-zinc-400 bg-zinc-50 text-zinc-500 opacity-70`
   }
 
-  if (isDropTarget) {
-    if (isInvalidDropTarget) {
-      return `${base} border-red-500 bg-red-50 text-red-950 ring-2 ring-red-300`
+  if (isMoveActive && preview) {
+    if (preview.status === 'invalid') {
+      return `${base} border-dashed border-red-400 bg-red-50 text-red-900 ${isHovered ? 'ring-2 ring-red-400' : 'opacity-70'}`
     }
-    return `${base} border-green-500 bg-green-50 text-green-950 ring-2 ring-green-300`
+    // An empty spot is the one we most want the manager to notice.
+    const emphasis = preview.isEmptyTarget ? 'ring-2 ring-green-400 shadow-sm' : 'ring-1 ring-green-200'
+    const hovered = isHovered ? 'ring-4 ring-green-400 shadow-md' : emphasis
+    const pulse = isHovered && wouldReplace ? ' animate-pulse' : ''
+    return `${base} border-green-500 bg-green-50 text-green-950 ${hovered}${pulse}`
+  }
+
+  if (isMoveActive) {
+    return `${base} border-zinc-200 bg-white text-zinc-500 opacity-70`
   }
 
   if (status !== 'good') {
     return `${base} ${statusMeta[status].chip}`
-  }
-
-  if (isDragging) {
-    return `${base} border-zinc-300 bg-white text-zinc-900 ring-1 ring-zinc-200`
   }
 
   return `${base} ${roleChipClasses[role]}`
@@ -1735,13 +1844,29 @@ function leftDropTarget(event: React.DragEvent<HTMLElement>) {
   return !(nextTarget instanceof Node && event.currentTarget.contains(nextTarget))
 }
 
-type IconName = 'check' | 'close' | 'lock' | 'plus' | 'print' | 'reset' | 'spark' | 'target' | 'undo' | 'warning'
+type IconName =
+  | 'check'
+  | 'chevronDown'
+  | 'chevronRight'
+  | 'close'
+  | 'lock'
+  | 'move'
+  | 'plus'
+  | 'print'
+  | 'reset'
+  | 'spark'
+  | 'target'
+  | 'undo'
+  | 'warning'
 
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, React.ReactNode> = {
     check: <path d="M5 12l4 4L19 6" />,
+    chevronDown: <path d="M6 9l6 6 6-6" />,
+    chevronRight: <path d="M9 6l6 6-6 6" />,
     close: <path d="M6 6l12 12M18 6L6 18" />,
     lock: <path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v10H6z" />,
+    move: <path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" />,
     plus: <path d="M12 5v14M5 12h14" />,
     print: <path d="M7 8V4h10v4M7 17H5V9h14v8h-2M7 14h10v6H7z" />,
     reset: <path d="M4 12a8 8 0 1 0 2.3-5.7M4 5v5h5" />,
