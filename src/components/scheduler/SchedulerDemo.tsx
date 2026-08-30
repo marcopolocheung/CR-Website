@@ -34,6 +34,7 @@ import {
   type TimeRange,
   type ValidationViolation,
 } from '@/lib/scheduler'
+import SharePanel from './SharePanel'
 
 type AvailabilityMode = 'all' | 'am' | 'pm' | 'weekdayPm' | 'weekend' | 'gap'
 
@@ -568,6 +569,7 @@ export default function SchedulerDemo() {
   const [history, setHistory] = useState<HistorySnapshot[]>([])
   const [ignoredIssueIds, setIgnoredIssueIds] = useState<string[]>([])
   const [guidedChoosing, setGuidedChoosing] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
   const assignments = weeks[weekStart] ?? emptyAssignments
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
@@ -688,6 +690,7 @@ export default function SchedulerDemo() {
     setDiagnostics([])
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
+    setSharing(false)
     setOpenShiftKey(null)
     setDropFeedback(null)
     setMoveSource(null)
@@ -999,6 +1002,9 @@ export default function SchedulerDemo() {
             <Button onClick={fixNextIssue} icon="target" disabled={!nextIssue} badge={visibleFixIssues.length}>
               Fix next issue
             </Button>
+            <Button onClick={() => setSharing((open) => !open)} icon="share" disabled={!weekStart}>
+              Share with staff
+            </Button>
             <span aria-hidden="true" className="mx-1 hidden h-8 w-px bg-zinc-200 sm:block" />
             <IconButton
               icon="undo"
@@ -1015,6 +1021,17 @@ export default function SchedulerDemo() {
 
       <div className="mx-auto grid max-w-[1400px] gap-5 px-4 py-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <main className="order-1 space-y-4">
+          {sharing && weekStart && (
+            <SharePanel
+              weekStart={weekStart}
+              weekLabel={formatWeekRange(weekStart)}
+              slots={slots}
+              employees={employees}
+              assignments={assignments}
+              onClose={() => setSharing(false)}
+            />
+          )}
+
           <GuidedFixPanel
             nextIssue={nextIssue}
             issueCount={visibleFixIssues.length}
@@ -2320,6 +2337,7 @@ type IconName =
   | 'plus'
   | 'print'
   | 'reset'
+  | 'share'
   | 'spark'
   | 'target'
   | 'undo'
@@ -2337,6 +2355,7 @@ function Icon({ name }: { name: IconName }) {
     plus: <path d="M12 5v14M5 12h14" />,
     print: <path d="M7 8V4h10v4M7 17H5V9h14v8h-2M7 14h10v6H7z" />,
     reset: <path d="M4 12a8 8 0 1 0 2.3-5.7M4 5v5h5" />,
+    share: <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M12 3v13M8 7l4-4 4 4" />,
     spark: <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z" />,
     target: <path d="M12 2v4M12 18v4M2 12h4M18 12h4M7 12a5 5 0 1 0 10 0 5 5 0 0 0-10 0zM10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0z" />,
     undo: <path d="M9 14l-4-4 4-4M5 10h9a5 5 0 1 1 0 10h-1" />,

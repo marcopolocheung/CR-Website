@@ -2,39 +2,10 @@
 
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
-import { SHARE_VERSION, encryptWeek, minimumCodeLength, type PublishedWeek } from '@/lib/schedule-share'
+import { buildPublishedWeek, encryptWeek, minimumCodeLength } from '@/lib/schedule-share'
 import type { Employee, ScheduleAssignment, StaffingSlot } from '@/lib/scheduler'
 
 const QRCodeSVG = dynamic(() => import('qrcode.react').then((module) => module.QRCodeSVG), { ssr: false })
-
-export function buildPublishedWeek({
-  weekStart,
-  name,
-  slots,
-  employees,
-  assignments,
-}: {
-  weekStart: string
-  name: string
-  slots: StaffingSlot[]
-  employees: Employee[]
-  assignments: ScheduleAssignment[]
-}): PublishedWeek {
-  const employeeById = new Map(employees.map((employee) => [employee.id, employee]))
-  const assignmentBySlot = new Map(assignments.map((assignment) => [assignment.slotId, assignment.employeeId]))
-  const people: string[] = []
-
-  const slotPeople = slots.map((slot) => {
-    const employee = employeeById.get(assignmentBySlot.get(slot.id) ?? '')
-    if (!employee) return -1
-    const existing = people.indexOf(employee.name)
-    if (existing >= 0) return existing
-    people.push(employee.name)
-    return people.length - 1
-  })
-
-  return { version: SHARE_VERSION, weekStart, name, people, slotPeople }
-}
 
 export default function SharePanel({
   weekStart,
