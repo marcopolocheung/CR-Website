@@ -4,13 +4,16 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   DAYS,
   PERIODS,
+  dateForDay,
   dayOfMonth,
   expandTemplate,
   formatTimeRange,
   formatWeekRange,
+  hoursFor,
   seedTemplate,
   type DayOfWeek,
   type ShiftPeriod,
+  type StaffingSlot,
 } from '@/lib/scheduler'
 import { UnreadableShareError, WrongCodeError, decryptWeek, type PublishedWeek } from '@/lib/schedule-share'
 
@@ -156,6 +159,11 @@ export default function ScheduleViewer() {
   )
 }
 
+function localToday() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 function WeekView({
   week,
   slots,
@@ -169,10 +177,15 @@ function WeekView({
   onOnlyPersonChange: (person: string) => void
   onBack: () => void
 }) {
-  const personFor = (index: number) => (index >= 0 ? week.people[index] : undefined)
+  const today = localToday()
+  const entries = slots
+    .map((slot, index) => ({ slot, person: week.slotPeople[index] >= 0 ? week.people[week.slotPeople[index]] : undefined }))
+    .filter((entry): entry is { slot: StaffingSlot; person: string } => Boolean(entry.person))
+  const shown = onlyPerson ? entries.filter((entry) => entry.person === onlyPerson) : entries
+  const hours = shown.reduce((total, entry) => total + hoursFor(entry.slot), 0)
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8">
       <button
         type="button"
         className="text-sm font-semibold text-red-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
@@ -180,35 +193,46 @@ function WeekView({
       >
         &lsaquo; All weeks
       </button>
-      <h1 className="mt-2 text-2xl font-bold text-zinc-900">{formatWeekRange(week.weekStart)}</h1>
-      <p className="text-zinc-600">{week.name}</p>
 
-      <label className="mt-5 block text-sm font-medium text-zinc-800">
-        Show
-        <select
-          className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:w-64"
-          value={onlyPerson}
-          onChange={(event) => onOnlyPersonChange(event.target.value)}
-        >
-          <option value="">Everyone</option>
-          {week.people.map((person) => (
-            <option key={person} value={person}>
-              Only {person}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900">{formatWeekRange(week.weekStart)}</h1>
+          <p className="text-zinc-600">{week.name}</p>
+        </div>
+        <label className="text-sm font-medium text-zinc-800">
+          <span className="sr-only">Whose shifts to show</span>
+          <select
+            className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:w-56"
+            value={onlyPerson}
+            onChange={(event) => onOnlyPersonChange(event.target.value)}
+          >
+            <option value="">Everyone</option>
+            {week.people.map((person) => (
+              <option key={person} value={person}>
+                Only {person}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
-      <div className="mt-6 space-y-5">
+      {onlyPerson && (
+        <p className="mt-3 rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800">
+          <span className="font-semibold">{onlyPerson}</span> works {shown.length} shift{shown.length === 1 ? '' : 's'}
+          {shown.length > 0 && ` this week, ${hours.toFixed(1)} hours in total`}.
+        </p>
+      )}
+
+      {/* One column per day on a wide screen, stacking into a readable list on a phone. */}
+      <div className="mt-5 grid gap-2 lg:grid-cols-7">
         {DAYS.map((day) => (
-          <DayCard
+          <DayCell
             key={day}
             day={day}
             weekStart={week.weekStart}
-            slots={slots}
-            slotPeople={week.slotPeople}
-            personFor={personFor}
-            onlyPerson={onlyPerson}
+            today={today}
+            entries={shown.filter((entry) => entry.slot.day === day)}
+            showOff={Boolean(onlyPerson)}
           />
         ))}
       </div>
@@ -216,56 +240,64 @@ function WeekView({
   )
 }
 
-function DayCard({
+function DayCell({
   day,
   weekStart,
-  slots,
-  slotPeople,
-  personFor,
-  onlyPerson,
+  today,
+  entries,
+  showOff,
 }: {
   day: DayOfWeek
   weekStart: string
-  slots: ReturnType<typeof expandTemplate>
-  slotPeople: number[]
-  personFor: (index: number) => string | undefined
-  onlyPerson: string
+  today: string
+  entries: { slot: StaffingSlot; person: string }[]
+  showOff: boolean
 }) {
-  const rows = PERIODS.map((period: ShiftPeriod) => {
-    const entries = slots
-      .map((slot, index) => ({ slot, person: personFor(slotPeople[index]) }))
-      .filter(({ slot }) => slot.day === day && slot.period === period)
-      .filter(({ person }) => person && (!onlyPerson || person === onlyPerson))
-    return { period, entries }
-  }).filter(({ entries }) => entries.length > 0)
-
-  if (rows.length === 0) return null
+  const date = dateForDay(weekStart, day)
+  const isToday = date === today
+  const isPast = date < today
 
   return (
-    <section>
-      <h2 className="text-base font-bold text-zinc-900">
-        {day} <span className="text-sm font-normal text-zinc-500">{dayOfMonth(weekStart, day)}</span>
+    <section
+      className={`rounded-lg border p-2 ${
+        isToday ? 'border-red-300 bg-red-50' : isPast ? 'border-zinc-200 bg-zinc-50/60' : 'border-zinc-200 bg-white'
+      }`}
+    >
+      <h2 className={`flex items-baseline gap-1.5 px-1 ${isPast ? 'text-zinc-400' : 'text-zinc-900'}`}>
+        <span className="text-sm font-bold">{day.slice(0, 3)}</span>
+        <span className="text-sm font-normal text-zinc-500">{dayOfMonth(weekStart, day)}</span>
+        {isToday && <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-red-800">Today</span>}
       </h2>
-      <div className="mt-2 space-y-3">
-        {rows.map(({ period, entries }) => (
-          <div key={period}>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              {period === 'AM' ? 'Morning' : 'Dinner'}
-            </h3>
-            <ul className="mt-1 divide-y divide-zinc-100 border-t border-zinc-100">
-              {entries.map(({ slot, person }) => (
-                <li key={slot.id} className="flex items-baseline justify-between gap-3 py-2">
-                  <span className="font-semibold text-zinc-900">{person}</span>
-                  <span className="text-right text-sm text-zinc-600">
-                    {slot.label}
-                    <span className="ml-2 text-zinc-500">{formatTimeRange(slot)}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+
+      {entries.length === 0 ? (
+        <p className={`px-1 py-2 text-sm ${showOff ? 'font-medium text-zinc-500' : 'text-zinc-400'}`}>
+          {showOff ? 'Off' : 'Nobody yet'}
+        </p>
+      ) : (
+        <div className="mt-1 space-y-2">
+          {PERIODS.map((period: ShiftPeriod) => {
+            const periodEntries = entries.filter((entry) => entry.slot.period === period)
+            if (periodEntries.length === 0) return null
+            return (
+              <div key={period}>
+                <h3 className="px-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                  {period === 'AM' ? 'Morning' : 'Dinner'}
+                </h3>
+                <ul className="mt-0.5">
+                  {periodEntries.map(({ slot, person }) => (
+                    <li key={slot.id} className="rounded px-1 py-1 odd:bg-zinc-50/70">
+                      <span className="block text-sm font-semibold text-zinc-900">{person}</span>
+                      <span className="block text-xs text-zinc-500">
+                        {slot.label} &middot; {formatTimeRange(slot)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </section>
   )
 }
