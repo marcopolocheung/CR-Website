@@ -93,6 +93,67 @@ const roleChipClasses: Record<Role, string> = {
   cashier: 'border-emerald-200 bg-emerald-50 text-emerald-900',
 }
 
+type SpotStatus = 'good' | 'review' | 'missing' | 'idle'
+
+const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: string; row: string; shiftLabel: string }> = {
+  good: {
+    icon: 'check',
+    chip: 'border-green-500 bg-white text-green-950',
+    badge: 'border-green-300 bg-green-50 text-green-900',
+    row: 'border-zinc-200 border-l-4 border-l-green-600',
+    shiftLabel: 'Ready',
+  },
+  review: {
+    icon: 'warning',
+    chip: 'border-amber-500 bg-amber-50 text-amber-950',
+    badge: 'border-amber-300 bg-amber-50 text-amber-950',
+    row: 'border-amber-200 border-l-4 border-l-amber-500',
+    shiftLabel: 'Needs a look',
+  },
+  missing: {
+    icon: 'warning',
+    chip: 'border-dashed border-red-500 bg-red-50 text-red-950',
+    badge: 'border-red-300 bg-red-50 text-red-900',
+    row: 'border-red-200 border-l-4 border-l-red-600',
+    shiftLabel: 'Nobody assigned',
+  },
+  idle: {
+    icon: 'plus',
+    chip: 'border-dashed border-zinc-400 bg-white text-zinc-600',
+    badge: 'border-zinc-200 bg-zinc-50 text-zinc-600',
+    row: 'border-zinc-200 border-l-4 border-l-zinc-300',
+    shiftLabel: 'Not made yet',
+  },
+}
+
+const roleInitials: Record<Role, string> = {
+  server: 'S',
+  cashier: 'C',
+  lead: 'L',
+  manager: 'M',
+}
+
+function spotStatus({
+  hasEmployee,
+  hasSchedule,
+  violations,
+}: {
+  hasEmployee: boolean
+  hasSchedule: boolean
+  violations: ValidationViolation[]
+}): SpotStatus {
+  if (!hasEmployee) return hasSchedule ? 'missing' : 'idle'
+  if (violations.length > 0) return 'review'
+  return 'good'
+}
+
+function shiftStatus(statuses: SpotStatus[]): SpotStatus {
+  if (statuses.includes('missing')) return 'missing'
+  if (statuses.includes('review')) return 'review'
+  if (statuses.length > 0 && statuses.every((status) => status === 'good')) return 'good'
+  return 'idle'
+}
+
 const fullDay = { start: minutes(9, 30), end: minutes(23) }
 const amShift = { start: minutes(9, 30), end: minutes(16) }
 const pmShift = { start: minutes(16), end: minutes(23) }
@@ -662,6 +723,7 @@ export default function SchedulerDemo() {
             </div>
             <WeeklyScheduleBoard
               slots={slots}
+              hasSchedule={assignments.length > 0}
               employees={employees}
               assignmentMap={assignmentMap}
               violations={violations}
@@ -1148,6 +1210,7 @@ function ChecklistItem({ complete, label }: { complete: boolean; label: string }
 
 function WeeklyScheduleBoard({
   slots,
+  hasSchedule,
   employees,
   assignmentMap,
   violations,
@@ -1166,6 +1229,7 @@ function WeeklyScheduleBoard({
   onDropAssignment,
 }: {
   slots: StaffingSlot[]
+  hasSchedule: boolean
   employees: Employee[]
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
@@ -1202,6 +1266,7 @@ function WeeklyScheduleBoard({
                     shiftKey={shiftKey}
                     period={period}
                     slots={shiftSlots}
+                    hasSchedule={hasSchedule}
                     employees={employees}
                     assignmentMap={assignmentMap}
                     violations={violations}
@@ -1225,20 +1290,36 @@ function WeeklyScheduleBoard({
           </div>
         ))}
       </div>
-      <RoleLegend />
+      <BoardLegend />
     </div>
   )
 }
 
-function RoleLegend() {
+function BoardLegend() {
+  const statusOrder: SpotStatus[] = ['good', 'review', 'missing']
+
   return (
-    <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3 text-xs">
-      <span className="text-zinc-500">Colors show the position:</span>
-      {ROLES.map((role) => (
-        <span key={role} className={`rounded border px-2 py-1 font-medium ${roleChipClasses[role]}`}>
-          {roleLabels[role]}
-        </span>
-      ))}
+    <div className="space-y-2 border-t border-zinc-100 pt-3 text-xs">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-zinc-500">Position:</span>
+        {ROLES.map((role) => (
+          <span key={role} className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium ${roleChipClasses[role]}`}>
+            <span aria-hidden="true" className="font-bold">
+              {roleInitials[role]}
+            </span>
+            {roleLabels[role]}
+          </span>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-zinc-500">Shift:</span>
+        {statusOrder.map((status) => (
+          <span key={status} className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium ${statusMeta[status].badge}`}>
+            <Icon name={statusMeta[status].icon} />
+            {statusMeta[status].shiftLabel}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -1247,6 +1328,7 @@ function ShiftRow({
   shiftKey,
   period,
   slots,
+  hasSchedule,
   employees,
   assignmentMap,
   violations,
@@ -1267,6 +1349,7 @@ function ShiftRow({
   shiftKey: ShiftKey
   period: ShiftPeriod
   slots: StaffingSlot[]
+  hasSchedule: boolean
   employees: Employee[]
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
@@ -1284,13 +1367,25 @@ function ShiftRow({
   onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
 }) {
-  const shiftViolations = violations.filter((violation) => slots.some((slot) => slot.id === violation.slotId))
-  const filledSlots = slots.filter((slot) => assignmentMap.get(slot.id)?.employeeId).length
-  const complete = filledSlots === slots.length && shiftViolations.length === 0
-  const hasIssue = shiftViolations.length > 0
+  const slotStatuses = slots.map((slot) =>
+    spotStatus({
+      hasEmployee: Boolean(assignmentMap.get(slot.id)?.employeeId),
+      hasSchedule,
+      violations: violations.filter((violation) => violation.slotId === slot.id),
+    }),
+  )
+  const status = shiftStatus(slotStatuses)
+  const missingCount = slotStatuses.filter((slotStatus) => slotStatus === 'missing').length
+  const reviewCount = slotStatuses.filter((slotStatus) => slotStatus === 'review').length
+  const statusLabel =
+    status === 'missing'
+      ? `Needs ${missingCount} more`
+      : status === 'review'
+        ? `${reviewCount} to check`
+        : statusMeta[status].shiftLabel
 
   return (
-    <div className={`rounded border bg-white ${hasIssue ? 'border-amber-300' : 'border-zinc-200'}`}>
+    <div className={`rounded border bg-white ${statusMeta[status].row}`}>
       <button
         type="button"
         className="grid w-full gap-3 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 md:grid-cols-[96px_minmax(0,1fr)_auto]"
@@ -1302,13 +1397,13 @@ function ShiftRow({
           <div className="text-xs text-zinc-500">{open ? 'Tap to close' : 'Tap to change'}</div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {slots.map((slot) => (
+          {slots.map((slot, index) => (
             <AssignmentChip
               key={slot.id}
               slot={slot}
               assignment={assignmentMap.get(slot.id)}
               employee={employees.find((candidate) => candidate.id === assignmentMap.get(slot.id)?.employeeId)}
-              hasIssue={violations.some((violation) => violation.slotId === slot.id)}
+              status={slotStatuses[index]}
               dragState={dragState}
               dragOverSlotId={dragOverSlotId}
               movePreview={getMovePreview(slot.id)}
@@ -1321,25 +1416,21 @@ function ShiftRow({
           ))}
         </div>
         <span
-          className={`inline-flex items-center justify-center rounded px-2 py-1 text-xs font-semibold ${
-            complete
-              ? 'bg-green-100 text-green-800'
-              : hasIssue
-                ? 'bg-amber-100 text-amber-900'
-                : 'bg-zinc-100 text-zinc-700'
-          }`}
+          className={`inline-flex items-center gap-1.5 self-start rounded border px-2 py-1 text-xs font-semibold ${statusMeta[status].badge}`}
         >
-          {complete ? 'Ready' : hasIssue ? 'Review' : `${filledSlots}/${slots.length}`}
+          <Icon name={statusMeta[status].icon} />
+          {statusLabel}
         </span>
       </button>
 
       {open && (
         <div className="border-t border-zinc-200 bg-zinc-50 p-3">
           <div className="grid gap-3 md:grid-cols-2">
-            {slots.map((slot) => (
+            {slots.map((slot, index) => (
               <SlotEditor
                 key={slot.id}
                 slot={slot}
+                status={slotStatuses[index]}
                 employees={employees}
                 assignment={assignmentMap.get(slot.id)}
                 violations={violations.filter((violation) => violation.slotId === slot.id)}
@@ -1365,7 +1456,7 @@ function AssignmentChip({
   slot,
   assignment,
   employee,
-  hasIssue,
+  status,
   dragState,
   dragOverSlotId,
   movePreview,
@@ -1378,7 +1469,7 @@ function AssignmentChip({
   slot: StaffingSlot
   assignment?: ScheduleAssignment
   employee?: Employee
-  hasIssue: boolean
+  status: SpotStatus
   dragState: DragState | null
   dragOverSlotId: string | null
   movePreview: MovePreview | null
@@ -1392,22 +1483,22 @@ function AssignmentChip({
   const isSource = dragState?.fromSlotId === slot.id
   const isDropTarget = dragOverSlotId === slot.id && Boolean(dragState) && !isSource
   const isDragging = Boolean(dragState)
-  let secondaryText = employee?.name ?? 'Open'
+  let secondaryText = employee?.name ?? (status === 'missing' ? 'Nobody yet' : 'Open')
+  const isGhosted = isDropTarget && movePreview?.status === 'valid'
   if (isSource) {
-    secondaryText = 'Open while moving'
-  } else if (isDropTarget && movePreview?.status === 'valid') {
-    secondaryText = employee ? `Would replace ${employee.name}` : movePreview.employeeName
+    secondaryText = 'Open'
+  } else if (isGhosted && movePreview) {
+    secondaryText = movePreview.employeeName
   }
   const replacingClass = isDropTarget && movePreview?.status === 'valid' && employee ? ' animate-pulse' : ''
 
   return (
     <span
       className={`${assignmentChipClass(slot.role, {
-        hasIssue,
+        status,
         isDragging,
         isDropTarget,
         isInvalidDropTarget: isDropTarget && movePreview?.status === 'invalid',
-        isEmpty: !assignment?.employeeId,
         isSource,
       })}${replacingClass}`}
       draggable={canDrag}
@@ -1439,15 +1530,24 @@ function AssignmentChip({
       }}
       title={movePreview?.message ?? (canDrag ? 'Drag to another position' : 'Open position')}
     >
+      <span
+        aria-hidden="true"
+        className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border text-[10px] font-bold ${roleChipClasses[slot.role]}`}
+      >
+        {roleInitials[slot.role]}
+      </span>
       <span className="font-semibold">{slot.label}</span>
-      <span className="truncate">{secondaryText}</span>
+      <span className={`truncate${isGhosted ? ' italic opacity-80' : ''}`}>{secondaryText}</span>
+      {status !== 'good' && status !== 'idle' && <Icon name={statusMeta[status].icon} />}
       {assignment?.locked && <Icon name="lock" />}
+      <span className="sr-only">{`${roleLabels[slot.role]}. ${statusMeta[status].shiftLabel}.`}</span>
     </span>
   )
 }
 
 function SlotEditor({
   slot,
+  status,
   employees,
   assignment,
   violations,
@@ -1462,6 +1562,7 @@ function SlotEditor({
   onDropAssignment,
 }: {
   slot: StaffingSlot
+  status: SpotStatus
   employees: Employee[]
   assignment?: ScheduleAssignment
   violations: ValidationViolation[]
@@ -1485,10 +1586,10 @@ function SlotEditor({
         ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
         : 'border-green-500 bg-green-50 ring-2 ring-green-200'
       : isSource
-        ? 'border-red-300 bg-red-50 ring-2 ring-red-100'
-        : violations.length > 0 || dropFeedback
-          ? 'border-amber-300 bg-amber-50'
-          : 'border-zinc-200 bg-white'
+        ? 'border-dashed border-zinc-400 bg-zinc-50'
+        : dropFeedback
+          ? 'border-amber-400 bg-amber-50'
+          : `bg-white ${statusMeta[status].row}`
 
   return (
     <div
@@ -1515,9 +1616,18 @@ function SlotEditor({
           <div className="text-sm font-semibold text-zinc-900">{slot.label}</div>
           <div className="text-xs text-zinc-500">{formatTimeRange(slot)}</div>
         </div>
-        <span className={`rounded border px-2 py-1 text-xs font-medium ${roleChipClasses[slot.role]}`}>
-          {roleLabels[slot.role]}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium ${roleChipClasses[slot.role]}`}>
+            <span aria-hidden="true" className="font-bold">
+              {roleInitials[slot.role]}
+            </span>
+            {roleLabels[slot.role]}
+          </span>
+          <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-medium ${statusMeta[status].badge}`}>
+            <Icon name={statusMeta[status].icon} />
+            {statusMeta[status].shiftLabel}
+          </span>
+        </div>
       </div>
       <select
         className="mt-3 w-full rounded border border-zinc-300 bg-white px-2 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
@@ -1583,25 +1693,23 @@ function SlotEditor({
 function assignmentChipClass(
   role: Role,
   {
-    hasIssue,
+    status,
     isDragging,
     isDropTarget,
     isInvalidDropTarget,
-    isEmpty,
     isSource,
   }: {
-    hasIssue: boolean
+    status: SpotStatus
     isDragging: boolean
     isDropTarget: boolean
     isInvalidDropTarget: boolean
-    isEmpty: boolean
     isSource: boolean
   },
 ) {
   const base = 'inline-flex min-h-8 max-w-full items-center gap-2 rounded border px-2 py-1 text-xs font-medium transition duration-150'
 
   if (isSource) {
-    return `${base} border-red-300 bg-red-50 text-red-950 opacity-75 ring-2 ring-red-200`
+    return `${base} border-dashed border-zinc-400 bg-zinc-50 text-zinc-600 opacity-75`
   }
 
   if (isDropTarget) {
@@ -1611,8 +1719,8 @@ function assignmentChipClass(
     return `${base} border-green-500 bg-green-50 text-green-950 ring-2 ring-green-300`
   }
 
-  if (hasIssue || isEmpty) {
-    return `${base} border-amber-300 bg-amber-50 text-amber-950`
+  if (status !== 'good') {
+    return `${base} ${statusMeta[status].chip}`
   }
 
   if (isDragging) {
