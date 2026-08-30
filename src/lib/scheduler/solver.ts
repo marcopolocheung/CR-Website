@@ -185,8 +185,13 @@ function searchSchedule({
       return {
         diagnostic: {
           code: 'invalid_locked_assignment',
-          message: `A locked assignment for ${assignment.slotId} cannot be kept with the current rules.`,
+          message: slot
+            ? `The kept assignment for ${slot.day} ${slot.period} ${slot.label} cannot be kept with the current rules.`
+            : `A kept assignment cannot be kept with the current rules.`,
           slotId: assignment.slotId,
+          day: slot?.day,
+          period: slot?.period,
+          role: slot?.role,
         },
       }
     }

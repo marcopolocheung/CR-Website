@@ -251,9 +251,31 @@ function cloneAssignmentList(assignments: ScheduleAssignment[]) {
   return assignments.map((assignment) => ({ ...assignment }))
 }
 
+function uniqueMessages(messages: string[]) {
+  return Array.from(new Set(messages))
+}
+
 function diagnosticLabel(diagnostic: Diagnostic) {
-  if (diagnostic.day && diagnostic.period && diagnostic.role) {
-    return `${diagnostic.day} ${periodLabels[diagnostic.period]} needs ${roleLabels[diagnostic.role]} coverage.`
+  const where = diagnostic.day && diagnostic.period ? `${diagnostic.day} ${periodLabels[diagnostic.period]}` : null
+  const role = diagnostic.role ? roleLabels[diagnostic.role] : null
+
+  if (diagnostic.code === 'search_exhausted') {
+    return 'There is no way to fill every spot with the people and rules you have now.'
+  }
+  if (diagnostic.code === 'invalid_locked_assignment') {
+    return where ? `The person you kept on ${where} no longer fits the rules.` : 'A spot you marked Keep no longer fits the rules.'
+  }
+  if (where && role && diagnostic.code.startsWith('no_')) {
+    return `${where} has nobody who can work as ${role}.`
+  }
+  if (where && role && diagnostic.code.startsWith('insufficient_')) {
+    return `${where} needs more ${role} cover than the staff list can give.`
+  }
+  if (where && diagnostic.code === 'insufficient_shift_capacity') {
+    return `${where} does not have enough people available.`
+  }
+  if (where && role) {
+    return `${where} needs ${role} cover.`
   }
 
   return diagnostic.message
@@ -358,9 +380,7 @@ function buildMovePreview({
   }
 }
 
-function reviewLabel(violation: ValidationViolation, slots: StaffingSlot[], employees: Employee[]) {
-  const slot = slots.find((candidate) => candidate.id === violation.slotId)
-  const employee = employees.find((candidate) => candidate.id === violation.employeeId)
+function reviewLabel(violation: ValidationViolation, slot?: StaffingSlot, employee?: Employee) {
   const shift = slot ? `${slot.day} ${periodLabels[slot.period]}` : 'This schedule'
   const position = slot?.label ?? 'this spot'
   const name = employee?.name ?? 'Someone'
@@ -470,7 +490,7 @@ function buildFixIssues(
     const employee = employees.find((candidate) => candidate.id === violation.employeeId)
     issues.push({
       id: `review:${violation.code}:${violation.slotId ?? ''}:${violation.employeeId ?? ''}:${violation.message}`,
-      title: reviewLabel(violation, slots, employees),
+      title: reviewLabel(violation, slot, employee),
       detail: fixAdvice(violation.code),
       slot,
       employee,
@@ -587,7 +607,7 @@ export default function SchedulerDemo() {
     setEmployees(cloneEmployeeList(snapshot.employees))
     setAssignments(cloneAssignmentList(snapshot.assignments))
     setGeneratedAssignments(cloneAssignmentList(snapshot.generatedAssignments))
-    setDiagnostics([`Undid: ${snapshot.label}`])
+    setDiagnostics([`Undone: ${snapshot.label}.`])
     setHistory(rest)
     setDropFeedback(null)
     setDragState(null)
@@ -693,7 +713,7 @@ export default function SchedulerDemo() {
     if (result.status === 'INFEASIBLE') {
       setDiagnostics([
         'The schedule could not be made with these rules.',
-        ...result.diagnostics.map((diagnostic) => diagnostic.message),
+        ...uniqueMessages(result.diagnostics.map(diagnosticLabel)),
       ])
       return
     }
@@ -701,7 +721,7 @@ export default function SchedulerDemo() {
     const summary = summarizeSchedule(employees, slots, result.assignments, previousAssignments)
     setDiagnostics([
       generationMessage(variant, summary, previousAssignments.length || result.assignments.length),
-      ...result.diagnostics.map((diagnostic) => diagnostic.message),
+      ...uniqueMessages(result.diagnostics.map(diagnosticLabel)),
     ])
     setAssignments(result.assignments)
     setGeneratedAssignments(cloneAssignmentList(result.assignments))
@@ -853,7 +873,7 @@ export default function SchedulerDemo() {
       ),
     )
     setIgnoredIssueIds([])
-    setDiagnostics(['Lead and manager employees were deactivated. Make the schedule again to see where coverage is missing.'])
+    setDiagnostics(['Everyone who can run a shift is now off the list. Press Make schedule to see what a week with missing cover looks like.'])
   }
 
   return (
@@ -920,7 +940,7 @@ export default function SchedulerDemo() {
           <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
               <h2 className="text-lg font-semibold">This week</h2>
-              <p className="text-sm text-zinc-600">Tap a name to move it, then tap where it goes. Dragging works too.</p>
+              <p className="text-sm text-zinc-600">Click a name to move it, then click where it goes. Dragging works too.</p>
             </div>
 
             {movingEmployee && (
@@ -930,7 +950,7 @@ export default function SchedulerDemo() {
               >
                 <p className="flex items-center gap-2 text-sm font-semibold text-green-950">
                   <Icon name="move" />
-                  Moving {movingEmployee.name}. Tap a green spot to put them there.
+                  Moving {movingEmployee.name}. Click a green spot to put them there.
                 </p>
                 <Button onClick={cancelMove} icon="close">
                   Cancel move
@@ -2046,7 +2066,9 @@ function SlotEditor({
       {violations.length > 0 && (
         <ul className="mt-2 space-y-1 text-xs leading-4 text-amber-900">
           {violations.map((violation) => (
-            <li key={`${slot.id}-${violation.code}-${violation.employeeId ?? ''}`}>{violation.message}</li>
+            <li key={`${slot.id}-${violation.code}-${violation.employeeId ?? ''}`}>
+              {reviewLabel(violation, slot, employees.find((candidate) => candidate.id === violation.employeeId))}
+            </li>
           ))}
         </ul>
       )}
