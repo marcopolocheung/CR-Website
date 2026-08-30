@@ -1207,24 +1207,57 @@ function EmployeeForm({
 }
 
 function EmployeeCard({ employee, onUpdate }: { employee: Employee; onUpdate: (employeeId: string, update: Partial<Employee>) => void }) {
+  function toggleRole(role: Role, enabled: boolean) {
+    const roles = enabled ? [...employee.roles, role] : employee.roles.filter((candidate) => candidate !== role)
+    onUpdate(employee.id, { roles: ROLES.filter((candidate) => roles.includes(candidate)) })
+  }
+
   return (
     <div className="rounded border border-zinc-200 p-3">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="font-semibold text-zinc-950">{employee.name}</div>
-          <div className="mt-1 text-xs uppercase tracking-wide text-zinc-500">
-            {employee.roles.map((role) => roleLabels[role]).join(', ')}
-          </div>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-zinc-700">
+        <div className="font-semibold text-zinc-950">{employee.name}</div>
+        <label className="flex shrink-0 items-center gap-2 text-sm text-zinc-700">
           <input
             type="checkbox"
             checked={employee.active}
             onChange={(event) => onUpdate(employee.id, { active: event.target.checked })}
           />
-          Active
+          Working
         </label>
       </div>
+
+      <fieldset className="mt-2">
+        <legend className="sr-only">Positions {employee.name} can work</legend>
+        <div className="flex flex-wrap gap-1.5">
+          {ROLES.map((role) => {
+            const checked = employee.roles.includes(role)
+            return (
+              <label
+                key={role}
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium ${
+                  checked ? roleChipClasses[role] : 'border-zinc-200 bg-white text-zinc-400'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="h-3 w-3"
+                  checked={checked}
+                  onChange={(event) => toggleRole(role, event.target.checked)}
+                />
+                {roleLabels[role]}
+              </label>
+            )
+          })}
+        </div>
+      </fieldset>
+
+      {employee.roles.length === 0 && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-800">
+          <Icon name="warning" />
+          No positions picked, so {employee.name} cannot be scheduled.
+        </p>
+      )}
+
       <div className="mt-3 grid grid-cols-2 gap-3">
         <label className="text-sm text-zinc-700">
           Max days
