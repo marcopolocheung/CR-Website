@@ -100,6 +100,9 @@ test('a real generated week survives publish, encrypt, decrypt and read back', a
 
   // Nobody is stored twice, however many shifts they work.
   assert.equal(new Set(reopened.people).size, reopened.people.length)
+
+  // Anyone rostered but unscheduled still gets a row to be marked OFF against.
+  assert.equal(reopened.people.length, seedEmployees.filter((employee) => employee.active).length)
 })
 
 test('unfilled spots travel as nobody rather than as a stray name', async () => {
@@ -112,7 +115,9 @@ test('unfilled spots travel as nobody rather than as a stray name', async () => 
     assignments: [{ slotId: slots[0].id, employeeId: 'desiree' }],
   })
 
-  assert.equal(published.slotPeople[0], 0)
   assert.ok(published.slotPeople.slice(1).every((index) => index === -1))
-  assert.deepEqual(published.people, ['Desiree'])
+  assert.equal(published.people[published.slotPeople[0]], 'Desiree')
+
+  // Everyone active is listed even with nothing assigned, so the reader can show them as OFF.
+  assert.deepEqual(published.people, seedEmployees.filter((employee) => employee.active).map((employee) => employee.name))
 })

@@ -159,18 +159,15 @@ export function buildPublishedWeek({
   employees: Employee[]
   assignments: ScheduleAssignment[]
 }): PublishedWeek {
-  const employeeById = new Map(employees.map((employee) => [employee.id, employee]))
   const assignmentBySlot = new Map(assignments.map((assignment) => [assignment.slotId, assignment.employeeId]))
-  const people: string[] = []
 
-  const slotPeople = slots.map((slot) => {
-    const employee = employeeById.get(assignmentBySlot.get(slot.id) ?? '')
-    if (!employee) return -1
-    const existing = people.indexOf(employee.name)
-    if (existing >= 0) return existing
-    people.push(employee.name)
-    return people.length - 1
-  })
+  // Everyone rostered is listed, including anyone with no shifts, so the reader can show them
+  // an explicit OFF row rather than leaving them to wonder whether they were forgotten.
+  const roster = employees.filter((employee) => employee.active)
+  const people = roster.map((employee) => employee.name)
+  const indexById = new Map(roster.map((employee, index) => [employee.id, index]))
+
+  const slotPeople = slots.map((slot) => indexById.get(assignmentBySlot.get(slot.id) ?? '') ?? -1)
 
   return { version: SHARE_VERSION, weekStart, name, people, slotPeople }
 }

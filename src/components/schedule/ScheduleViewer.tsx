@@ -3,16 +3,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   DAYS,
-  PERIODS,
   dateForDay,
   dayOfMonth,
   expandTemplate,
-  formatTimeRange,
   formatWeekRange,
   hoursFor,
   seedTemplate,
-  type DayOfWeek,
-  type ShiftPeriod,
   type StaffingSlot,
 } from '@/lib/scheduler'
 import { UnreadableShareError, WrongCodeError, decryptWeek, type PublishedWeek } from '@/lib/schedule-share'
@@ -164,6 +160,18 @@ function localToday() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
+/** "Cashier 1" and "Cashier 2" differ only by start time, which the cell already shows. */
+function positionName(label: string) {
+  return label.replace(/\s*\d+$/, '')
+}
+
+function shortTime(totalMinutes: number) {
+  const hour24 = Math.floor(totalMinutes / 60)
+  const minute = totalMinutes % 60
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+  return minute === 0 ? `${hour12}` : `${hour12}:${String(minute).padStart(2, '0')}`
+}
+
 function WeekView({
   week,
   slots,
@@ -179,10 +187,14 @@ function WeekView({
 }) {
   const today = localToday()
   const entries = slots
-    .map((slot, index) => ({ slot, person: week.slotPeople[index] >= 0 ? week.people[week.slotPeople[index]] : undefined }))
-    .filter((entry): entry is { slot: StaffingSlot; person: string } => Boolean(entry.person))
-  const shown = onlyPerson ? entries.filter((entry) => entry.person === onlyPerson) : entries
-  const hours = shown.reduce((total, entry) => total + hoursFor(entry.slot), 0)
+    .map((slot, index) => ({ slot, personIndex: week.slotPeople[index] }))
+    .filter((entry) => entry.personIndex >= 0)
+  const rows = week.people
+    .map((person, personIndex) => ({
+      person,
+      shifts: entries.filter((entry) => entry.personIndex === personIndex).map((entry) => entry.slot),
+    }))
+    .filter((row) => !onlyPerson || row.person === onlyPerson)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -216,88 +228,84 @@ function WeekView({
         </label>
       </div>
 
-      {onlyPerson && (
-        <p className="mt-3 rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800">
-          <span className="font-semibold">{onlyPerson}</span> works {shown.length} shift{shown.length === 1 ? '' : 's'}
-          {shown.length > 0 && ` this week, ${hours.toFixed(1)} hours in total`}.
-        </p>
-      )}
-
-      {/* One column per day on a wide screen, stacking into a readable list on a phone. */}
-      <div className="mt-5 grid gap-2 lg:grid-cols-7">
-        {DAYS.map((day) => (
-          <DayCell
-            key={day}
-            day={day}
-            weekStart={week.weekStart}
-            today={today}
-            entries={shown.filter((entry) => entry.slot.day === day)}
-            showOff={Boolean(onlyPerson)}
-          />
-        ))}
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[720px] border-collapse text-left">
+          <thead>
+            <tr>
+              <th scope="col" className="sticky left-0 z-10 bg-white px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Who
+              </th>
+              {DAYS.map((day) => {
+                const date = dateForDay(week.weekStart, day)
+                const isToday = date === today
+                return (
+                  <th
+                    key={day}
+                    scope="col"
+                    className={`px-2 pb-2 text-xs font-semibold uppercase tracking-wide ${
+                      isToday ? 'text-red-800' : date < today ? 'text-zinc-400' : 'text-zinc-500'
+                    }`}
+                  >
+                    {day.slice(0, 3)} {dayOfMonth(week.weekStart, day)}
+                    {isToday && <span className="ml-1 normal-case">(today)</span>}
+                  </th>
+                )
+              })}
+              <th scope="col" className="px-2 pb-2 text-right text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Hours
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {rows.map(({ person, shifts }) => (
+              <tr key={person} className="align-top">
+                <th
+                  scope="row"
+                  className="sticky left-0 z-10 bg-white px-2 py-2 text-sm font-semibold text-zinc-900"
+                >
+                  {person}
+                </th>
+                {DAYS.map((day) => (
+                  <DayCell
+                    key={day}
+                    shifts={shifts.filter((slot) => slot.day === day)}
+                    isToday={dateForDay(week.weekStart, day) === today}
+                    isPast={dateForDay(week.weekStart, day) < today}
+                  />
+                ))}
+                <td className="px-2 py-2 text-right text-sm font-semibold text-zinc-900">
+                  {shifts.length === 0 ? '\u2014' : `${shifts.reduce((total, slot) => total + hoursFor(slot), 0).toFixed(1)}`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )
 }
 
-function DayCell({
-  day,
-  weekStart,
-  today,
-  entries,
-  showOff,
-}: {
-  day: DayOfWeek
-  weekStart: string
-  today: string
-  entries: { slot: StaffingSlot; person: string }[]
-  showOff: boolean
-}) {
-  const date = dateForDay(weekStart, day)
-  const isToday = date === today
-  const isPast = date < today
+function DayCell({ shifts, isToday, isPast }: { shifts: StaffingSlot[]; isToday: boolean; isPast: boolean }) {
+  if (shifts.length === 0) {
+    return (
+      <td className={`px-2 py-2 ${isToday ? 'bg-red-50/60' : 'bg-zinc-50'}`}>
+        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Off</span>
+      </td>
+    )
+  }
 
   return (
-    <section
-      className={`rounded-lg border p-2 ${
-        isToday ? 'border-red-300 bg-red-50' : isPast ? 'border-zinc-200 bg-zinc-50/60' : 'border-zinc-200 bg-white'
-      }`}
-    >
-      <h2 className={`flex items-baseline gap-1.5 px-1 ${isPast ? 'text-zinc-400' : 'text-zinc-900'}`}>
-        <span className="text-sm font-bold">{day.slice(0, 3)}</span>
-        <span className="text-sm font-normal text-zinc-500">{dayOfMonth(weekStart, day)}</span>
-        {isToday && <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-red-800">Today</span>}
-      </h2>
-
-      {entries.length === 0 ? (
-        <p className={`px-1 py-2 text-sm ${showOff ? 'font-medium text-zinc-500' : 'text-zinc-400'}`}>
-          {showOff ? 'Off' : 'Nobody yet'}
-        </p>
-      ) : (
-        <div className="mt-1 space-y-2">
-          {PERIODS.map((period: ShiftPeriod) => {
-            const periodEntries = entries.filter((entry) => entry.slot.period === period)
-            if (periodEntries.length === 0) return null
-            return (
-              <div key={period}>
-                <h3 className="px-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                  {period === 'AM' ? 'Morning' : 'Dinner'}
-                </h3>
-                <ul className="mt-0.5">
-                  {periodEntries.map(({ slot, person }) => (
-                    <li key={slot.id} className="rounded px-1 py-1 odd:bg-zinc-50/70">
-                      <span className="block text-sm font-semibold text-zinc-900">{person}</span>
-                      <span className="block text-xs text-zinc-500">
-                        {slot.label} &middot; {formatTimeRange(slot)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </section>
+    <td className={`px-2 py-2 ${isToday ? 'bg-red-50/60' : ''} ${isPast ? 'opacity-60' : ''}`}>
+      <ul className="space-y-1">
+        {shifts.map((slot) => (
+          <li key={slot.id}>
+            <span className="block text-sm font-semibold text-zinc-900">
+              {shortTime(slot.start)}-{shortTime(slot.end)}
+            </span>
+            <span className="block text-xs text-zinc-500">{positionName(slot.label)}</span>
+          </li>
+        ))}
+      </ul>
+    </td>
   )
 }
