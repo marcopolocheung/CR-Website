@@ -4,7 +4,7 @@ import { seedEmployees, seedTemplate, expandTemplate } from './data'
 import { SCHEDULE_STRATEGIES, generateSchedule, summarizeSchedule } from './solver'
 import { validateSchedule } from './validator'
 import type { Employee, ScheduleAssignment, StaffingSlot } from './types'
-import { minutes } from './time'
+import { formatTime, formatTimeRange, minutes } from './time'
 import { dateForDay, dayOfMonth, formatDayLabel, formatWeekRange, shiftWeek, weekStartFor, weeksBetween } from './week'
 
 const slots = expandTemplate(seedTemplate)
@@ -288,4 +288,14 @@ test('day labels abbreviate for the table header', () => {
   // A week that crosses a month must show the right month on each day.
   assert.equal(formatDayLabel('2026-03-29', 'Sunday'), 'Sun, Mar 29')
   assert.equal(formatDayLabel('2026-03-29', 'Wednesday'), 'Wed, Apr 1')
+})
+
+test('times always read as a padded 12 hour clock with AM or PM', () => {
+  assert.equal(formatTime(minutes(9, 30)), '09:30 AM')
+  assert.equal(formatTime(minutes(16)), '04:00 PM')
+  assert.equal(formatTime(minutes(12)), '12:00 PM')
+  assert.equal(formatTime(minutes(0)), '12:00 AM')
+  // A morning and an evening shift must never render the same way.
+  assert.notEqual(formatTime(minutes(4)), formatTime(minutes(16)))
+  assert.equal(formatTimeRange({ start: minutes(16), end: minutes(23) }), '04:00 PM - 11:00 PM')
 })
