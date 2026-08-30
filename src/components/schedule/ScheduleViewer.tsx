@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   DAYS,
   dateForDay,
-  dayOfMonth,
   expandTemplate,
+  formatDayLabel,
   formatWeekRange,
   hoursFor,
   seedTemplate,
@@ -139,7 +139,7 @@ export default function ScheduleViewer() {
                   onClick={() => setWeek(seen)}
                 >
                   <span>
-                    <span className="block font-semibold text-zinc-900">{formatWeekRange(seen.weekStart)}</span>
+                    <span className="block font-semibold text-zinc-900">Week of {formatWeekRange(seen.weekStart)}</span>
                     <span className="block text-sm text-zinc-600">{seen.name}</span>
                   </span>
                   <span aria-hidden="true" className="text-zinc-400">
@@ -208,7 +208,7 @@ function WeekView({
 
       <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">{formatWeekRange(week.weekStart)}</h1>
+          <h1 className="text-2xl font-bold text-zinc-900">Week of {formatWeekRange(week.weekStart)}</h1>
           <p className="text-zinc-600">{week.name}</p>
         </div>
         <label className="text-sm font-medium text-zinc-800">
@@ -246,7 +246,7 @@ function WeekView({
                       isToday ? 'text-red-800' : date < today ? 'text-zinc-400' : 'text-zinc-500'
                     }`}
                   >
-                    {day.slice(0, 3)} {dayOfMonth(week.weekStart, day)}
+                    {formatDayLabel(week.weekStart, day)}
                     {isToday && <span className="ml-1 normal-case">(today)</span>}
                   </th>
                 )
