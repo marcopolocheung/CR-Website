@@ -6,6 +6,7 @@ import {
   dateForDay,
   dayOfMonth,
   expandTemplate,
+  formatTimeRange,
   formatWeekRange,
   hoursFor,
   seedTemplate,
@@ -165,13 +166,6 @@ function positionName(label: string) {
   return label.replace(/\s*\d+$/, '')
 }
 
-function shortTime(totalMinutes: number) {
-  const hour24 = Math.floor(totalMinutes / 60)
-  const minute = totalMinutes % 60
-  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
-  return minute === 0 ? `${hour12}` : `${hour12}:${String(minute).padStart(2, '0')}`
-}
-
 function WeekView({
   week,
   slots,
@@ -229,10 +223,10 @@ function WeekView({
       </div>
 
       <div className="mt-5 overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-left">
+        <table className="w-full min-w-[1040px] border-collapse text-left">
           <thead>
             <tr>
-              <th scope="col" className="sticky left-0 z-10 bg-white px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              <th scope="col" className="sticky left-0 z-10 border border-zinc-300 bg-zinc-100 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">
                 Who
               </th>
               {DAYS.map((day) => {
@@ -242,8 +236,8 @@ function WeekView({
                   <th
                     key={day}
                     scope="col"
-                    className={`px-2 pb-2 text-xs font-semibold uppercase tracking-wide ${
-                      isToday ? 'text-red-800' : date < today ? 'text-zinc-400' : 'text-zinc-500'
+                    className={`border border-zinc-300 px-2 py-2 text-xs font-semibold uppercase tracking-wide ${
+                      isToday ? 'bg-red-100 text-red-900' : date < today ? 'bg-zinc-100 text-zinc-400' : 'bg-zinc-100 text-zinc-600'
                     }`}
                   >
                     {day.slice(0, 3)} {dayOfMonth(week.weekStart, day)}
@@ -251,17 +245,17 @@ function WeekView({
                   </th>
                 )
               })}
-              <th scope="col" className="px-2 pb-2 text-right text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              <th scope="col" className="border border-zinc-300 bg-zinc-100 px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-zinc-600">
                 Hours
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-100">
+          <tbody>
             {rows.map(({ person, shifts }) => (
               <tr key={person} className="align-top">
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 bg-white px-2 py-2 text-sm font-semibold text-zinc-900"
+                  className="sticky left-0 z-10 border border-zinc-300 bg-white px-2 py-2 text-sm font-semibold text-zinc-900"
                 >
                   {person}
                 </th>
@@ -273,12 +267,38 @@ function WeekView({
                     isPast={dateForDay(week.weekStart, day) < today}
                   />
                 ))}
-                <td className="px-2 py-2 text-right text-sm font-semibold text-zinc-900">
+                <td className="border border-zinc-300 px-2 py-2 text-right text-sm font-semibold tabular-nums text-zinc-900">
                   {shifts.length === 0 ? '\u2014' : `${shifts.reduce((total, slot) => total + hoursFor(slot), 0).toFixed(1)}`}
                 </td>
               </tr>
             ))}
           </tbody>
+          {/* The days repeat under a long roster so you can still tell which column you are in.
+              Hidden from screen readers: the thead scope already ties every cell to its day. */}
+          <tfoot aria-hidden="true">
+            <tr>
+              <td className="sticky left-0 z-10 border border-zinc-300 bg-zinc-100 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                Who
+              </td>
+              {DAYS.map((day) => {
+                const date = dateForDay(week.weekStart, day)
+                const isToday = date === today
+                return (
+                  <td
+                    key={day}
+                    className={`border border-zinc-300 px-2 py-2 text-xs font-semibold uppercase tracking-wide ${
+                      isToday ? 'bg-red-100 text-red-900' : date < today ? 'bg-zinc-100 text-zinc-400' : 'bg-zinc-100 text-zinc-600'
+                    }`}
+                  >
+                    {day.slice(0, 3)} {dayOfMonth(week.weekStart, day)}
+                  </td>
+                )
+              })}
+              <td className="border border-zinc-300 bg-zinc-100 px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                Hours
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -288,19 +308,19 @@ function WeekView({
 function DayCell({ shifts, isToday, isPast }: { shifts: StaffingSlot[]; isToday: boolean; isPast: boolean }) {
   if (shifts.length === 0) {
     return (
-      <td className={`px-2 py-2 ${isToday ? 'bg-red-50/60' : 'bg-zinc-50'}`}>
-        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Off</span>
+      <td className={`border border-zinc-300 px-2 py-2 ${isToday ? 'bg-red-50' : 'bg-zinc-100'}`}>
+        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Off</span>
       </td>
     )
   }
 
   return (
-    <td className={`px-2 py-2 ${isToday ? 'bg-red-50/60' : ''} ${isPast ? 'opacity-60' : ''}`}>
+    <td className={`border border-zinc-300 px-2 py-2 ${isToday ? 'bg-red-50' : 'bg-white'} ${isPast ? 'opacity-60' : ''}`}>
       <ul className="space-y-1">
         {shifts.map((slot) => (
           <li key={slot.id}>
-            <span className="block text-sm font-semibold text-zinc-900">
-              {shortTime(slot.start)}-{shortTime(slot.end)}
+            <span className="block whitespace-nowrap text-sm font-semibold tabular-nums text-zinc-900">
+              {formatTimeRange(slot)}
             </span>
             <span className="block text-xs text-zinc-500">{positionName(slot.label)}</span>
           </li>
