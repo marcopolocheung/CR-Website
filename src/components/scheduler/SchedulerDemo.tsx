@@ -1055,7 +1055,7 @@ export default function SchedulerDemo() {
                   onClick={() => goToWeek(shiftWeek(weekStart, -1))}
                   disabled={!weekStart}
                 />
-                <h2 className="min-w-40 text-center text-lg font-semibold">
+                <h2 className="min-w-64 whitespace-nowrap text-center text-lg font-semibold">
                   {weekStart ? formatWeekRange(weekStart) : '\u2014'}
                 </h2>
                 <IconButton

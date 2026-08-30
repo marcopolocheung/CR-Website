@@ -5,7 +5,7 @@ import { SCHEDULE_STRATEGIES, generateSchedule, summarizeSchedule } from './solv
 import { validateSchedule } from './validator'
 import type { Employee, ScheduleAssignment, StaffingSlot } from './types'
 import { formatTime, formatTimeRange, minutes } from './time'
-import { dateForDay, dayOfMonth, formatWeekRange, shiftWeek, weekStartFor, weeksBetween } from './week'
+import { dateForDay, dayOfMonth, formatDayLabel, formatWeekRange, shiftWeek, weekStartFor, weeksBetween } from './week'
 
 const slots = expandTemplate(seedTemplate)
 
@@ -276,9 +276,18 @@ test('day dates follow the day order used by the board', () => {
   assert.equal(dayOfMonth('2026-03-01', 'Wednesday'), 4)
 })
 
-test('week ranges read naturally across a month boundary', () => {
-  assert.equal(formatWeekRange('2026-03-01'), 'Mar 1-7')
-  assert.equal(formatWeekRange('2026-03-29'), 'Mar 29 - Apr 4')
+test('week ranges spell the month out for headings', () => {
+  assert.equal(formatWeekRange('2026-09-06'), 'September 6 - 12')
+  assert.equal(formatWeekRange('2026-03-01'), 'March 1 - 7')
+  assert.equal(formatWeekRange('2026-03-29'), 'March 29 - April 4')
+})
+
+test('day labels abbreviate for the table header', () => {
+  assert.equal(formatDayLabel('2026-09-06', 'Sunday'), 'Sun, Sep 6')
+  assert.equal(formatDayLabel('2026-09-06', 'Saturday'), 'Sat, Sep 12')
+  // A week that crosses a month must show the right month on each day.
+  assert.equal(formatDayLabel('2026-03-29', 'Sunday'), 'Sun, Mar 29')
+  assert.equal(formatDayLabel('2026-03-29', 'Wednesday'), 'Wed, Apr 1')
 })
 
 test('times always read as a padded 12 hour clock with AM or PM', () => {

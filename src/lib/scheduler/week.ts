@@ -37,11 +37,11 @@ export function dayOfMonth(weekStart: string, day: DayOfWeek) {
   return new Date(toUtcMs(dateForDay(weekStart, day))).getUTCDate()
 }
 
-function shortMonth(utcMs: number) {
-  return new Date(utcMs).toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
+function monthName(utcMs: number, month: 'short' | 'long') {
+  return new Date(utcMs).toLocaleDateString('en-US', { month, timeZone: 'UTC' })
 }
 
-/** "Mar 3-9" within one month, "Mar 30 - Apr 5" across two. */
+/** Spelled out for headings: "September 6 - 12", or "March 29 - April 4" across two months. */
 export function formatWeekRange(weekStart: string) {
   const startMs = toUtcMs(weekStart)
   const endMs = startMs + 6 * DAY_MS
@@ -49,10 +49,16 @@ export function formatWeekRange(weekStart: string) {
   const end = new Date(endMs)
 
   if (start.getUTCMonth() === end.getUTCMonth()) {
-    return `${shortMonth(startMs)} ${start.getUTCDate()}-${end.getUTCDate()}`
+    return `${monthName(startMs, 'long')} ${start.getUTCDate()} - ${end.getUTCDate()}`
   }
 
-  return `${shortMonth(startMs)} ${start.getUTCDate()} - ${shortMonth(endMs)} ${end.getUTCDate()}`
+  return `${monthName(startMs, 'long')} ${start.getUTCDate()} - ${monthName(endMs, 'long')} ${end.getUTCDate()}`
+}
+
+/** Abbreviated for a column header, where the month has to fit: "Sun, Sep 6". */
+export function formatDayLabel(weekStart: string, day: DayOfWeek) {
+  const utcMs = toUtcMs(dateForDay(weekStart, day))
+  return `${day.slice(0, 3)}, ${monthName(utcMs, 'short')} ${new Date(utcMs).getUTCDate()}`
 }
 
 export function weeksBetween(fromWeekStart: string, toWeekStart: string) {
