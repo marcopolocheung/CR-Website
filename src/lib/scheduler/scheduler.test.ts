@@ -5,6 +5,7 @@ import { SCHEDULE_STRATEGIES, generateSchedule, summarizeSchedule } from './solv
 import { validateSchedule } from './validator'
 import type { Employee, ScheduleAssignment, StaffingSlot } from './types'
 import { minutes } from './time'
+import { dateForDay, dayOfMonth, formatWeekRange, shiftWeek, weekStartFor, weeksBetween } from './week'
 
 const slots = expandTemplate(seedTemplate)
 
@@ -246,4 +247,36 @@ test('keep similar strategy stays closer to the week it is given', () => {
     summarizeSchedule(seedEmployees, slots, similar.assignments, previous.assignments).keptFromReference >=
       summarizeSchedule(seedEmployees, slots, balanced.assignments, previous.assignments).keptFromReference,
   )
+})
+
+test('week keys land on Sunday regardless of the day inside the week', () => {
+  // 2026-03-04 is a Wednesday; its week starts Sunday 2026-03-01.
+  for (const [date, expected] of [
+    ['2026-03-01', '2026-03-01'],
+    ['2026-03-04', '2026-03-01'],
+    ['2026-03-07', '2026-03-01'],
+    ['2026-03-08', '2026-03-08'],
+  ] as const) {
+    const [year, month, day] = date.split('-').map(Number)
+    assert.equal(weekStartFor(new Date(year, month - 1, day)), expected, date)
+  }
+})
+
+test('week maths survives a daylight saving change', () => {
+  // US DST starts 2026-03-08. Stepping across it must stay on Sundays.
+  assert.equal(shiftWeek('2026-03-01', 1), '2026-03-08')
+  assert.equal(shiftWeek('2026-03-08', -1), '2026-03-01')
+  assert.equal(shiftWeek('2026-03-01', 4), '2026-03-29')
+  assert.equal(weeksBetween('2026-03-01', '2026-03-29'), 4)
+})
+
+test('day dates follow the day order used by the board', () => {
+  assert.equal(dateForDay('2026-03-01', 'Sunday'), '2026-03-01')
+  assert.equal(dateForDay('2026-03-01', 'Saturday'), '2026-03-07')
+  assert.equal(dayOfMonth('2026-03-01', 'Wednesday'), 4)
+})
+
+test('week ranges read naturally across a month boundary', () => {
+  assert.equal(formatWeekRange('2026-03-01'), 'Mar 1-7')
+  assert.equal(formatWeekRange('2026-03-29'), 'Mar 29 - Apr 4')
 })
