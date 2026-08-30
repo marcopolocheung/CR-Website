@@ -940,7 +940,7 @@ export default function SchedulerDemo() {
           <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
               <h2 className="text-lg font-semibold">This week</h2>
-              <p className="text-sm text-zinc-600">Tap a name to move it, then tap where it goes. Dragging works too.</p>
+              <p className="text-sm text-zinc-600">Click a name to move it, then click where it goes. Dragging works too.</p>
             </div>
 
             {movingEmployee && (
@@ -950,7 +950,7 @@ export default function SchedulerDemo() {
               >
                 <p className="flex items-center gap-2 text-sm font-semibold text-green-950">
                   <Icon name="move" />
-                  Moving {movingEmployee.name}. Tap a green spot to put them there.
+                  Moving {movingEmployee.name}. Click a green spot to put them there.
                 </p>
                 <Button onClick={cancelMove} icon="close">
                   Cancel move
