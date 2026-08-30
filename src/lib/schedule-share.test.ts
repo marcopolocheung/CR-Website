@@ -9,7 +9,11 @@ import {
   encryptWeek,
   serializePublishedWeek,
   type PublishedWeek,
+  buildPublishedWeek,
 } from './schedule-share'
+import { expandTemplate, seedEmployees, seedTemplate } from './scheduler/data'
+import { generateSchedule } from './scheduler/solver'
+
 
 const week: PublishedWeek = {
   version: SHARE_VERSION,
@@ -66,4 +70,49 @@ test('a link stays small enough to print as a QR code', async () => {
   }
   const token = await encryptWeek(fullWeek, 'break room')
   assert.ok(token.length < 900, `token was ${token.length} characters`)
+})
+
+test('a real generated week survives publish, encrypt, decrypt and read back', async () => {
+  const slots = expandTemplate(seedTemplate)
+  const generated = generateSchedule({ employees: seedEmployees, template: seedTemplate })
+  assert.equal(generated.status, 'FEASIBLE')
+
+  const published = buildPublishedWeek({
+    weekStart: '2026-03-01',
+    name: 'Front of house',
+    slots,
+    employees: seedEmployees,
+    assignments: generated.assignments,
+  })
+
+  // The reader rebuilds slot order from the same template, so the lengths must line up.
+  assert.equal(published.slotPeople.length, slots.length)
+
+  const reopened = await decryptWeek(await encryptWeek(published, 'break room'), 'break room')
+
+  // Every assignment the scheduler made must come back against the same slot, by name.
+  const nameById = new Map(seedEmployees.map((employee) => [employee.id, employee.name]))
+  for (const assignment of generated.assignments) {
+    const slotIndex = slots.findIndex((slot) => slot.id === assignment.slotId)
+    assert.notEqual(slotIndex, -1)
+    assert.equal(reopened.people[reopened.slotPeople[slotIndex]], nameById.get(assignment.employeeId))
+  }
+
+  // Nobody is stored twice, however many shifts they work.
+  assert.equal(new Set(reopened.people).size, reopened.people.length)
+})
+
+test('unfilled spots travel as nobody rather than as a stray name', async () => {
+  const slots = expandTemplate(seedTemplate)
+  const published = buildPublishedWeek({
+    weekStart: '2026-03-01',
+    name: 'Half a week',
+    slots,
+    employees: seedEmployees,
+    assignments: [{ slotId: slots[0].id, employeeId: 'desiree' }],
+  })
+
+  assert.equal(published.slotPeople[0], 0)
+  assert.ok(published.slotPeople.slice(1).every((index) => index === -1))
+  assert.deepEqual(published.people, ['Desiree'])
 })
