@@ -15,7 +15,11 @@ import {
   preflightDiagnostics,
   schedulerAssumptions,
   seedEmployees,
+  currentWeekStart,
+  dayOfMonth,
+  formatWeekRange,
   seedTemplate,
+  shiftWeek,
   summarizeSchedule,
   validateSchedule,
   type DayOfWeek,
@@ -56,10 +60,12 @@ type DropFeedback = {
 type HistorySnapshot = {
   label: string
   employees: Employee[]
-  assignments: ScheduleAssignment[]
-  generatedAssignments: ScheduleAssignment[]
+  weeks: WeekAssignments
+  generatedWeeks: WeekAssignments
   diagnostics: string[]
 }
+
+type WeekAssignments = Record<string, ScheduleAssignment[]>
 
 type ScheduleVariant = ScheduleStrategy
 
@@ -176,7 +182,7 @@ const pmShift = { start: minutes(16), end: minutes(23) }
 const scheduleVariants: { id: ScheduleVariant; label: string; description: string; icon: IconName }[] = [
   { id: 'balanced', label: 'Balanced', description: 'Spreads the work across everyone.', icon: 'spark' },
   { id: 'fewestDoubles', label: 'Fewest doubles', description: 'Avoids putting anyone on both shifts in one day.', icon: 'target' },
-  { id: 'similarWeek', label: 'Keep this week similar', description: 'Changes as little as possible from what is on screen now.', icon: 'lock' },
+  { id: 'similarWeek', label: 'Like last week', description: 'Keeps as much of the previous week as the rules allow.', icon: 'lock' },
   { id: 'fairHours', label: 'Similar hours for all', description: 'Evens out how many hours each person gets.', icon: 'undo' },
 ]
 
@@ -256,6 +262,41 @@ function cloneEmployeeList(employees: Employee[]) {
     ) as Employee['recurringAvailability'],
     incompatibleEmployeeIds: [...(employee.incompatibleEmployeeIds ?? [])],
   }))
+}
+
+const emptyAssignments: ScheduleAssignment[] = []
+const storageKey = 'chinarose.scheduler.v1'
+
+type SavedState = {
+  version: 1
+  employees: Employee[]
+  weeks: WeekAssignments
+  generatedWeeks: WeekAssignments
+}
+
+function readSavedState(): SavedState | null {
+  try {
+    const raw = window.localStorage.getItem(storageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as SavedState
+    if (parsed.version !== 1 || !Array.isArray(parsed.employees)) return null
+    return parsed
+  } catch {
+    // A private window, cleared site data, or a browser that blocks storage.
+    return null
+  }
+}
+
+function writeSavedState(state: SavedState) {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(state))
+  } catch {
+    // Nothing to do; the demo still works for this session.
+  }
+}
+
+function cloneWeeks(weeks: WeekAssignments): WeekAssignments {
+  return Object.fromEntries(Object.entries(weeks).map(([week, assignments]) => [week, cloneAssignmentList(assignments)]))
 }
 
 function cloneAssignmentList(assignments: ScheduleAssignment[]) {
@@ -513,7 +554,9 @@ function buildFixIssues(
 
 export default function SchedulerDemo() {
   const [employees, setEmployees] = useState<Employee[]>(cloneEmployees)
-  const [assignments, setAssignments] = useState<ScheduleAssignment[]>([])
+  const [weekStart, setWeekStart] = useState('')
+  const [weeks, setWeeks] = useState<WeekAssignments>({})
+  const [generatedWeeks, setGeneratedWeeks] = useState<WeekAssignments>({})
   const [diagnostics, setDiagnostics] = useState<string[]>([])
   const [draft, setDraft] = useState<EmployeeDraft>(() => blankDraft())
   const [employeePanelOpen, setEmployeePanelOpen] = useState(false)
@@ -523,10 +566,23 @@ export default function SchedulerDemo() {
   const [dragOverSlotId, setDragOverSlotId] = useState<string | null>(null)
   const [dropFeedback, setDropFeedback] = useState<DropFeedback>(null)
   const [history, setHistory] = useState<HistorySnapshot[]>([])
-  const [generatedAssignments, setGeneratedAssignments] = useState<ScheduleAssignment[]>([])
   const [ignoredIssueIds, setIgnoredIssueIds] = useState<string[]>([])
   const [guidedChoosing, setGuidedChoosing] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
+  const assignments = weeks[weekStart] ?? emptyAssignments
+  const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
+
+  function setAssignments(next: ScheduleAssignment[] | ((current: ScheduleAssignment[]) => ScheduleAssignment[])) {
+    setWeeks((current) => {
+      const existing = current[weekStart] ?? emptyAssignments
+      return { ...current, [weekStart]: typeof next === 'function' ? next(existing) : next }
+    })
+  }
+
+  function setGeneratedAssignments(next: ScheduleAssignment[]) {
+    setGeneratedWeeks((current) => ({ ...current, [weekStart]: next }))
+  }
+
   const slots = useMemo(() => expandTemplate(seedTemplate), [])
   const readinessProblems = useMemo(() => preflightDiagnostics(employees, slots), [employees, slots])
   const firstGap = readinessProblems.find((problem) => problem.day && problem.period && problem.role)
@@ -596,6 +652,26 @@ export default function SchedulerDemo() {
   const selectedRoles = ROLES.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && selectedRoles.length > 0
 
+  const [restored, setRestored] = useState(false)
+
+  useEffect(() => {
+    // Date and storage both have to wait for the browser: this page is prerendered,
+    // so reading either during render would not match the HTML that shipped.
+    setWeekStart(currentWeekStart())
+    const saved = readSavedState()
+    if (saved) {
+      setEmployees(saved.employees)
+      setWeeks(saved.weeks ?? {})
+      setGeneratedWeeks(saved.generatedWeeks ?? {})
+    }
+    setRestored(true)
+  }, [])
+
+  useEffect(() => {
+    if (!restored) return
+    writeSavedState({ version: 1, employees, weeks, generatedWeeks })
+  }, [employees, generatedWeeks, restored, weeks])
+
   useEffect(() => {
     if (!moveSource) return
     function cancelOnEscape(event: KeyboardEvent) {
@@ -605,13 +681,26 @@ export default function SchedulerDemo() {
     return () => window.removeEventListener('keydown', cancelOnEscape)
   }, [moveSource])
 
+  // Messages, skipped issues and an open shift all describe the week that was on screen.
+  function goToWeek(nextWeekStart: string) {
+    if (!nextWeekStart || nextWeekStart === weekStart) return
+    setWeekStart(nextWeekStart)
+    setDiagnostics([])
+    setIgnoredIssueIds([])
+    setGuidedChoosing(false)
+    setOpenShiftKey(null)
+    setDropFeedback(null)
+    setMoveSource(null)
+    setDragOverSlotId(null)
+  }
+
   function remember(label: string) {
     setHistory((current) => [
       {
         label,
         employees: cloneEmployeeList(employees),
-        assignments: cloneAssignmentList(assignments),
-        generatedAssignments: cloneAssignmentList(generatedAssignments),
+        weeks: cloneWeeks(weeks),
+        generatedWeeks: cloneWeeks(generatedWeeks),
         diagnostics: [...diagnostics],
       },
       ...current.slice(0, 5),
@@ -622,8 +711,8 @@ export default function SchedulerDemo() {
     const [snapshot, ...rest] = history
     if (!snapshot) return
     setEmployees(cloneEmployeeList(snapshot.employees))
-    setAssignments(cloneAssignmentList(snapshot.assignments))
-    setGeneratedAssignments(cloneAssignmentList(snapshot.generatedAssignments))
+    setWeeks(cloneWeeks(snapshot.weeks))
+    setGeneratedWeeks(cloneWeeks(snapshot.generatedWeeks))
     setDiagnostics([`Undone: ${snapshot.label}.`])
     setHistory(rest)
     setDropFeedback(null)
@@ -717,7 +806,8 @@ export default function SchedulerDemo() {
     setSelectedVariant(variant)
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
-    const previousAssignments = assignments
+    // similarWeek should anchor to the week before this one, not to whatever is on screen.
+    const previousAssignments = variant === 'similarWeek' ? weeks[shiftWeek(weekStart, -1)] ?? assignments : assignments
     const result = generateSchedule(
       { employees, template: seedTemplate },
       {
@@ -748,8 +838,8 @@ export default function SchedulerDemo() {
     if (!window.confirm('Start over? This clears the schedule and every change to the staff list.')) return
     remember('reset demo')
     setEmployees(cloneEmployees())
-    setAssignments([])
-    setGeneratedAssignments([])
+    setWeeks({})
+    setGeneratedWeeks({})
     setDiagnostics([])
     setDraft(blankDraft())
     setEmployeePanelOpen(false)
@@ -940,9 +1030,34 @@ export default function SchedulerDemo() {
           />
 
           <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
-              <h2 className="text-lg font-semibold">This week</h2>
-              <p className="text-sm text-zinc-600">Click a name to move it, then click where it goes. Dragging works too.</p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-1">
+                <IconButton
+                  icon="chevronLeft"
+                  label="Previous week"
+                  onClick={() => goToWeek(shiftWeek(weekStart, -1))}
+                  disabled={!weekStart}
+                />
+                <h2 className="min-w-40 text-center text-lg font-semibold">
+                  {weekStart ? formatWeekRange(weekStart) : '\u2014'}
+                </h2>
+                <IconButton
+                  icon="chevronRight"
+                  label="Next week"
+                  onClick={() => goToWeek(shiftWeek(weekStart, 1))}
+                  disabled={!weekStart}
+                />
+                {weekStart && weekStart !== currentWeekStart() && (
+                  <button
+                    type="button"
+                    className="ml-2 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={() => goToWeek(currentWeekStart())}
+                  >
+                    This week
+                  </button>
+                )}
+              </div>
+              <p className="text-sm text-zinc-600">Click a name to move it, then click where it goes.</p>
             </div>
 
             {movingEmployee && (
@@ -961,6 +1076,7 @@ export default function SchedulerDemo() {
             )}
             <WeeklyScheduleBoard
               slots={slots}
+              weekStart={weekStart}
               hasSchedule={assignments.length > 0}
               employees={employees}
               assignmentMap={assignmentMap}
@@ -1588,6 +1704,7 @@ function ChecklistItem({ complete, label }: { complete: boolean; label: string }
 
 function WeeklyScheduleBoard({
   slots,
+  weekStart,
   hasSchedule,
   employees,
   assignmentMap,
@@ -1610,6 +1727,7 @@ function WeeklyScheduleBoard({
   onActivateSlot,
 }: {
   slots: StaffingSlot[]
+  weekStart: string
   hasSchedule: boolean
   employees: Employee[]
   assignmentMap: Map<string, ScheduleAssignment>
@@ -1639,7 +1757,10 @@ function WeeklyScheduleBoard({
             key={day}
             className="py-2 md:grid md:grid-cols-[92px_minmax(0,1fr)] md:items-start md:gap-3"
           >
-            <h3 className="px-1 py-2 text-base font-bold text-zinc-900">{day}</h3>
+            <h3 className="px-1 py-2 text-base font-bold text-zinc-900">
+              {day}
+              {weekStart && <span className="ml-1.5 text-sm font-normal text-zinc-500">{dayOfMonth(weekStart, day)}</span>}
+            </h3>
             <div className="space-y-1">
               {PERIODS.map((period) => {
                 const shiftKey = `${day}-${period}` as ShiftKey
@@ -2191,6 +2312,7 @@ function leftDropTarget(event: React.DragEvent<HTMLElement>) {
 type IconName =
   | 'check'
   | 'chevronDown'
+  | 'chevronLeft'
   | 'chevronRight'
   | 'close'
   | 'lock'
@@ -2207,6 +2329,7 @@ function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, React.ReactNode> = {
     check: <path d="M5 12l4 4L19 6" />,
     chevronDown: <path d="M6 9l6 6 6-6" />,
+    chevronLeft: <path d="M15 6l-6 6 6 6" />,
     chevronRight: <path d="M9 6l6 6-6 6" />,
     close: <path d="M6 6l12 12M18 6L6 18" />,
     lock: <path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v10H6z" />,
