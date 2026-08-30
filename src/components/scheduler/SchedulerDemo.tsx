@@ -38,6 +38,8 @@ type EmployeeDraft = {
   allowDoubles: boolean
 }
 
+type ShiftKey = `${DayOfWeek}-${ShiftPeriod}`
+
 const roleLabels: Record<Role, string> = {
   server: 'Server',
   cashier: 'Cashier',
@@ -48,6 +50,13 @@ const roleLabels: Record<Role, string> = {
 const periodLabels: Record<ShiftPeriod, string> = {
   AM: 'Morning',
   PM: 'Dinner',
+}
+
+const roleChipClasses: Record<Role, string> = {
+  lead: 'border-red-200 bg-red-50 text-red-900',
+  manager: 'border-violet-200 bg-violet-50 text-violet-900',
+  server: 'border-sky-200 bg-sky-50 text-sky-900',
+  cashier: 'border-emerald-200 bg-emerald-50 text-emerald-900',
 }
 
 const fullDay = { start: minutes(9, 30), end: minutes(23) }
@@ -132,6 +141,7 @@ export default function SchedulerDemo() {
   const [diagnostics, setDiagnostics] = useState<string[]>([])
   const [draft, setDraft] = useState<EmployeeDraft>(() => blankDraft())
   const [employeePanelOpen, setEmployeePanelOpen] = useState(false)
+  const [openShiftKey, setOpenShiftKey] = useState<ShiftKey | null>(null)
   const slots = useMemo(() => expandTemplate(seedTemplate), [])
   const readinessProblems = useMemo(() => preflightDiagnostics(employees, slots), [employees, slots])
   const firstGap = readinessProblems.find((problem) => problem.day && problem.period && problem.role)
@@ -363,27 +373,24 @@ export default function SchedulerDemo() {
 
           <section className="rounded border border-zinc-200 bg-white p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-lg font-semibold">Weekly schedule</h2>
+              <div>
+                <h2 className="text-lg font-semibold">Weekly schedule</h2>
+                <p className="mt-1 text-sm text-zinc-600">Colors show each position. Open a shift only when you need to change it.</p>
+              </div>
               <Button onClick={makeInfeasible} icon="warning">
                 Show gap example
               </Button>
             </div>
-            <div className="mt-4 overflow-x-auto">
-              <div className="grid min-w-[1040px] grid-cols-7 gap-3">
-                {DAYS.map((day) => (
-                  <DayColumn
-                    key={day}
-                    day={day}
-                    slots={slots.filter((slot) => slot.day === day)}
-                    employees={employees}
-                    assignmentMap={assignmentMap}
-                    violations={violations}
-                    onAssign={setEmployeeAssignment}
-                    onLock={setLocked}
-                  />
-                ))}
-              </div>
-            </div>
+            <WeeklyScheduleBoard
+              slots={slots}
+              employees={employees}
+              assignmentMap={assignmentMap}
+              violations={violations}
+              openShiftKey={openShiftKey}
+              onOpenShift={setOpenShiftKey}
+              onAssign={setEmployeeAssignment}
+              onLock={setLocked}
+            />
           </section>
 
           <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -657,103 +664,265 @@ function MessageList({ title, messages, empty }: { title: string; messages: stri
   )
 }
 
-function DayColumn({
-  day,
+function WeeklyScheduleBoard({
   slots,
   employees,
   assignmentMap,
   violations,
+  openShiftKey,
+  onOpenShift,
   onAssign,
   onLock,
 }: {
-  day: DayOfWeek
   slots: StaffingSlot[]
   employees: Employee[]
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
+  openShiftKey: ShiftKey | null
+  onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
 }) {
   return (
-    <div className="rounded border border-zinc-200 bg-zinc-50 p-3">
-      <h3 className="text-center font-semibold text-zinc-950">{day.slice(0, 3)}</h3>
-      {PERIODS.map((period) => (
-        <div key={period} className="mt-3">
-          <div className="mb-2 border-b border-zinc-200 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            {periodLabels[period]}
-          </div>
-          <div className="space-y-2">
-            {slots
-              .filter((slot) => slot.period === period)
-              .map((slot) => {
-                const assignment = assignmentMap.get(slot.id)
-                const slotViolations = violations.filter((violation) => violation.slotId === slot.id)
-                const eligibleEmployees = employees.filter((employee) => employee.active && isEmployeeQualified(employee, slot) && isEmployeeAvailableForSlot(employee, slot))
-                const otherEmployees = employees.filter((employee) => !eligibleEmployees.includes(employee))
-                const hasIssue = slotViolations.length > 0
+    <div className="mt-4 space-y-4">
+      <RoleLegend />
+      <div className="space-y-3">
+        {DAYS.map((day) => (
+          <div key={day} className="rounded border border-zinc-200 bg-zinc-50 p-3">
+            <h3 className="font-semibold text-zinc-950">{day}</h3>
+            <div className="mt-3 space-y-2">
+              {PERIODS.map((period) => {
+                const shiftKey = `${day}-${period}` as ShiftKey
+                const shiftSlots = slots.filter((slot) => slot.day === day && slot.period === period)
                 return (
-                  <div key={slot.id} className={`rounded border p-2 ${hasIssue ? 'border-amber-300 bg-amber-50' : 'border-zinc-200 bg-white'}`}>
-                    <div className="min-h-9">
-                      <div className="text-xs font-semibold text-zinc-900">{slot.label}</div>
-                      <div className="text-[11px] text-zinc-500">{formatTimeRange(slot)}</div>
-                    </div>
-                    <select
-                      className="mt-2 w-full rounded border border-zinc-300 bg-white px-2 py-1 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                      value={assignment?.employeeId ?? ''}
-                      onChange={(event) => onAssign(slot.id, event.target.value)}
-                    >
-                      <option value="">Unassigned</option>
-                      {eligibleEmployees.length > 0 && (
-                        <optgroup label="Best choices">
-                          {eligibleEmployees.map((employee) => (
-                            <option key={employee.id} value={employee.id}>
-                              {employee.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {otherEmployees.length > 0 && (
-                        <optgroup label="Other employees">
-                          {otherEmployees.map((employee) => (
-                            <option key={employee.id} value={employee.id}>
-                              {employee.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
-                    <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
-                      <input
-                        type="checkbox"
-                        disabled={!assignment}
-                        checked={assignment?.locked ?? false}
-                        onChange={(event) => onLock(slot.id, event.target.checked)}
-                      />
-                      Keep
-                    </label>
-                    {slotViolations.length > 0 && (
-                      <ul className="mt-2 space-y-1 text-[11px] leading-4 text-amber-900">
-                        {slotViolations.map((violation) => (
-                          <li key={`${slot.id}-${violation.code}-${violation.employeeId ?? ''}`}>{violation.message}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                  <ShiftRow
+                    key={shiftKey}
+                    shiftKey={shiftKey}
+                    day={day}
+                    period={period}
+                    slots={shiftSlots}
+                    employees={employees}
+                    assignmentMap={assignmentMap}
+                    violations={violations}
+                    open={openShiftKey === shiftKey}
+                    onOpenShift={onOpenShift}
+                    onAssign={onAssign}
+                    onLock={onLock}
+                  />
                 )
               })}
+            </div>
           </div>
-        </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function RoleLegend() {
+  return (
+    <div className="flex flex-wrap gap-2 text-xs">
+      {ROLES.map((role) => (
+        <span key={role} className={`rounded border px-2 py-1 font-medium ${roleChipClasses[role]}`}>
+          {roleLabels[role]}
+        </span>
       ))}
     </div>
   )
 }
 
-type IconName = 'check' | 'close' | 'plus' | 'print' | 'reset' | 'spark' | 'warning'
+function ShiftRow({
+  shiftKey,
+  day,
+  period,
+  slots,
+  employees,
+  assignmentMap,
+  violations,
+  open,
+  onOpenShift,
+  onAssign,
+  onLock,
+}: {
+  shiftKey: ShiftKey
+  day: DayOfWeek
+  period: ShiftPeriod
+  slots: StaffingSlot[]
+  employees: Employee[]
+  assignmentMap: Map<string, ScheduleAssignment>
+  violations: ValidationViolation[]
+  open: boolean
+  onOpenShift: (shiftKey: ShiftKey | null) => void
+  onAssign: (slotId: string, employeeId: string) => void
+  onLock: (slotId: string, locked: boolean) => void
+}) {
+  const shiftViolations = violations.filter((violation) => slots.some((slot) => slot.id === violation.slotId))
+  const filledSlots = slots.filter((slot) => assignmentMap.get(slot.id)?.employeeId).length
+  const complete = filledSlots === slots.length && shiftViolations.length === 0
+  const hasIssue = shiftViolations.length > 0
+
+  return (
+    <div className={`rounded border bg-white ${hasIssue ? 'border-amber-300' : 'border-zinc-200'}`}>
+      <button
+        type="button"
+        className="grid w-full gap-3 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 md:grid-cols-[116px_minmax(0,1fr)_auto]"
+        onClick={() => onOpenShift(open ? null : shiftKey)}
+        aria-expanded={open}
+      >
+        <div>
+          <div className="text-sm font-semibold text-zinc-950">{periodLabels[period]}</div>
+          <div className="text-xs text-zinc-500">{day.slice(0, 3)} shift</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {slots.map((slot) => (
+            <AssignmentChip
+              key={slot.id}
+              slot={slot}
+              assignment={assignmentMap.get(slot.id)}
+              employee={employees.find((candidate) => candidate.id === assignmentMap.get(slot.id)?.employeeId)}
+              hasIssue={violations.some((violation) => violation.slotId === slot.id)}
+            />
+          ))}
+        </div>
+        <span
+          className={`inline-flex items-center justify-center rounded px-2 py-1 text-xs font-semibold ${
+            complete
+              ? 'bg-green-100 text-green-800'
+              : hasIssue
+                ? 'bg-amber-100 text-amber-900'
+                : 'bg-zinc-100 text-zinc-700'
+          }`}
+        >
+          {complete ? 'Ready' : hasIssue ? 'Review' : `${filledSlots}/${slots.length}`}
+        </span>
+      </button>
+
+      {open && (
+        <div className="border-t border-zinc-200 bg-zinc-50 p-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            {slots.map((slot) => (
+              <SlotEditor
+                key={slot.id}
+                slot={slot}
+                employees={employees}
+                assignment={assignmentMap.get(slot.id)}
+                violations={violations.filter((violation) => violation.slotId === slot.id)}
+                onAssign={onAssign}
+                onLock={onLock}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AssignmentChip({
+  slot,
+  assignment,
+  employee,
+  hasIssue,
+}: {
+  slot: StaffingSlot
+  assignment?: ScheduleAssignment
+  employee?: Employee
+  hasIssue: boolean
+}) {
+  return (
+    <span
+      className={`inline-flex min-h-8 max-w-full items-center gap-2 rounded border px-2 py-1 text-xs font-medium ${
+        hasIssue || !assignment?.employeeId ? 'border-amber-300 bg-amber-50 text-amber-950' : roleChipClasses[slot.role]
+      }`}
+    >
+      <span className="font-semibold">{slot.label}</span>
+      <span className="truncate">{employee?.name ?? 'Open'}</span>
+      {assignment?.locked && <Icon name="lock" />}
+    </span>
+  )
+}
+
+function SlotEditor({
+  slot,
+  employees,
+  assignment,
+  violations,
+  onAssign,
+  onLock,
+}: {
+  slot: StaffingSlot
+  employees: Employee[]
+  assignment?: ScheduleAssignment
+  violations: ValidationViolation[]
+  onAssign: (slotId: string, employeeId: string) => void
+  onLock: (slotId: string, locked: boolean) => void
+}) {
+  const eligibleEmployees = employees.filter((employee) => employee.active && isEmployeeQualified(employee, slot) && isEmployeeAvailableForSlot(employee, slot))
+  const otherEmployees = employees.filter((employee) => !eligibleEmployees.includes(employee))
+
+  return (
+    <div className={`rounded border p-3 ${violations.length > 0 ? 'border-amber-300 bg-amber-50' : 'border-zinc-200 bg-white'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-zinc-900">{slot.label}</div>
+          <div className="text-xs text-zinc-500">{formatTimeRange(slot)}</div>
+        </div>
+        <span className={`rounded border px-2 py-1 text-xs font-medium ${roleChipClasses[slot.role]}`}>
+          {roleLabels[slot.role]}
+        </span>
+      </div>
+      <select
+        className="mt-3 w-full rounded border border-zinc-300 bg-white px-2 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+        value={assignment?.employeeId ?? ''}
+        onChange={(event) => onAssign(slot.id, event.target.value)}
+      >
+        <option value="">Unassigned</option>
+        {eligibleEmployees.length > 0 && (
+          <optgroup label="Best choices">
+            {eligibleEmployees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {otherEmployees.length > 0 && (
+          <optgroup label="Other employees">
+            {otherEmployees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+      <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
+        <input
+          type="checkbox"
+          disabled={!assignment}
+          checked={assignment?.locked ?? false}
+          onChange={(event) => onLock(slot.id, event.target.checked)}
+        />
+        Keep this person here
+      </label>
+      {violations.length > 0 && (
+        <ul className="mt-2 space-y-1 text-xs leading-4 text-amber-900">
+          {violations.map((violation) => (
+            <li key={`${slot.id}-${violation.code}-${violation.employeeId ?? ''}`}>{violation.message}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+type IconName = 'check' | 'close' | 'lock' | 'plus' | 'print' | 'reset' | 'spark' | 'warning'
 
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, React.ReactNode> = {
     check: <path d="M5 12l4 4L19 6" />,
     close: <path d="M6 6l12 12M18 6L6 18" />,
+    lock: <path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v10H6z" />,
     plus: <path d="M12 5v14M5 12h14" />,
     print: <path d="M7 8V4h10v4M7 17H5V9h14v8h-2M7 14h10v6H7z" />,
     reset: <path d="M4 12a8 8 0 1 0 2.3-5.7M4 5v5h5" />,
