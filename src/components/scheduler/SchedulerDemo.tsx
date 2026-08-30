@@ -1057,8 +1057,6 @@ function AssignmentChip({
       <span className="font-semibold">{slot.label}</span>
       <span className="truncate">{employee?.name ?? 'Open'}</span>
       {assignment?.locked && <Icon name="lock" />}
-      {isSource && <span className="rounded bg-white/80 px-1 text-[10px] font-bold uppercase tracking-wide text-red-900">Moving</span>}
-      {isDropTarget && <span className="rounded bg-white/80 px-1 text-[10px] font-bold uppercase tracking-wide text-green-900">Drop here</span>}
     </span>
   )
 }
@@ -1166,16 +1164,6 @@ function SlotEditor({
         />
         Keep this person here
       </label>
-      {isSource && (
-        <div className="mt-2 rounded border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-950">
-          Moving from this spot
-        </div>
-      )}
-      {isDropTarget && (
-        <div className="mt-2 rounded border border-green-300 bg-white px-2 py-1 text-xs font-medium text-green-950">
-          Drop here to try this spot
-        </div>
-      )}
       {dropFeedback && (
         <div className="mt-2 rounded border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-950">
           {dropFeedback}
