@@ -376,6 +376,44 @@ function reviewLabel(violation: ValidationViolation, slots: StaffingSlot[], empl
   return violation.message
 }
 
+function fixAdvice(code: string) {
+  if (code === 'missing_assignment') return 'Pick someone for this spot, or add a new employee.'
+  if (code === 'unavailable_employee') return 'They are not free then. Pick someone else for this spot.'
+  if (code === 'unqualified_employee') return 'Pick someone trained for this position.'
+  if (code === 'inactive_employee') return 'They are off the list. Pick someone else, or turn them back on.'
+  if (code === 'overlapping_assignment') return 'They are in two places at once. Move one of the two.'
+  if (code === 'max_days_exceeded') return 'Give this shift to someone else, or raise their weekly day limit.'
+  if (code === 'max_shifts_exceeded') return 'Give this shift to someone else, or raise their weekly shift limit.'
+  if (code === 'prohibited_double') return 'Pick someone else for one of the two shifts that day.'
+  if (code === 'incompatible_pair') return 'These two should not work the same shift. Move one of them.'
+  if (code === 'locked_assignment_changed') return 'A spot you marked Keep changed. Confirm it still works.'
+  return 'Nobody on the list can cover this. Add someone, or turn an inactive person back on.'
+}
+
+function candidatesForSlot({
+  slot,
+  employees,
+  slots,
+  assignments,
+}: {
+  slot: StaffingSlot
+  employees: Employee[]
+  slots: StaffingSlot[]
+  assignments: ScheduleAssignment[]
+}) {
+  const others = assignments.filter((assignment) => assignment.slotId !== slot.id)
+
+  return employees.filter((employee) => {
+    if (!employee.active || !isEmployeeQualified(employee, slot) || !isEmployeeAvailableForSlot(employee, slot)) return false
+    const proposed = [...others, { slotId: slot.id, employeeId: employee.id }]
+    return (
+      validateSchedule({ employees, slots, assignments: proposed, requireCoverage: false }).filter(
+        (violation) => violation.slotId === slot.id || violation.employeeId === employee.id,
+      ).length === 0
+    )
+  })
+}
+
 function buildFixIssues(
   readinessProblems: Diagnostic[],
   violations: ValidationViolation[],
@@ -391,7 +429,7 @@ function buildFixIssues(
     issues.push({
       id: `ready:${problem.code}:${problem.slotId ?? problem.day ?? ''}:${problem.period ?? ''}:${problem.role ?? ''}`,
       title: diagnosticLabel(problem),
-      detail: 'Add or reactivate someone who can cover this shift.',
+      detail: fixAdvice(problem.code),
       slot,
     })
   }
@@ -402,7 +440,7 @@ function buildFixIssues(
     issues.push({
       id: `review:${violation.code}:${violation.slotId ?? ''}:${violation.employeeId ?? ''}:${violation.message}`,
       title: reviewLabel(violation, slots, employees),
-      detail: violation.message,
+      detail: fixAdvice(violation.code),
       slot,
       employee,
     })
@@ -424,6 +462,7 @@ export default function SchedulerDemo() {
   const [dropFeedback, setDropFeedback] = useState<DropFeedback>(null)
   const [history, setHistory] = useState<HistorySnapshot[]>([])
   const [ignoredIssueIds, setIgnoredIssueIds] = useState<string[]>([])
+  const [guidedChoosing, setGuidedChoosing] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
   const slots = useMemo(() => expandTemplate(seedTemplate), [])
   const readinessProblems = useMemo(() => preflightDiagnostics(employees, slots), [employees, slots])
@@ -468,6 +507,14 @@ export default function SchedulerDemo() {
   )
   const visibleFixIssues = fixIssues.filter((issue) => !ignoredIssueIds.includes(issue.id))
   const nextIssue = visibleFixIssues[0]
+  const fixCandidates = useMemo(
+    () =>
+      nextIssue?.slot
+        ? candidatesForSlot({ slot: nextIssue.slot, employees, slots, assignments })
+        : [],
+    [assignments, employees, nextIssue, slots],
+  )
+  const ignoredCount = fixIssues.filter((issue) => ignoredIssueIds.includes(issue.id)).length
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
   const lockedCount = assignments.filter((assignment) => assignment.locked).length
   const assignedCount = assignments.filter((assignment) => assignment.employeeId).length
@@ -529,12 +576,25 @@ export default function SchedulerDemo() {
 
   function fixNextIssue() {
     if (!nextIssue) return
+    setGuidedChoosing(true)
     openSlot(nextIssue.slot?.id)
+  }
+
+  // Staying in guided mode after a pick walks the manager straight to the next spot.
+  function chooseForIssue(employeeId: string) {
+    const slotId = nextIssue?.slot?.id
+    if (!slotId) return
+    setEmployeeAssignment(slotId, employeeId)
   }
 
   function ignoreNextIssue() {
     if (!nextIssue) return
     setIgnoredIssueIds((current) => [...current, nextIssue.id])
+  }
+
+  function showIgnoredIssues() {
+    setIgnoredIssueIds([])
+    setGuidedChoosing(true)
   }
 
   function generationMessage(variant: ScheduleVariant, objectiveScore: number | null) {
@@ -550,6 +610,7 @@ export default function SchedulerDemo() {
     remember('previous schedule')
     setSelectedVariant(variant)
     setIgnoredIssueIds([])
+    setGuidedChoosing(false)
     const result = generateSchedule(
       { employees, template: seedTemplate },
       { existingAssignments: assignments.filter((assignment) => assignment.locked) },
@@ -568,13 +629,13 @@ export default function SchedulerDemo() {
     setDraft(blankDraft())
     setEmployeePanelOpen(false)
     setIgnoredIssueIds([])
+    setGuidedChoosing(false)
     setSelectedVariant('balanced')
   }
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
     remember('changed one assignment')
     setDropFeedback(null)
-    setIgnoredIssueIds([])
     setAssignments((current) => {
       const existing = current.find((assignment) => assignment.slotId === slotId)
       if (!employeeId) return current.filter((assignment) => assignment.slotId !== slotId)
@@ -611,7 +672,6 @@ export default function SchedulerDemo() {
     }
 
     remember(`moved ${employee.name}`)
-    setIgnoredIssueIds([])
     setAssignments(proposeMovedAssignments(move, assignments, targetSlotId))
     setDropFeedback(null)
   }
@@ -666,7 +726,6 @@ export default function SchedulerDemo() {
 
   function updateEmployee(employeeId: string, update: Partial<Employee>) {
     remember('updated staff list')
-    setIgnoredIssueIds([])
     setEmployees((current) =>
       current.map((employee) => (employee.id === employeeId ? { ...employee, ...update } : employee)),
     )
@@ -755,9 +814,15 @@ export default function SchedulerDemo() {
           <GuidedFixPanel
             nextIssue={nextIssue}
             issueCount={visibleFixIssues.length}
+            ignoredCount={ignoredCount}
+            candidates={fixCandidates}
+            choosing={guidedChoosing}
+            hasSchedule={assignments.length > 0}
             onChooseEmployee={fixNextIssue}
+            onPickEmployee={chooseForIssue}
             onAddEmployee={() => addEmployeeForSlot(nextIssue?.slot)}
             onIgnore={ignoreNextIssue}
+            onShowIgnored={showIgnoredIssues}
           />
 
           <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
@@ -1056,42 +1121,68 @@ function EmployeeCard({ employee, onUpdate }: { employee: Employee; onUpdate: (e
 function GuidedFixPanel({
   nextIssue,
   issueCount,
+  ignoredCount,
+  candidates,
+  choosing,
+  hasSchedule,
   onChooseEmployee,
+  onPickEmployee,
   onAddEmployee,
   onIgnore,
+  onShowIgnored,
 }: {
   nextIssue?: FixIssue
   issueCount: number
+  ignoredCount: number
+  candidates: Employee[]
+  choosing: boolean
+  hasSchedule: boolean
   onChooseEmployee: () => void
+  onPickEmployee: (employeeId: string) => void
   onAddEmployee: () => void
   onIgnore: () => void
+  onShowIgnored: () => void
 }) {
   if (!nextIssue) {
     return (
-      <section className="rounded border border-green-200 bg-green-50 p-4">
-        <div className="flex items-start gap-3">
+      <section className="rounded-lg border border-green-300 bg-green-50 p-4 shadow-sm">
+        <div className="flex flex-wrap items-start gap-3">
           <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-700 text-white">
             <Icon name="check" />
           </span>
-          <div>
-            <h2 className="text-lg font-semibold text-green-950">No schedule fixes waiting</h2>
-            <p className="mt-1 text-sm text-green-900">Make a schedule, then use this panel to walk through anything that needs a manager decision.</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold text-green-950">
+              {hasSchedule ? 'Nothing left to fix' : 'Ready when you are'}
+            </h2>
+            <p className="mt-1 text-sm text-green-900">
+              {hasSchedule
+                ? 'Every spot is filled and nobody is double-booked.'
+                : 'Press Make schedule. Anything that needs a decision will show up here, one at a time.'}
+            </p>
           </div>
+          {ignoredCount > 0 && (
+            <Button onClick={onShowIgnored} icon="undo">
+              Show {ignoredCount} skipped
+            </Button>
+          )}
         </div>
       </section>
     )
   }
 
   return (
-    <section className="rounded border border-amber-300 bg-amber-50 p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-amber-900">{issueCount} spot{issueCount === 1 ? '' : 's'} need fixing</p>
+    <section className="rounded-lg border border-amber-400 bg-amber-50 p-4 shadow-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-amber-900">
+            {issueCount} spot{issueCount === 1 ? '' : 's'} need fixing
+            {ignoredCount > 0 && ` · ${ignoredCount} skipped`}
+          </p>
           <h2 className="mt-1 text-lg font-semibold text-amber-950">{nextIssue.title}</h2>
           <p className="mt-1 text-sm text-amber-900">{nextIssue.detail}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={onChooseEmployee} icon="target" disabled={!nextIssue.slot}>
+          <Button tone="primary" onClick={onChooseEmployee} icon="target" disabled={!nextIssue.slot}>
             Choose employee
           </Button>
           <Button onClick={onAddEmployee} icon="plus">
@@ -1102,6 +1193,36 @@ function GuidedFixPanel({
           </Button>
         </div>
       </div>
+
+      {choosing && nextIssue.slot && (
+        <div className="mt-4 rounded border border-amber-300 bg-white p-3">
+          {candidates.length > 0 ? (
+            <>
+              <p className="text-sm font-semibold text-zinc-900">
+                Who should work {nextIssue.slot.day} {periodLabels[nextIssue.slot.period]} as {nextIssue.slot.label}?
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {candidates.map((candidate) => (
+                  <button
+                    key={candidate.id}
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded border border-green-500 bg-green-50 px-3 py-2 text-sm font-semibold text-green-950 hover:bg-green-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={() => onPickEmployee(candidate.id)}
+                  >
+                    <Icon name="check" />
+                    {candidate.name}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-zinc-500">Everyone here is free and trained for this position.</p>
+            </>
+          ) : (
+            <p className="text-sm text-zinc-700">
+              Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.
+            </p>
+          )}
+        </div>
+      )}
     </section>
   )
 }
