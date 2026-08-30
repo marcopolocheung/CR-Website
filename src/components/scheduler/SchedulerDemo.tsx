@@ -50,6 +50,30 @@ type DropFeedback = {
   message: string
 } | null
 
+type HistorySnapshot = {
+  label: string
+  employees: Employee[]
+  assignments: ScheduleAssignment[]
+  diagnostics: string[]
+}
+
+type ScheduleVariant = 'balanced' | 'fewestDoubles' | 'similarWeek' | 'fairHours'
+
+type FixIssue = {
+  id: string
+  title: string
+  detail: string
+  slot?: StaffingSlot
+  employee?: Employee
+}
+
+type MovePreview = {
+  status: 'valid' | 'invalid'
+  message: string
+  employeeName: string
+  replacedName?: string
+}
+
 const roleLabels: Record<Role, string> = {
   server: 'Server',
   cashier: 'Cashier',
@@ -72,6 +96,13 @@ const roleChipClasses: Record<Role, string> = {
 const fullDay = { start: minutes(9, 30), end: minutes(23) }
 const amShift = { start: minutes(9, 30), end: minutes(16) }
 const pmShift = { start: minutes(16), end: minutes(23) }
+
+const scheduleVariants: { id: ScheduleVariant; label: string; description: string }[] = [
+  { id: 'balanced', label: 'Balanced schedule', description: 'Spreads shifts across the available staff.' },
+  { id: 'fewestDoubles', label: 'Fewest doubles', description: 'Tries the same deterministic schedule with double-shift pressure called out.' },
+  { id: 'similarWeek', label: 'Keep locked people', description: 'Regenerates around anyone marked Keep.' },
+  { id: 'fairHours', label: 'Fair hours', description: 'Reviews the schedule by total assigned hours.' },
+]
 
 function cloneEmployees() {
   return seedEmployees.map((employee) => ({
@@ -137,6 +168,24 @@ function createEmployeeId(name: string, employees: Employee[]) {
   return id
 }
 
+function cloneEmployeeList(employees: Employee[]) {
+  return employees.map((employee) => ({
+    ...employee,
+    roles: [...employee.roles],
+    recurringAvailability: Object.fromEntries(
+      Object.entries(employee.recurringAvailability).map(([day, ranges]) => [
+        day,
+        ranges?.map((range) => ({ ...range })) ?? [],
+      ]),
+    ) as Employee['recurringAvailability'],
+    incompatibleEmployeeIds: [...(employee.incompatibleEmployeeIds ?? [])],
+  }))
+}
+
+function cloneAssignmentList(assignments: ScheduleAssignment[]) {
+  return assignments.map((assignment) => ({ ...assignment }))
+}
+
 function diagnosticLabel(diagnostic: Diagnostic) {
   if (diagnostic.day && diagnostic.period && diagnostic.role) {
     return `${diagnostic.day} ${periodLabels[diagnostic.period]} needs ${roleLabels[diagnostic.role]} coverage.`
@@ -161,6 +210,86 @@ function dragErrorMessage(employee: Employee, slot: StaffingSlot, violations: Va
   return first.message
 }
 
+function proposeMovedAssignments(
+  dragState: DragState,
+  assignments: ScheduleAssignment[],
+  targetSlotId: string,
+) {
+  const targetAssignment = assignments.find((assignment) => assignment.slotId === targetSlotId)
+  const proposed = assignments
+    .map((assignment) => {
+      if (assignment.slotId === targetSlotId) {
+        return { ...assignment, employeeId: dragState.employeeId, locked: false }
+      }
+      if (assignment.slotId === dragState.fromSlotId) {
+        return targetAssignment?.employeeId
+          ? { ...assignment, employeeId: targetAssignment.employeeId, locked: false }
+          : { ...assignment, employeeId: '' }
+      }
+      return assignment
+    })
+    .filter((assignment) => assignment.employeeId)
+
+  const targetExists = proposed.some((assignment) => assignment.slotId === targetSlotId)
+  return targetExists ? proposed : [...proposed, { slotId: targetSlotId, employeeId: dragState.employeeId }]
+}
+
+function reviewLabel(violation: ValidationViolation, slots: StaffingSlot[], employees: Employee[]) {
+  const slot = slots.find((candidate) => candidate.id === violation.slotId)
+  const employee = employees.find((candidate) => candidate.id === violation.employeeId)
+  const shift = slot ? `${slot.day} ${periodLabels[slot.period]}` : 'This schedule'
+  const position = slot?.label ?? 'this spot'
+  const name = employee?.name ?? 'Someone'
+
+  if (violation.code === 'missing_assignment') return `${shift} needs ${position}.`
+  if (violation.code === 'unqualified_employee') return `${name} is not set up for ${position}.`
+  if (violation.code === 'unavailable_employee') return `${name} cannot work ${shift}.`
+  if (violation.code === 'inactive_employee') return `${name} is inactive.`
+  if (violation.code === 'overlapping_assignment') return `${name} is already working at that time.`
+  if (violation.code === 'max_days_exceeded') return `${name} has too many work days.`
+  if (violation.code === 'max_shifts_exceeded') return `${name} has too many shifts.`
+  if (violation.code === 'prohibited_double') return `${name} cannot work both shifts that day.`
+  if (violation.code === 'incompatible_pair') return violation.message
+  if (violation.code === 'locked_assignment_changed') return `A kept spot changed and needs review.`
+
+  return violation.message
+}
+
+function buildFixIssues(
+  readinessProblems: Diagnostic[],
+  violations: ValidationViolation[],
+  slots: StaffingSlot[],
+  employees: Employee[],
+) {
+  const issues: FixIssue[] = []
+
+  for (const problem of readinessProblems) {
+    const slot = problem.slotId
+      ? slots.find((candidate) => candidate.id === problem.slotId)
+      : slots.find((candidate) => candidate.day === problem.day && candidate.period === problem.period && candidate.role === problem.role)
+    issues.push({
+      id: `ready:${problem.code}:${problem.slotId ?? problem.day ?? ''}:${problem.period ?? ''}:${problem.role ?? ''}`,
+      title: diagnosticLabel(problem),
+      detail: 'Add or reactivate someone who can cover this shift.',
+      slot,
+    })
+  }
+
+  for (const violation of violations) {
+    const slot = slots.find((candidate) => candidate.id === violation.slotId)
+    const employee = employees.find((candidate) => candidate.id === violation.employeeId)
+    issues.push({
+      id: `review:${violation.code}:${violation.slotId ?? ''}:${violation.employeeId ?? ''}:${violation.message}`,
+      title: reviewLabel(violation, slots, employees),
+      detail: violation.message,
+      slot,
+      employee,
+    })
+  }
+
+  return issues
+}
+
 export default function SchedulerDemo() {
   const [employees, setEmployees] = useState<Employee[]>(cloneEmployees)
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([])
@@ -171,6 +300,9 @@ export default function SchedulerDemo() {
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [dragOverSlotId, setDragOverSlotId] = useState<string | null>(null)
   const [dropFeedback, setDropFeedback] = useState<DropFeedback>(null)
+  const [history, setHistory] = useState<HistorySnapshot[]>([])
+  const [ignoredIssueIds, setIgnoredIssueIds] = useState<string[]>([])
+  const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
   const slots = useMemo(() => expandTemplate(seedTemplate), [])
   const readinessProblems = useMemo(() => preflightDiagnostics(employees, slots), [employees, slots])
   const firstGap = readinessProblems.find((problem) => problem.day && problem.period && problem.role)
@@ -196,6 +328,12 @@ export default function SchedulerDemo() {
     () => new Map(assignments.map((assignment) => [assignment.slotId, assignment])),
     [assignments],
   )
+  const fixIssues = useMemo(
+    () => buildFixIssues(readinessProblems, violations, slots, employees),
+    [employees, readinessProblems, slots, violations],
+  )
+  const visibleFixIssues = fixIssues.filter((issue) => !ignoredIssueIds.includes(issue.id))
+  const nextIssue = visibleFixIssues[0]
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
   const lockedCount = assignments.filter((assignment) => assignment.locked).length
   const assignedCount = assignments.filter((assignment) => assignment.employeeId).length
@@ -203,27 +341,97 @@ export default function SchedulerDemo() {
   const selectedRoles = ROLES.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && selectedRoles.length > 0
 
-  function generate() {
+  function remember(label: string) {
+    setHistory((current) => [
+      {
+        label,
+        employees: cloneEmployeeList(employees),
+        assignments: cloneAssignmentList(assignments),
+        diagnostics: [...diagnostics],
+      },
+      ...current.slice(0, 5),
+    ])
+  }
+
+  function undoLastChange() {
+    const [snapshot, ...rest] = history
+    if (!snapshot) return
+    setEmployees(cloneEmployeeList(snapshot.employees))
+    setAssignments(cloneAssignmentList(snapshot.assignments))
+    setDiagnostics([`Undid: ${snapshot.label}`])
+    setHistory(rest)
+    setDropFeedback(null)
+    setDragState(null)
+    setDragOverSlotId(null)
+  }
+
+  function openSlot(slotId?: string) {
+    if (!slotId) return
+    const slot = slots.find((candidate) => candidate.id === slotId)
+    if (!slot) return
+    setOpenShiftKey(`${slot.day}-${slot.period}`)
+  }
+
+  function addEmployeeForSlot(slot?: StaffingSlot) {
+    if (slot) {
+      setDraft(blankDraft(slot.role, 'gap'))
+      setOpenShiftKey(`${slot.day}-${slot.period}`)
+    } else if (firstGap?.role) {
+      setDraft(blankDraft(firstGap.role, 'gap'))
+    } else {
+      setDraft(blankDraft())
+    }
+    setEmployeePanelOpen(true)
+  }
+
+  function fixNextIssue() {
+    if (!nextIssue) return
+    openSlot(nextIssue.slot?.id)
+  }
+
+  function ignoreNextIssue() {
+    if (!nextIssue) return
+    setIgnoredIssueIds((current) => [...current, nextIssue.id])
+  }
+
+  function generationMessage(variant: ScheduleVariant, objectiveScore: number | null) {
+    const label = scheduleVariants.find((candidate) => candidate.id === variant)?.label ?? 'Schedule'
+    const score = objectiveScore === null ? '' : ` Score ${objectiveScore}.`
+    if (variant === 'fewestDoubles') return `${label} generated. Review any same-day doubles before publishing.${score}`
+    if (variant === 'similarWeek') return `${label} generated around the people marked Keep.${score}`
+    if (variant === 'fairHours') return `${label} generated. Check Employee totals for hour balance.${score}`
+    return `${label} generated.${score}`
+  }
+
+  function generate(variant: ScheduleVariant = selectedVariant) {
+    remember('previous schedule')
+    setSelectedVariant(variant)
+    setIgnoredIssueIds([])
     const result = generateSchedule(
       { employees, template: seedTemplate },
       { existingAssignments: assignments.filter((assignment) => assignment.locked) },
     )
-    setDiagnostics(result.diagnostics.map((diagnostic) => diagnostic.message))
+    setDiagnostics([generationMessage(variant, result.objectiveScore), ...result.diagnostics.map((diagnostic) => diagnostic.message)])
     if (result.status !== 'INFEASIBLE') {
       setAssignments(result.assignments)
     }
   }
 
   function reset() {
+    remember('reset demo')
     setEmployees(cloneEmployees())
     setAssignments([])
     setDiagnostics([])
     setDraft(blankDraft())
     setEmployeePanelOpen(false)
+    setIgnoredIssueIds([])
+    setSelectedVariant('balanced')
   }
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
+    remember('changed one assignment')
     setDropFeedback(null)
+    setIgnoredIssueIds([])
     setAssignments((current) => {
       const existing = current.find((assignment) => assignment.slotId === slotId)
       if (!employeeId) return current.filter((assignment) => assignment.slotId !== slotId)
@@ -237,9 +445,54 @@ export default function SchedulerDemo() {
   }
 
   function setLocked(slotId: string, locked: boolean) {
+    remember(locked ? 'kept one assignment' : 'released one kept assignment')
     setAssignments((current) =>
       current.map((assignment) => (assignment.slotId === slotId ? { ...assignment, locked } : assignment)),
     )
+  }
+
+  function getMovePreview(targetSlotId: string): MovePreview | null {
+    if (!dragState || dragState.fromSlotId === targetSlotId) return null
+    const targetSlot = slots.find((slot) => slot.id === targetSlotId)
+    const sourceSlot = slots.find((slot) => slot.id === dragState.fromSlotId)
+    const employee = employees.find((candidate) => candidate.id === dragState.employeeId)
+    if (!targetSlot || !sourceSlot || !employee) return null
+
+    const sourceAssignment = assignmentMap.get(dragState.fromSlotId)
+    const targetAssignment = assignmentMap.get(targetSlotId)
+    const replacedEmployee = employees.find((candidate) => candidate.id === targetAssignment?.employeeId)
+    if (sourceAssignment?.locked) {
+      return { status: 'invalid', employeeName: employee.name, message: `${employee.name} is marked Keep and cannot move yet.` }
+    }
+    if (targetAssignment?.locked) {
+      return { status: 'invalid', employeeName: employee.name, message: `${targetSlot.label} is marked Keep.` }
+    }
+
+    const proposedAssignments = proposeMovedAssignments(dragState, assignments, targetSlotId)
+    const moveViolations = validateSchedule({
+      employees,
+      slots,
+      assignments: proposedAssignments,
+      requireCoverage: false,
+    }).filter((violation) => violation.slotId === targetSlotId || violation.employeeId === dragState.employeeId)
+
+    if (moveViolations.length > 0) {
+      return {
+        status: 'invalid',
+        employeeName: employee.name,
+        replacedName: replacedEmployee?.name,
+        message: dragErrorMessage(employee, targetSlot, moveViolations),
+      }
+    }
+
+    return {
+      status: 'valid',
+      employeeName: employee.name,
+      replacedName: replacedEmployee?.name,
+      message: replacedEmployee
+        ? `${employee.name} would replace ${replacedEmployee.name}.`
+        : `${employee.name} fits here.`,
+    }
   }
 
   function moveAssignment(targetSlotId: string) {
@@ -263,22 +516,7 @@ export default function SchedulerDemo() {
       return
     }
 
-    const proposed = assignments
-      .map((assignment) => {
-        if (assignment.slotId === targetSlotId) {
-          return { ...assignment, employeeId: dragState.employeeId, locked: false }
-        }
-        if (assignment.slotId === dragState.fromSlotId) {
-          return targetAssignment?.employeeId
-            ? { ...assignment, employeeId: targetAssignment.employeeId, locked: false }
-            : { ...assignment, employeeId: '' }
-        }
-        return assignment
-      })
-      .filter((assignment) => assignment.employeeId)
-
-    const targetExists = proposed.some((assignment) => assignment.slotId === targetSlotId)
-    const proposedAssignments = targetExists ? proposed : [...proposed, { slotId: targetSlotId, employeeId: dragState.employeeId }]
+    const proposedAssignments = proposeMovedAssignments(dragState, assignments, targetSlotId)
     const moveViolations = validateSchedule({
       employees,
       slots,
@@ -295,6 +533,8 @@ export default function SchedulerDemo() {
       return
     }
 
+    remember(`moved ${employee.name}`)
+    setIgnoredIssueIds([])
     setAssignments(proposedAssignments)
     setDropFeedback(null)
   }
@@ -320,22 +560,20 @@ export default function SchedulerDemo() {
   }
 
   function updateEmployee(employeeId: string, update: Partial<Employee>) {
+    remember('updated staff list')
+    setIgnoredIssueIds([])
     setEmployees((current) =>
       current.map((employee) => (employee.id === employeeId ? { ...employee, ...update } : employee)),
     )
   }
 
   function openEmployeePanelForGap() {
-    if (firstGap?.role) {
-      setDraft(blankDraft(firstGap.role, 'gap'))
-    } else {
-      setDraft(blankDraft())
-    }
-    setEmployeePanelOpen(true)
+    addEmployeeForSlot(gapSlot)
   }
 
   function addEmployee() {
     if (!canAddEmployee) return
+    remember('added employee')
     const employee: Employee = {
       id: createEmployeeId(draft.name, employees),
       name: draft.name.trim(),
@@ -350,10 +588,12 @@ export default function SchedulerDemo() {
     setEmployees((current) => [...current, employee])
     setDraft(blankDraft(firstGap?.role ?? selectedRoles[0], firstGap ? 'gap' : 'all'))
     setEmployeePanelOpen(false)
+    setIgnoredIssueIds([])
     setDiagnostics([`${employee.name} was added. Make the schedule again when the staff list looks right.`])
   }
 
   function makeInfeasible() {
+    remember('gap example')
     setEmployees((current) =>
       current.map((employee) =>
         employee.roles.includes('lead') || employee.roles.includes('manager')
@@ -361,6 +601,7 @@ export default function SchedulerDemo() {
           : employee,
       ),
     )
+    setIgnoredIssueIds([])
     setDiagnostics(['Lead and manager employees were deactivated. Make the schedule again to see where coverage is missing.'])
   }
 
@@ -377,8 +618,14 @@ export default function SchedulerDemo() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button tone="primary" onClick={generate} icon="spark">
+              <Button tone="primary" onClick={() => generate()} icon="spark">
                 Make schedule
+              </Button>
+              <Button onClick={fixNextIssue} icon="target" disabled={!nextIssue}>
+                Fix next issue
+              </Button>
+              <Button onClick={undoLastChange} icon="undo" disabled={history.length === 0}>
+                Undo
               </Button>
               <Button onClick={openEmployeePanelForGap} icon="plus">
                 Add employee
@@ -398,15 +645,15 @@ export default function SchedulerDemo() {
             <StatusPanel label="Kept in place" value={String(lockedCount)} />
             <StatusPanel
               label="Schedule check"
-              value={schedulePassing ? 'Ready' : assignments.length > 0 ? `${violations.length} to fix` : 'Not made'}
+              value={schedulePassing ? 'Ready' : assignments.length > 0 ? `${violations.length} spot${violations.length === 1 ? '' : 's'} to fix` : 'Not made'}
               tone={schedulePassing ? 'good' : assignments.length > 0 ? 'warn' : 'plain'}
             />
           </div>
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <aside className="space-y-6">
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <aside className="order-2 space-y-6">
           <section className="rounded border border-zinc-200 bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -467,13 +714,21 @@ export default function SchedulerDemo() {
           </section>
         </aside>
 
-        <main className="space-y-6">
+        <main className="order-1 space-y-6">
+          <GuidedFixPanel
+            nextIssue={nextIssue}
+            issueCount={visibleFixIssues.length}
+            onChooseEmployee={fixNextIssue}
+            onAddEmployee={() => addEmployeeForSlot(nextIssue?.slot)}
+            onIgnore={ignoreNextIssue}
+          />
+
           {(diagnostics.length > 0 || violations.length > 0) && (
             <section className="rounded border border-amber-300 bg-amber-50 p-4">
               <h2 className="text-lg font-semibold text-amber-950">Needs attention</h2>
               <div className="mt-3 grid gap-4 lg:grid-cols-2">
                 <MessageList title="Schedule maker" messages={diagnostics} empty="No messages." />
-                <MessageList title="Review" messages={violations.map((violation) => violation.message)} empty="No review items." />
+                <MessageList title="Review" messages={violations.map((violation) => reviewLabel(violation, slots, employees))} empty="No review items." />
               </div>
             </section>
           )}
@@ -488,6 +743,10 @@ export default function SchedulerDemo() {
                 Show gap example
               </Button>
             </div>
+            <VariantControls
+              selectedVariant={selectedVariant}
+              onGenerate={generate}
+            />
             <WeeklyScheduleBoard
               slots={slots}
               employees={employees}
@@ -497,6 +756,7 @@ export default function SchedulerDemo() {
               dragState={dragState}
               dragOverSlotId={dragOverSlotId}
               dropFeedback={dropFeedback}
+              getMovePreview={getMovePreview}
               onOpenShift={setOpenShiftKey}
               onAssign={setEmployeeAssignment}
               onLock={setLocked}
@@ -509,32 +769,7 @@ export default function SchedulerDemo() {
           </section>
 
           <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="rounded border border-zinc-200 bg-white p-4">
-              <h2 className="text-lg font-semibold">Staffing plan</h2>
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[700px] text-left text-sm">
-                  <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
-                    <tr>
-                      <th className="py-2 pr-3">Day</th>
-                      <th className="py-2 pr-3">Shift</th>
-                      <th className="py-2 pr-3">Position</th>
-                      <th className="py-2 pr-3">Hours</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {slots.map((slot) => (
-                      <tr key={slot.id}>
-                        <td className="py-2 pr-3 font-medium text-zinc-900">{slot.day}</td>
-                        <td className="py-2 pr-3 text-zinc-700">{periodLabels[slot.period]}</td>
-                        <td className="py-2 pr-3 text-zinc-700">{slot.label}</td>
-                        <td className="py-2 pr-3 text-zinc-700">{formatTimeRange(slot)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
+            <ScheduleRules slots={slots} />
             <div className="rounded border border-zinc-200 bg-white p-4">
               <h2 className="text-lg font-semibold">Employee totals</h2>
               <div className="mt-4 space-y-2">
@@ -554,14 +789,14 @@ export default function SchedulerDemo() {
             </div>
           </section>
 
-          <section className="rounded border border-zinc-200 bg-white p-4">
-            <h2 className="text-lg font-semibold">Demo assumptions</h2>
+          <details className="rounded border border-zinc-200 bg-white p-4">
+            <summary className="cursor-pointer text-lg font-semibold text-zinc-950">Demo assumptions</summary>
             <ul className="mt-3 space-y-2 text-sm text-zinc-700">
               {schedulerAssumptions.map((assumption) => (
                 <li key={assumption}>{assumption}</li>
               ))}
             </ul>
-          </section>
+          </details>
         </main>
       </div>
     </div>
@@ -713,24 +948,138 @@ function EmployeeCard({ employee, onUpdate }: { employee: Employee; onUpdate: (e
   )
 }
 
+function GuidedFixPanel({
+  nextIssue,
+  issueCount,
+  onChooseEmployee,
+  onAddEmployee,
+  onIgnore,
+}: {
+  nextIssue?: FixIssue
+  issueCount: number
+  onChooseEmployee: () => void
+  onAddEmployee: () => void
+  onIgnore: () => void
+}) {
+  if (!nextIssue) {
+    return (
+      <section className="rounded border border-green-200 bg-green-50 p-4">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-700 text-white">
+            <Icon name="check" />
+          </span>
+          <div>
+            <h2 className="text-lg font-semibold text-green-950">No schedule fixes waiting</h2>
+            <p className="mt-1 text-sm text-green-900">Make a schedule, then use this panel to walk through anything that needs a manager decision.</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="rounded border border-amber-300 bg-amber-50 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-amber-900">{issueCount} spot{issueCount === 1 ? '' : 's'} need fixing</p>
+          <h2 className="mt-1 text-lg font-semibold text-amber-950">{nextIssue.title}</h2>
+          <p className="mt-1 text-sm text-amber-900">{nextIssue.detail}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={onChooseEmployee} icon="target" disabled={!nextIssue.slot}>
+            Choose employee
+          </Button>
+          <Button onClick={onAddEmployee} icon="plus">
+            Add employee
+          </Button>
+          <Button onClick={onIgnore} icon="close">
+            Ignore for now
+          </Button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function VariantControls({
+  selectedVariant,
+  onGenerate,
+}: {
+  selectedVariant: ScheduleVariant
+  onGenerate: (variant: ScheduleVariant) => void
+}) {
+  return (
+    <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-100 pt-4">
+      {scheduleVariants.map((variant) => (
+        <button
+          key={variant.id}
+          type="button"
+          className={`inline-flex items-center justify-center gap-2 rounded border px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${
+            selectedVariant === variant.id
+              ? 'border-red-800 bg-red-800 text-white'
+              : 'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100'
+          }`}
+          onClick={() => onGenerate(variant.id)}
+          title={variant.description}
+        >
+          <Icon name={variant.id === 'balanced' ? 'spark' : variant.id === 'similarWeek' ? 'lock' : 'target'} />
+          {variant.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ScheduleRules({ slots }: { slots: StaffingSlot[] }) {
+  return (
+    <details className="rounded border border-zinc-200 bg-white p-4">
+      <summary className="cursor-pointer text-lg font-semibold text-zinc-950">Schedule rules</summary>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[700px] text-left text-sm">
+          <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
+            <tr>
+              <th className="py-2 pr-3">Day</th>
+              <th className="py-2 pr-3">Shift</th>
+              <th className="py-2 pr-3">Position</th>
+              <th className="py-2 pr-3">Hours</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {slots.map((slot) => (
+              <tr key={slot.id}>
+                <td className="py-2 pr-3 font-medium text-zinc-900">{slot.day}</td>
+                <td className="py-2 pr-3 text-zinc-700">{periodLabels[slot.period]}</td>
+                <td className="py-2 pr-3 text-zinc-700">{slot.label}</td>
+                <td className="py-2 pr-3 text-zinc-700">{formatTimeRange(slot)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  )
+}
+
 function Button({
   children,
   icon,
   tone = 'plain',
   onClick,
+  disabled = false,
 }: {
   children: React.ReactNode
   icon: IconName
   tone?: 'plain' | 'primary'
   onClick: () => void
+  disabled?: boolean
 }) {
   const className =
     tone === 'primary'
-      ? 'inline-flex items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
-      : 'inline-flex items-center justify-center gap-2 rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+      ? 'inline-flex items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+      : 'inline-flex items-center justify-center gap-2 rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
 
   return (
-    <button type="button" className={className} onClick={onClick}>
+    <button type="button" className={className} onClick={onClick} disabled={disabled}>
       <Icon name={icon} />
       {children}
     </button>
@@ -788,6 +1137,7 @@ function WeeklyScheduleBoard({
   dragState,
   dragOverSlotId,
   dropFeedback,
+  getMovePreview,
   onOpenShift,
   onAssign,
   onLock,
@@ -805,6 +1155,7 @@ function WeeklyScheduleBoard({
   dragState: DragState | null
   dragOverSlotId: string | null
   dropFeedback: DropFeedback
+  getMovePreview: (slotId: string) => MovePreview | null
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
@@ -839,6 +1190,7 @@ function WeeklyScheduleBoard({
                     dragState={dragState}
                     dragOverSlotId={dragOverSlotId}
                     dropFeedback={dropFeedback}
+                    getMovePreview={getMovePreview}
                     onOpenShift={onOpenShift}
                     onAssign={onAssign}
                     onLock={onLock}
@@ -882,6 +1234,7 @@ function ShiftRow({
   dragState,
   dragOverSlotId,
   dropFeedback,
+  getMovePreview,
   onOpenShift,
   onAssign,
   onLock,
@@ -902,6 +1255,7 @@ function ShiftRow({
   dragState: DragState | null
   dragOverSlotId: string | null
   dropFeedback: DropFeedback
+  getMovePreview: (slotId: string) => MovePreview | null
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
@@ -938,6 +1292,7 @@ function ShiftRow({
               hasIssue={violations.some((violation) => violation.slotId === slot.id)}
               dragState={dragState}
               dragOverSlotId={dragOverSlotId}
+              movePreview={getMovePreview(slot.id)}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
               onDragOverSlot={onDragOverSlot}
@@ -971,6 +1326,7 @@ function ShiftRow({
                 violations={violations.filter((violation) => violation.slotId === slot.id)}
                 dragState={dragState}
                 dragOverSlotId={dragOverSlotId}
+                movePreview={getMovePreview(slot.id)}
                 dropFeedback={dropFeedback?.slotId === slot.id ? dropFeedback.message : null}
                 onAssign={onAssign}
                 onLock={onLock}
@@ -993,6 +1349,7 @@ function AssignmentChip({
   hasIssue,
   dragState,
   dragOverSlotId,
+  movePreview,
   onDragStart,
   onDragEnd,
   onDragOverSlot,
@@ -1005,6 +1362,7 @@ function AssignmentChip({
   hasIssue: boolean
   dragState: DragState | null
   dragOverSlotId: string | null
+  movePreview: MovePreview | null
   onDragStart: (dragState: DragState) => void
   onDragEnd: () => void
   onDragOverSlot: (slotId: string) => void
@@ -1015,16 +1373,24 @@ function AssignmentChip({
   const isSource = dragState?.fromSlotId === slot.id
   const isDropTarget = dragOverSlotId === slot.id && Boolean(dragState) && !isSource
   const isDragging = Boolean(dragState)
+  let secondaryText = employee?.name ?? 'Open'
+  if (isSource) {
+    secondaryText = 'Open while moving'
+  } else if (isDropTarget && movePreview?.status === 'valid') {
+    secondaryText = employee ? `Would replace ${employee.name}` : movePreview.employeeName
+  }
+  const replacingClass = isDropTarget && movePreview?.status === 'valid' && employee ? ' animate-pulse' : ''
 
   return (
     <span
-      className={assignmentChipClass(slot.role, {
+      className={`${assignmentChipClass(slot.role, {
         hasIssue,
         isDragging,
         isDropTarget,
+        isInvalidDropTarget: isDropTarget && movePreview?.status === 'invalid',
         isEmpty: !assignment?.employeeId,
         isSource,
-      })}
+      })}${replacingClass}`}
       draggable={canDrag}
       onDragStart={(event) => {
         if (!assignment?.employeeId) return
@@ -1052,10 +1418,10 @@ function AssignmentChip({
         event.stopPropagation()
         onDropAssignment(slot.id)
       }}
-      title={canDrag ? 'Drag to another position' : 'Open position'}
+      title={movePreview?.message ?? (canDrag ? 'Drag to another position' : 'Open position')}
     >
       <span className="font-semibold">{slot.label}</span>
-      <span className="truncate">{employee?.name ?? 'Open'}</span>
+      <span className="truncate">{secondaryText}</span>
       {assignment?.locked && <Icon name="lock" />}
     </span>
   )
@@ -1068,6 +1434,7 @@ function SlotEditor({
   violations,
   dragState,
   dragOverSlotId,
+  movePreview,
   dropFeedback,
   onAssign,
   onLock,
@@ -1081,6 +1448,7 @@ function SlotEditor({
   violations: ValidationViolation[]
   dragState: DragState | null
   dragOverSlotId: string | null
+  movePreview: MovePreview | null
   dropFeedback: string | null
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
@@ -1094,7 +1462,9 @@ function SlotEditor({
   const isDropTarget = dragOverSlotId === slot.id && Boolean(dragState) && !isSource
   const panelTone =
     isDropTarget
-      ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+      ? movePreview?.status === 'invalid'
+        ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
+        : 'border-green-500 bg-green-50 ring-2 ring-green-200'
       : isSource
         ? 'border-red-300 bg-red-50 ring-2 ring-red-100'
         : violations.length > 0 || dropFeedback
@@ -1164,6 +1534,17 @@ function SlotEditor({
         />
         Keep this person here
       </label>
+      {isDropTarget && movePreview && (
+        <div
+          className={`mt-2 rounded border bg-white px-2 py-1 text-xs font-medium ${
+            movePreview.status === 'valid'
+              ? 'border-green-300 text-green-900'
+              : 'border-red-300 text-red-900'
+          }`}
+        >
+          {movePreview.message}
+        </div>
+      )}
       {dropFeedback && (
         <div className="mt-2 rounded border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-950">
           {dropFeedback}
@@ -1186,12 +1567,14 @@ function assignmentChipClass(
     hasIssue,
     isDragging,
     isDropTarget,
+    isInvalidDropTarget,
     isEmpty,
     isSource,
   }: {
     hasIssue: boolean
     isDragging: boolean
     isDropTarget: boolean
+    isInvalidDropTarget: boolean
     isEmpty: boolean
     isSource: boolean
   },
@@ -1203,6 +1586,9 @@ function assignmentChipClass(
   }
 
   if (isDropTarget) {
+    if (isInvalidDropTarget) {
+      return `${base} border-red-500 bg-red-50 text-red-950 ring-2 ring-red-300`
+    }
     return `${base} border-green-500 bg-green-50 text-green-950 ring-2 ring-green-300`
   }
 
@@ -1222,7 +1608,7 @@ function leftDropTarget(event: React.DragEvent<HTMLElement>) {
   return !(nextTarget instanceof Node && event.currentTarget.contains(nextTarget))
 }
 
-type IconName = 'check' | 'close' | 'lock' | 'plus' | 'print' | 'reset' | 'spark' | 'warning'
+type IconName = 'check' | 'close' | 'lock' | 'plus' | 'print' | 'reset' | 'spark' | 'target' | 'undo' | 'warning'
 
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -1233,6 +1619,8 @@ function Icon({ name }: { name: IconName }) {
     print: <path d="M7 8V4h10v4M7 17H5V9h14v8h-2M7 14h10v6H7z" />,
     reset: <path d="M4 12a8 8 0 1 0 2.3-5.7M4 5v5h5" />,
     spark: <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z" />,
+    target: <path d="M12 2v4M12 18v4M2 12h4M18 12h4M7 12a5 5 0 1 0 10 0 5 5 0 0 0-10 0zM10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0z" />,
+    undo: <path d="M9 14l-4-4 4-4M5 10h9a5 5 0 1 1 0 10h-1" />,
     warning: <path d="M12 9v4M12 17h.01M10.3 4.9L2.8 18a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.9a2 2 0 0 0-3.4 0z" />,
   }
 
