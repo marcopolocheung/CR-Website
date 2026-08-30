@@ -127,7 +127,7 @@ const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: stri
   },
   idle: {
     icon: 'plus',
-    chip: 'border-dashed border-zinc-300 bg-white text-zinc-500',
+    chip: 'border-dashed border-zinc-200 bg-white text-zinc-400',
     badge: 'border-zinc-200 bg-zinc-50 text-zinc-600',
     row: 'border-zinc-200 border-l-4 border-l-zinc-300',
     shiftRow: 'border-l-4 border-l-transparent bg-zinc-50',
@@ -585,6 +585,14 @@ export default function SchedulerDemo() {
   const ignoredCount = fixIssues.filter((issue) => ignoredIssueIds.includes(issue.id)).length
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
   const schedulePassing = assignments.length > 0 && violations.length === 0
+  const blockers = [
+    activeEmployeeCount === 0 ? 'Nobody is marked as working.' : null,
+    readinessProblems.length > 0
+      ? `${readinessProblems.length} shift${readinessProblems.length === 1 ? '' : 's'} nobody on the list can cover.`
+      : null,
+    assignments.length === 0 ? 'No schedule has been made yet.' : null,
+    assignments.length > 0 && !schedulePassing ? 'Some spots still need fixing.' : null,
+  ].filter((blocker): blocker is string => Boolean(blocker))
   const selectedRoles = ROLES.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && selectedRoles.length > 0
 
@@ -737,6 +745,7 @@ export default function SchedulerDemo() {
   }
 
   function reset() {
+    if (!window.confirm('Start over? This clears the schedule and every change to the staff list.')) return
     remember('reset demo')
     setEmployees(cloneEmployees())
     setAssignments([])
@@ -995,7 +1004,7 @@ export default function SchedulerDemo() {
           )}
 
           {diagnostics.length > 0 && (
-            <Disclosure summary={`Messages (${diagnostics.length})`}>
+            <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
               <ul className="space-y-1 text-sm text-zinc-700">
                 {diagnostics.map((message, index) => (
                   <li key={`${message}-${index}`}>{message}</li>
@@ -1004,13 +1013,14 @@ export default function SchedulerDemo() {
             </Disclosure>
           )}
 
-          <Disclosure summary="Hours for each person">
-            <HoursSummary stats={stats} />
-          </Disclosure>
+          <div className="space-y-1 pt-2">
+            <Disclosure summary="Hours for each person" tone="quiet">
+              <HoursSummary stats={stats} />
+            </Disclosure>
 
-          <ScheduleRules slots={slots} />
+            <ScheduleRules slots={slots} />
 
-          <Disclosure summary="About this demo">
+          <Disclosure summary="About this demo" tone="quiet">
             <ul className="space-y-2 text-sm text-zinc-700">
               {schedulerAssumptions.map((assumption) => (
                 <li key={assumption}>{assumption}</li>
@@ -1024,7 +1034,8 @@ export default function SchedulerDemo() {
               <Icon name="warning" />
               Show what a missing-coverage week looks like
             </button>
-          </Disclosure>
+            </Disclosure>
+          </div>
         </main>
 
         <aside className="order-2 space-y-4">
@@ -1064,21 +1075,22 @@ export default function SchedulerDemo() {
             </details>
           </section>
 
-          <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-            <h2 className="font-semibold">Before you print</h2>
-            <div className="mt-3 space-y-2">
-              <ChecklistItem complete={activeEmployeeCount > 0} label={`${activeEmployeeCount} people ready to work`} />
-              <ChecklistItem
-                complete={readinessProblems.length === 0}
-                label={
-                  readinessProblems.length === 0
-                    ? 'Every shift can be covered'
-                    : `${readinessProblems.length} shift${readinessProblems.length === 1 ? '' : 's'} nobody can cover`
-                }
-              />
-              <ChecklistItem complete={schedulePassing} label={schedulePassing ? 'Nothing left to fix' : 'Some spots still need fixing'} />
-            </div>
-          </section>
+          {blockers.length > 0 && (
+            <section className="rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
+              <h2 className="font-semibold text-amber-950">Before you print</h2>
+              <ul className="mt-3 space-y-2">
+                {blockers.map((blocker) => (
+                  <li key={blocker} className="flex items-start gap-2 text-sm text-amber-900">
+                    <span className="mt-0.5 shrink-0 text-amber-700">
+                      <Icon name="warning" />
+                    </span>
+                    {blocker}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
         </aside>
       </div>
     </div>
@@ -1443,7 +1455,7 @@ function HoursSummary({ stats }: { stats: ScheduleStats[] }) {
 
 function ScheduleRules({ slots }: { slots: StaffingSlot[] }) {
   return (
-    <Disclosure summary="Schedule rules">
+    <Disclosure summary="Schedule rules" tone="quiet">
       <p className="text-sm text-zinc-600">Who the restaurant needs on each shift. The schedule maker follows this list.</p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[700px] text-left text-sm">
@@ -1529,7 +1541,26 @@ function IconButton({
   )
 }
 
-function Disclosure({ summary, children }: { summary: string; children: React.ReactNode }) {
+function Disclosure({
+  summary,
+  tone = 'default',
+  children,
+}: {
+  summary: string
+  tone?: 'default' | 'quiet'
+  children: React.ReactNode
+}) {
+  if (tone === 'quiet') {
+    return (
+      <details className="px-1">
+        <summary className="cursor-pointer py-1 text-sm text-zinc-500 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700">
+          {summary}
+        </summary>
+        <div className="py-2">{children}</div>
+      </details>
+    )
+  }
+
   return (
     <details className="rounded-lg border border-zinc-200 bg-white shadow-sm">
       <summary className="cursor-pointer px-4 py-3 font-semibold text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700">
