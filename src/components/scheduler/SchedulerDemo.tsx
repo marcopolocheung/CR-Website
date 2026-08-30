@@ -16,12 +16,14 @@ import {
   schedulerAssumptions,
   seedEmployees,
   seedTemplate,
+  summarizeSchedule,
   validateSchedule,
   type DayOfWeek,
   type Diagnostic,
   type Employee,
   type Role,
   type ScheduleAssignment,
+  type ScheduleStrategy,
   type ShiftPeriod,
   type StaffingSlot,
   type TimeRange,
@@ -57,7 +59,7 @@ type HistorySnapshot = {
   diagnostics: string[]
 }
 
-type ScheduleVariant = 'balanced' | 'fewestDoubles' | 'similarWeek' | 'fairHours'
+type ScheduleVariant = ScheduleStrategy
 
 type FixIssue = {
   id: string
@@ -159,11 +161,11 @@ const fullDay = { start: minutes(9, 30), end: minutes(23) }
 const amShift = { start: minutes(9, 30), end: minutes(16) }
 const pmShift = { start: minutes(16), end: minutes(23) }
 
-const scheduleVariants: { id: ScheduleVariant; label: string; description: string }[] = [
-  { id: 'balanced', label: 'Balanced schedule', description: 'Spreads shifts across the available staff.' },
-  { id: 'fewestDoubles', label: 'Fewest doubles', description: 'Tries the same deterministic schedule with double-shift pressure called out.' },
-  { id: 'similarWeek', label: 'Keep locked people', description: 'Regenerates around anyone marked Keep.' },
-  { id: 'fairHours', label: 'Fair hours', description: 'Reviews the schedule by total assigned hours.' },
+const scheduleVariants: { id: ScheduleVariant; label: string; description: string; icon: IconName }[] = [
+  { id: 'balanced', label: 'Balanced', description: 'Spreads the work across everyone.', icon: 'spark' },
+  { id: 'fewestDoubles', label: 'Fewest doubles', description: 'Avoids putting anyone on both shifts in one day.', icon: 'target' },
+  { id: 'similarWeek', label: 'Keep this week similar', description: 'Changes as little as possible from what is on screen now.', icon: 'lock' },
+  { id: 'fairHours', label: 'Similar hours for all', description: 'Evens out how many hours each person gets.', icon: 'undo' },
 ]
 
 function cloneEmployees() {
@@ -597,13 +599,22 @@ export default function SchedulerDemo() {
     setGuidedChoosing(true)
   }
 
-  function generationMessage(variant: ScheduleVariant, objectiveScore: number | null) {
-    const label = scheduleVariants.find((candidate) => candidate.id === variant)?.label ?? 'Schedule'
-    const score = objectiveScore === null ? '' : ` Score ${objectiveScore}.`
-    if (variant === 'fewestDoubles') return `${label} generated. Review any same-day doubles before publishing.${score}`
-    if (variant === 'similarWeek') return `${label} generated around the people marked Keep.${score}`
-    if (variant === 'fairHours') return `${label} generated. Check Employee totals for hour balance.${score}`
-    return `${label} generated.${score}`
+  function generationMessage(variant: ScheduleVariant, summary: ReturnType<typeof summarizeSchedule>, kept: number) {
+    const hours = `Hours run from ${summary.fewestHours} to ${summary.mostHours}.`
+
+    if (variant === 'fewestDoubles') {
+      return summary.doubles === 0
+        ? 'Nobody works both shifts in the same day this week.'
+        : `${summary.doubles} double shift${summary.doubles === 1 ? '' : 's'} left. That was the fewest possible with these rules.`
+    }
+    if (variant === 'similarWeek') {
+      return `${summary.keptFromReference} of ${kept} spots stayed with the same person.`
+    }
+    if (variant === 'fairHours') {
+      return `Hours evened out as far as the rules allow. ${hours}`
+    }
+
+    return `Balanced schedule made. ${hours}`
   }
 
   function generate(variant: ScheduleVariant = selectedVariant) {
@@ -611,14 +622,30 @@ export default function SchedulerDemo() {
     setSelectedVariant(variant)
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
+    const previousAssignments = assignments
     const result = generateSchedule(
       { employees, template: seedTemplate },
-      { existingAssignments: assignments.filter((assignment) => assignment.locked) },
+      {
+        strategy: variant,
+        referenceAssignments: previousAssignments,
+        existingAssignments: assignments.filter((assignment) => assignment.locked),
+      },
     )
-    setDiagnostics([generationMessage(variant, result.objectiveScore), ...result.diagnostics.map((diagnostic) => diagnostic.message)])
-    if (result.status !== 'INFEASIBLE') {
-      setAssignments(result.assignments)
+
+    if (result.status === 'INFEASIBLE') {
+      setDiagnostics([
+        'The schedule could not be made with these rules.',
+        ...result.diagnostics.map((diagnostic) => diagnostic.message),
+      ])
+      return
     }
+
+    const summary = summarizeSchedule(employees, slots, result.assignments, previousAssignments)
+    setDiagnostics([
+      generationMessage(variant, summary, previousAssignments.length || result.assignments.length),
+      ...result.diagnostics.map((diagnostic) => diagnostic.message),
+    ])
+    setAssignments(result.assignments)
   }
 
   function reset() {
@@ -1236,7 +1263,7 @@ function VariantControls({
 }) {
   return (
     <div className="mt-4 border-t border-zinc-100 pt-4">
-      <p className="text-sm text-zinc-600">Other ways to build this week</p>
+      <p className="text-sm text-zinc-600">Other ways to build this week. Anyone marked Keep stays put.</p>
       <div className="mt-2 flex flex-wrap gap-2">
       {scheduleVariants.map((variant) => (
         <button
@@ -1250,7 +1277,7 @@ function VariantControls({
           onClick={() => onGenerate(variant.id)}
           title={variant.description}
         >
-          <Icon name={variant.id === 'balanced' ? 'spark' : variant.id === 'similarWeek' ? 'lock' : 'target'} />
+          <Icon name={variant.icon} />
           {variant.label}
         </button>
       ))}

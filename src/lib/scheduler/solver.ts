@@ -23,9 +23,42 @@ type SolverState = {
   employeeSlots: Map<string, StaffingSlot[]>
 }
 
+type CandidateWeights = {
+  day: number
+  hour: number
+  addDay: number
+  double: number
+  keep: number
+}
+
+/**
+ * The search is greedy, so the weights it orders candidates by decide the week it lands on.
+ * Rather than trust one set, every strategy runs all of these and keeps whichever result scores
+ * best against what that strategy is asking for. Same input, same profiles, same answer.
+ */
+const WEIGHT_PROFILES: CandidateWeights[] = [
+  { day: 12, hour: 1, addDay: 6, double: 10, keep: 0 },
+  { day: 6, hour: 1, addDay: 3, double: 40, keep: 0 },
+  { day: 2, hour: 6, addDay: 1, double: 6, keep: 0 },
+  { day: 0, hour: 10, addDay: 0, double: 2, keep: 0 },
+  { day: 16, hour: 2, addDay: 8, double: 20, keep: 0 },
+  { day: 8, hour: 4, addDay: 4, double: 12, keep: 0 },
+]
+
+export const SCHEDULE_STRATEGIES = ['balanced', 'fewestDoubles', 'similarWeek', 'fairHours'] as const
+
+export type ScheduleStrategy = (typeof SCHEDULE_STRATEGIES)[number]
+
 type GenerateOptions = {
   existingAssignments?: ScheduleAssignment[]
   maxNodes?: number
+  /**
+   * Picks the tie-breaking rule the greedy search follows. Every strategy explores the same
+   * feasible space and is fully deterministic; they differ only in which candidate is tried first.
+   */
+  strategy?: ScheduleStrategy
+  /** Schedule to stay close to when the strategy is `similarWeek`. */
+  referenceAssignments?: ScheduleAssignment[]
 }
 
 export function generateSchedule(input: SchedulerInput, options: GenerateOptions = {}): GenerateScheduleResult {
@@ -42,8 +75,104 @@ export function generateSchedule(input: SchedulerInput, options: GenerateOptions
     }
   }
 
+  const strategy = options.strategy ?? 'balanced'
+  const referenceBySlot = new Map(
+    (options.referenceAssignments ?? []).map((assignment) => [assignment.slotId, assignment.employeeId]),
+  )
   const lockedAssignments = (options.existingAssignments ?? []).filter((assignment) => assignment.locked)
   const lockedBySlot = Object.fromEntries(lockedAssignments.map((assignment) => [assignment.slotId, assignment.employeeId]))
+  const maxNodes = options.maxNodes ?? 250000
+
+  let bestAssignments: ScheduleAssignment[] | null = null
+  let bestObjective = Number.POSITIVE_INFINITY
+  let lastFailure: Diagnostic | null = null
+
+  for (const profile of WEIGHT_PROFILES) {
+    const weights = strategy === 'similarWeek' ? { ...profile, keep: 100 } : profile
+    const attempt = searchSchedule({
+      employees: input.employees,
+      slots,
+      lockedAssignments,
+      weights,
+      referenceBySlot,
+      maxNodes,
+    })
+
+    if ('diagnostic' in attempt) {
+      lastFailure = attempt.diagnostic
+      if (attempt.diagnostic.code === 'invalid_locked_assignment') {
+        return {
+          status: 'INFEASIBLE',
+          assignments: lockedAssignments,
+          diagnostics: [...diagnostics, attempt.diagnostic],
+          objectiveScore: null,
+        }
+      }
+      continue
+    }
+
+    const violations = validateSchedule({
+      employees: input.employees,
+      slots,
+      assignments: attempt.assignments,
+      lockedAssignments: lockedBySlot,
+    })
+    if (violations.length > 0) {
+      lastFailure = {
+        code: violations[0].code,
+        message: violations[0].message,
+        slotId: violations[0].slotId,
+      }
+      continue
+    }
+
+    const objective = strategyObjective(strategy, input.employees, slots, attempt.assignments, referenceBySlot)
+    if (objective < bestObjective) {
+      bestObjective = objective
+      bestAssignments = attempt.assignments
+    }
+  }
+
+  if (!bestAssignments) {
+    return {
+      status: 'INFEASIBLE',
+      assignments: [],
+      diagnostics: [
+        ...diagnostics,
+        lastFailure ?? {
+          code: 'search_exhausted',
+          message: 'No valid schedule was found with the current rules.',
+        },
+      ],
+      objectiveScore: null,
+    }
+  }
+
+  return {
+    status: 'FEASIBLE',
+    assignments: bestAssignments,
+    diagnostics,
+    objectiveScore: scoreSchedule(input.employees, slots, bestAssignments),
+  }
+}
+
+type SearchResult = { assignments: ScheduleAssignment[] } | { diagnostic: Diagnostic }
+
+function searchSchedule({
+  employees,
+  slots,
+  lockedAssignments,
+  weights,
+  referenceBySlot,
+  maxNodes,
+}: {
+  employees: Employee[]
+  slots: StaffingSlot[]
+  lockedAssignments: ScheduleAssignment[]
+  weights: CandidateWeights
+  referenceBySlot: Map<string, string>
+  maxNodes: number
+}): SearchResult {
   const state: SolverState = {
     assignments: new Map(),
     employeeSlots: new Map(),
@@ -51,20 +180,14 @@ export function generateSchedule(input: SchedulerInput, options: GenerateOptions
 
   for (const assignment of lockedAssignments) {
     const slot = slots.find((candidate) => candidate.id === assignment.slotId)
-    const employee = input.employees.find((candidate) => candidate.id === assignment.employeeId)
-    if (!slot || !employee || !canAssign(input.employees, employee, slot, state)) {
+    const employee = employees.find((candidate) => candidate.id === assignment.employeeId)
+    if (!slot || !employee || !canAssign(employees, employee, slot, state)) {
       return {
-        status: 'INFEASIBLE',
-        assignments: lockedAssignments,
-        diagnostics: [
-          ...diagnostics,
-          {
-            code: 'invalid_locked_assignment',
-            message: `A locked assignment for ${assignment.slotId} cannot be kept with the current rules.`,
-            slotId: assignment.slotId,
-          },
-        ],
-        objectiveScore: null,
+        diagnostic: {
+          code: 'invalid_locked_assignment',
+          message: `A locked assignment for ${assignment.slotId} cannot be kept with the current rules.`,
+          slotId: assignment.slotId,
+        },
       }
     }
     applyAssignment(employee, slot, true, state)
@@ -80,14 +203,13 @@ export function generateSchedule(input: SchedulerInput, options: GenerateOptions
     })
 
   let visitedNodes = 0
-  const maxNodes = options.maxNodes ?? 250000
 
   function search(remainingSlots: StaffingSlot[]): boolean {
     visitedNodes += 1
     if (visitedNodes > maxNodes) return false
     if (remainingSlots.length === 0) return true
 
-    const next = chooseNextSlot(input.employees, remainingSlots, state)
+    const next = chooseNextSlot(employees, remainingSlots, state, weights, referenceBySlot)
     if (!next) return false
     const { slot, candidates, remaining } = next
     for (const employee of candidates) {
@@ -101,46 +223,52 @@ export function generateSchedule(input: SchedulerInput, options: GenerateOptions
 
   if (!search(unassignedSlots)) {
     return {
-      status: 'INFEASIBLE',
-      assignments: Array.from(state.assignments.values()),
-      diagnostics: [
-        ...diagnostics,
-        {
-          code: 'search_exhausted',
-          message: `No valid schedule was found after checking ${visitedNodes.toLocaleString()} assignment states.`,
-        },
-      ],
-      objectiveScore: null,
-    }
-  }
-
-  const assignments = slots.map((slot) => state.assignments.get(slot.id)).filter((assignment): assignment is ScheduleAssignment => Boolean(assignment))
-  const validationViolations = validateSchedule({
-    employees: input.employees,
-    slots,
-    assignments,
-    lockedAssignments: lockedBySlot,
-  })
-
-  if (validationViolations.length > 0) {
-    return {
-      status: 'INFEASIBLE',
-      assignments,
-      diagnostics: validationViolations.map((violation) => ({
-        code: violation.code,
-        message: violation.message,
-        slotId: violation.slotId,
-      })),
-      objectiveScore: null,
+      diagnostic: {
+        code: 'search_exhausted',
+        message: `No valid schedule was found after checking ${visitedNodes.toLocaleString()} assignment states.`,
+      },
     }
   }
 
   return {
-    status: 'FEASIBLE',
-    assignments,
-    diagnostics,
-    objectiveScore: scoreSchedule(input.employees, slots, assignments),
+    assignments: slots
+      .map((slot) => state.assignments.get(slot.id))
+      .filter((assignment): assignment is ScheduleAssignment => Boolean(assignment)),
   }
+}
+
+/** Lower is better. Each strategy answers "which of these weeks is the one I asked for?". */
+function strategyObjective(
+  strategy: ScheduleStrategy,
+  employees: Employee[],
+  slots: StaffingSlot[],
+  assignments: ScheduleAssignment[],
+  referenceBySlot: Map<string, string>,
+) {
+  const summary = summarizeSchedule(employees, slots, assignments, Array.from(referenceBySlot, ([slotId, employeeId]) => ({ slotId, employeeId })))
+  const spread = hoursDeviation(employees, slots, assignments)
+
+  if (strategy === 'fewestDoubles') return summary.doubles * 1000 + spread
+  if (strategy === 'fairHours') return spread * 10 + summary.doubles
+  if (strategy === 'similarWeek') return -summary.keptFromReference * 100 + spread
+  return spread * 2 + summary.doubles * 5
+}
+
+function hoursDeviation(employees: Employee[], slots: StaffingSlot[], assignments: ScheduleAssignment[]) {
+  const slotsById = new Map(slots.map((slot) => [slot.id, slot]))
+  const hours = employees
+    .filter((employee) => employee.active)
+    .map((employee) =>
+      assignments
+        .filter((assignment) => assignment.employeeId === employee.id)
+        .map((assignment) => slotsById.get(assignment.slotId))
+        .filter((slot): slot is StaffingSlot => Boolean(slot))
+        .reduce((total, slot) => total + hoursFor(slot), 0),
+    )
+  if (hours.length === 0) return 0
+  const average = hours.reduce((total, value) => total + value, 0) / hours.length
+
+  return Math.round(hours.reduce((total, value) => total + Math.abs(value - average), 0) * 10) / 10
 }
 
 export function preflightDiagnostics(employees: Employee[], slots: StaffingSlot[]): Diagnostic[] {
@@ -245,13 +373,29 @@ function removeAssignment(employee: Employee, slot: StaffingSlot, state: SolverS
   )
 }
 
-function orderCandidates(employees: Employee[], slot: StaffingSlot, state: SolverState) {
+function orderCandidates(
+  employees: Employee[],
+  slot: StaffingSlot,
+  state: SolverState,
+  weights: CandidateWeights,
+  referenceBySlot: Map<string, string>,
+) {
   return employees
     .filter((employee) => basicCandidate(employee, slot))
-    .sort((a, b) => candidateScore(a, slot, state) - candidateScore(b, slot, state) || a.name.localeCompare(b.name))
+    .sort(
+      (a, b) =>
+        candidateScore(a, slot, state, weights, referenceBySlot) -
+          candidateScore(b, slot, state, weights, referenceBySlot) || a.name.localeCompare(b.name),
+    )
 }
 
-function chooseNextSlot(employees: Employee[], slots: StaffingSlot[], state: SolverState) {
+function chooseNextSlot(
+  employees: Employee[],
+  slots: StaffingSlot[],
+  state: SolverState,
+  weights: CandidateWeights,
+  referenceBySlot: Map<string, string>,
+) {
   let best:
     | {
         slot: StaffingSlot
@@ -262,7 +406,7 @@ function chooseNextSlot(employees: Employee[], slots: StaffingSlot[], state: Sol
 
   for (let index = 0; index < slots.length; index += 1) {
     const slot = slots[index]
-    const candidates = orderCandidates(employees, slot, state).filter((employee) =>
+    const candidates = orderCandidates(employees, slot, state, weights, referenceBySlot).filter((employee) =>
       canAssign(employees, employee, slot, state),
     )
     if (candidates.length === 0) return null
@@ -281,7 +425,13 @@ function chooseNextSlot(employees: Employee[], slots: StaffingSlot[], state: Sol
   }
 }
 
-function candidateScore(employee: Employee, slot: StaffingSlot, state: SolverState) {
+function candidateScore(
+  employee: Employee,
+  slot: StaffingSlot,
+  state: SolverState,
+  weights: CandidateWeights,
+  referenceBySlot: Map<string, string>,
+) {
   const existingSlots = state.employeeSlots.get(employee.id) ?? []
   const workedDays = new Set(existingSlots.map((existingSlot) => existingSlot.day))
   const hours = existingSlots.reduce((total, existingSlot) => total + hoursFor(existingSlot), 0)
@@ -290,8 +440,66 @@ function candidateScore(employee: Employee, slot: StaffingSlot, state: SolverSta
   const wouldDouble = existingSlots.some((existingSlot) => existingSlot.day === slot.day && existingSlot.period !== slot.period) ? 1 : 0
   const maxDayPressure =
     employee.maxDaysPerWeek === undefined ? 0 : ((workedDays.size + wouldAddDay) / employee.maxDaysPerWeek) * 4
+  const keepsReference = referenceBySlot.get(slot.id) === employee.id ? 1 : 0
 
-  return workedDays.size * 12 + hours + wouldAddDay * 6 + wouldDouble * 10 + maxDayPressure - dayPreference
+  return (
+    workedDays.size * weights.day +
+    hours * weights.hour +
+    wouldAddDay * weights.addDay +
+    wouldDouble * weights.double +
+    maxDayPressure -
+    keepsReference * weights.keep -
+    dayPreference
+  )
+}
+
+export type ScheduleSummary = {
+  doubles: number
+  mostHours: number
+  fewestHours: number
+  hoursSpread: number
+  keptFromReference: number
+}
+
+/** Plain numbers a manager can compare between two generated weeks. */
+export function summarizeSchedule(
+  employees: Employee[],
+  slots: StaffingSlot[],
+  assignments: ScheduleAssignment[],
+  referenceAssignments: ScheduleAssignment[] = [],
+): ScheduleSummary {
+  const slotsById = new Map(slots.map((slot) => [slot.id, slot]))
+  const referenceBySlot = new Map(referenceAssignments.map((assignment) => [assignment.slotId, assignment.employeeId]))
+  const working = employees.filter((employee) =>
+    assignments.some((assignment) => assignment.employeeId === employee.id),
+  )
+
+  let doubles = 0
+  const hoursPerEmployee = working.map((employee) => {
+    const employeeSlots = assignments
+      .filter((assignment) => assignment.employeeId === employee.id)
+      .map((assignment) => slotsById.get(assignment.slotId))
+      .filter((slot): slot is StaffingSlot => Boolean(slot))
+
+    for (const day of DAYS) {
+      const periods = new Set(employeeSlots.filter((slot) => slot.day === day).map((slot) => slot.period))
+      if (periods.size > 1) doubles += 1
+    }
+
+    return employeeSlots.reduce((total, slot) => total + hoursFor(slot), 0)
+  })
+
+  const mostHours = hoursPerEmployee.length > 0 ? Math.max(...hoursPerEmployee) : 0
+  const fewestHours = hoursPerEmployee.length > 0 ? Math.min(...hoursPerEmployee) : 0
+
+  return {
+    doubles,
+    mostHours,
+    fewestHours,
+    hoursSpread: Math.round((mostHours - fewestHours) * 10) / 10,
+    keptFromReference: assignments.filter((assignment) => referenceBySlot.get(assignment.slotId) === assignment.employeeId)
+      .length,
+  }
 }
 
 function scoreSchedule(employees: Employee[], slots: StaffingSlot[], assignments: ScheduleAssignment[]) {

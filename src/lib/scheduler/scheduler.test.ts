@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { seedEmployees, seedTemplate, expandTemplate } from './data'
-import { generateSchedule } from './solver'
+import { SCHEDULE_STRATEGIES, generateSchedule, summarizeSchedule } from './solver'
 import { validateSchedule } from './validator'
 import type { Employee, ScheduleAssignment, StaffingSlot } from './types'
 import { minutes } from './time'
@@ -199,4 +199,51 @@ test('availability is checked against exact slot time, not only shift name', () 
   })
 
   assert.ok(violations.some((violation) => violation.code === 'unavailable_employee'))
+})
+
+test('every schedule strategy produces a valid week', () => {
+  for (const strategy of SCHEDULE_STRATEGIES) {
+    const result = generateSchedule({ employees: seedEmployees, template: seedTemplate }, { strategy })
+    assert.equal(result.status, 'FEASIBLE', `${strategy} should be feasible`)
+    assert.equal(
+      validateSchedule({ employees: seedEmployees, slots, assignments: result.assignments }).length,
+      0,
+      `${strategy} should pass validation`,
+    )
+  }
+})
+
+test('the same strategy always returns the same week', () => {
+  for (const strategy of SCHEDULE_STRATEGIES) {
+    const first = generateSchedule({ employees: seedEmployees, template: seedTemplate }, { strategy })
+    const second = generateSchedule({ employees: seedEmployees, template: seedTemplate }, { strategy })
+    assert.deepEqual(second.assignments, first.assignments, `${strategy} should be deterministic`)
+  }
+})
+
+test('fewest doubles strategy does not increase double shifts', () => {
+  const balanced = generateSchedule({ employees: seedEmployees, template: seedTemplate }, { strategy: 'balanced' })
+  const fewest = generateSchedule({ employees: seedEmployees, template: seedTemplate }, { strategy: 'fewestDoubles' })
+
+  assert.ok(
+    summarizeSchedule(seedEmployees, slots, fewest.assignments).doubles <=
+      summarizeSchedule(seedEmployees, slots, balanced.assignments).doubles,
+  )
+})
+
+test('keep similar strategy stays closer to the week it is given', () => {
+  const previous = generateSchedule({ employees: seedEmployees, template: seedTemplate }, { strategy: 'fairHours' })
+  const similar = generateSchedule(
+    { employees: seedEmployees, template: seedTemplate },
+    { strategy: 'similarWeek', referenceAssignments: previous.assignments },
+  )
+  const balanced = generateSchedule(
+    { employees: seedEmployees, template: seedTemplate },
+    { strategy: 'balanced', referenceAssignments: previous.assignments },
+  )
+
+  assert.ok(
+    summarizeSchedule(seedEmployees, slots, similar.assignments, previous.assignments).keptFromReference >=
+      summarizeSchedule(seedEmployees, slots, balanced.assignments, previous.assignments).keptFromReference,
+  )
 })
