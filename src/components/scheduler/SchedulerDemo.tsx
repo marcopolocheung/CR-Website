@@ -100,12 +100,13 @@ const roleChipClasses: Record<Role, string> = {
 
 type SpotStatus = 'good' | 'review' | 'missing' | 'idle'
 
-const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: string; row: string; shiftLabel: string }> = {
+const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: string; row: string; shiftRow: string; shiftLabel: string }> = {
   good: {
     icon: 'check',
     chip: 'border-zinc-200 bg-white text-zinc-900',
     badge: 'border-green-300 bg-green-50 text-green-900',
     row: 'border-zinc-200 border-l-4 border-l-green-600',
+    shiftRow: 'border-l-4 border-l-transparent bg-zinc-50',
     shiftLabel: 'Ready',
   },
   review: {
@@ -113,6 +114,7 @@ const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: stri
     chip: 'border-amber-500 bg-amber-50 text-amber-950',
     badge: 'border-amber-300 bg-amber-50 text-amber-950',
     row: 'border-amber-200 border-l-4 border-l-amber-500',
+    shiftRow: 'border-l-4 border-l-amber-500 bg-amber-50',
     shiftLabel: 'Needs a look',
   },
   missing: {
@@ -120,6 +122,7 @@ const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: stri
     chip: 'border-dashed border-red-500 bg-red-50 text-red-950',
     badge: 'border-red-300 bg-red-50 text-red-900',
     row: 'border-red-200 border-l-4 border-l-red-600',
+    shiftRow: 'border-l-4 border-l-red-600 bg-red-50',
     shiftLabel: 'Nobody assigned',
   },
   idle: {
@@ -127,6 +130,7 @@ const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: stri
     chip: 'border-dashed border-zinc-300 bg-white text-zinc-500',
     badge: 'border-zinc-200 bg-zinc-50 text-zinc-600',
     row: 'border-zinc-200 border-l-4 border-l-zinc-300',
+    shiftRow: 'border-l-4 border-l-transparent bg-zinc-50',
     shiftLabel: 'Not made yet',
   },
 }
@@ -580,8 +584,6 @@ export default function SchedulerDemo() {
   )
   const ignoredCount = fixIssues.filter((issue) => ignoredIssueIds.includes(issue.id)).length
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
-  const lockedCount = assignments.filter((assignment) => assignment.locked).length
-  const assignedCount = assignments.filter((assignment) => assignment.employeeId).length
   const schedulePassing = assignments.length > 0 && violations.length === 0
   const selectedRoles = ROLES.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && selectedRoles.length > 0
@@ -909,22 +911,6 @@ export default function SchedulerDemo() {
             <IconButton icon="print" label="Print schedule" onClick={() => window.print()} />
             <IconButton icon="reset" label="Start over" onClick={reset} />
           </div>
-        </div>
-        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-2 px-4 pb-4">
-          <StatusPill icon="check" label={`${assignedCount} of ${slots.length} spots filled`} tone={assignedCount === slots.length ? 'good' : 'plain'} />
-          <StatusPill icon="target" label={`${activeEmployeeCount} people working`} tone="plain" />
-          {lockedCount > 0 && <StatusPill icon="lock" label={`${lockedCount} kept in place`} tone="plain" />}
-          <StatusPill
-            icon={schedulePassing ? 'check' : 'warning'}
-            label={
-              assignments.length === 0
-                ? 'No schedule yet'
-                : schedulePassing
-                  ? 'Schedule looks good'
-                  : `${visibleFixIssues.length} spot${visibleFixIssues.length === 1 ? '' : 's'} need fixing`
-            }
-            tone={assignments.length === 0 ? 'plain' : schedulePassing ? 'good' : 'warn'}
-          />
         </div>
       </header>
 
@@ -1543,22 +1529,6 @@ function IconButton({
   )
 }
 
-function StatusPill({ icon, label, tone }: { icon: IconName; label: string; tone: 'plain' | 'good' | 'warn' }) {
-  const toneClass =
-    tone === 'good'
-      ? 'border-green-300 bg-green-50 text-green-900'
-      : tone === 'warn'
-        ? 'border-amber-300 bg-amber-50 text-amber-950'
-        : 'border-zinc-200 bg-zinc-50 text-zinc-700'
-
-  return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium ${toneClass}`}>
-      <Icon name={icon} />
-      {label}
-    </span>
-  )
-}
-
 function Disclosure({ summary, children }: { summary: string; children: React.ReactNode }) {
   return (
     <details className="rounded-lg border border-zinc-200 bg-white shadow-sm">
@@ -1631,15 +1601,15 @@ function WeeklyScheduleBoard({
   onActivateSlot: (slotId: string) => void
 }) {
   return (
-    <div className="mt-4 space-y-3">
-      <div className="space-y-2">
+    <div className="mt-4">
+      <div className="divide-y divide-zinc-100">
         {DAYS.map((day) => (
           <div
             key={day}
-            className="rounded-lg border border-zinc-200 bg-zinc-50 p-2 md:grid md:grid-cols-[92px_minmax(0,1fr)] md:items-start md:gap-2"
+            className="py-2 md:grid md:grid-cols-[92px_minmax(0,1fr)] md:items-start md:gap-3"
           >
             <h3 className="px-1 py-2 text-base font-bold text-zinc-900">{day}</h3>
-            <div className="mt-2 space-y-2 md:mt-0">
+            <div className="space-y-1">
               {PERIODS.map((period) => {
                 const shiftKey = `${day}-${period}` as ShiftKey
                 const shiftSlots = slots.filter((slot) => slot.day === day && slot.period === period)
@@ -1682,7 +1652,7 @@ function WeeklyScheduleBoard({
 }
 
 function BoardLegend() {
-  const statusOrder: SpotStatus[] = ['good', 'review', 'missing']
+  const statusOrder: SpotStatus[] = ['review', 'missing']
 
   return (
     <div className="space-y-2 border-t border-zinc-100 pt-3 text-xs">
@@ -1698,7 +1668,7 @@ function BoardLegend() {
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-zinc-500">Shift:</span>
+        <span className="text-zinc-500">Marked only when:</span>
         {statusOrder.map((status) => (
           <span key={status} className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium ${statusMeta[status].badge}`}>
             <Icon name={statusMeta[status].icon} />
@@ -1777,7 +1747,7 @@ function ShiftRow({
         : statusMeta[status].shiftLabel
 
   return (
-    <div className={`rounded border bg-white ${statusMeta[status].row}`}>
+    <div className={`overflow-hidden rounded ${statusMeta[status].shiftRow}`}>
       <div className="grid w-full gap-3 px-3 py-3 md:grid-cols-[84px_minmax(0,1fr)_auto]">
         <button
           type="button"
@@ -1825,7 +1795,7 @@ function ShiftRow({
       </div>
 
       {open && (
-        <div id={`${shiftKey}-detail`} className="border-t border-zinc-200 bg-zinc-50 p-3">
+        <div id={`${shiftKey}-detail`} className="border-t border-zinc-200 bg-white p-3">
           <div className="grid gap-3 md:grid-cols-2">
             {slots.map((slot, index) => (
               <SlotEditor
