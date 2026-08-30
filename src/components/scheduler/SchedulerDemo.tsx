@@ -606,115 +606,47 @@ export default function SchedulerDemo() {
   }
 
   return (
-    <div className="bg-zinc-50 text-zinc-950">
-      <section className="border-b border-red-100 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-sm font-semibold uppercase tracking-wide text-red-700">Scheduler demo</p>
-              <h1 className="mt-2 text-3xl font-bold md:text-4xl">Weekly staff schedule</h1>
-              <p className="mt-3 text-base text-zinc-700">
-                Build the staff list, make the schedule, then review anything marked in yellow.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button tone="primary" onClick={() => generate()} icon="spark">
-                Make schedule
-              </Button>
-              <Button onClick={fixNextIssue} icon="target" disabled={!nextIssue}>
-                Fix next issue
-              </Button>
-              <Button onClick={undoLastChange} icon="undo" disabled={history.length === 0}>
-                Undo
-              </Button>
-              <Button onClick={openEmployeePanelForGap} icon="plus">
-                Add employee
-              </Button>
-              <Button onClick={() => window.print()} icon="print">
-                Print
-              </Button>
-              <Button onClick={reset} icon="reset">
-                Reset
-              </Button>
-            </div>
+    <div className="bg-zinc-100 text-zinc-950">
+      <header className="border-b border-zinc-200 bg-white">
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Scheduler demo</p>
+            <h1 className="text-2xl font-bold md:text-3xl">Weekly staff schedule</h1>
           </div>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-4">
-            <StatusPanel label="Active employees" value={String(activeEmployeeCount)} />
-            <StatusPanel label="Filled shifts" value={`${assignedCount}/${slots.length}`} />
-            <StatusPanel label="Kept in place" value={String(lockedCount)} />
-            <StatusPanel
-              label="Schedule check"
-              value={schedulePassing ? 'Ready' : assignments.length > 0 ? `${violations.length} spot${violations.length === 1 ? '' : 's'} to fix` : 'Not made'}
-              tone={schedulePassing ? 'good' : assignments.length > 0 ? 'warn' : 'plain'}
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button tone="primary" onClick={() => generate()} icon="spark">
+              Make schedule
+            </Button>
+            <Button onClick={fixNextIssue} icon="target" disabled={!nextIssue} badge={visibleFixIssues.length}>
+              Fix next issue
+            </Button>
+            <span aria-hidden="true" className="mx-1 hidden h-8 w-px bg-zinc-200 sm:block" />
+            <IconButton icon="undo" label="Undo last change" onClick={undoLastChange} disabled={history.length === 0} />
+            <IconButton icon="plus" label="Add employee" onClick={openEmployeePanelForGap} />
+            <IconButton icon="print" label="Print schedule" onClick={() => window.print()} />
+            <IconButton icon="reset" label="Start over" onClick={reset} />
           </div>
         </div>
-      </section>
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-2 px-4 pb-4">
+          <StatusPill icon="check" label={`${assignedCount} of ${slots.length} spots filled`} tone={assignedCount === slots.length ? 'good' : 'plain'} />
+          <StatusPill icon="target" label={`${activeEmployeeCount} people working`} tone="plain" />
+          {lockedCount > 0 && <StatusPill icon="lock" label={`${lockedCount} kept in place`} tone="plain" />}
+          <StatusPill
+            icon={schedulePassing ? 'check' : 'warning'}
+            label={
+              assignments.length === 0
+                ? 'No schedule yet'
+                : schedulePassing
+                  ? 'Schedule looks good'
+                  : `${visibleFixIssues.length} spot${visibleFixIssues.length === 1 ? '' : 's'} need fixing`
+            }
+            tone={assignments.length === 0 ? 'plain' : schedulePassing ? 'good' : 'warn'}
+          />
+        </div>
+      </header>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <aside className="order-2 space-y-6">
-          <section className="rounded border border-zinc-200 bg-white p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">Staff list</h2>
-                <p className="mt-1 text-sm text-zinc-600">{employees.length} people saved for this demo</p>
-              </div>
-              <button
-                type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded border border-red-200 bg-red-50 text-red-800 hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                onClick={() => setEmployeePanelOpen((open) => !open)}
-                aria-label={employeePanelOpen ? 'Close employee form' : 'Add employee'}
-                title={employeePanelOpen ? 'Close employee form' : 'Add employee'}
-              >
-                <Icon name={employeePanelOpen ? 'close' : 'plus'} />
-              </button>
-            </div>
-
-            {employeePanelOpen && (
-              <EmployeeForm
-                draft={draft}
-                gapSlot={gapSlot}
-                canAddEmployee={canAddEmployee}
-                onDraftChange={setDraft}
-                onAdd={addEmployee}
-              />
-            )}
-
-            <div className="mt-4 space-y-3">
-              {employees.map((employee) => (
-                <EmployeeCard key={employee.id} employee={employee} onUpdate={updateEmployee} />
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded border border-zinc-200 bg-white p-4">
-            <h2 className="text-lg font-semibold">Readiness</h2>
-            <div className="mt-3 space-y-2">
-              <ChecklistItem complete={activeEmployeeCount > 0} label={`${activeEmployeeCount} active employees`} />
-              <ChecklistItem
-                complete={readinessProblems.length === 0}
-                label={readinessProblems.length === 0 ? 'Coverage looks ready' : `${readinessProblems.length} coverage gap${readinessProblems.length === 1 ? '' : 's'}`}
-              />
-              <ChecklistItem complete={schedulePassing} label={schedulePassing ? 'Schedule passes review' : 'Schedule needs review'} />
-            </div>
-            {firstGap && (
-              <div className="mt-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                <div className="font-semibold">{diagnosticLabel(firstGap)}</div>
-                <button
-                  type="button"
-                  className="mt-3 inline-flex items-center gap-2 rounded bg-amber-900 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-800"
-                  onClick={openEmployeePanelForGap}
-                >
-                  <Icon name="plus" />
-                  Add someone for this
-                </button>
-              </div>
-            )}
-          </section>
-        </aside>
-
-        <main className="order-1 space-y-6">
+      <div className="mx-auto grid max-w-[1400px] gap-5 px-4 py-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <main className="order-1 space-y-4">
           <GuidedFixPanel
             nextIssue={nextIssue}
             issueCount={visibleFixIssues.length}
@@ -723,30 +655,11 @@ export default function SchedulerDemo() {
             onIgnore={ignoreNextIssue}
           />
 
-          {(diagnostics.length > 0 || violations.length > 0) && (
-            <section className="rounded border border-amber-300 bg-amber-50 p-4">
-              <h2 className="text-lg font-semibold text-amber-950">Needs attention</h2>
-              <div className="mt-3 grid gap-4 lg:grid-cols-2">
-                <MessageList title="Schedule maker" messages={diagnostics} empty="No messages." />
-                <MessageList title="Review" messages={violations.map((violation) => reviewLabel(violation, slots, employees))} empty="No review items." />
-              </div>
-            </section>
-          )}
-
-          <section className="rounded border border-zinc-200 bg-white p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Weekly schedule</h2>
-                <p className="mt-1 text-sm text-zinc-600">Colors show each position. Open a shift to edit, or drag a name to move it.</p>
-              </div>
-              <Button onClick={makeInfeasible} icon="warning">
-                Show gap example
-              </Button>
+          <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+              <h2 className="text-lg font-semibold">This week</h2>
+              <p className="text-sm text-zinc-600">Tap a shift to change it. Drag a name to move it.</p>
             </div>
-            <VariantControls
-              selectedVariant={selectedVariant}
-              onGenerate={generate}
-            />
             <WeeklyScheduleBoard
               slots={slots}
               employees={employees}
@@ -766,38 +679,108 @@ export default function SchedulerDemo() {
               onDragLeaveSlot={clearDropPreview}
               onDropAssignment={moveAssignment}
             />
+            <VariantControls selectedVariant={selectedVariant} onGenerate={generate} />
           </section>
 
-          <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <ScheduleRules slots={slots} />
-            <div className="rounded border border-zinc-200 bg-white p-4">
-              <h2 className="text-lg font-semibold">Employee totals</h2>
-              <div className="mt-4 space-y-2">
-                {stats.map((stat) => (
-                  <div key={stat.employeeId} className="grid grid-cols-[1fr_auto] gap-3 border-b border-zinc-100 pb-2 text-sm last:border-0">
-                    <div>
-                      <div className="font-medium text-zinc-900">{stat.name}</div>
-                      <div className="text-zinc-500">{stat.shifts} shift{stat.shifts === 1 ? '' : 's'}</div>
-                    </div>
-                    <div className="text-right text-zinc-700">
-                      <div>{stat.days} day{stat.days === 1 ? '' : 's'}</div>
-                      <div>{stat.hours.toFixed(1)} hrs</div>
-                    </div>
-                  </div>
+          {diagnostics.length > 0 && (
+            <Disclosure summary={`Messages (${diagnostics.length})`}>
+              <ul className="space-y-1 text-sm text-zinc-700">
+                {diagnostics.map((message, index) => (
+                  <li key={`${message}-${index}`}>{message}</li>
                 ))}
-              </div>
-            </div>
-          </section>
+              </ul>
+            </Disclosure>
+          )}
 
-          <details className="rounded border border-zinc-200 bg-white p-4">
-            <summary className="cursor-pointer text-lg font-semibold text-zinc-950">Demo assumptions</summary>
-            <ul className="mt-3 space-y-2 text-sm text-zinc-700">
+          <Disclosure summary="Hours for each person">
+            <div className="space-y-2">
+              {stats.map((stat) => (
+                <div key={stat.employeeId} className="grid grid-cols-[1fr_auto] gap-3 border-b border-zinc-100 pb-2 text-sm last:border-0">
+                  <div>
+                    <div className="font-medium text-zinc-900">{stat.name}</div>
+                    <div className="text-zinc-500">{stat.shifts} shift{stat.shifts === 1 ? '' : 's'}</div>
+                  </div>
+                  <div className="text-right text-zinc-700">
+                    <div>{stat.days} day{stat.days === 1 ? '' : 's'}</div>
+                    <div>{stat.hours.toFixed(1)} hrs</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Disclosure>
+
+          <ScheduleRules slots={slots} />
+
+          <Disclosure summary="About this demo">
+            <ul className="space-y-2 text-sm text-zinc-700">
               {schedulerAssumptions.map((assumption) => (
                 <li key={assumption}>{assumption}</li>
               ))}
             </ul>
-          </details>
+            <button
+              type="button"
+              className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              onClick={makeInfeasible}
+            >
+              <Icon name="warning" />
+              Show what a missing-coverage week looks like
+            </button>
+          </Disclosure>
         </main>
+
+        <aside className="order-2 space-y-4">
+          <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Staff</h2>
+                <p className="mt-0.5 text-sm text-zinc-600">
+                  {activeEmployeeCount} working, {employees.length - activeEmployeeCount} off the list
+                </p>
+              </div>
+              <IconButton
+                icon={employeePanelOpen ? 'close' : 'plus'}
+                label={employeePanelOpen ? 'Close employee form' : 'Add employee'}
+                tone="accent"
+                onClick={() => setEmployeePanelOpen((open) => !open)}
+              />
+            </div>
+
+            {employeePanelOpen && (
+              <EmployeeForm
+                draft={draft}
+                gapSlot={gapSlot}
+                canAddEmployee={canAddEmployee}
+                onDraftChange={setDraft}
+                onAdd={addEmployee}
+              />
+            )}
+
+            <details className="mt-3 border-t border-zinc-100 pt-3">
+              <summary className="cursor-pointer text-sm font-semibold text-zinc-800">Everyone on the list</summary>
+              <div className="mt-3 space-y-3">
+                {employees.map((employee) => (
+                  <EmployeeCard key={employee.id} employee={employee} onUpdate={updateEmployee} />
+                ))}
+              </div>
+            </details>
+          </section>
+
+          <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+            <h2 className="font-semibold">Before you print</h2>
+            <div className="mt-3 space-y-2">
+              <ChecklistItem complete={activeEmployeeCount > 0} label={`${activeEmployeeCount} people ready to work`} />
+              <ChecklistItem
+                complete={readinessProblems.length === 0}
+                label={
+                  readinessProblems.length === 0
+                    ? 'Every shift can be covered'
+                    : `${readinessProblems.length} shift${readinessProblems.length === 1 ? '' : 's'} nobody can cover`
+                }
+              />
+              <ChecklistItem complete={schedulePassing} label={schedulePassing ? 'Nothing left to fix' : 'Some spots still need fixing'} />
+            </div>
+          </section>
+        </aside>
       </div>
     </div>
   )
@@ -1009,7 +992,9 @@ function VariantControls({
   onGenerate: (variant: ScheduleVariant) => void
 }) {
   return (
-    <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-100 pt-4">
+    <div className="mt-4 border-t border-zinc-100 pt-4">
+      <p className="text-sm text-zinc-600">Other ways to build this week</p>
+      <div className="mt-2 flex flex-wrap gap-2">
       {scheduleVariants.map((variant) => (
         <button
           key={variant.id}
@@ -1026,15 +1011,16 @@ function VariantControls({
           {variant.label}
         </button>
       ))}
+      </div>
     </div>
   )
 }
 
 function ScheduleRules({ slots }: { slots: StaffingSlot[] }) {
   return (
-    <details className="rounded border border-zinc-200 bg-white p-4">
-      <summary className="cursor-pointer text-lg font-semibold text-zinc-950">Schedule rules</summary>
-      <div className="mt-4 overflow-x-auto">
+    <Disclosure summary="Schedule rules">
+      <p className="text-sm text-zinc-600">Who the restaurant needs on each shift. The schedule maker follows this list.</p>
+      <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[700px] text-left text-sm">
           <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
             <tr>
@@ -1056,7 +1042,7 @@ function ScheduleRules({ slots }: { slots: StaffingSlot[] }) {
           </tbody>
         </table>
       </div>
-    </details>
+    </Disclosure>
   )
 }
 
@@ -1064,12 +1050,14 @@ function Button({
   children,
   icon,
   tone = 'plain',
+  badge,
   onClick,
   disabled = false,
 }: {
   children: React.ReactNode
   icon: IconName
   tone?: 'plain' | 'primary'
+  badge?: number
   onClick: () => void
   disabled?: boolean
 }) {
@@ -1082,17 +1070,64 @@ function Button({
     <button type="button" className={className} onClick={onClick} disabled={disabled}>
       <Icon name={icon} />
       {children}
+      {badge !== undefined && badge > 0 && (
+        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-200 px-1.5 text-xs font-bold text-amber-950">
+          {badge}
+        </span>
+      )}
     </button>
   )
 }
 
-function StatusPanel({ label, value, tone = 'plain' }: { label: string; value: string; tone?: 'plain' | 'good' | 'warn' }) {
-  const toneClass = tone === 'good' ? 'text-green-700' : tone === 'warn' ? 'text-amber-700' : 'text-zinc-950'
+function IconButton({
+  icon,
+  label,
+  onClick,
+  disabled = false,
+  tone = 'plain',
+}: {
+  icon: IconName
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  tone?: 'plain' | 'accent'
+}) {
+  const className =
+    tone === 'accent'
+      ? 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-red-200 bg-red-50 text-red-800 hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+      : 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+
   return (
-    <div className="rounded border border-zinc-200 bg-zinc-50 p-4">
-      <div className="text-sm text-zinc-600">{label}</div>
-      <div className={`mt-1 text-2xl font-bold ${toneClass}`}>{value}</div>
-    </div>
+    <button type="button" className={className} onClick={onClick} disabled={disabled} aria-label={label} title={label}>
+      <Icon name={icon} />
+    </button>
+  )
+}
+
+function StatusPill({ icon, label, tone }: { icon: IconName; label: string; tone: 'plain' | 'good' | 'warn' }) {
+  const toneClass =
+    tone === 'good'
+      ? 'border-green-300 bg-green-50 text-green-900'
+      : tone === 'warn'
+        ? 'border-amber-300 bg-amber-50 text-amber-950'
+        : 'border-zinc-200 bg-zinc-50 text-zinc-700'
+
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium ${toneClass}`}>
+      <Icon name={icon} />
+      {label}
+    </span>
+  )
+}
+
+function Disclosure({ summary, children }: { summary: string; children: React.ReactNode }) {
+  return (
+    <details className="rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <summary className="cursor-pointer px-4 py-3 font-semibold text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700">
+        {summary}
+      </summary>
+      <div className="border-t border-zinc-100 px-4 py-3">{children}</div>
+    </details>
   )
 }
 
@@ -1107,23 +1142,6 @@ function ChecklistItem({ complete, label }: { complete: boolean; label: string }
         {complete ? <Icon name="check" /> : '!'}
       </span>
       {label}
-    </div>
-  )
-}
-
-function MessageList({ title, messages, empty }: { title: string; messages: string[]; empty: string }) {
-  return (
-    <div>
-      <h3 className="font-semibold text-amber-950">{title}</h3>
-      {messages.length > 0 ? (
-        <ul className="mt-2 space-y-1 text-sm text-amber-900">
-          {messages.map((message, index) => (
-            <li key={`${message}-${index}`}>{message}</li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-2 text-sm text-amber-800">{empty}</p>
-      )}
     </div>
   )
 }
@@ -1166,13 +1184,15 @@ function WeeklyScheduleBoard({
   onDropAssignment: (targetSlotId: string) => void
 }) {
   return (
-    <div className="mt-4 space-y-4">
-      <RoleLegend />
-      <div className="space-y-3">
+    <div className="mt-4 space-y-3">
+      <div className="space-y-2">
         {DAYS.map((day) => (
-          <div key={day} className="rounded border border-zinc-200 bg-zinc-50 p-3">
-            <h3 className="font-semibold text-zinc-950">{day}</h3>
-            <div className="mt-3 space-y-2">
+          <div
+            key={day}
+            className="rounded-lg border border-zinc-200 bg-zinc-50 p-2 md:grid md:grid-cols-[92px_minmax(0,1fr)] md:items-start md:gap-2"
+          >
+            <h3 className="px-1 py-2 font-semibold text-zinc-950">{day}</h3>
+            <div className="mt-2 space-y-2 md:mt-0">
               {PERIODS.map((period) => {
                 const shiftKey = `${day}-${period}` as ShiftKey
                 const shiftSlots = slots.filter((slot) => slot.day === day && slot.period === period)
@@ -1180,7 +1200,6 @@ function WeeklyScheduleBoard({
                   <ShiftRow
                     key={shiftKey}
                     shiftKey={shiftKey}
-                    day={day}
                     period={period}
                     slots={shiftSlots}
                     employees={employees}
@@ -1206,13 +1225,15 @@ function WeeklyScheduleBoard({
           </div>
         ))}
       </div>
+      <RoleLegend />
     </div>
   )
 }
 
 function RoleLegend() {
   return (
-    <div className="flex flex-wrap gap-2 text-xs">
+    <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3 text-xs">
+      <span className="text-zinc-500">Colors show the position:</span>
       {ROLES.map((role) => (
         <span key={role} className={`rounded border px-2 py-1 font-medium ${roleChipClasses[role]}`}>
           {roleLabels[role]}
@@ -1224,7 +1245,6 @@ function RoleLegend() {
 
 function ShiftRow({
   shiftKey,
-  day,
   period,
   slots,
   employees,
@@ -1245,7 +1265,6 @@ function ShiftRow({
   onDropAssignment,
 }: {
   shiftKey: ShiftKey
-  day: DayOfWeek
   period: ShiftPeriod
   slots: StaffingSlot[]
   employees: Employee[]
@@ -1274,13 +1293,13 @@ function ShiftRow({
     <div className={`rounded border bg-white ${hasIssue ? 'border-amber-300' : 'border-zinc-200'}`}>
       <button
         type="button"
-        className="grid w-full gap-3 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 md:grid-cols-[116px_minmax(0,1fr)_auto]"
+        className="grid w-full gap-3 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 md:grid-cols-[96px_minmax(0,1fr)_auto]"
         onClick={() => onOpenShift(open ? null : shiftKey)}
         aria-expanded={open}
       >
         <div>
           <div className="text-sm font-semibold text-zinc-950">{periodLabels[period]}</div>
-          <div className="text-xs text-zinc-500">{day.slice(0, 3)} shift</div>
+          <div className="text-xs text-zinc-500">{open ? 'Tap to close' : 'Tap to change'}</div>
         </div>
         <div className="flex flex-wrap gap-2">
           {slots.map((slot) => (
