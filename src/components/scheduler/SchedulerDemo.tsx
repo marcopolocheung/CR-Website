@@ -16,12 +16,14 @@ import {
   schedulerAssumptions,
   seedEmployees,
   seedTemplate,
+  summarizeSchedule,
   validateSchedule,
   type DayOfWeek,
   type Diagnostic,
   type Employee,
   type Role,
   type ScheduleAssignment,
+  type ScheduleStrategy,
   type ShiftPeriod,
   type StaffingSlot,
   type TimeRange,
@@ -54,10 +56,11 @@ type HistorySnapshot = {
   label: string
   employees: Employee[]
   assignments: ScheduleAssignment[]
+  generatedAssignments: ScheduleAssignment[]
   diagnostics: string[]
 }
 
-type ScheduleVariant = 'balanced' | 'fewestDoubles' | 'similarWeek' | 'fairHours'
+type ScheduleVariant = ScheduleStrategy
 
 type FixIssue = {
   id: string
@@ -159,11 +162,11 @@ const fullDay = { start: minutes(9, 30), end: minutes(23) }
 const amShift = { start: minutes(9, 30), end: minutes(16) }
 const pmShift = { start: minutes(16), end: minutes(23) }
 
-const scheduleVariants: { id: ScheduleVariant; label: string; description: string }[] = [
-  { id: 'balanced', label: 'Balanced schedule', description: 'Spreads shifts across the available staff.' },
-  { id: 'fewestDoubles', label: 'Fewest doubles', description: 'Tries the same deterministic schedule with double-shift pressure called out.' },
-  { id: 'similarWeek', label: 'Keep locked people', description: 'Regenerates around anyone marked Keep.' },
-  { id: 'fairHours', label: 'Fair hours', description: 'Reviews the schedule by total assigned hours.' },
+const scheduleVariants: { id: ScheduleVariant; label: string; description: string; icon: IconName }[] = [
+  { id: 'balanced', label: 'Balanced', description: 'Spreads the work across everyone.', icon: 'spark' },
+  { id: 'fewestDoubles', label: 'Fewest doubles', description: 'Avoids putting anyone on both shifts in one day.', icon: 'target' },
+  { id: 'similarWeek', label: 'Keep this week similar', description: 'Changes as little as possible from what is on screen now.', icon: 'lock' },
+  { id: 'fairHours', label: 'Similar hours for all', description: 'Evens out how many hours each person gets.', icon: 'undo' },
 ]
 
 function cloneEmployees() {
@@ -376,6 +379,34 @@ function reviewLabel(violation: ValidationViolation, slots: StaffingSlot[], empl
   return violation.message
 }
 
+type ScheduleChange = {
+  slotId: string
+  shiftKey: ShiftKey
+  text: string
+}
+
+function changesSince(
+  generated: ScheduleAssignment[],
+  current: ScheduleAssignment[],
+  slots: StaffingSlot[],
+  employees: Employee[],
+): ScheduleChange[] {
+  if (generated.length === 0) return []
+  const generatedBySlot = new Map(generated.map((assignment) => [assignment.slotId, assignment.employeeId]))
+  const currentBySlot = new Map(current.map((assignment) => [assignment.slotId, assignment.employeeId]))
+  const nameFor = (employeeId?: string) => employees.find((employee) => employee.id === employeeId)?.name
+
+  return slots.flatMap((slot) => {
+    const before = nameFor(generatedBySlot.get(slot.id))
+    const after = nameFor(currentBySlot.get(slot.id))
+    if (before === after) return []
+    const where = `${slot.day} ${periodLabels[slot.period]} ${slot.label}`
+    const text = before && after ? `${where}: ${before} to ${after}` : after ? `${where}: ${after} added` : `${where}: ${before} removed`
+
+    return [{ slotId: slot.id, shiftKey: `${slot.day}-${slot.period}` as ShiftKey, text }]
+  })
+}
+
 function fixAdvice(code: string) {
   if (code === 'missing_assignment') return 'Pick someone for this spot, or add a new employee.'
   if (code === 'unavailable_employee') return 'They are not free then. Pick someone else for this spot.'
@@ -461,6 +492,7 @@ export default function SchedulerDemo() {
   const [dragOverSlotId, setDragOverSlotId] = useState<string | null>(null)
   const [dropFeedback, setDropFeedback] = useState<DropFeedback>(null)
   const [history, setHistory] = useState<HistorySnapshot[]>([])
+  const [generatedAssignments, setGeneratedAssignments] = useState<ScheduleAssignment[]>([])
   const [ignoredIssueIds, setIgnoredIssueIds] = useState<string[]>([])
   const [guidedChoosing, setGuidedChoosing] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
@@ -507,6 +539,11 @@ export default function SchedulerDemo() {
   )
   const visibleFixIssues = fixIssues.filter((issue) => !ignoredIssueIds.includes(issue.id))
   const nextIssue = visibleFixIssues[0]
+  const changes = useMemo(
+    () => changesSince(generatedAssignments, assignments, slots, employees),
+    [assignments, employees, generatedAssignments, slots],
+  )
+  const changedSlotIds = useMemo(() => new Set(changes.map((change) => change.slotId)), [changes])
   const fixCandidates = useMemo(
     () =>
       nextIssue?.slot
@@ -537,6 +574,7 @@ export default function SchedulerDemo() {
         label,
         employees: cloneEmployeeList(employees),
         assignments: cloneAssignmentList(assignments),
+        generatedAssignments: cloneAssignmentList(generatedAssignments),
         diagnostics: [...diagnostics],
       },
       ...current.slice(0, 5),
@@ -548,11 +586,33 @@ export default function SchedulerDemo() {
     if (!snapshot) return
     setEmployees(cloneEmployeeList(snapshot.employees))
     setAssignments(cloneAssignmentList(snapshot.assignments))
+    setGeneratedAssignments(cloneAssignmentList(snapshot.generatedAssignments))
     setDiagnostics([`Undid: ${snapshot.label}`])
     setHistory(rest)
     setDropFeedback(null)
     setDragState(null)
     setDragOverSlotId(null)
+  }
+
+  function restoreEverything() {
+    if (generatedAssignments.length === 0) return
+    remember('put the schedule back')
+    setAssignments(cloneAssignmentList(generatedAssignments))
+    setDropFeedback(null)
+    setDiagnostics(['The schedule is back the way it was generated.'])
+  }
+
+  function restoreShift(shiftKey: ShiftKey) {
+    const shiftSlotIds = new Set(
+      slots.filter((slot) => `${slot.day}-${slot.period}` === shiftKey).map((slot) => slot.id),
+    )
+    if (shiftSlotIds.size === 0) return
+    remember('put one shift back')
+    setAssignments((current) => [
+      ...current.filter((assignment) => !shiftSlotIds.has(assignment.slotId)),
+      ...generatedAssignments.filter((assignment) => shiftSlotIds.has(assignment.slotId)).map((assignment) => ({ ...assignment })),
+    ])
+    setDropFeedback(null)
   }
 
   function openSlot(slotId?: string) {
@@ -597,13 +657,22 @@ export default function SchedulerDemo() {
     setGuidedChoosing(true)
   }
 
-  function generationMessage(variant: ScheduleVariant, objectiveScore: number | null) {
-    const label = scheduleVariants.find((candidate) => candidate.id === variant)?.label ?? 'Schedule'
-    const score = objectiveScore === null ? '' : ` Score ${objectiveScore}.`
-    if (variant === 'fewestDoubles') return `${label} generated. Review any same-day doubles before publishing.${score}`
-    if (variant === 'similarWeek') return `${label} generated around the people marked Keep.${score}`
-    if (variant === 'fairHours') return `${label} generated. Check Employee totals for hour balance.${score}`
-    return `${label} generated.${score}`
+  function generationMessage(variant: ScheduleVariant, summary: ReturnType<typeof summarizeSchedule>, kept: number) {
+    const hours = `Hours run from ${summary.fewestHours} to ${summary.mostHours}.`
+
+    if (variant === 'fewestDoubles') {
+      return summary.doubles === 0
+        ? 'Nobody works both shifts in the same day this week.'
+        : `${summary.doubles} double shift${summary.doubles === 1 ? '' : 's'} left. That was the fewest possible with these rules.`
+    }
+    if (variant === 'similarWeek') {
+      return `${summary.keptFromReference} of ${kept} spots stayed with the same person.`
+    }
+    if (variant === 'fairHours') {
+      return `Hours evened out as far as the rules allow. ${hours}`
+    }
+
+    return `Balanced schedule made. ${hours}`
   }
 
   function generate(variant: ScheduleVariant = selectedVariant) {
@@ -611,20 +680,38 @@ export default function SchedulerDemo() {
     setSelectedVariant(variant)
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
+    const previousAssignments = assignments
     const result = generateSchedule(
       { employees, template: seedTemplate },
-      { existingAssignments: assignments.filter((assignment) => assignment.locked) },
+      {
+        strategy: variant,
+        referenceAssignments: previousAssignments,
+        existingAssignments: assignments.filter((assignment) => assignment.locked),
+      },
     )
-    setDiagnostics([generationMessage(variant, result.objectiveScore), ...result.diagnostics.map((diagnostic) => diagnostic.message)])
-    if (result.status !== 'INFEASIBLE') {
-      setAssignments(result.assignments)
+
+    if (result.status === 'INFEASIBLE') {
+      setDiagnostics([
+        'The schedule could not be made with these rules.',
+        ...result.diagnostics.map((diagnostic) => diagnostic.message),
+      ])
+      return
     }
+
+    const summary = summarizeSchedule(employees, slots, result.assignments, previousAssignments)
+    setDiagnostics([
+      generationMessage(variant, summary, previousAssignments.length || result.assignments.length),
+      ...result.diagnostics.map((diagnostic) => diagnostic.message),
+    ])
+    setAssignments(result.assignments)
+    setGeneratedAssignments(cloneAssignmentList(result.assignments))
   }
 
   function reset() {
     remember('reset demo')
     setEmployees(cloneEmployees())
     setAssignments([])
+    setGeneratedAssignments([])
     setDiagnostics([])
     setDraft(blankDraft())
     setEmployeePanelOpen(false)
@@ -785,7 +872,12 @@ export default function SchedulerDemo() {
               Fix next issue
             </Button>
             <span aria-hidden="true" className="mx-1 hidden h-8 w-px bg-zinc-200 sm:block" />
-            <IconButton icon="undo" label="Undo last change" onClick={undoLastChange} disabled={history.length === 0} />
+            <IconButton
+              icon="undo"
+              label={history[0] ? `Undo ${history[0].label}` : 'Undo last change'}
+              onClick={undoLastChange}
+              disabled={history.length === 0}
+            />
             <IconButton icon="plus" label="Add employee" onClick={openEmployeePanelForGap} />
             <IconButton icon="print" label="Print schedule" onClick={() => window.print()} />
             <IconButton icon="reset" label="Start over" onClick={reset} />
@@ -853,6 +945,8 @@ export default function SchedulerDemo() {
               violations={violations}
               openShiftKey={openShiftKey}
               activeMove={activeMove}
+              changedSlotIds={changedSlotIds}
+              onResetShift={restoreShift}
               dragOverSlotId={dragOverSlotId}
               dropFeedback={dropFeedback}
               movePreviews={movePreviews}
@@ -868,6 +962,24 @@ export default function SchedulerDemo() {
             />
             <VariantControls selectedVariant={selectedVariant} onGenerate={generate} />
           </section>
+
+          {changes.length > 0 && (
+            <Disclosure summary={`Changes since you made the schedule (${changes.length})`}>
+              <ul className="space-y-1 text-sm text-zinc-700">
+                {changes.map((change) => (
+                  <li key={change.slotId}>{change.text}</li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                onClick={restoreEverything}
+              >
+                <Icon name="reset" />
+                Put the whole week back
+              </button>
+            </Disclosure>
+          )}
 
           {diagnostics.length > 0 && (
             <Disclosure summary={`Messages (${diagnostics.length})`}>
@@ -1236,7 +1348,7 @@ function VariantControls({
 }) {
   return (
     <div className="mt-4 border-t border-zinc-100 pt-4">
-      <p className="text-sm text-zinc-600">Other ways to build this week</p>
+      <p className="text-sm text-zinc-600">Other ways to build this week. Anyone marked Keep stays put.</p>
       <div className="mt-2 flex flex-wrap gap-2">
       {scheduleVariants.map((variant) => (
         <button
@@ -1250,7 +1362,7 @@ function VariantControls({
           onClick={() => onGenerate(variant.id)}
           title={variant.description}
         >
-          <Icon name={variant.id === 'balanced' ? 'spark' : variant.id === 'similarWeek' ? 'lock' : 'target'} />
+          <Icon name={variant.icon} />
           {variant.label}
         </button>
       ))}
@@ -1400,6 +1512,8 @@ function WeeklyScheduleBoard({
   dropFeedback,
   movePreviews,
   activeMove,
+  changedSlotIds,
+  onResetShift,
   onOpenShift,
   onAssign,
   onLock,
@@ -1420,6 +1534,8 @@ function WeeklyScheduleBoard({
   dropFeedback: DropFeedback
   movePreviews: Map<string, MovePreview>
   activeMove: DragState | null
+  changedSlotIds: Set<string>
+  onResetShift: (shiftKey: ShiftKey) => void
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
@@ -1458,6 +1574,8 @@ function WeeklyScheduleBoard({
                     dropFeedback={dropFeedback}
                     movePreviews={movePreviews}
                     activeMove={activeMove}
+                    changedSlotIds={changedSlotIds}
+                    onResetShift={onResetShift}
                     onOpenShift={onOpenShift}
                     onAssign={onAssign}
                     onLock={onLock}
@@ -1521,6 +1639,8 @@ function ShiftRow({
   dropFeedback,
   movePreviews,
   activeMove,
+  changedSlotIds,
+  onResetShift,
   onOpenShift,
   onAssign,
   onLock,
@@ -1543,6 +1663,8 @@ function ShiftRow({
   dropFeedback: DropFeedback
   movePreviews: Map<string, MovePreview>
   activeMove: DragState | null
+  changedSlotIds: Set<string>
+  onResetShift: (shiftKey: ShiftKey) => void
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
   onLock: (slotId: string, locked: boolean) => void
@@ -1594,6 +1716,7 @@ function ShiftRow({
               assignment={assignmentMap.get(slot.id)}
               employee={employees.find((candidate) => candidate.id === assignmentMap.get(slot.id)?.employeeId)}
               status={slotStatuses[index]}
+              isChanged={changedSlotIds.has(slot.id)}
               activeMove={activeMove}
               dragOverSlotId={dragOverSlotId}
               movePreview={movePreviews.get(slot.id) ?? null}
@@ -1641,6 +1764,16 @@ function ShiftRow({
               />
             ))}
           </div>
+          {slots.some((slot) => changedSlotIds.has(slot.id)) && (
+            <button
+              type="button"
+              className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              onClick={() => onResetShift(shiftKey)}
+            >
+              <Icon name="reset" />
+              Put this shift back
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1652,6 +1785,7 @@ function AssignmentChip({
   assignment,
   employee,
   status,
+  isChanged,
   activeMove,
   dragOverSlotId,
   movePreview,
@@ -1666,6 +1800,7 @@ function AssignmentChip({
   assignment?: ScheduleAssignment
   employee?: Employee
   status: SpotStatus
+  isChanged: boolean
   activeMove: DragState | null
   dragOverSlotId: string | null
   movePreview: MovePreview | null
@@ -1760,6 +1895,12 @@ function AssignmentChip({
       </span>
       <span className="font-semibold">{slot.label}</span>
       <span className={`truncate${isGhosted ? ' italic opacity-80' : ''}`}>{secondaryText}</span>
+      {!isMoveActive && isChanged && (
+        <>
+          <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500" />
+          <span className="sr-only">Changed since the schedule was made.</span>
+        </>
+      )}
       {!isMoveActive && status !== 'good' && status !== 'idle' && <Icon name={statusMeta[status].icon} />}
       {isMoveActive && !isSource && preview && <Icon name={preview.status === 'valid' ? 'check' : 'close'} />}
       {assignment?.locked && <Icon name="lock" />}
