@@ -154,6 +154,15 @@ if (!fs.existsSync(outDir)) {
     if (html.includes('content="noindex')) fail(`${page.file} is accidentally noindexed`)
     checkJsonLd(page.file, html, page.requiresJsonLd)
     checkHeadings(page.file, html)
+
+    // /menu and /menu/ must both answer, and the slashed copy must point its
+    // canonical back at the unslashed form so the pair consolidates to one URL.
+    if (page.route !== '/') {
+      const mirrored = readOut(path.join(page.route.replace(/^\//, ''), 'index.html'))
+      if (mirrored && !mirrored.includes(canonical)) {
+        fail(`${page.route}/ is missing canonical ${canonical}`)
+      }
+    }
   }
 
   for (const file of noindexPages) {

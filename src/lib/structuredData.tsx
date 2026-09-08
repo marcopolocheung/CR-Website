@@ -2,6 +2,7 @@ import type { RestaurantLocation } from '@/data/locations'
 import {
   absoluteUrl,
   DEFAULT_DESCRIPTION,
+  LOGO_PATH,
   OG_IMAGE_PATH,
   SITE_NAME,
 } from '@/lib/seo'
@@ -116,6 +117,15 @@ export function homepageJsonLd(locationList: RestaurantLocation[]) {
         name: SITE_NAME,
         url: absoluteUrl('/'),
         description: DEFAULT_DESCRIPTION,
+        // The wordmark, on a crawlable URL. This is what Google uses for the
+        // knowledge-panel logo, and it is the same mark the favicon is cut from.
+        logo: {
+          '@type': 'ImageObject',
+          url: absoluteUrl(LOGO_PATH),
+          width: 1000,
+          height: 197,
+          caption: SITE_NAME,
+        },
         department: locationList.map((location) => ({
           '@id': `${absoluteUrl(location.path)}#restaurant`,
         })),
