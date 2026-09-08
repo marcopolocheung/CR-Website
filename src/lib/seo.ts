@@ -5,6 +5,7 @@ export const SITE_NAME = 'China Rose'
 export const DEFAULT_DESCRIPTION =
   'China Rose - Authentic Chinese cuisine with two locations in San Antonio, TX. Order pick-up or delivery online.'
 export const OG_IMAGE_PATH = '/imgs/crbanner.webp'
+export const LOGO_PATH = '/imgs/china-rose-logo.png'
 
 export const indexableRoutes = [
   { path: '/', changeFrequency: 'weekly', priority: 1, lastModified: '2026-08-22' },
