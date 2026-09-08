@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # sitemap lastmod is derived from each route's own commit history, so
+          # the shallow default clone would date every page to the last deploy.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
