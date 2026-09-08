@@ -7,12 +7,74 @@ export const DEFAULT_DESCRIPTION =
 export const OG_IMAGE_PATH = '/imgs/crbanner.webp'
 export const LOGO_PATH = '/imgs/china-rose-logo.png'
 
+/**
+ * The date each route last genuinely changed is derived from the commit history
+ * of the files that render it — see `src/lib/lastmod.ts`. `sources` is that
+ * list. Add a file here when it starts affecting what a route *says*; a route
+ * whose sitemap date never moves is discounted the same way one that claims to
+ * change on every deploy is.
+ *
+ * Sitewide chrome — the layout, Nav, Footer — is deliberately absent. It renders
+ * on every page, so including it would re-date all five routes for a footer
+ * tweak and flatten the per-route signal back into a single deploy date.
+ */
 export const indexableRoutes = [
-  { path: '/', changeFrequency: 'weekly', priority: 1, lastModified: '2026-08-22' },
-  { path: '/menu', changeFrequency: 'weekly', priority: 0.9, lastModified: '2026-08-22' },
-  { path: '/locations/w-military', changeFrequency: 'weekly', priority: 0.9, lastModified: '2026-08-22' },
-  { path: '/locations/sw-military', changeFrequency: 'weekly', priority: 0.9, lastModified: '2026-08-22' },
-  { path: '/careers', changeFrequency: 'monthly', priority: 0.3, lastModified: '2026-08-22' },
+  {
+    path: '/',
+    changeFrequency: 'weekly',
+    priority: 1,
+    sources: [
+      'src/app/(public)/page.tsx',
+      'src/components/LocationCard.tsx',
+      'src/data/locations.ts',
+      'src/lib/structuredData.tsx',
+    ],
+  },
+  {
+    path: '/menu',
+    changeFrequency: 'weekly',
+    priority: 0.9,
+    sources: [
+      'src/app/(public)/menu/page.tsx',
+      'src/data/menu.json',
+      'src/lib/menuUtils.ts',
+      'src/lib/menuStructuredData.ts',
+    ],
+  },
+  {
+    path: '/locations/w-military',
+    changeFrequency: 'weekly',
+    priority: 0.9,
+    sources: [
+      'src/app/(public)/locations/w-military/page.tsx',
+      'src/components/LocationPageContent.tsx',
+      'src/components/LocationOpenStatus.tsx',
+      'src/data/locations.ts',
+      'src/data/featuredDishes.ts',
+      'src/data/menu.json',
+      'src/lib/structuredData.tsx',
+    ],
+  },
+  {
+    path: '/locations/sw-military',
+    changeFrequency: 'weekly',
+    priority: 0.9,
+    sources: [
+      'src/app/(public)/locations/sw-military/page.tsx',
+      'src/components/LocationPageContent.tsx',
+      'src/components/LocationOpenStatus.tsx',
+      'src/data/locations.ts',
+      'src/data/featuredDishes.ts',
+      'src/data/menu.json',
+      'src/lib/structuredData.tsx',
+    ],
+  },
+  {
+    path: '/careers',
+    changeFrequency: 'monthly',
+    priority: 0.3,
+    sources: ['src/app/(public)/careers/page.tsx'],
+  },
 ] as const
 
 export function absoluteUrl(path = '/') {
