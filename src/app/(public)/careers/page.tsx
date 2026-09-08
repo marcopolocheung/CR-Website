@@ -5,7 +5,7 @@ export const metadata: Metadata = publicPageMetadata({
   title: 'Jobs at China Rose | Chinese Restaurant in San Antonio, TX',
   absoluteTitle: true,
   description:
-    'Job openings at China Rose, a family Chinese restaurant with two San Antonio locations on W Military Dr and SW Military Dr.',
+    'Job openings at China Rose, a Chinese restaurant with two San Antonio locations on W Military Dr and SW Military Dr.',
   path: '/careers',
 })
 
