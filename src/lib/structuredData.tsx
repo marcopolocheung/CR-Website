@@ -44,7 +44,13 @@ function restaurantNode(location: RestaurantLocation) {
     ],
     priceRange: PRICE_RANGE,
     image: absoluteUrl(OG_IMAGE_PATH),
-    hasMenu: absoluteUrl('/menu'),
+    // A typed reference, not a bare URL: /menu defines the Menu node this points
+    // at, so a crawler that reads both pages resolves them to one entity.
+    hasMenu: {
+      '@type': 'Menu',
+      '@id': `${absoluteUrl('/menu')}#menu`,
+      url: absoluteUrl('/menu'),
+    },
     hasMap: location.mapUrl,
     // The profile links Google already ranks. Each location reconciles to its own
     // listing, so these are per-location and never shared between the two.

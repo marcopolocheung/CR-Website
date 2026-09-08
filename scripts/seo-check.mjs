@@ -9,7 +9,7 @@ const siteUrl = 'https://chinarosesa.com'
 // results; every page's JSON-LD is validated when present either way.
 const publicPages = [
   { route: '/', file: 'index.html', requiresJsonLd: true },
-  { route: '/menu', file: 'menu.html' },
+  { route: '/menu', file: 'menu.html', requiresJsonLd: true },
   { route: '/locations/w-military', file: 'locations/w-military.html', requiresJsonLd: true },
   { route: '/locations/sw-military', file: 'locations/sw-military.html', requiresJsonLd: true },
   { route: '/careers', file: 'careers.html' },
@@ -20,6 +20,10 @@ const noindexPages = [
   'order/review.html',
   'order/confirmation.html',
   'internal/qr-generator.html',
+  // Staff-facing. These carry no customer value in search and /schedule can
+  // expose the published roster, so the noindex is a guarantee, not a default.
+  'schedule.html',
+  'scheduler-demo.html',
 ]
 
 function fail(message) {
@@ -154,8 +158,14 @@ if (!fs.existsSync(outDir)) {
 
   for (const file of noindexPages) {
     const html = readOut(file)
-    if (!html.includes('name="robots"') || !html.includes('noindex')) {
-      fail(`${file} missing noindex robots meta`)
+    // Read the directive out of the meta tag itself. A bare `includes('noindex')`
+    // over the whole document also matches the serialized RSC payload further
+    // down the page, so it passed even when the real tag said "index, follow".
+    const robots = html.match(/<meta name="robots" content="([^"]*)"/)?.[1]
+    if (!robots) {
+      fail(`${file} has no robots meta tag`)
+    } else if (!/\bnoindex\b/.test(robots)) {
+      fail(`${file} robots meta is "${robots}", expected noindex`)
     }
   }
 }
