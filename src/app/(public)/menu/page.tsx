@@ -10,7 +10,10 @@ import { JsonLd } from '@/lib/structuredData'
 
 export const metadata: Metadata = publicPageMetadata({
   title: 'China Rose Menu | San Antonio Chinese Restaurant',
-  description: 'Browse the China Rose menu for both San Antonio locations, including combo meals, bowls, fried rice, lo mein, soups, sides, and drinks.',
+  // Named dishes, not just category names: "lemon chicken san antonio" is a
+  // real query this page should be able to answer. Every dish here is on the menu.
+  description:
+    'China Rose menu and prices \u2014 lemon chicken, sesame chicken, orange chicken, beef and broccoli, fried rice, lo-mein, pad thai. Both San Antonio locations.',
   path: '/menu',
   absoluteTitle: true,
 })

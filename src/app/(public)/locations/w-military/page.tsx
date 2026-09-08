@@ -5,8 +5,13 @@ import { JsonLd, restaurantJsonLd } from '@/lib/structuredData'
 import { publicPageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = publicPageMetadata({
-  title: 'Military Location',
-  description: 'China Rose at 7046 W Military Dr in San Antonio, TX. View hours, menu, pickup, delivery, and directions.',
+  // The street and ZIP carry the search intent this page exists to win
+  // ("chinese food 78227", "chinese drive thru san antonio"). The old title,
+  // "Military Location | China Rose", named neither the city nor the cuisine.
+  title: 'China Rose W Military Dr | Chinese Restaurant, San Antonio',
+  absoluteTitle: true,
+  description:
+    'China Rose at 7046 W Military Dr, San Antonio, TX 78227. Chinese dine-in, pick-up, delivery and drive-thru, plus catering and lunch specials.',
   path: '/locations/w-military',
 })
 
