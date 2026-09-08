@@ -1,10 +1,12 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { formatOpeningDays, formatOpeningHours, type OpeningHours } from '@/data/locations'
+import TrackedLink from '@/components/analytics/TrackedLink'
+import { formatOpeningDays, formatOpeningHours, type LocationSlug, type OpeningHours } from '@/data/locations'
 import menuData from '@/data/menu.json'
 import { formatMenuItemName, getMenuPreviewSections, type MenuCategory } from '@/lib/menuUtils'
 
 interface Props {
+  slug: LocationSlug
   name: string
   addressLines: string[]
   phone: string
@@ -23,7 +25,7 @@ const MENU_IMAGES = [`${BASE}/imgs/menu1.jpg`, `${BASE}/imgs/menu2.jpg`, `${BASE
 const MENU_PREVIEW_SECTIONS = getMenuPreviewSections(menuData as MenuCategory[])
 
 export default function LocationPageContent({
-  name, addressLines, phone, phoneHref, toastUrl, uberUrl, mapUrl, hours, services, featuredDishes, menuNote,
+  slug, name, addressLines, phone, phoneHref, toastUrl, uberUrl, mapUrl, hours, services, featuredDishes, menuNote,
 }: Props) {
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-10">
@@ -43,7 +45,14 @@ export default function LocationPageContent({
           </div>
           <div>
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-1">Phone</h2>
-            <a href={phoneHref} className="text-red-700 font-medium hover:underline">{phone}</a>
+            <TrackedLink
+              href={phoneHref}
+              event="phone_click"
+              params={{ location: slug }}
+              className="text-red-700 font-medium hover:underline"
+            >
+              {phone}
+            </TrackedLink>
           </div>
           <div>
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-1">Hours</h2>
@@ -66,15 +75,17 @@ export default function LocationPageContent({
           <p className="text-gray-600 text-sm mb-4">
             Open this location in Google Maps for directions and current map details.
           </p>
-          <a
+          <TrackedLink
             href={mapUrl}
+            event="directions_click"
+            params={{ location: slug }}
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`View on Google Maps - ${name}`}
             className="inline-flex justify-center rounded-xl bg-red-700 px-4 py-3 text-sm font-bold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 transition-colors"
           >
             View on Google Maps
-          </a>
+          </TrackedLink>
         </div>
       </div>
 
@@ -128,24 +139,28 @@ export default function LocationPageContent({
 
         {/* on mobile the order buttons go above the menu so they dont get buried */}
         <div className="flex flex-col gap-3 mb-4 md:hidden">
-          <a
+          <TrackedLink
             href={toastUrl}
+            event="pickup_order_click"
+            params={{ location: slug }}
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Order Pick-Up on Toast - ${name}`}
             className="text-center bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-4 rounded-xl transition-colors"
           >
             Order Pick-Up on Toast
-          </a>
-          <a
+          </TrackedLink>
+          <TrackedLink
             href={uberUrl}
+            event="delivery_order_click"
+            params={{ location: slug }}
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Order Delivery on Uber Eats - ${name}`}
             className="text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
           >
             Order Delivery on Uber Eats
-          </a>
+          </TrackedLink>
           <p className="text-xs text-gray-500 text-center">
             Ordering opens through third-party services. Availability and fees may vary.
           </p>
@@ -172,24 +187,28 @@ export default function LocationPageContent({
 
           {/* desktop only order buttons to the right of the menu */}
           <div className="hidden md:flex flex-col gap-3 w-44 shrink-0">
-            <a
+            <TrackedLink
               href={toastUrl}
+              event="pickup_order_click"
+              params={{ location: slug }}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Order Pick-Up on Toast - ${name}`}
               className="text-center bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-3 rounded-xl transition-colors text-sm"
             >
               Order Pick-Up on Toast
-            </a>
-            <a
+            </TrackedLink>
+            <TrackedLink
               href={uberUrl}
+              event="delivery_order_click"
+              params={{ location: slug }}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Order Delivery on Uber Eats - ${name}`}
               className="text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-3 rounded-xl transition-colors text-sm"
             >
               Order Delivery on Uber Eats
-            </a>
+            </TrackedLink>
             <p className="text-xs text-gray-500 leading-snug">
               Ordering opens through third-party services. Availability and fees may vary.
             </p>

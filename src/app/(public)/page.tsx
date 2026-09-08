@@ -6,6 +6,7 @@ import {
   formatOpeningDays,
   formatOpeningHours,
   locations,
+  orderUrl,
 } from '@/data/locations'
 import { DEFAULT_DESCRIPTION, publicPageMetadata } from '@/lib/seo'
 import { homepageJsonLd, JsonLd } from '@/lib/structuredData'
@@ -34,11 +35,12 @@ const driveThruLocations = Object.values(locations)
   .map((location) => location.displayName.replace('China Rose - ', ''))
 
 const homepageLocations = Object.values(locations).map((location) => ({
+  slug: location.slug,
   name: location.displayName,
   address: formatLocationAddress(location),
   phone: location.phone,
-  toastUrl: location.toastUrl,
-  uberUrl: location.uberUrl,
+  toastUrl: orderUrl(location, 'pickup'),
+  uberUrl: orderUrl(location, 'delivery'),
   href: location.path,
 }))
 

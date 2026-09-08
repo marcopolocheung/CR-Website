@@ -44,6 +44,11 @@ jobs:
           # deploy needs a basePath, and setting one wrongly rewrites every
           # asset URL and canonical on the site.
           NEXT_PUBLIC_BASE_PATH: ''
+          # GA4 measurement ID. Set as a repository *variable* (not a secret) —
+          # it is served in the page source, so it is public by design, and a
+          # variable can be read and changed without re-entering it. Unset, the
+          # build simply ships no analytics rather than failing.
+          NEXT_PUBLIC_GA_ID: ${{ vars.NEXT_PUBLIC_GA_ID }}
 
       # The SEO guarantees — canonicals, JSON-LD, headings, robots, sitemap,
       # noindex on staff routes — are only guarantees if a broken one fails the
