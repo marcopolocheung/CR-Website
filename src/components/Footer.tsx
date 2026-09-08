@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import LocationOpenStatus from './LocationOpenStatus'
+import TrackedLink from '@/components/analytics/TrackedLink'
 
 export default function Footer() {
   return (
@@ -32,14 +33,24 @@ export default function Footer() {
           <ul className="space-y-2">
             <li><Link href="/careers" className="hover:text-yellow-300 transition-colors">Careers</Link></li>
             <li>
-              <a href="tel:2106753226" className="hover:text-yellow-300 transition-colors">
+              <TrackedLink
+                href="tel:2106753226"
+                event="phone_click"
+                params={{ location: 'w-military' }}
+                className="hover:text-yellow-300 transition-colors"
+              >
                 Military Location: (210) 675-3226
-              </a>
+              </TrackedLink>
             </li>
             <li>
-              <a href="tel:2109277339" className="hover:text-yellow-300 transition-colors">
+              <TrackedLink
+                href="tel:2109277339"
+                event="phone_click"
+                params={{ location: 'sw-military' }}
+                className="hover:text-yellow-300 transition-colors"
+              >
                 Zarzamora Location: (210) 927-7339
-              </a>
+              </TrackedLink>
             </li>
           </ul>
           <p className="mt-3 text-xs text-red-200">

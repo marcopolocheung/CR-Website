@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import LocationPageContent from '@/components/LocationPageContent'
-import { getLocation } from '@/data/locations'
+import { getLocation, orderUrl } from '@/data/locations'
 import { JsonLd, restaurantJsonLd } from '@/lib/structuredData'
 import { publicPageMetadata } from '@/lib/seo'
 
@@ -21,12 +21,13 @@ export default function SWMilitaryPage() {
     <>
       <JsonLd data={restaurantJsonLd(location)} />
       <LocationPageContent
+        slug={location.slug}
         name={location.displayName}
         addressLines={location.addressLines}
         phone={location.phone}
         phoneHref={location.phoneHref}
-        toastUrl={location.toastUrl}
-        uberUrl={location.uberUrl}
+        toastUrl={orderUrl(location, 'pickup')}
+        uberUrl={orderUrl(location, 'delivery')}
         mapUrl={location.mapUrl}
         hours={location.hours}
         services={location.services}

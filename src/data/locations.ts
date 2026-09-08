@@ -109,6 +109,27 @@ export const locations: Record<LocationSlug, RestaurantLocation> = {
   },
 }
 
+export type OrderChannel = 'pickup' | 'delivery'
+
+/**
+ * The ordering link a customer actually clicks, tagged so Toast and Uber can
+ * report how much of their volume this site sends them.
+ *
+ * The tags are applied here rather than stored on the record so the canonical
+ * URLs stay canonical: the JSON-LD `OrderAction` targets and any URL we publish
+ * for a machine to read keep no tracking parameters, since a crawler never
+ * clicks a button and would only be handed a campaign it did not come from.
+ */
+export function orderUrl(location: RestaurantLocation, channel: OrderChannel) {
+  const url = new URL(channel === 'pickup' ? location.toastUrl : location.uberUrl)
+
+  url.searchParams.set('utm_source', 'site')
+  url.searchParams.set('utm_medium', 'referral')
+  url.searchParams.set('utm_campaign', location.slug)
+
+  return url.toString()
+}
+
 export function getLocation(slug: LocationSlug) {
   return locations[slug]
 }

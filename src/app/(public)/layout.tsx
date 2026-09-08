@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import '../globals.css'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
+import Analytics from '@/components/analytics/Analytics'
 import { DEFAULT_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/seo'
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Nav />
         <main className="flex-1">{children}</main>
         <Footer />
+        <Analytics />
       </body>
     </html>
   )
