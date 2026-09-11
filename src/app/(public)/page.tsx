@@ -37,6 +37,7 @@ const driveThruLocations = Object.values(locations)
 const homepageLocations = Object.values(locations).map((location) => ({
   slug: location.slug,
   name: location.displayName,
+  areaLabel: location.areaLabel,
   address: formatLocationAddress(location),
   phone: location.phone,
   toastUrl: orderUrl(location, 'pickup'),
