@@ -38,6 +38,13 @@ export type GeoPoint = {
 export type RestaurantLocation = {
   slug: LocationSlug
   displayName: string
+  /**
+   * Short side-of-town label, spelled out from the directional prefix already
+   * in `streetAddress` (W / SW). Exists so the homepage cards can show a cue
+   * that doesn't rely on a customer reading past the word "Military" in both
+   * addresses to tell the two locations apart.
+   */
+  areaLabel: string
   schemaName: string
   path: string
   streetAddress: string
@@ -68,6 +75,7 @@ export const locations: Record<LocationSlug, RestaurantLocation> = {
   'w-military': {
     slug: 'w-military',
     displayName: 'China Rose - Military Location',
+    areaLabel: 'West Side',
     schemaName: 'China Rose',
     path: '/locations/w-military',
     streetAddress: '7046 W Military Dr',
@@ -89,6 +97,7 @@ export const locations: Record<LocationSlug, RestaurantLocation> = {
   'sw-military': {
     slug: 'sw-military',
     displayName: 'China Rose - Zarzamora Location',
+    areaLabel: 'Southwest Side',
     schemaName: 'China Rose',
     path: '/locations/sw-military',
     streetAddress: '2535 SW Military Dr',
