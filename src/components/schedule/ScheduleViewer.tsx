@@ -158,7 +158,7 @@ export default function ScheduleViewer() {
     return (
       <div>
         {viewingShare && (
-          <div className="border-b border-zinc-200 bg-white">
+          <div className="border-b border-zinc-200 bg-white print:hidden">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2">
               <span className="text-sm text-zinc-600">This link can change when your manager edits the week.</span>
               <button
@@ -169,7 +169,11 @@ export default function ScheduleViewer() {
               >
                 {checking ? 'Checking...' : 'Check for updates'}
               </button>
-              {updateNote && <span className="text-sm font-medium text-zinc-700">{updateNote}</span>}
+              {updateNote && (
+                <span className="text-sm font-medium text-zinc-700" role="status">
+                  {updateNote}
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -282,23 +286,57 @@ function WeekView({
       shifts: entries.filter((entry) => entry.personIndex === personIndex).map((entry) => entry.slot),
     }))
     .filter((row) => !onlyPerson || row.person === onlyPerson)
+  const todayDay = DAYS.find((day) => dateForDay(week.weekStart, day) === today) ?? null
+  const daySections = DAYS.map((day) => ({
+    day,
+    date: dateForDay(week.weekStart, day),
+    shifts: entries
+      .filter((entry) => entry.slot.day === day && (!onlyPerson || week.people[entry.personIndex] === onlyPerson))
+      .sort((a, b) => a.slot.start - b.slot.start),
+  }))
+  const printRows = entries
+    .filter((entry) => !onlyPerson || week.people[entry.personIndex] === onlyPerson)
+    .sort((a, b) => a.slot.day.localeCompare(b.slot.day) || a.slot.start - b.slot.start)
+
+  function jumpToToday() {
+    if (!todayDay) return
+    document.getElementById(`staff-day-${todayDay}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <button
-        type="button"
-        className="text-sm font-semibold text-red-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-        onClick={onBack}
-      >
-        &lsaquo; All weeks
-      </button>
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
+        <button
+          type="button"
+          className="text-sm font-semibold text-red-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          onClick={onBack}
+        >
+          &lsaquo; All weeks
+        </button>
+        {todayDay && (
+          <button
+            type="button"
+            className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            onClick={jumpToToday}
+          >
+            Today
+          </button>
+        )}
+        <button
+          type="button"
+          className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          onClick={() => window.print()}
+        >
+          Print
+        </button>
+      </div>
 
       <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">Week of {formatWeekRange(week.weekStart)}</h1>
           <p className="text-zinc-600">{week.name}</p>
         </div>
-        <label className="text-sm font-medium text-zinc-800">
+        <label className="text-sm font-medium text-zinc-800 print:hidden">
           <span className="sr-only">Whose shifts to show</span>
           <select
             className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:w-56"
@@ -315,7 +353,46 @@ function WeekView({
         </label>
       </div>
 
-      <div className="mt-5 overflow-x-auto">
+      <div className="mt-5 space-y-3 md:hidden print:hidden">
+        {daySections.map(({ day, date, shifts }) => {
+          const isToday = date === today
+          return (
+            <section
+              key={day}
+              id={`staff-day-${day}`}
+              aria-label={`${day}${isToday ? ', today' : ''}`}
+              className={`scroll-mt-4 rounded-lg border bg-white p-3 shadow-sm ${isToday ? 'border-red-300' : 'border-zinc-200'}`}
+            >
+              <h2 className="flex items-center gap-2 font-semibold text-zinc-900">
+                {formatDayLabel(week.weekStart, day)}
+                {isToday && (
+                  <span className="rounded-full bg-red-800 px-2 py-0.5 text-xs font-bold text-white">Today</span>
+                )}
+                <span className="ml-auto text-xs font-normal text-zinc-500">
+                  {shifts.length} shift{shifts.length === 1 ? '' : 's'}
+                </span>
+              </h2>
+              {shifts.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-500">Nobody scheduled{onlyPerson ? ` for ${onlyPerson}` : ''}.</p>
+              ) : (
+                <ul className="mt-2 divide-y divide-zinc-100">
+                  {shifts.map(({ slot, personIndex }) => (
+                    <li key={slot.id} className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-zinc-900">{week.people[personIndex]}</span>
+                        <span className="block text-xs text-zinc-500">{positionName(slot.label)}</span>
+                      </span>
+                      <span className="shrink-0 font-semibold tabular-nums text-zinc-900">{formatTimeRange(slot)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )
+        })}
+      </div>
+
+      <div className="mt-5 hidden overflow-x-auto md:block print:hidden">
         <table className="w-full min-w-[1040px] border-collapse text-left">
           <thead>
             <tr>
@@ -390,6 +467,31 @@ function WeekView({
               </td>
             </tr>
           </tfoot>
+        </table>
+      </div>
+
+      <div className="hidden print:block">
+        <h2 className="text-lg font-bold text-black">Week of {formatWeekRange(week.weekStart)}{onlyPerson ? ` — ${onlyPerson}` : ''}</h2>
+        <p className="text-sm text-black">{week.name}</p>
+        <table className="mt-3 w-full border-collapse text-left text-sm">
+          <thead>
+            <tr>
+              <th scope="col" className="border border-black px-2 py-1">Day</th>
+              <th scope="col" className="border border-black px-2 py-1">Time</th>
+              <th scope="col" className="border border-black px-2 py-1">Who</th>
+              <th scope="col" className="border border-black px-2 py-1">Position</th>
+            </tr>
+          </thead>
+          <tbody>
+            {printRows.map(({ slot, personIndex }) => (
+              <tr key={slot.id}>
+                <td className="border border-black px-2 py-1">{formatDayLabel(week.weekStart, slot.day)}</td>
+                <td className="border border-black px-2 py-1">{formatTimeRange(slot)}</td>
+                <td className="border border-black px-2 py-1">{week.people[personIndex]}</td>
+                <td className="border border-black px-2 py-1">{positionName(slot.label)}</td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
     </div>

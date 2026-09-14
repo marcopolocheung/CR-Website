@@ -168,6 +168,23 @@ function shortTimeRange(slot: StaffingSlot) {
   return `${shortHour(slot.start)}-${shortHour(slot.end)}`
 }
 
+function clampMaxDays(value: number) {
+  if (!Number.isFinite(value)) return 1
+  return Math.min(7, Math.max(1, Math.trunc(value)))
+}
+
+function availabilitySummary(employee: Employee) {
+  const daysAvailable = DAYS.filter((day) => (employee.recurringAvailability[day]?.length ?? 0) > 0)
+  if (daysAvailable.length === 0) return 'No availability set'
+  const ranges = daysAvailable.flatMap((day) => employee.recurringAvailability[day] ?? [])
+  const morningsOnly = ranges.length > 0 && ranges.every((range) => range.end <= minutes(16))
+  const dinnersOnly = ranges.length > 0 && ranges.every((range) => range.start >= minutes(16))
+  const timeHint = morningsOnly ? 'mornings' : dinnersOnly ? 'dinners' : 'mixed hours'
+  if (daysAvailable.length === 7) return `Any day · ${timeHint}`
+  const short = daysAvailable.map((day) => day.slice(0, 3)).join(', ')
+  return `${short} · ${timeHint}`
+}
+
 function spotStatus({
   hasEmployee,
   hasSchedule,
@@ -619,6 +636,7 @@ export default function SchedulerDemo() {
   const [guidedChoosing, setGuidedChoosing] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [confirmingReset, setConfirmingReset] = useState(false)
+  const [staffQuery, setStaffQuery] = useState('')
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
   const assignments = weeks[weekStart] ?? emptyAssignments
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
@@ -748,6 +766,17 @@ export default function SchedulerDemo() {
     window.addEventListener('keydown', cancelOnEscape)
     return () => window.removeEventListener('keydown', cancelOnEscape)
   }, [dragState, moveSource])
+
+  const staffStatsById = useMemo(() => new Map(stats.map((stat) => [stat.employeeId, stat])), [stats])
+  const filteredEmployees = useMemo(() => {
+    const query = staffQuery.trim().toLowerCase()
+    if (!query) return employees
+    return employees.filter(
+      (employee) =>
+        employee.name.toLowerCase().includes(query) ||
+        employee.roles.some((role) => roleLabels[role].toLowerCase().includes(query)),
+    )
+  }, [employees, staffQuery])
 
   // Messages, skipped issues and an open shift all describe the week that was on screen.
   function goToWeek(nextWeekStart: string) {
@@ -1070,7 +1099,7 @@ export default function SchedulerDemo() {
             <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Scheduler demo</p>
             <h1 className="text-2xl font-bold md:text-3xl">Weekly staff schedule</h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Button
               tone="primary"
               onClick={() => generate()}
@@ -1201,12 +1230,12 @@ export default function SchedulerDemo() {
                   </button>
                 )}
               </div>
-              <p className="text-sm text-zinc-600">Click a name to move it, then click where it goes.</p>
+              <p className="text-sm text-zinc-600 print:hidden">Click a name to move it, then click where it goes.</p>
             </div>
 
             {movingEmployee && (
               <div
-                className="mt-3 flex flex-col gap-2 rounded border border-green-300 bg-green-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                className="mt-3 flex flex-col gap-2 rounded border border-green-300 bg-green-50 p-3 sm:flex-row sm:items-center sm:justify-between print:hidden"
                 role="status"
               >
                 <p className="flex items-center gap-2 text-sm font-semibold text-green-950">
@@ -1243,29 +1272,33 @@ export default function SchedulerDemo() {
               onDropAssignment={moveAssignmentTo}
               onActivateSlot={activateSlot}
             />
-            <VariantControls selectedVariant={selectedVariant} onGenerate={generate} />
+            <div className="print:hidden">
+              <VariantControls selectedVariant={selectedVariant} onGenerate={generate} />
+            </div>
           </section>
 
           {changes.length > 0 && (
-            <Disclosure summary={`Changes since you made the schedule (${changes.length})`}>
-              <ul className="space-y-1 text-sm text-zinc-700">
-                {changes.map((change) => (
-                  <li key={change.slotId}>{change.text}</li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                onClick={restoreEverything}
-              >
-                <Icon name="reset" />
-                Put the whole week back
-              </button>
-            </Disclosure>
+            <div className="print:hidden">
+              <Disclosure summary={`Changes since you made the schedule (${changes.length})`}>
+                <ul className="space-y-1 text-sm text-zinc-700">
+                  {changes.map((change) => (
+                    <li key={change.slotId}>{change.text}</li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={restoreEverything}
+                >
+                  <Icon name="reset" />
+                  Put the whole week back
+                </button>
+              </Disclosure>
+            </div>
           )}
 
           {diagnostics.length > 0 && (
-            <div aria-live="polite">
+            <div aria-live="polite" className="print:hidden">
               <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
                 <ul className="space-y-1 text-sm text-zinc-700">
                   {diagnostics.map((message, index) => (
@@ -1276,7 +1309,7 @@ export default function SchedulerDemo() {
             </div>
           )}
 
-          <div className="space-y-1 pt-2">
+          <div className="space-y-1 pt-2 print:hidden">
             <Disclosure summary="Hours for each person" tone="quiet">
               <HoursSummary stats={stats} employees={employees} />
             </Disclosure>
@@ -1301,7 +1334,7 @@ export default function SchedulerDemo() {
           </div>
         </main>
 
-        <aside className="order-2 space-y-4">
+        <aside className="order-2 space-y-4 print:hidden">
           <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1328,14 +1361,35 @@ export default function SchedulerDemo() {
               />
             )}
 
-            <details className="mt-3 border-t border-zinc-100 pt-3">
-              <summary className="cursor-pointer text-sm font-semibold text-zinc-800">Everyone on the list</summary>
-              <div className="mt-3 space-y-3">
-                {employees.map((employee) => (
-                  <EmployeeCard key={employee.id} employee={employee} onUpdate={updateEmployee} />
-                ))}
-              </div>
-            </details>
+            <div className="mt-3 border-t border-zinc-100 pt-3">
+              <label className="block text-sm font-medium text-zinc-800">
+                <span className="sr-only">Search staff</span>
+                <input
+                  className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  value={staffQuery}
+                  onChange={(event) => setStaffQuery(event.target.value)}
+                  placeholder={employees.length > 8 ? `Search ${employees.length} staff by name or position` : 'Search by name or position'}
+                />
+              </label>
+              <details className="mt-2" open={staffQuery.trim().length > 0}>
+                <summary className="cursor-pointer text-sm font-semibold text-zinc-800">
+                  Everyone on the list ({filteredEmployees.length}/{employees.length})
+                </summary>
+                <div className="mt-3 space-y-3">
+                  {filteredEmployees.map((employee) => (
+                    <EmployeeCard
+                      key={employee.id}
+                      employee={employee}
+                      stat={staffStatsById.get(employee.id)}
+                      onUpdate={updateEmployee}
+                    />
+                  ))}
+                  {filteredEmployees.length === 0 && (
+                    <p className="text-sm text-zinc-600">Nobody matches &ldquo;{staffQuery.trim()}&rdquo;.</p>
+                  )}
+                </div>
+              </details>
+            </div>
           </section>
 
           {blockers.length > 0 && (
@@ -1373,8 +1427,13 @@ function EmployeeForm({
   onDraftChange: (draft: EmployeeDraft) => void
   onAdd: () => void
 }) {
+  const saveHint = !draft.name.trim()
+    ? 'Add a name to save.'
+    : ROLES.every((role) => !draft.roles[role])
+      ? 'Pick at least one position to save.'
+      : null
   return (
-    <div className="mt-4 rounded border border-red-100 bg-red-50 p-3">
+    <div className="mt-4 rounded border border-zinc-200 bg-zinc-50 p-3">
       <label className="block text-sm font-medium text-zinc-800">
         Employee name
         <input
@@ -1428,14 +1487,14 @@ function EmployeeForm({
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <label className="text-sm font-medium text-zinc-800">
-          Max days
+          Max days (1–7)
           <input
             className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             min={1}
             max={7}
             type="number"
             value={draft.maxDaysPerWeek}
-            onChange={(event) => onDraftChange({ ...draft, maxDaysPerWeek: Number(event.target.value) })}
+            onChange={(event) => onDraftChange({ ...draft, maxDaysPerWeek: clampMaxDays(Number(event.target.value)) })}
           />
         </label>
         <label className="flex items-end gap-2 pb-2 text-sm font-medium text-zinc-800">
@@ -1453,24 +1512,44 @@ function EmployeeForm({
         className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
         disabled={!canAddEmployee}
         onClick={onAdd}
+        title={saveHint ?? 'Save this person to the staff list.'}
+        aria-disabled={!canAddEmployee}
       >
         <Icon name="plus" />
         Save employee
       </button>
+      {saveHint && (
+        <p className="mt-2 text-xs text-zinc-600" role="note">
+          {saveHint}
+        </p>
+      )}
     </div>
   )
 }
 
-function EmployeeCard({ employee, onUpdate }: { employee: Employee; onUpdate: (employeeId: string, update: Partial<Employee>) => void }) {
+function EmployeeCard({
+  employee,
+  stat,
+  onUpdate,
+}: {
+  employee: Employee
+  stat?: ScheduleStats
+  onUpdate: (employeeId: string, update: Partial<Employee>) => void
+}) {
   function toggleRole(role: Role, enabled: boolean) {
     const roles = enabled ? [...employee.roles, role] : employee.roles.filter((candidate) => candidate !== role)
     onUpdate(employee.id, { roles: ROLES.filter((candidate) => roles.includes(candidate)) })
   }
 
   return (
-    <div className="rounded border border-zinc-200 p-3">
+    <div className="rounded border border-zinc-200 bg-white p-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="font-semibold text-zinc-950">{employee.name}</div>
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-zinc-950">{employee.name}</div>
+          <p className="mt-0.5 text-xs text-zinc-600">
+            {availabilitySummary(employee)} · {stat && stat.shifts > 0 ? `${stat.hours.toFixed(1)}h · ${stat.days}d this week` : 'off this week'}
+          </p>
+        </div>
         <label className="flex shrink-0 items-center gap-2 text-sm text-zinc-700">
           <input
             type="checkbox"
@@ -1515,14 +1594,14 @@ function EmployeeCard({ employee, onUpdate }: { employee: Employee; onUpdate: (e
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <label className="text-sm text-zinc-700">
-          Max days
+          Max days (1–7)
           <input
             className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             min={1}
             max={7}
             type="number"
             value={employee.maxDaysPerWeek ?? 7}
-            onChange={(event) => onUpdate(employee.id, { maxDaysPerWeek: Number(event.target.value) })}
+            onChange={(event) => onUpdate(employee.id, { maxDaysPerWeek: clampMaxDays(Number(event.target.value)) })}
           />
         </label>
         <label className="flex items-end gap-2 pb-1 text-sm text-zinc-700">
@@ -1569,7 +1648,7 @@ function GuidedFixPanel({
 }) {
   if (!nextIssue) {
     return (
-      <section className="rounded-lg border border-green-300 bg-green-50 p-4 shadow-sm">
+      <section className="rounded-lg border border-green-300 bg-green-50 p-4 shadow-sm print:hidden">
         <div className="flex flex-wrap items-start gap-3">
           <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-700 text-white">
             <Icon name="check" />
@@ -1598,7 +1677,7 @@ function GuidedFixPanel({
   const position = totalCount > 0 ? totalCount - issueCount + 1 : 1
   return (
     <section
-      className={`rounded-lg border p-4 shadow-sm ${isBlocker ? 'border-red-400 bg-red-50' : 'border-amber-400 bg-amber-50'}`}
+      className={`rounded-lg border p-4 shadow-sm print:hidden ${isBlocker ? 'border-red-400 bg-red-50' : 'border-amber-400 bg-amber-50'}`}
       aria-live="polite"
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
