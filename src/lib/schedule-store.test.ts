@@ -123,6 +123,24 @@ test('saveGoldenWeek sends the write token and maps 401 to auth', async () => {
   }
 })
 
+test('saveGoldenWeek maps 503 to an unavailable error naming the missing secret', async () => {
+  const restore = mockFetchOnce(() => ({ status: 503, payload: { error: 'write_not_configured' } }))
+  try {
+    const caught = await saveGoldenWeek(
+      '2026-09-13',
+      { week: goldenWeek, templateHash: 'a1b2c3d4', visible: true, baseRev: 0 },
+      'manager-token',
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    )
+    assert.ok(caught instanceof StoreUnavailableError)
+    assert.match((caught as StoreUnavailableError).message, /SCHEDULE_WRITE_TOKEN/)
+  } finally {
+    restore()
+  }
+})
+
 test('saveGoldenWeek maps 409 to a conflict carrying the server revision', async () => {
   const restore = mockFetchOnce(() => ({ status: 409, payload: { error: 'conflict', rev: 4 } }))
   try {

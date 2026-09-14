@@ -5,6 +5,7 @@ import { buildPublishedWeek, templateHashForSlots } from '@/lib/schedule-share'
 import {
   StoreAuthError,
   StoreConflictError,
+  StoreNotFoundError,
   StoreUnavailableError,
   fetchGoldenWeek,
   saveGoldenWeek,
@@ -130,7 +131,11 @@ export default function PublishPanel({
             : 'Someone else saved this week first. Press Save again to overwrite with your copy.',
         )
       } else if (caught instanceof StoreUnavailableError) {
-        setError('Could not reach the schedule store. Your edits are safe on this screen — try again in a moment.')
+        setError(`${caught.message} Your edits are safe on this screen — try again in a moment.`)
+      } else if (caught instanceof StoreNotFoundError) {
+        setError(
+          'The schedule store did not recognize that week. The Worker is probably still running the old version — redeploy worker/dashboard.js.',
+        )
       } else {
         setError('Something went wrong saving.')
       }
