@@ -1892,15 +1892,11 @@ function MonthStrip({
                   {status === 'on' ? 'On' : 'Off'} · {filled} filled
                 </span>
               </button>
-              <button
-                type="button"
-                className="shrink-0 rounded border border-zinc-300 bg-white px-1.5 py-1 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100"
-                onClick={() => onToggleWeek(week, status === 'on' ? 'off' : 'on')}
-                aria-pressed={status === 'on'}
-                title={status === 'on' ? `Turn off the week of ${formatWeekRange(week)}.` : `Turn on the week of ${formatWeekRange(week)}.`}
-              >
-                {status === 'on' ? 'Off' : 'On'}
-              </button>
+              <FlipSwitch
+                on={status === 'on'}
+                onFlip={() => onToggleWeek(week, status === 'on' ? 'off' : 'on')}
+                label={`Week of ${formatWeekRange(week)}`}
+              />
             </div>
           )
         })}
@@ -1921,17 +1917,40 @@ function WeekVisibilityToggle({
   if (!weekStart) return null
   const on = status === 'on'
   return (
+    <span className="inline-flex items-center gap-1.5">
+      <FlipSwitch on={on} onFlip={() => onToggle(weekStart, on ? 'off' : 'on')} label="This week" />
+      <span className={`text-xs font-bold ${on ? 'text-green-900' : 'text-zinc-500'}`}>Week {on ? 'on' : 'off'}</span>
+    </span>
+  )
+}
+
+function FlipSwitch({
+  on,
+  onFlip,
+  label,
+}: {
+  on: boolean
+  onFlip: () => void
+  label: string
+}) {
+  return (
     <button
       type="button"
-      onClick={() => onToggle(weekStart, on ? 'off' : 'on')}
-      aria-pressed={on}
-      title={on ? 'Hide this week from staff.' : 'Show this week to staff once shared.'}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${
-        on ? 'border-green-300 bg-green-50 text-green-900' : 'border-zinc-300 bg-zinc-100 text-zinc-600'
+      role="switch"
+      aria-checked={on}
+      aria-label={`${label} ${on ? 'on' : 'off'}`}
+      title={on ? `Turn ${label.toLowerCase()} off.` : `Turn ${label.toLowerCase()} on.`}
+      onClick={onFlip}
+      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${
+        on ? 'bg-green-600' : 'bg-zinc-300'
       }`}
     >
-      <span aria-hidden="true" className={`h-2 w-2 rounded-full ${on ? 'bg-green-600' : 'bg-zinc-400'}`} />
-      Week {on ? 'on' : 'off'}
+      <span
+        aria-hidden="true"
+        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+          on ? 'left-[18px]' : 'left-0.5'
+        }`}
+      />
     </button>
   )
 }
