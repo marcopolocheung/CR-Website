@@ -10,9 +10,11 @@ import {
   formatTimeRange,
   formatWeekRange,
   hoursFor,
+  monthGridForMonth,
   monthLabel,
   seedTemplate,
   shiftMonth,
+  todayIsoDate,
   type StaffingSlot,
 } from '@/lib/scheduler'
 import { templateHashForSlots, type PublishedWeek } from '@/lib/schedule-share'
@@ -158,6 +160,7 @@ export default function ScheduleViewer() {
         refreshing={refreshing}
         loadError={loadError}
         templateHash={templateHash}
+        selectedWeekStart={openWeekStart}
         onMonthChange={goToMonth}
         onRefresh={refresh}
         onOpenWeek={setOpenWeekStart}
@@ -173,6 +176,7 @@ function MonthBrowser({
   refreshing,
   loadError,
   templateHash,
+  selectedWeekStart,
   onMonthChange,
   onRefresh,
   onOpenWeek,
@@ -183,11 +187,15 @@ function MonthBrowser({
   refreshing: boolean
   loadError: string
   templateHash: string
+  selectedWeekStart: string | null
   onMonthChange: (monthKey: string) => void
   onRefresh: () => void
   onOpenWeek: (weekStart: string) => void
 }) {
   if (!monthKey) return null
+  const grid = monthGridForMonth(monthKey)
+  const docByWeek = new Map(docs.map((doc) => [doc.weekStart, doc]))
+  const todayWeekStart = grid.find((row) => row.days.some((day) => day.isToday))?.weekStart
   return (
     <section className="mx-auto mt-8 w-full max-w-none" aria-label="Browse weeks by month">
       <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-2">
@@ -234,54 +242,106 @@ function MonthBrowser({
       <div className="mt-4">
         {loading ? (
           <p className="text-center text-sm text-zinc-500">Looking for this month&apos;s weeks...</p>
-        ) : docs.length === 0 ? (
-          <p className="mx-auto max-w-2xl rounded-lg border border-dashed border-zinc-300 bg-white p-4 text-center text-sm text-zinc-600">
-            No weeks are turned on for {monthLabel(monthKey)} yet. Weeks your manager turns off stay hidden here.
-          </p>
         ) : (
-          <ul className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {docs.map((doc) => {
-              const mismatched = doc.templateHash !== templateHash
-              return (
-                <li
-                  key={doc.weekStart}
-                  className="flex min-w-0 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 shadow-sm"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-zinc-900">
-                      Week of {formatWeekRange(doc.weekStart)}
-                    </span>
-                    <span className="block truncate text-xs text-zinc-500">{doc.week.name || 'Shared week'}</span>
-                  </span>
-                  {mismatched ? (
-                    <span
-                      className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900"
-                      title="This week was made with a different shift layout. Ask your manager to republish it."
-                    >
-                      Needs republish
-                    </span>
-                  ) : (
+          <div className="mx-auto w-full max-w-2xl">
+            {docs.length === 0 && (
+              <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-4 text-center text-sm text-zinc-600">
+                No weeks are turned on for {monthLabel(monthKey)} yet. Weeks your manager turns off stay hidden here.
+              </p>
+            )}
+            <div className="mt-3 grid grid-cols-7 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-400" aria-hidden="true">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                <span key={day} className="py-1">{day}</span>
+              ))}
+            </div>
+            <ul className="mt-1 space-y-2">
+              {grid.map((row) => {
+                const doc = docByWeek.get(row.weekStart)
+                const mismatched = doc !== undefined && doc.templateHash !== templateHash
+                const published = doc !== undefined && !mismatched
+                const selected = selectedWeekStart === row.weekStart
+                const isTodayWeek = todayWeekStart === row.weekStart
+                return (
+                  <li
+                    key={row.weekStart}
+                    className={`overflow-hidden rounded-lg border bg-white shadow-sm ${
+                      selected
+                        ? 'border-red-800 ring-2 ring-red-800'
+                        : isTodayWeek
+                          ? 'border-red-300 bg-red-50/50'
+                          : 'border-zinc-200'
+                    }`}
+                  >
                     <button
                       type="button"
-                      className="shrink-0 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                      onClick={() => onOpenWeek(doc.weekStart)}
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-default"
+                      disabled={!published}
+                      aria-pressed={published ? selected : undefined}
+                      aria-label={
+                        published
+                          ? `Open week of ${formatWeekRange(row.weekStart)}`
+                          : `Week of ${formatWeekRange(row.weekStart)}, not published yet`
+                      }
+                      onClick={() => onOpenWeek(row.weekStart)}
                     >
-                      Open
+                      <span
+                        aria-hidden="true"
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          published ? 'bg-green-600' : mismatched ? 'bg-amber-500' : 'border border-zinc-300 bg-white'
+                        }`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-zinc-900">
+                          Week of {formatWeekRange(row.weekStart)}
+                        </span>
+                        <span className="block truncate text-xs text-zinc-500">
+                          {published ? doc.week.name || 'Shared week' : mismatched ? 'Made with an old shift layout' : 'Not published yet'}
+                        </span>
+                      </span>
+                      {isTodayWeek && (
+                        <span className="shrink-0 rounded-full bg-red-800 px-2 py-0.5 text-[11px] font-bold text-white">
+                          This week
+                        </span>
+                      )}
+                      {mismatched && (
+                        <span
+                          className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900"
+                          title="This week was made with a different shift layout. Ask your manager to republish it."
+                        >
+                          Needs republish
+                        </span>
+                      )}
+                      {published && (
+                        <span aria-hidden="true" className="shrink-0 text-lg leading-none text-zinc-400">
+                          &rsaquo;
+                        </span>
+                      )}
                     </button>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
+                    <div className="grid grid-cols-7 border-t border-zinc-100" aria-hidden="true">
+                      {row.days.map((day) => (
+                        <span
+                          key={day.date}
+                          className={`py-1.5 text-center text-xs tabular-nums ${
+                            day.isToday
+                              ? 'font-bold text-red-800'
+                              : day.inMonth
+                                ? 'text-zinc-700'
+                                : 'text-zinc-300'
+                          } ${day.isToday ? 'rounded-full bg-red-100' : ''}`}
+                        >
+                          {day.dayOfMonth}
+                        </span>
+                      ))}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
         )}
       </div>
     </section>
   )
-}
-
-function localToday() {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
 function positionName(label: string) {
@@ -301,7 +361,7 @@ function WeekView({
   onOnlyPersonChange: (person: string) => void
   onBack: () => void
 }) {
-  const today = localToday()
+  const today = todayIsoDate()
   const entries = slots
     .map((slot, index) => ({ slot, personIndex: week.slotPeople[index] }))
     .filter((entry) => entry.personIndex >= 0)

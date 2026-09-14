@@ -3,11 +3,13 @@ import test from 'node:test'
 import {
   copyWeekForward,
   migrateV1Weeks,
+  monthGridForMonth,
   monthKeyForWeek,
   monthLabel,
   setWeekAssignments,
   setWeekStatus,
   shiftMonth,
+  todayIsoDate,
   visibleWeeks,
   weeksForMonth,
 } from './week-visibility'
@@ -53,4 +55,27 @@ test('v1 migration turns filled weeks on and keeps generated snapshots', () => {
   assert.equal(state['2026-09-13'].status, 'on')
   assert.equal(state['2026-09-13'].generated.length, 1)
   assert.equal(state['2026-09-20'].status, 'off')
+})
+
+test('month grid builds sunday rows with edge dimming and today marking', () => {
+  const grid = monthGridForMonth('2026-09', '2026-09-14')
+  assert.deepEqual(
+    grid.map((row) => row.weekStart),
+    ['2026-08-30', '2026-09-06', '2026-09-13', '2026-09-20', '2026-09-27'],
+  )
+  assert.equal(grid[0].days[0].date, '2026-08-30')
+  assert.equal(grid[0].days[0].inMonth, false)
+  assert.equal(grid[0].days[3].date, '2026-09-02')
+  assert.equal(grid[0].days[3].inMonth, true)
+  assert.equal(grid[2].days[1].date, '2026-09-14')
+  assert.equal(grid[2].days[1].dayOfMonth, 14)
+  assert.equal(grid[2].days[1].isToday, true)
+  assert.equal(grid[2].days[0].isToday, false)
+  assert.equal(grid[4].days[6].date, '2026-10-03')
+  assert.equal(grid[4].days[6].inMonth, false)
+  assert.deepEqual(monthGridForMonth('september'), [])
+})
+
+test('todayIsoDate renders the local calendar date', () => {
+  assert.equal(todayIsoDate(new Date(2026, 8, 14, 12)), '2026-09-14')
 })

@@ -125,6 +125,40 @@ export function monthKeyForDate(isoDate: string): string {
   return isoDate.slice(0, 7)
 }
 
+export function todayIsoDate(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+export type MonthGridDay = {
+  date: string
+  dayOfMonth: number
+  inMonth: boolean
+  isToday: boolean
+}
+
+export type MonthGridWeek = {
+  weekStart: string
+  days: MonthGridDay[]
+}
+
+/** Sunday rows covering the month for the staff calendar skeleton. Day cells are visual only. */
+export function monthGridForMonth(monthKey: string, today = todayIsoDate()): MonthGridWeek[] {
+  if (!MONTH_RE.test(monthKey)) return []
+  return weeksForMonth(monthKey).map((weekStart) => {
+    const startMs = toUtcMs(weekStart)
+    const days = Array.from({ length: 7 }, (_, offset) => {
+      const date = toIsoDate(startMs + offset * DAY_MS)
+      return {
+        date,
+        dayOfMonth: Number(date.slice(8, 10)),
+        inMonth: date.slice(0, 7) === monthKey,
+        isToday: date === today,
+      }
+    })
+    return { weekStart, days }
+  })
+}
+
 /** v1 stored bare assignment lists; v2 stores status + draft + generated per week. */
 export function migrateV1Weeks(
   weeks: LegacyWeeks | undefined,
