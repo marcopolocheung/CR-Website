@@ -48,19 +48,19 @@ Add new structured fields to `types.ts`, enforce generation behavior in `solver.
 
 ## Sharing
 
-Publishing encrypts the week in the browser (`encryptWeek`) and stores only the
-ciphertext in a free Cloudflare Worker + KV (`worker/`). Each doc carries
-`visible` and `monthKey`; `GET /api/weeks?month=YYYY-MM` lists only visible
-weeks so the staff month browser never sees off weeks. Toggling visibility
-sends a rev-guarded `PUT` without re-encrypting, and the month index
-(`month:YYYY-MM`) is repaired on read for docs written before it existed.
-The staff link holds a short ID (`/schedule#<id>`), so the manager sends it once and later presses
-"Save updates to this link" — readers press "Check for updates". Staff can also
-type one code to open every visible week in a month; off weeks stay hidden. The Worker
-never sees names, shifts, or the code; it enforces optimistic concurrency with
-`rev` (`409 conflict` means someone else saved first). Old data-in-URL links
-still open as legacy snapshots. Local `localStorage` remains the offline draft
-cache and remembers which link ID belongs to each week.
+The demo edits one persistent golden schedule in the free Cloudflare Worker
++ KV (`worker/`). Each week is stored in plaintext under
+`golden:YYYY-MM-DD` with `visible` (the week on/off switch), a
+`templateHash` guard against shift-layout drift, and `rev` for optimistic
+concurrency (`409 conflict` means someone else saved first — saving again
+overwrites with your copy, and the first save of a week uses `baseRev: 0`).
+
+Reads are public: `/schedule` lists visible weeks for a month and needs no
+link or code. Writes need the manager token (`SCHEDULE_WRITE_TOKEN`
+Worker secret), typed into the publish panel when saving; it lives in the
+tab only. Nothing schedule-related persists in `localStorage` anymore —
+the Worker is the source of truth. Legacy `/api/weeks` link blobs are
+still served so old staff links open, but the UI no longer makes them.
 
 ## Commands
 
