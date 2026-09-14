@@ -1,0 +1,7 @@
+name = "chinarose-schedule-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[[kv_namespaces]]
+binding = "SCHEDULES"
+id = "REPLACE_WITH_YOUR_NAMESPACE_ID"

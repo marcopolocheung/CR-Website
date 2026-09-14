@@ -45,8 +45,22 @@ The UI has a "Show gap example" button that deactivates lead/manager employees s
 
 Add new structured fields to `types.ts`, enforce generation behavior in `solver.ts`, and add a separate validator check in `validator.ts`. Then add a regression case in `src/lib/scheduler/scheduler.test.ts` so manual schedules cannot bypass the rule.
 
+## Sharing
+
+Publishing encrypts the week in the browser (`encryptWeek`) and stores only the
+ciphertext in a free Cloudflare Worker + KV (`worker/`). The staff link holds a
+short ID (`/schedule#<id>`), so the manager sends it once and later presses
+"Save updates to this link" — readers press "Check for updates". The Worker
+never sees names, shifts, or the code; it enforces optimistic concurrency with
+`rev` (`409 conflict` means someone else saved first). Old data-in-URL links
+still open as legacy snapshots. Local `localStorage` remains the offline draft
+cache and remembers which link ID belongs to each week.
+
 ## Commands
 
 - Run the app: `npm run dev`, then open `/scheduler-demo`.
 - Run scheduler tests: `npm run scheduler:test`.
 - Validate the static site: `npm run build`.
+- Deploy the store: paste `worker/dashboard.js` (plain JavaScript — the dashboard
+  editor rejects the TypeScript source) into the `chinarose-schedule-api`
+  Worker (KV binding `SCHEDULES`), then open `/api/health` to verify.

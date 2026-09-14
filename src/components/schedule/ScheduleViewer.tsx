@@ -12,7 +12,16 @@ import {
   seedTemplate,
   type StaffingSlot,
 } from '@/lib/scheduler'
-import { UnreadableShareError, WrongCodeError, decryptWeek, type PublishedWeek } from '@/lib/schedule-share'
+import {
+  UnreadableShareError,
+  WrongCodeError,
+  decryptWeek,
+  isShareId,
+  serializePublishedWeek,
+  templateHashForSlots,
+  type PublishedWeek,
+} from '@/lib/schedule-share'
+import { StoreNotFoundError, StoreUnavailableError, fetchSharedWeek } from '@/lib/schedule-store'
 
 const seenKey = 'chinarose.schedule.seen.v1'
 
@@ -33,61 +42,145 @@ function rememberWeek(week: PublishedWeek) {
     const next = [...others, week].sort((a, b) => b.weekStart.localeCompare(a.weekStart)).slice(0, 12)
     window.localStorage.setItem(seenKey, JSON.stringify(next))
   } catch {
-    // Viewing still works; this device just will not remember the week.
+    return
   }
 }
 
 export default function ScheduleViewer() {
   const slots = useMemo(() => expandTemplate(seedTemplate), [])
-  const [token, setToken] = useState<string | null>(null)
+  const templateHash = useMemo(() => templateHashForSlots(slots), [slots])
+  const [rawToken, setRawToken] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [week, setWeek] = useState<PublishedWeek | null>(null)
+  const [viewingShare, setViewingShare] = useState<{ id: string; rev: number } | null>(null)
   const [seenWeeks, setSeenWeeks] = useState<PublishedWeek[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const [updateNote, setUpdateNote] = useState('')
   const [onlyPerson, setOnlyPerson] = useState('')
   const [ready, setReady] = useState(false)
+  const isIdLink = rawToken !== null && isShareId(rawToken)
 
   useEffect(() => {
-    setToken(window.location.hash.slice(1) || null)
+    const readHash = () => window.location.hash.slice(1) || null
+    setRawToken(readHash())
     setSeenWeeks(readSeenWeeks())
     setReady(true)
+    const onHashChange = () => {
+      setRawToken(readHash())
+      setWeek(null)
+      setViewingShare(null)
+      setCode('')
+      setError('')
+      setUpdateNote('')
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
   async function unlock() {
-    if (!token || !code) return
+    if (!rawToken || !code) return
     setBusy(true)
     setError('')
+    setUpdateNote('')
     try {
-      const opened = await decryptWeek(token, code)
-      if (opened.slotPeople.length !== slots.length) {
-        setError('This link was made with a different shift layout and cannot be shown here.')
-        return
+      if (isShareId(rawToken)) {
+        const doc = await fetchSharedWeek(rawToken)
+        const opened = await decryptWeek(doc.ciphertext, code)
+        if (doc.templateHash !== templateHash) {
+          setError('This link was made with a different shift layout and cannot be shown here.')
+          return
+        }
+        setWeek(opened)
+        setViewingShare({ id: rawToken, rev: doc.rev })
+        rememberWeek(opened)
+        setSeenWeeks(readSeenWeeks())
+      } else {
+        const opened = await decryptWeek(rawToken, code)
+        if (opened.slotPeople.length !== slots.length) {
+          setError('This link was made with a different shift layout and cannot be shown here.')
+          return
+        }
+        setWeek(opened)
+        setViewingShare(null)
+        rememberWeek(opened)
+        setSeenWeeks(readSeenWeeks())
       }
-      setWeek(opened)
-      rememberWeek(opened)
-      setSeenWeeks(readSeenWeeks())
     } catch (caught) {
       if (caught instanceof WrongCodeError) setError('That code did not work. Check with your manager.')
       else if (caught instanceof UnreadableShareError) setError('This link is damaged. Ask for a new one.')
+      else if (caught instanceof StoreNotFoundError)
+        setError('This link does not match any saved schedule. Ask your manager for the current link.')
+      else if (caught instanceof StoreUnavailableError)
+        setError('Could not reach the schedule store. Check your connection and try again.')
       else setError('Something went wrong opening this schedule.')
     } finally {
       setBusy(false)
     }
   }
 
+  async function checkForUpdates() {
+    if (!viewingShare || !code) return
+    setChecking(true)
+    setUpdateNote('')
+    try {
+      const doc = await fetchSharedWeek(viewingShare.id)
+      if (doc.rev === viewingShare.rev) {
+        setUpdateNote('You are up to date.')
+        return
+      }
+      const opened = await decryptWeek(doc.ciphertext, code)
+      if (serializePublishedWeek(opened) !== (week ? serializePublishedWeek(week) : '')) {
+        setWeek(opened)
+        rememberWeek(opened)
+        setSeenWeeks(readSeenWeeks())
+      }
+      setViewingShare({ id: viewingShare.id, rev: doc.rev })
+      setUpdateNote('Updated to the latest schedule.')
+    } catch (caught) {
+      if (caught instanceof StoreNotFoundError)
+        setUpdateNote('This link no longer has a saved schedule. Ask your manager for the current link.')
+      else setUpdateNote('Could not check for updates. Try again in a moment.')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  function goBack() {
+    setWeek(null)
+    setViewingShare(null)
+    setCode('')
+    setUpdateNote('')
+  }
+
   if (week) {
     return (
-      <WeekView
-        week={week}
-        slots={slots}
-        onlyPerson={onlyPerson}
-        onOnlyPersonChange={setOnlyPerson}
-        onBack={() => {
-          setWeek(null)
-          setCode('')
-        }}
-      />
+      <div>
+        {viewingShare && (
+          <div className="border-b border-zinc-200 bg-white">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2">
+              <span className="text-sm text-zinc-600">This link can change when your manager edits the week.</span>
+              <button
+                type="button"
+                className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                onClick={checkForUpdates}
+                disabled={checking}
+              >
+                {checking ? 'Checking...' : 'Check for updates'}
+              </button>
+              {updateNote && <span className="text-sm font-medium text-zinc-700">{updateNote}</span>}
+            </div>
+          </div>
+        )}
+        <WeekView
+          week={week}
+          slots={slots}
+          onlyPerson={onlyPerson}
+          onOnlyPersonChange={setOnlyPerson}
+          onBack={goBack}
+        />
+      </div>
     )
   }
 
@@ -95,9 +188,7 @@ export default function ScheduleViewer() {
     <div className="mx-auto max-w-2xl px-4 py-10">
       <h1 className="text-2xl font-bold text-zinc-900">Staff schedule</h1>
 
-      {/* The hash and this device's saved weeks are only readable after mount, and the page is
-          prerendered, so hold the body back rather than flash the wrong state. */}
-      {!ready ? null : token ? (
+      {!ready ? null : rawToken ? (
         <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
           <label className="block text-sm font-medium text-zinc-800">
             Type the code your manager gave you
@@ -120,6 +211,9 @@ export default function ScheduleViewer() {
             {busy ? 'Opening...' : 'Open the schedule'}
           </button>
           {error && <p className="mt-3 text-sm font-medium text-red-800">{error}</p>}
+          {isIdLink && !error && (
+            <p className="mt-3 text-sm text-zinc-600">This link stays up to date when your manager edits the week.</p>
+          )}
         </div>
       ) : (
         <p className="mt-4 text-zinc-700">
@@ -161,7 +255,6 @@ function localToday() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
-/** "Cashier 1" and "Cashier 2" differ only by start time, which the cell already shows. */
 function positionName(label: string) {
   return label.replace(/\s*\d+$/, '')
 }
@@ -273,8 +366,6 @@ function WeekView({
               </tr>
             ))}
           </tbody>
-          {/* The days repeat under a long roster so you can still tell which column you are in.
-              Hidden from screen readers: the thead scope already ties every cell to its day. */}
           <tfoot aria-hidden="true">
             <tr>
               <td className="sticky left-0 z-10 border border-zinc-300 bg-zinc-100 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">

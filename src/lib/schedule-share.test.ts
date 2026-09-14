@@ -7,7 +7,9 @@ import {
   decryptWeek,
   deserializePublishedWeek,
   encryptWeek,
+  isShareId,
   serializePublishedWeek,
+  templateHashForSlots,
   type PublishedWeek,
   buildPublishedWeek,
 } from './schedule-share'
@@ -120,4 +122,19 @@ test('unfilled spots travel as nobody rather than as a stray name', async () => 
 
   // Everyone active is listed even with nothing assigned, so the reader can show them as OFF.
   assert.deepEqual(published.people, seedEmployees.filter((employee) => employee.active).map((employee) => employee.name))
+})
+
+test('short ids are detected without confusing them with legacy link tokens', async () => {
+  assert.ok(isShareId('Ab3x9QzY2k'))
+  assert.equal(isShareId('short'), false)
+  assert.equal(isShareId(''), false)
+  const token = await encryptWeek(week, 'break room')
+  assert.equal(isShareId(token), false)
+})
+
+test('the template hash is stable and changes with the shift layout', () => {
+  const slots = expandTemplate(seedTemplate)
+  assert.match(templateHashForSlots(slots), /^[0-9a-f]{8}$/)
+  assert.equal(templateHashForSlots(slots), templateHashForSlots(expandTemplate(seedTemplate)))
+  assert.notEqual(templateHashForSlots(slots), templateHashForSlots(slots.slice(1)))
 })
