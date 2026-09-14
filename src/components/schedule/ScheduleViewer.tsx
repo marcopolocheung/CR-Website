@@ -15,213 +15,97 @@ import {
   shiftMonth,
   type StaffingSlot,
 } from '@/lib/scheduler'
-import {
-  UnreadableShareError,
-  WrongCodeError,
-  decryptWeek,
-  isShareId,
-  serializePublishedWeek,
-  templateHashForSlots,
-  type PublishedWeek,
-} from '@/lib/schedule-share'
-import {
-  StoreNotFoundError,
-  StoreUnavailableError,
-  fetchSharedWeek,
-  listVisibleWeeks,
-  type VisibleWeekStub,
-} from '@/lib/schedule-store'
+import { templateHashForSlots, type PublishedWeek } from '@/lib/schedule-share'
+import { fetchGoldenMonth, type GoldenWeekDoc } from '@/lib/schedule-store'
 
 export default function ScheduleViewer() {
   const slots = useMemo(() => expandTemplate(seedTemplate), [])
   const templateHash = useMemo(() => templateHashForSlots(slots), [slots])
-  const [rawToken, setRawToken] = useState<string | null>(null)
-  const [code, setCode] = useState('')
-  const [week, setWeek] = useState<PublishedWeek | null>(null)
-  const [viewingShare, setViewingShare] = useState<{ id: string; rev: number } | null>(null)
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [checking, setChecking] = useState(false)
-  const [updateNote, setUpdateNote] = useState('')
+  const [monthKey, setMonthKey] = useState('')
+  const [docs, setDocs] = useState<GoldenWeekDoc[]>([])
+  const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [openWeekStart, setOpenWeekStart] = useState<string | null>(null)
   const [onlyPerson, setOnlyPerson] = useState('')
   const [ready, setReady] = useState(false)
-  const [monthKey, setMonthKey] = useState('')
-  const [stubs, setStubs] = useState<VisibleWeekStub[]>([])
-  const [stubsLoading, setStubsLoading] = useState(false)
-  const [monthCode, setMonthCode] = useState('')
-  const [unlockingMonth, setUnlockingMonth] = useState(false)
-  const [monthNote, setMonthNote] = useState('')
-  const [monthUnlocked, setMonthUnlocked] = useState<PublishedWeek[]>([])
-  const isIdLink = rawToken !== null && isShareId(rawToken)
 
   useEffect(() => {
-    const readHash = () => window.location.hash.slice(1) || null
-    setRawToken(readHash())
     setMonthKey(currentMonthKey())
     setReady(true)
-    const onHashChange = () => {
-      setRawToken(readHash())
-      setWeek(null)
-      setViewingShare(null)
-      setCode('')
-      setError('')
-      setUpdateNote('')
-    }
-    window.addEventListener('hashchange', onHashChange)
-    return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
   useEffect(() => {
     if (!ready || !monthKey) return
     let cancelled = false
-    setStubsLoading(true)
-    listVisibleWeeks(monthKey)
-      .then((visible) => {
-        if (!cancelled) setStubs(visible)
+    setLoading(true)
+    setLoadError('')
+    fetchGoldenMonth(monthKey)
+      .then((weeks) => {
+        if (!cancelled) setDocs(weeks)
       })
       .catch(() => {
-        if (!cancelled) setStubs([])
+        if (!cancelled) {
+          setDocs([])
+          setLoadError('Could not reach the schedule store. Check your connection and try again.')
+        }
       })
       .finally(() => {
-        if (!cancelled) setStubsLoading(false)
+        if (!cancelled) setLoading(false)
       })
     return () => {
       cancelled = true
     }
   }, [monthKey, ready])
 
-  async function unlockMonth() {
-    if (!monthCode || stubs.length === 0 || unlockingMonth) return
-    setUnlockingMonth(true)
-    setMonthNote('')
-    let openedCount = 0
-    let lockedCount = 0
-    const opened: PublishedWeek[] = []
-    for (const stub of stubs) {
-      if (monthUnlocked.some((item) => item.weekStart === stub.weekStart)) continue
-      try {
-        const doc = await fetchSharedWeek(stub.id)
-        if (!doc.visible) continue
-        const unlocked = await decryptWeek(doc.ciphertext, monthCode)
-        if (doc.templateHash !== templateHash) {
-          lockedCount += 1
-          continue
-        }
-        opened.push(unlocked)
-        openedCount += 1
-      } catch {
-        lockedCount += 1
-      }
-    }
-    if (opened.length > 0) {
-      setMonthUnlocked((current) => {
-        const merged = new Map(current.map((item) => [item.weekStart, item]))
-        for (const item of opened) merged.set(item.weekStart, item)
-        return [...merged.values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart))
-      })
-    }
-    setMonthNote(
-      openedCount === 0
-        ? 'That code did not open any week in this month. Check with your manager.'
-        : lockedCount > 0
-          ? `${openedCount} week${openedCount === 1 ? '' : 's'} opened. ${lockedCount} still need${lockedCount === 1 ? 's' : ''} a different code.`
-          : `${openedCount} week${openedCount === 1 ? '' : 's'} opened.`,
-    )
-    setUnlockingMonth(false)
+  function goToMonth(next: string) {
+    if (!next || next === monthKey) return
+    setMonthKey(next)
+    setOpenWeekStart(null)
+    setOnlyPerson('')
   }
 
-  async function unlock() {
-    if (!rawToken || !code) return
-    setBusy(true)
-    setError('')
-    setUpdateNote('')
+  async function refresh() {
+    if (!monthKey || refreshing) return
+    setRefreshing(true)
     try {
-      if (isShareId(rawToken)) {
-        const doc = await fetchSharedWeek(rawToken)
-        const opened = await decryptWeek(doc.ciphertext, code)
-        if (doc.templateHash !== templateHash) {
-          setError('This link was made with a different shift layout and cannot be shown here.')
-          return
-        }
-        setWeek(opened)
-        setViewingShare({ id: rawToken, rev: doc.rev })
-      } else {
-        const opened = await decryptWeek(rawToken, code)
-        if (opened.slotPeople.length !== slots.length) {
-          setError('This link was made with a different shift layout and cannot be shown here.')
-          return
-        }
-        setWeek(opened)
-        setViewingShare(null)
+      const weeks = await fetchGoldenMonth(monthKey)
+      setDocs(weeks)
+      if (openWeekStart && !weeks.some((doc) => doc.weekStart === openWeekStart)) {
+        setOpenWeekStart(null)
       }
-    } catch (caught) {
-      if (caught instanceof WrongCodeError) setError('That code did not work. Check with your manager.')
-      else if (caught instanceof UnreadableShareError) setError('This link is damaged. Ask for a new one.')
-      else if (caught instanceof StoreNotFoundError)
-        setError('This link does not match any saved schedule. Ask your manager for the current link.')
-      else if (caught instanceof StoreUnavailableError)
-        setError('Could not reach the schedule store. Check your connection and try again.')
-      else setError('Something went wrong opening this schedule.')
+    } catch {
+      setLoadError('Could not check for updates. Try again in a moment.')
     } finally {
-      setBusy(false)
-    }
-  }
-
-  async function checkForUpdates() {
-    if (!viewingShare || !code) return
-    setChecking(true)
-    setUpdateNote('')
-    try {
-      const doc = await fetchSharedWeek(viewingShare.id)
-      if (doc.rev === viewingShare.rev) {
-        setUpdateNote('You are up to date.')
-        return
-      }
-      const opened = await decryptWeek(doc.ciphertext, code)
-      if (serializePublishedWeek(opened) !== (week ? serializePublishedWeek(week) : '')) {
-        setWeek(opened)
-      }
-      setViewingShare({ id: viewingShare.id, rev: doc.rev })
-      setUpdateNote('Updated to the latest schedule.')
-    } catch (caught) {
-      if (caught instanceof StoreNotFoundError)
-        setUpdateNote('This link no longer has a saved schedule. Ask your manager for the current link.')
-      else setUpdateNote('Could not check for updates. Try again in a moment.')
-    } finally {
-      setChecking(false)
+      setRefreshing(false)
     }
   }
 
   function goBack() {
-    setWeek(null)
-    setViewingShare(null)
-    setCode('')
-    setUpdateNote('')
+    setOpenWeekStart(null)
+    setOnlyPerson('')
   }
 
-  if (week) {
+  const openDoc = docs.find((doc) => doc.weekStart === openWeekStart) ?? null
+  const layoutMismatch = openDoc !== null && openDoc.templateHash !== templateHash
+
+  if (openDoc && !layoutMismatch) {
+    const week: PublishedWeek = openDoc.week
     return (
       <div>
-        {viewingShare && (
-          <div className="border-b border-zinc-200 bg-white print:hidden">
-            <div className="mx-auto flex w-full max-w-none flex-wrap items-center gap-2 px-4 py-2">
-              <span className="text-sm text-zinc-600">This link can change when your manager edits the week.</span>
-              <button
-                type="button"
-                className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                onClick={checkForUpdates}
-                disabled={checking}
-              >
-                {checking ? 'Checking...' : 'Check for updates'}
-              </button>
-              {updateNote && (
-                <span className="text-sm font-medium text-zinc-700" role="status">
-                  {updateNote}
-                </span>
-              )}
-            </div>
+        <div className="border-b border-zinc-200 bg-white print:hidden">
+          <div className="mx-auto flex w-full max-w-none flex-wrap items-center gap-2 px-4 py-2">
+            <span className="text-sm text-zinc-600">This schedule can change when your manager publishes updates.</span>
+            <button
+              type="button"
+              className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              onClick={refresh}
+              disabled={refreshing}
+            >
+              {refreshing ? 'Checking...' : 'Check for updates'}
+            </button>
           </div>
-        )}
+        </div>
         <WeekView
           week={week}
           slots={slots}
@@ -237,55 +121,46 @@ export default function ScheduleViewer() {
     <div className="mx-auto w-full max-w-none px-4 py-10">
       <div className="mx-auto max-w-2xl">
         <h1 className="text-2xl font-bold text-zinc-900">Staff schedule</h1>
-
-        {!ready ? null : rawToken ? (
-          <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-            <label className="block text-sm font-medium text-zinc-800">
-              Type the code your manager gave you
-              <input
-                className="mt-2 w-full rounded border border-zinc-300 px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                value={code}
-                autoComplete="off"
-                onChange={(event) => setCode(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') unlock()
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              className="mt-4 w-full rounded bg-red-800 px-4 py-3 text-base font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-              onClick={unlock}
-              disabled={busy || !code}
-            >
-              {busy ? 'Opening...' : 'Open the schedule'}
-            </button>
-            {error && <p className="mt-3 text-sm font-medium text-red-800">{error}</p>}
-            {isIdLink && !error && (
-              <p className="mt-3 text-sm text-zinc-600">This link stays up to date when your manager edits the week.</p>
-            )}
-          </div>
-        ) : (
-      <p className="mt-4 text-zinc-700">
-          Open the link your manager sent you to see a week. Use the month browser below to open
-          weeks that are turned on.
+        <p className="mt-2 text-zinc-700">
+          The current schedule, straight from your manager. No links or codes — pick a week below.
         </p>
+        {openDoc && layoutMismatch && (
+          <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-5 shadow-sm">
+            <p className="font-semibold text-amber-950">This week was made with a different shift layout.</p>
+            <p className="mt-1 text-sm text-amber-900">
+              Ask your manager to republish it, then press Check for updates.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                onClick={refresh}
+                disabled={refreshing}
+              >
+                {refreshing ? 'Checking...' : 'Check for updates'}
+              </button>
+              <button
+                type="button"
+                className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                onClick={goBack}
+              >
+                All weeks
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
       <MonthBrowser
         monthKey={monthKey}
-        stubs={stubs}
-        loading={stubsLoading}
-        monthCode={monthCode}
-        unlocking={unlockingMonth}
-        note={monthNote}
-        unlocked={monthUnlocked}
-        onMonthChange={setMonthKey}
-        onMonthCodeChange={setMonthCode}
-        onUnlockMonth={unlockMonth}
-        onOpenWeek={setWeek}
-        onCloseWeek={(weekStart) => setMonthUnlocked((current) => current.filter((item) => item.weekStart !== weekStart))}
+        docs={docs}
+        loading={loading}
+        refreshing={refreshing}
+        loadError={loadError}
+        templateHash={templateHash}
+        onMonthChange={goToMonth}
+        onRefresh={refresh}
+        onOpenWeek={setOpenWeekStart}
       />
     </div>
   )
@@ -293,33 +168,26 @@ export default function ScheduleViewer() {
 
 function MonthBrowser({
   monthKey,
-  stubs,
+  docs,
   loading,
-  monthCode,
-  unlocking,
-  note,
-  unlocked,
+  refreshing,
+  loadError,
+  templateHash,
   onMonthChange,
-  onMonthCodeChange,
-  onUnlockMonth,
+  onRefresh,
   onOpenWeek,
-  onCloseWeek,
 }: {
   monthKey: string
-  stubs: VisibleWeekStub[]
+  docs: GoldenWeekDoc[]
   loading: boolean
-  monthCode: string
-  unlocking: boolean
-  note: string
-  unlocked: PublishedWeek[]
+  refreshing: boolean
+  loadError: string
+  templateHash: string
   onMonthChange: (monthKey: string) => void
-  onMonthCodeChange: (code: string) => void
-  onUnlockMonth: () => void
-  onOpenWeek: (week: PublishedWeek) => void
-  onCloseWeek: (weekStart: string) => void
+  onRefresh: () => void
+  onOpenWeek: (weekStart: string) => void
 }) {
   if (!monthKey) return null
-  const unlockedByWeek = new Map(unlocked.map((item) => [item.weekStart, item]))
   return (
     <section className="mx-auto mt-8 w-full max-w-none" aria-label="Browse weeks by month">
       <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-2">
@@ -347,85 +215,59 @@ function MonthBrowser({
         >
           This month
         </button>
-      </div>
-
-      <div className="mx-auto mt-3 flex max-w-2xl flex-col gap-2 sm:flex-row">
-        <label className="min-w-0 flex-1 text-sm font-medium text-zinc-800">
-          <span className="sr-only">Code for this month&apos;s weeks</span>
-          <input
-            className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-base"
-            value={monthCode}
-            autoComplete="off"
-            placeholder="Type the staff code once to open the month"
-            onChange={(event) => onMonthCodeChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') onUnlockMonth()
-            }}
-          />
-        </label>
         <button
           type="button"
-          className="rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300"
-          onClick={onUnlockMonth}
-          disabled={unlocking || !monthCode || stubs.length === 0}
+          className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400"
+          onClick={onRefresh}
+          disabled={refreshing || loading}
         >
-          {unlocking ? 'Opening...' : 'Open this month'}
+          {refreshing ? 'Checking...' : 'Check for updates'}
         </button>
       </div>
-      {note && (
-        <p className="mx-auto mt-2 max-w-2xl text-sm font-medium text-zinc-700" role="status">
-          {note}
+
+      {loadError && (
+        <p className="mx-auto mt-3 max-w-2xl text-sm font-medium text-red-800" role="status">
+          {loadError}
         </p>
       )}
 
       <div className="mt-4">
         {loading ? (
           <p className="text-center text-sm text-zinc-500">Looking for this month&apos;s weeks...</p>
-        ) : stubs.length === 0 ? (
+        ) : docs.length === 0 ? (
           <p className="mx-auto max-w-2xl rounded-lg border border-dashed border-zinc-300 bg-white p-4 text-center text-sm text-zinc-600">
             No weeks are turned on for {monthLabel(monthKey)} yet. Weeks your manager turns off stay hidden here.
           </p>
         ) : (
           <ul className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {stubs.map((stub) => {
-              const opened = unlockedByWeek.get(stub.weekStart) ?? null
+            {docs.map((doc) => {
+              const mismatched = doc.templateHash !== templateHash
               return (
                 <li
-                  key={stub.id}
+                  key={doc.weekStart}
                   className="flex min-w-0 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 shadow-sm"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-zinc-900">
-                      Week of {formatWeekRange(stub.weekStart)}
+                      Week of {formatWeekRange(doc.weekStart)}
                     </span>
-                    <span className="block text-xs text-zinc-500">
-                      {opened ? `On · ${opened.name || 'shared'}` : 'On · code needed'}
-                    </span>
+                    <span className="block truncate text-xs text-zinc-500">{doc.week.name || 'Shared week'}</span>
                   </span>
-                  {opened ? (
-                    <span className="flex shrink-0 gap-1.5">
-                      <button
-                        type="button"
-                        className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100"
-                        onClick={() => onOpenWeek(opened)}
-                      >
-                        Open
-                      </button>
-                      {unlockedByWeek.has(stub.weekStart) && (
-                        <button
-                          type="button"
-                          className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-500 hover:bg-zinc-50"
-                          onClick={() => onCloseWeek(stub.weekStart)}
-                          aria-label={`Hide week of ${formatWeekRange(stub.weekStart)}`}
-                        >
-                          Hide
-                        </button>
-                      )}
+                  {mismatched ? (
+                    <span
+                      className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900"
+                      title="This week was made with a different shift layout. Ask your manager to republish it."
+                    >
+                      Needs republish
                     </span>
                   ) : (
-                    <span className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
-                      Locked
-                    </span>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      onClick={() => onOpenWeek(doc.weekStart)}
+                    >
+                      Open
+                    </button>
                   )}
                 </li>
               )
@@ -433,10 +275,6 @@ function MonthBrowser({
           </ul>
         )}
       </div>
-
-      {unlocked.length > 0 && (
-        <p className="mt-4 text-center text-sm text-zinc-500">Scroll to move through the open weeks below.</p>
-      )}
     </section>
   )
 }
