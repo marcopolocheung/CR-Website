@@ -29,7 +29,17 @@ export function normalizeStoredWeek(raw) {
     const monthKey = typeof doc.monthKey === 'string' && MONTH_RE.test(doc.monthKey)
         ? doc.monthKey
         : monthKeyForWeekStart(doc.weekStart);
-    return { v: 2, id: doc.id, rev: doc.rev, ciphertext: doc.ciphertext, templateHash: doc.templateHash, weekStart: doc.weekStart, updatedAt: doc.updatedAt, visible, monthKey };
+    return {
+        v: 2,
+        id: doc.id,
+        rev: doc.rev,
+        ciphertext: doc.ciphertext,
+        templateHash: doc.templateHash,
+        weekStart: doc.weekStart,
+        updatedAt: doc.updatedAt,
+        visible,
+        monthKey,
+    };
 }
 export function validatePublishBody(body) {
     if (!body || typeof body !== 'object')
@@ -47,7 +57,8 @@ export function validatePublishBody(body) {
         return null;
     if (visible !== undefined && typeof visible !== 'boolean')
         return null;
-    return { ciphertext, templateHash, weekStart, visible: visible ?? true };
+    const nextVisible = visible === undefined ? true : visible;
+    return { ciphertext, templateHash, weekStart, visible: nextVisible };
 }
 export function validateUpdateBody(body) {
     if (!body || typeof body !== 'object')
@@ -69,7 +80,7 @@ export function validateUpdateBody(body) {
         return null;
     if (nextCipher === undefined && visible === undefined)
         return null;
-    return { ciphertext: nextCipher, visible, baseRev };
+    return { ciphertext: nextCipher, visible: visible, baseRev };
 }
 export function newShareId() {
     const bytes = crypto.getRandomValues(new Uint8Array(7));
@@ -77,6 +88,110 @@ export function newShareId() {
     for (const byte of bytes)
         binary += String.fromCharCode(byte);
     return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+const GOLDEN_VERSION = 1;
+const MAX_PEOPLE = 64;
+const MAX_NAME_CHARS = 80;
+const MAX_TITLE_CHARS = 120;
+const MAX_SLOTS = 200;
+export function goldenKey(weekStart) {
+    return `golden:${weekStart}`;
+}
+export function validateGoldenWeekBody(body) {
+    if (!body || typeof body !== 'object')
+        return null;
+    const { week, visible, baseRev } = body;
+    if (typeof baseRev !== 'number' || !Number.isInteger(baseRev) || baseRev < 0)
+        return null;
+    if (!week || typeof week !== 'object')
+        return null;
+    const candidate = week;
+    if (candidate.version !== GOLDEN_VERSION)
+        return null;
+    if (typeof candidate.weekStart !== 'string' || !WEEK_RE.test(candidate.weekStart))
+        return null;
+    if (typeof candidate.name !== 'string' || candidate.name.length > MAX_TITLE_CHARS)
+        return null;
+    const people = candidate.people;
+    if (!Array.isArray(people) || people.length > MAX_PEOPLE)
+        return null;
+    if (!people.every((person) => typeof person === 'string' && person.length > 0 && person.length <= MAX_NAME_CHARS)) {
+        return null;
+    }
+    const slotPeople = candidate.slotPeople;
+    if (!Array.isArray(slotPeople) || slotPeople.length > MAX_SLOTS)
+        return null;
+    const personCount = people.length;
+    if (!slotPeople.every((index) => typeof index === 'number' && Number.isInteger(index) && index >= -1 && index < personCount)) {
+        return null;
+    }
+    if (visible !== undefined && typeof visible !== 'boolean')
+        return null;
+    const nextVisible = visible === undefined ? true : visible;
+    return {
+        week: {
+            version: GOLDEN_VERSION,
+            weekStart: candidate.weekStart,
+            name: candidate.name,
+            people: [...people],
+            slotPeople: [...slotPeople],
+        },
+        visible: nextVisible,
+        baseRev,
+    };
+}
+export function normalizeGoldenDoc(raw) {
+    if (!raw || typeof raw !== 'object')
+        return null;
+    const doc = raw;
+    if (doc.v !== 3)
+        return null;
+    if (typeof doc.weekStart !== 'string' || !WEEK_RE.test(doc.weekStart))
+        return null;
+    if (typeof doc.rev !== 'number' || !Number.isInteger(doc.rev) || doc.rev < 1)
+        return null;
+    if (typeof doc.templateHash !== 'string' || !HASH_RE.test(doc.templateHash))
+        return null;
+    if (typeof doc.updatedAt !== 'string')
+        return null;
+    const week = validateGoldenWeekBody({ week: doc.week, baseRev: doc.rev });
+    if (!week)
+        return null;
+    if (week.week.weekStart !== doc.weekStart)
+        return null;
+    return {
+        v: 3,
+        weekStart: doc.weekStart,
+        rev: doc.rev,
+        week: week.week,
+        visible: doc.visible !== false,
+        templateHash: doc.templateHash,
+        updatedAt: doc.updatedAt,
+    };
+}
+const GOLDEN_DAY_MS = 24 * 60 * 60 * 1000;
+/** Every Sunday-week touching the month, mirroring weeksForMonth in the web app. */
+export function goldenWeeksForMonth(monthKey) {
+    if (!MONTH_RE.test(monthKey))
+        return [];
+    const [year, month] = monthKey.split('-').map(Number);
+    const firstMs = Date.UTC(year, month - 1, 1);
+    const lastMs = Date.UTC(year, month, 0);
+    const firstSundayMs = firstMs - new Date(firstMs).getUTCDay() * GOLDEN_DAY_MS;
+    const weeks = [];
+    for (let cursor = firstSundayMs; cursor <= lastMs; cursor += 7 * GOLDEN_DAY_MS) {
+        weeks.push(new Date(cursor).toISOString().slice(0, 10));
+    }
+    return weeks;
+}
+export function goldenWriteError(env) {
+    return env.SCHEDULE_WRITE_TOKEN ? null : 'write_not_configured';
+}
+export function isGoldenWriteAuthorized(request, env) {
+    const token = env.SCHEDULE_WRITE_TOKEN ?? '';
+    if (!token)
+        return false;
+    return request.headers.get('Authorization') === `Bearer ${token}`;
 }
 function clientIp(request) {
     return request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ?? 'unknown';
@@ -164,7 +279,7 @@ export default {
                 headers: {
                     ...corsHeaders(request, env),
                     'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type',
+                    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
                     'Access-Control-Max-Age': '86400',
                 },
             });
@@ -226,10 +341,128 @@ export default {
                     continue;
                 if (doc.monthKey !== month && monthKeyForWeekStart(doc.weekStart) !== month)
                     continue;
-                weeks.push({ id: doc.id, weekStart: doc.weekStart, rev: doc.rev, updatedAt: doc.updatedAt, templateHash: doc.templateHash });
+                weeks.push({
+                    id: doc.id,
+                    weekStart: doc.weekStart,
+                    rev: doc.rev,
+                    updatedAt: doc.updatedAt,
+                    templateHash: doc.templateHash,
+                });
             }
             weeks.sort((a, b) => a.weekStart.localeCompare(b.weekStart));
             return json({ weeks }, 200, request, env);
+        }
+        if (request.method === 'GET' && path === '/api/schedule') {
+            const month = url.searchParams.get('month') ?? '';
+            if (!MONTH_RE.test(month))
+                return json({ error: 'invalid_month' }, 400, request, env);
+            const weeks = [];
+            for (const weekStart of goldenWeeksForMonth(month)) {
+                const raw = await env.SCHEDULES.get(goldenKey(weekStart));
+                if (!raw)
+                    continue;
+                let parsed;
+                try {
+                    parsed = JSON.parse(raw);
+                }
+                catch {
+                    continue;
+                }
+                const doc = normalizeGoldenDoc(parsed);
+                if (!doc || !doc.visible)
+                    continue;
+                weeks.push(doc);
+            }
+            weeks.sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+            return json({ weeks }, 200, request, env);
+        }
+        const goldenMatch = path.match(/^\/api\/schedule\/(\d{4}-\d{2}-\d{2})$/);
+        if (goldenMatch) {
+            const weekStart = goldenMatch[1];
+            const key = goldenKey(weekStart);
+            if (request.method === 'GET') {
+                const raw = await env.SCHEDULES.get(key);
+                if (!raw)
+                    return json({ error: 'not_found' }, 404, request, env);
+                let parsed;
+                try {
+                    parsed = JSON.parse(raw);
+                }
+                catch {
+                    return json({ error: 'not_found' }, 404, request, env);
+                }
+                const doc = normalizeGoldenDoc(parsed);
+                if (!doc)
+                    return json({ error: 'not_found' }, 404, request, env);
+                return new Response(JSON.stringify(doc), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
+                });
+            }
+            if (request.method === 'PUT') {
+                if (goldenWriteError(env))
+                    return json({ error: 'write_not_configured' }, 503, request, env);
+                if (!isGoldenWriteAuthorized(request, env))
+                    return json({ error: 'unauthorized' }, 401, request, env);
+                if (!(await checkWriteThrottle(env, clientIp(request)))) {
+                    return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
+                }
+                let templateHash = null;
+                let body;
+                try {
+                    body = await readBody(request);
+                }
+                catch {
+                    return json({ error: 'body_too_large' }, 413, request, env);
+                }
+                const rawBody = body && typeof body === 'object' ? body : null;
+                if (rawBody && typeof rawBody.templateHash === 'string' && HASH_RE.test(rawBody.templateHash)) {
+                    templateHash = rawBody.templateHash;
+                }
+                const valid = validateGoldenWeekBody(body);
+                if (!valid || !templateHash || valid.week.weekStart !== weekStart) {
+                    return json({ error: 'invalid_body' }, 400, request, env);
+                }
+                const existing = await env.SCHEDULES.get(key);
+                if (!existing) {
+                    if (valid.baseRev !== 0)
+                        return json({ error: 'conflict', rev: 0 }, 409, request, env);
+                    const next = {
+                        v: 3,
+                        weekStart,
+                        rev: 1,
+                        week: valid.week,
+                        visible: valid.visible,
+                        templateHash,
+                        updatedAt: new Date().toISOString(),
+                    };
+                    await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
+                    return json({ rev: next.rev, updatedAt: next.updatedAt }, 201, request, env);
+                }
+                let parsed;
+                try {
+                    parsed = JSON.parse(existing);
+                }
+                catch {
+                    return json({ error: 'not_found' }, 404, request, env);
+                }
+                const current = normalizeGoldenDoc(parsed);
+                if (!current)
+                    return json({ error: 'not_found' }, 404, request, env);
+                if (valid.baseRev !== current.rev) {
+                    return json({ error: 'conflict', rev: current.rev, updatedAt: current.updatedAt }, 409, request, env);
+                }
+                const next = {
+                    ...current,
+                    week: valid.week,
+                    visible: valid.visible,
+                    templateHash,
+                    rev: current.rev + 1,
+                    updatedAt: new Date().toISOString(),
+                };
+                await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
+                return json({ rev: next.rev, updatedAt: next.updatedAt }, 200, request, env);
+            }
         }
         const weekMatch = path.match(/^\/api\/weeks\/([A-Za-z0-9_-]+)$/);
         if (weekMatch) {
@@ -251,6 +484,7 @@ export default {
                 const doc = normalizeStoredWeek(parsed);
                 if (!doc)
                     return json({ error: 'not_found' }, 404, request, env);
+                // Repair the month index for docs written before the index existed.
                 await addToMonthIndex(env, doc.monthKey, doc.id);
                 return new Response(JSON.stringify(doc), {
                     status: 200,

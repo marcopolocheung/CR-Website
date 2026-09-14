@@ -42,6 +42,92 @@ export class StoreConflictError extends Error {
   }
 }
 
+export class StoreAuthError extends Error {
+  constructor() {
+    super('That write token did not work. Ask for the current one and try again.')
+    this.name = 'StoreAuthError'
+  }
+}
+
+// --- Golden schedule (one persistent codeless schedule, edited by scheduler-demo) ---
+
+export type GoldenWeekPayload = {
+  version: number
+  weekStart: string
+  name: string
+  people: string[]
+  slotPeople: number[]
+}
+
+export type GoldenWeekDoc = {
+  v: number
+  weekStart: string
+  rev: number
+  week: GoldenWeekPayload
+  visible: boolean
+  templateHash: string
+  updatedAt: string
+}
+
+function isGoldenWeekDoc(body: unknown): body is GoldenWeekDoc {
+  if (!body || typeof body !== 'object') return false
+  const doc = body as Record<string, unknown>
+  const week = doc.week as Record<string, unknown> | undefined
+  return (
+    typeof doc.weekStart === 'string' &&
+    typeof doc.rev === 'number' &&
+    typeof doc.templateHash === 'string' &&
+    typeof doc.updatedAt === 'string' &&
+    !!week &&
+    typeof week.weekStart === 'string' &&
+    typeof week.name === 'string' &&
+    Array.isArray(week.people) &&
+    Array.isArray(week.slotPeople)
+  )
+}
+
+export async function fetchGoldenWeek(weekStart: string): Promise<GoldenWeekDoc | null> {
+  const { status, body } = await requestJson(`/api/schedule/${weekStart}`)
+  if (status === 404) return null
+  if (status === 200 && isGoldenWeekDoc(body)) {
+    return { ...body, visible: body.visible !== false }
+  }
+  throw new StoreUnavailableError()
+}
+
+export async function fetchGoldenMonth(month: string): Promise<GoldenWeekDoc[]> {
+  const { status, body } = await requestJson(`/api/schedule?month=${encodeURIComponent(month)}`)
+  if (status === 400) return []
+  if (status === 200 && body && typeof body === 'object' && 'weeks' in body) {
+    const { weeks } = body as { weeks: unknown }
+    if (Array.isArray(weeks)) return weeks.filter(isGoldenWeekDoc)
+  }
+  throw new StoreUnavailableError()
+}
+
+export async function saveGoldenWeek(
+  weekStart: string,
+  input: { week: GoldenWeekPayload; templateHash: string; visible: boolean; baseRev: number },
+  token: string,
+): Promise<{ rev: number }> {
+  const { status, body } = await requestJson(`/api/schedule/${weekStart}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  })
+  if (status === 404) throw new StoreNotFoundError()
+  if (status === 401) throw new StoreAuthError()
+  if (status === 409) {
+    const rev = body && typeof body === 'object' && 'rev' in body ? (body as { rev: unknown }).rev : 0
+    throw new StoreConflictError(typeof rev === 'number' ? rev : 0)
+  }
+  if ((status === 200 || status === 201) && body && typeof body === 'object' && 'rev' in body) {
+    const { rev } = body as { rev: unknown }
+    if (typeof rev === 'number') return { rev }
+  }
+  throw new StoreUnavailableError()
+}
+
 export class StoreUnavailableError extends Error {
   constructor() {
     super('Could not reach the schedule store.')

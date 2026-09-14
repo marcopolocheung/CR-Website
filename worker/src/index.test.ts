@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import handler, { isValidId, newShareId, validatePublishBody, validateUpdateBody } from './index'
+import handler, {
+  goldenWeeksForMonth,
+  isValidId,
+  newShareId,
+  validateGoldenWeekBody,
+  validatePublishBody,
+  validateUpdateBody,
+} from './index'
 
-function mockEnv() {
+function mockEnv(token = 'manager-token') {
   const data = new Map<string, string>()
   return {
     SCHEDULES: {
@@ -13,6 +20,7 @@ function mockEnv() {
         data.set(key, value)
       },
     },
+    SCHEDULE_WRITE_TOKEN: token,
   }
 }
 
@@ -106,6 +114,116 @@ test('month listing shows only visible weeks', async () => {
 
   const badMonth = await handler.fetch(new Request('https://api.test/api/weeks?month=september'), env)
   assert.equal(badMonth.status, 400)
+})
+
+test('golden weeks cover every Sunday touching the month', () => {
+  assert.deepEqual(goldenWeeksForMonth('2026-09'), ['2026-08-30', '2026-09-06', '2026-09-13', '2026-09-20', '2026-09-27'])
+  assert.deepEqual(goldenWeeksForMonth('september'), [])
+})
+
+function goldenPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    version: 1,
+    weekStart: '2026-09-13',
+    name: 'Week of Sep 13',
+    people: ['Mary', 'Desiree'],
+    slotPeople: [0, 1, -1],
+    ...overrides,
+  }
+}
+
+function goldenPut(weekStart: string, body: unknown, token = 'manager-token'): Request {
+  return new Request(`https://api.test/api/schedule/${weekStart}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  })
+}
+
+test('golden week bodies are strictly validated', () => {
+  const good = { week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }
+  assert.equal(validateGoldenWeekBody(good)?.baseRev, 0)
+  assert.equal(validateGoldenWeekBody({ ...good, baseRev: -1 }), null)
+  assert.equal(validateGoldenWeekBody({ ...good, week: goldenPayload({ version: 2 }) }), null)
+  assert.equal(validateGoldenWeekBody({ ...good, week: goldenPayload({ people: ['Mary', 7] }) }), null)
+  assert.equal(validateGoldenWeekBody({ ...good, week: goldenPayload({ slotPeople: [0, 5] }) }), null)
+  assert.equal(validateGoldenWeekBody({ ...good, week: goldenPayload({ slotPeople: [0.5] }) }), null)
+  assert.equal(validateGoldenWeekBody({ ...good, visible: 'yes' }), null)
+  assert.equal(validateGoldenWeekBody({ week: goldenPayload() }), null)
+})
+
+test('golden writes need the manager token and create on first save', async () => {
+  const env = mockEnv()
+  const body = { week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }
+
+  const noToken = await handler.fetch(
+    new Request('https://api.test/api/schedule/2026-09-13', { method: 'PUT', body: JSON.stringify(body) }),
+    env,
+  )
+  assert.equal(noToken.status, 401)
+
+  const wrongToken = await handler.fetch(goldenPut('2026-09-13', body, 'wrong'), env)
+  assert.equal(wrongToken.status, 401)
+
+  const created = await handler.fetch(goldenPut('2026-09-13', body), env)
+  assert.equal(created.status, 201)
+  assert.equal(((await created.json()) as { rev: number }).rev, 1)
+
+  const fetched = await handler.fetch(new Request('https://api.test/api/schedule/2026-09-13'), env)
+  assert.equal(fetched.status, 200)
+  const doc = (await fetched.json()) as { rev: number; visible: boolean; week: { people: string[] } }
+  assert.equal(doc.rev, 1)
+  assert.equal(doc.visible, true)
+  assert.deepEqual(doc.week.people, ['Mary', 'Desiree'])
+
+  const stale = await handler.fetch(
+    goldenPut('2026-09-13', { ...body, baseRev: 0, visible: false }),
+    env,
+  )
+  assert.equal(stale.status, 409)
+  assert.equal(((await stale.json()) as { rev: number }).rev, 1)
+
+  const updated = await handler.fetch(
+    goldenPut('2026-09-13', { ...body, baseRev: 1, visible: false }),
+    env,
+  )
+  assert.equal(updated.status, 200)
+  assert.equal(((await updated.json()) as { rev: number }).rev, 2)
+})
+
+test('golden month listing shows only visible weeks', async () => {
+  const env = mockEnv()
+  await handler.fetch(
+    goldenPut('2026-09-13', { week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }),
+    env,
+  )
+  await handler.fetch(
+    goldenPut(
+      '2026-09-20',
+      { week: goldenPayload({ weekStart: '2026-09-20' }), templateHash: 'a1b2c3d4', visible: false, baseRev: 0 },
+    ),
+    env,
+  )
+
+  const listed = await handler.fetch(new Request('https://api.test/api/schedule?month=2026-09'), env)
+  assert.equal(listed.status, 200)
+  const { weeks } = (await listed.json()) as { weeks: { weekStart: string }[] }
+  assert.ok(weeks.some((week) => week.weekStart === '2026-09-13'))
+  assert.ok(!weeks.some((week) => week.weekStart === '2026-09-20'))
+
+  const missing = await handler.fetch(new Request('https://api.test/api/schedule/2026-09-27'), env)
+  assert.equal(missing.status, 404)
+  const badMonth = await handler.fetch(new Request('https://api.test/api/schedule?month=september'), env)
+  assert.equal(badMonth.status, 400)
+})
+
+test('golden writes fail closed without a configured token', async () => {
+  const env = mockEnv('')
+  const response = await handler.fetch(
+    goldenPut('2026-09-13', { week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }),
+    env,
+  )
+  assert.equal(response.status, 503)
 })
 
 test('visibility can toggle without re-encrypting', async () => {
