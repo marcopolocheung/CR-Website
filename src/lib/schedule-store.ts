@@ -14,6 +14,16 @@ export type StoredWeekDoc = {
   templateHash: string
   weekStart: string
   updatedAt: string
+  visible: boolean
+  monthKey: string
+}
+
+export type VisibleWeekStub = {
+  id: string
+  weekStart: string
+  rev: number
+  updatedAt: string
+  templateHash: string
 }
 
 export class StoreNotFoundError extends Error {
@@ -66,6 +76,7 @@ export async function createSharedWeek(input: {
   ciphertext: string
   templateHash: string
   weekStart: string
+  visible?: boolean
 }): Promise<{ id: string; rev: number }> {
   const { status, body } = await requestJson('/api/weeks', { method: 'POST', body: JSON.stringify(input) })
   if (status === 201 && body && typeof body === 'object' && 'id' in body && 'rev' in body) {
@@ -79,14 +90,37 @@ export async function fetchSharedWeek(id: string): Promise<StoredWeekDoc> {
   const { status, body } = await requestJson(`/api/weeks/${id}`)
   if (status === 404) throw new StoreNotFoundError()
   if (status === 200 && body && typeof body === 'object' && 'ciphertext' in body && 'rev' in body) {
-    return body as StoredWeekDoc
+    const doc = body as StoredWeekDoc
+    return {
+      ...doc,
+      visible: typeof doc.visible === 'boolean' ? doc.visible : true,
+      monthKey: typeof doc.monthKey === 'string' ? doc.monthKey : doc.weekStart.slice(0, 7),
+    }
+  }
+  throw new StoreUnavailableError()
+}
+
+export async function listVisibleWeeks(month: string): Promise<VisibleWeekStub[]> {
+  const { status, body } = await requestJson(`/api/weeks?month=${encodeURIComponent(month)}`)
+  if (status === 400) return []
+  if (status === 200 && body && typeof body === 'object' && 'weeks' in body) {
+    const { weeks } = body as { weeks: unknown }
+    if (Array.isArray(weeks)) {
+      return weeks.filter(
+        (week): week is VisibleWeekStub =>
+          !!week &&
+          typeof week === 'object' &&
+          typeof (week as VisibleWeekStub).id === 'string' &&
+          typeof (week as VisibleWeekStub).weekStart === 'string',
+      )
+    }
   }
   throw new StoreUnavailableError()
 }
 
 export async function updateSharedWeek(
   id: string,
-  input: { ciphertext: string; baseRev: number },
+  input: { ciphertext?: string; visible?: boolean; baseRev: number },
 ): Promise<{ rev: number }> {
   const { status, body } = await requestJson(`/api/weeks/${id}`, { method: 'PUT', body: JSON.stringify(input) })
   if (status === 404) throw new StoreNotFoundError()

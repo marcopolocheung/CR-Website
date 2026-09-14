@@ -8,7 +8,8 @@ The demo at `/scheduler-demo` is a static Next.js App Router page with the corre
 - `src/lib/scheduler/data.ts`: structured seed data normalized from `scheduler.md`.
 - `src/lib/scheduler/solver.ts`: deterministic backtracking scheduler with preflight diagnostics and stable candidate ordering.
 - `src/lib/scheduler/validator.ts`: independent hard-constraint validator used for generated and manually edited schedules.
-- `src/components/scheduler/SchedulerDemo.tsx`: manager-facing demo UI for generating, locking, manually reassigning, validating, printing, editing basic employee constraints, and adding new employees.
+- `src/lib/scheduler/week-visibility.ts`: per-week on/off status, month strip helpers (`weeksForMonth`, `shiftMonth`), and v1→v2 draft migration. Off weeks are hidden from staff; they are never deleted.
+- `src/components/scheduler/SchedulerDemo.tsx`: manager-facing demo UI for generating, locking, manually reassigning, validating, printing, editing basic employee constraints, and adding new employees. The week board is a 7-column fluid grid (`lg:grid-cols-7`, no `min-w`, full-width containers) with a month strip, per-week on/off toggles, and copy-prior-week.
 
 ## Data Model
 
@@ -48,9 +49,14 @@ Add new structured fields to `types.ts`, enforce generation behavior in `solver.
 ## Sharing
 
 Publishing encrypts the week in the browser (`encryptWeek`) and stores only the
-ciphertext in a free Cloudflare Worker + KV (`worker/`). The staff link holds a
-short ID (`/schedule#<id>`), so the manager sends it once and later presses
-"Save updates to this link" — readers press "Check for updates". The Worker
+ciphertext in a free Cloudflare Worker + KV (`worker/`). Each doc carries
+`visible` and `monthKey`; `GET /api/weeks?month=YYYY-MM` lists only visible
+weeks so the staff month browser never sees off weeks. Toggling visibility
+sends a rev-guarded `PUT` without re-encrypting, and the month index
+(`month:YYYY-MM`) is repaired on read for docs written before it existed.
+The staff link holds a short ID (`/schedule#<id>`), so the manager sends it once and later presses
+"Save updates to this link" — readers press "Check for updates". Staff can also
+type one code to open every visible week in a month; off weeks stay hidden. The Worker
 never sees names, shifts, or the code; it enforces optimistic concurrency with
 `rev` (`409 conflict` means someone else saved first). Old data-in-URL links
 still open as legacy snapshots. Local `localStorage` remains the offline draft
@@ -61,6 +67,7 @@ cache and remembers which link ID belongs to each week.
 - Run the app: `npm run dev`, then open `/scheduler-demo`.
 - Run scheduler tests: `npm run scheduler:test`.
 - Validate the static site: `npm run build`.
-- Deploy the store: paste `worker/dashboard.js` (plain JavaScript — the dashboard
-  editor rejects the TypeScript source) into the `chinarose-schedule-api`
-  Worker (KV binding `SCHEDULES`), then open `/api/health` to verify.
+- Deploy the store: paste `worker/dashboard.js` (plain JavaScript mirror of
+  `worker/src/index.ts` — the dashboard editor rejects the TypeScript source)
+  into the `chinarose-schedule-api` Worker (KV binding `SCHEDULES`), then open
+  `/api/health` to verify. Keep the two files in sync when the API changes.

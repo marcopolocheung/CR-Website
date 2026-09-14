@@ -18,10 +18,14 @@ import {
   currentWeekStart,
   dayOfMonth,
   formatWeekRange,
+  monthKeyForWeek,
+  monthLabel,
   seedTemplate,
+  shiftMonth,
   shiftWeek,
   summarizeSchedule,
   validateSchedule,
+  weeksForMonth,
   type DayOfWeek,
   type Diagnostic,
   type Employee,
@@ -33,6 +37,7 @@ import {
   type StaffingSlot,
   type TimeRange,
   type ValidationViolation,
+  type WeekStatus,
 } from '@/lib/scheduler'
 import SharePanel from './SharePanel'
 
@@ -63,6 +68,7 @@ type HistorySnapshot = {
   employees: Employee[]
   weeks: WeekAssignments
   generatedWeeks: WeekAssignments
+  weekStatus: Record<string, WeekStatus>
   diagnostics: string[]
 }
 
@@ -296,22 +302,56 @@ function cloneEmployeeList(employees: Employee[]) {
 }
 
 const emptyAssignments: ScheduleAssignment[] = []
-const storageKey = 'chinarose.scheduler.v1'
+const storageKey = 'chinarose.scheduler.v2'
+const legacyStorageKey = 'chinarose.scheduler.v1'
 
 type SavedState = {
+  version: 2
+  employees: Employee[]
+  weeks: WeekAssignments
+  generatedWeeks: WeekAssignments
+  weekStatus: Record<string, WeekStatus>
+}
+
+type LegacySavedState = {
   version: 1
   employees: Employee[]
   weeks: WeekAssignments
   generatedWeeks: WeekAssignments
 }
 
+function statusForWeek(
+  weekStatus: Record<string, WeekStatus>,
+  weekStart: string,
+  assignments: ScheduleAssignment[],
+): WeekStatus {
+  const explicit = weekStatus[weekStart]
+  if (explicit) return explicit
+  return assignments.length > 0 ? 'on' : 'off'
+}
+
 function readSavedState(): SavedState | null {
   try {
     const raw = window.localStorage.getItem(storageKey)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as SavedState
-    if (parsed.version !== 1 || !Array.isArray(parsed.employees)) return null
-    return parsed
+    if (raw) {
+      const parsed = JSON.parse(raw) as SavedState
+      if (parsed.version !== 2 || !Array.isArray(parsed.employees)) return null
+      return {
+        ...parsed,
+        weeks: parsed.weeks ?? {},
+        generatedWeeks: parsed.generatedWeeks ?? {},
+        weekStatus: parsed.weekStatus ?? {},
+      }
+    }
+    const legacyRaw = window.localStorage.getItem(legacyStorageKey)
+    if (!legacyRaw) return null
+    const legacy = JSON.parse(legacyRaw) as LegacySavedState
+    if (legacy.version !== 1 || !Array.isArray(legacy.employees)) return null
+    const weekStatus: Record<string, WeekStatus> = {}
+    for (const [weekStart, assignments] of Object.entries(legacy.weeks ?? {})) {
+      weekStatus[weekStart] = Array.isArray(assignments) && assignments.length > 0 ? 'on' : 'off'
+    }
+    return { version: 2, employees: legacy.employees, weeks: legacy.weeks ?? {}, generatedWeeks: legacy.generatedWeeks ?? {}, weekStatus }
   } catch {
     // A private window, cleared site data, or a browser that blocks storage.
     return null
@@ -623,6 +663,8 @@ export default function SchedulerDemo() {
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
   const [generatedWeeks, setGeneratedWeeks] = useState<WeekAssignments>({})
+  const [weekStatus, setWeekStatus] = useState<Record<string, WeekStatus>>({})
+  const [monthKey, setMonthKey] = useState('')
   const [diagnostics, setDiagnostics] = useState<string[]>([])
   const [draft, setDraft] = useState<EmployeeDraft>(() => blankDraft())
   const [employeePanelOpen, setEmployeePanelOpen] = useState(false)
@@ -640,6 +682,12 @@ export default function SchedulerDemo() {
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
   const assignments = weeks[weekStart] ?? emptyAssignments
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
+  const weekVisibility = weekStart ? statusForWeek(weekStatus, weekStart, assignments) : 'off'
+  const monthWeeks = monthKey ? weeksForMonth(monthKey) : []
+  const onWeeksCount = useMemo(
+    () => Object.keys(weeks).filter((key) => statusForWeek(weekStatus, key, weeks[key] ?? []) === 'on').length,
+    [weeks, weekStatus],
+  )
 
   function setAssignments(next: ScheduleAssignment[] | ((current: ScheduleAssignment[]) => ScheduleAssignment[])) {
     setWeeks((current) => {
@@ -739,20 +787,23 @@ export default function SchedulerDemo() {
   useEffect(() => {
     // Date and storage both have to wait for the browser: this page is prerendered,
     // so reading either during render would not match the HTML that shipped.
-    setWeekStart(currentWeekStart())
+    const start = currentWeekStart()
+    setWeekStart(start)
+    setMonthKey(monthKeyForWeek(start))
     const saved = readSavedState()
     if (saved) {
       setEmployees(saved.employees)
       setWeeks(saved.weeks ?? {})
       setGeneratedWeeks(saved.generatedWeeks ?? {})
+      setWeekStatus(saved.weekStatus ?? {})
     }
     setRestored(true)
   }, [])
 
   useEffect(() => {
     if (!restored) return
-    writeSavedState({ version: 1, employees, weeks, generatedWeeks })
-  }, [employees, generatedWeeks, restored, weeks])
+    writeSavedState({ version: 2, employees, weeks, generatedWeeks, weekStatus })
+  }, [employees, generatedWeeks, restored, weeks, weekStatus])
 
   useEffect(() => {
     if (!dragState && !moveSource) return
@@ -782,6 +833,7 @@ export default function SchedulerDemo() {
   function goToWeek(nextWeekStart: string) {
     if (!nextWeekStart || nextWeekStart === weekStart) return
     setWeekStart(nextWeekStart)
+    setMonthKey(monthKeyForWeek(nextWeekStart))
     setDiagnostics([])
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
@@ -794,6 +846,38 @@ export default function SchedulerDemo() {
     setDragOverSlotId(null)
   }
 
+  function goToMonth(nextMonth: string) {
+    if (!nextMonth || nextMonth === monthKey) return
+    setMonthKey(nextMonth)
+    const firstWeek = weeksForMonth(nextMonth)[0]
+    if (firstWeek) goToWeek(firstWeek)
+  }
+
+  function setWeekVisibility(targetWeek: string, status: WeekStatus) {
+    if (!targetWeek) return
+    remember(status === 'on' ? 'turned a week on' : 'turned a week off')
+    setWeekStatus((current) => ({ ...current, [targetWeek]: status }))
+    setDiagnostics([
+      status === 'on'
+        ? 'That week is now on. Staff can see it once it is shared.'
+        : 'That week is now off and hidden from staff.',
+    ])
+  }
+
+  function copyPriorWeek() {
+    if (!weekStart) return
+    const prior = shiftWeek(weekStart, -1)
+    const source = weeks[prior] ?? emptyAssignments
+    if (source.length === 0) {
+      setDiagnostics(['The prior week has no schedule to copy yet.'])
+      return
+    }
+    remember('copied the prior week')
+    setWeeks((current) => ({ ...current, [weekStart]: cloneAssignmentList(source) }))
+    setWeekStatus((current) => ({ ...current, [weekStart]: 'on' }))
+    setDiagnostics(['Prior week copied here. Review it, then share when it looks right.'])
+  }
+
   function remember(label: string) {
     setHistory((current) => [
       {
@@ -801,6 +885,7 @@ export default function SchedulerDemo() {
         employees: cloneEmployeeList(employees),
         weeks: cloneWeeks(weeks),
         generatedWeeks: cloneWeeks(generatedWeeks),
+        weekStatus: { ...weekStatus },
         diagnostics: [...diagnostics],
       },
       ...current.slice(0, 5),
@@ -813,6 +898,7 @@ export default function SchedulerDemo() {
     setEmployees(cloneEmployeeList(snapshot.employees))
     setWeeks(cloneWeeks(snapshot.weeks))
     setGeneratedWeeks(cloneWeeks(snapshot.generatedWeeks))
+    setWeekStatus({ ...snapshot.weekStatus })
     setDiagnostics([`Undone: ${snapshot.label}.`])
     setHistory(rest)
     setDropFeedback(null)
@@ -934,6 +1020,7 @@ export default function SchedulerDemo() {
     ])
     setAssignments(result.assignments)
     setGeneratedAssignments(cloneAssignmentList(result.assignments))
+    setWeekStatus((current) => ({ ...current, [weekStart]: 'on' }))
   }
 
   function reset() {
@@ -943,6 +1030,7 @@ export default function SchedulerDemo() {
     setEmployees(cloneEmployees())
     setWeeks({})
     setGeneratedWeeks({})
+    setWeekStatus({})
     setDiagnostics([])
     setDraft(blankDraft())
     setEmployeePanelOpen(false)
@@ -1094,10 +1182,15 @@ export default function SchedulerDemo() {
   return (
     <div className="bg-zinc-100 text-zinc-950">
       <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mx-auto flex w-full max-w-none flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Scheduler demo</p>
             <h1 className="text-2xl font-bold md:text-3xl">Weekly staff schedule</h1>
+            {onWeeksCount > 0 && (
+              <p className="mt-1 text-sm text-zinc-600">
+                {onWeeksCount} week{onWeeksCount === 1 ? '' : 's'} on · off weeks stay hidden from staff
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Button
@@ -1112,7 +1205,12 @@ export default function SchedulerDemo() {
             <Button onClick={fixNextIssue} icon="target" disabled={!nextIssue} badge={visibleFixIssues.length}>
               Fix next issue
             </Button>
-            <Button onClick={() => setSharing((open) => !open)} icon="share" disabled={!weekStart}>
+            <Button
+              onClick={() => setSharing((open) => !open)}
+              icon="share"
+              disabled={!weekStart || weekVisibility === 'off'}
+              title={weekVisibility === 'off' ? 'Turn this week on before sharing it with staff.' : 'Share this week with staff.'}
+            >
               Share with staff
             </Button>
             {keptCount > 0 && (
@@ -1167,14 +1265,14 @@ export default function SchedulerDemo() {
           </div>
         </div>
         {activeEmployeeCount === 0 && (
-          <p className="mx-auto max-w-[1400px] px-4 pb-3 text-sm text-zinc-600">
+          <p className="mx-auto w-full max-w-none px-4 pb-3 text-sm text-zinc-600">
             Add someone to the staff list before making a schedule.
           </p>
         )}
       </header>
 
-      <div className="mx-auto grid max-w-[1400px] gap-5 px-4 py-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <main className="order-1 space-y-4">
+      <div className="mx-auto grid w-full max-w-none min-w-0 gap-5 overflow-x-clip px-4 py-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
+        <main className="order-1 min-w-0 space-y-4">
           {sharing && weekStart && (
             <SharePanel
               weekStart={weekStart}
@@ -1182,6 +1280,7 @@ export default function SchedulerDemo() {
               slots={slots}
               employees={employees}
               assignments={assignments}
+              visible={weekVisibility === 'on'}
               onClose={() => setSharing(false)}
             />
           )}
@@ -1202,8 +1301,18 @@ export default function SchedulerDemo() {
             onShowIgnored={showIgnoredIssues}
           />
 
-          <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+            <MonthStrip
+              monthKey={monthKey}
+              weekStart={weekStart}
+              monthWeeks={monthWeeks}
+              weeks={weeks}
+              weekStatus={weekStatus}
+              onSelectWeek={goToWeek}
+              onSelectMonth={goToMonth}
+              onToggleWeek={setWeekVisibility}
+            />
+            <div className="mt-4 flex flex-col gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-1">
                 <IconButton
                   icon="chevronLeft"
@@ -1211,8 +1320,8 @@ export default function SchedulerDemo() {
                   onClick={() => goToWeek(shiftWeek(weekStart, -1))}
                   disabled={!weekStart}
                 />
-                <h2 className="min-w-64 whitespace-nowrap text-center text-lg font-semibold">
-                  {weekStart ? formatWeekRange(weekStart) : '\u2014'}
+                <h2 className="min-w-0 flex-1 truncate px-2 text-center text-lg font-semibold">
+                  {weekStart ? formatWeekRange(weekStart) : '—'}
                 </h2>
                 <IconButton
                   icon="chevronRight"
@@ -1230,8 +1339,26 @@ export default function SchedulerDemo() {
                   </button>
                 )}
               </div>
-              <p className="text-sm text-zinc-600 print:hidden">Click a name to move it, then click where it goes.</p>
+              <div className="flex flex-wrap items-center gap-2 print:hidden">
+                <WeekVisibilityToggle weekStart={weekStart} status={weekVisibility} onToggle={setWeekVisibility} />
+                <button
+                  type="button"
+                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={copyPriorWeek}
+                  disabled={!weekStart}
+                  title="Copy last week's assignments into this week."
+                >
+                  Copy last week
+                </button>
+              </div>
             </div>
+            <p className="mt-1 text-sm text-zinc-600 print:hidden">Click a name to move it, then click where it goes.</p>
+
+            {weekVisibility === 'off' && weekStart && (
+              <div className="mt-3 rounded border border-zinc-300 bg-zinc-100 p-3 text-sm text-zinc-700" role="status">
+                This week is off and hidden from staff. Turn it on to share it.
+              </div>
+            )}
 
             {movingEmployee && (
               <div
@@ -1334,7 +1461,7 @@ export default function SchedulerDemo() {
           </div>
         </main>
 
-        <aside className="order-2 space-y-4 print:hidden">
+        <aside className="order-2 min-w-0 space-y-4 print:hidden">
           <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1775,6 +1902,106 @@ function GuidedFixPanel({
   )
 }
 
+function MonthStrip({
+  monthKey,
+  weekStart,
+  monthWeeks,
+  weeks,
+  weekStatus,
+  onSelectWeek,
+  onSelectMonth,
+  onToggleWeek,
+}: {
+  monthKey: string
+  weekStart: string
+  monthWeeks: string[]
+  weeks: WeekAssignments
+  weekStatus: Record<string, WeekStatus>
+  onSelectWeek: (weekStart: string) => void
+  onSelectMonth: (monthKey: string) => void
+  onToggleWeek: (weekStart: string, status: WeekStatus) => void
+}) {
+  if (!monthKey) return null
+  return (
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <IconButton icon="chevronLeft" label="Previous month" onClick={() => onSelectMonth(shiftMonth(monthKey, -1))} />
+        <h3 className="min-w-36 text-center text-base font-bold">{monthLabel(monthKey)}</h3>
+        <IconButton icon="chevronRight" label="Next month" onClick={() => onSelectMonth(shiftMonth(monthKey, 1))} />
+        <button
+          type="button"
+          className="ml-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+          onClick={() => onSelectMonth(monthKeyForWeek(currentWeekStart()))}
+        >
+          This month
+        </button>
+      </div>
+      <div className="mt-2 grid w-full min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5" role="listbox" aria-label="Weeks in this month">
+        {monthWeeks.map((week) => {
+          const list = weeks[week] ?? emptyAssignments
+          const status = statusForWeek(weekStatus, week, list)
+          const selected = week === weekStart
+          const filled = list.filter((assignment) => assignment.employeeId).length
+          return (
+            <div
+              key={week}
+              role="option"
+              aria-selected={selected}
+              className={`flex min-w-0 items-center gap-1.5 rounded border px-2 py-1.5 text-left ${
+                selected ? 'border-red-800 bg-red-50' : 'border-zinc-200 bg-white hover:bg-zinc-50'
+              } ${status === 'off' ? 'opacity-70' : ''}`}
+            >
+              <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onSelectWeek(week)} title={formatWeekRange(week)}>
+                <span className="block truncate text-xs font-semibold text-zinc-900">{formatWeekRange(week)}</span>
+                <span className="mt-0.5 flex items-center gap-1 text-[11px] text-zinc-500">
+                  <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${status === 'on' ? 'bg-green-600' : 'bg-zinc-300'}`} />
+                  {status === 'on' ? 'On' : 'Off'} · {filled} filled
+                </span>
+              </button>
+              <button
+                type="button"
+                className="shrink-0 rounded border border-zinc-300 bg-white px-1.5 py-1 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100"
+                onClick={() => onToggleWeek(week, status === 'on' ? 'off' : 'on')}
+                aria-pressed={status === 'on'}
+                title={status === 'on' ? `Turn off the week of ${formatWeekRange(week)}.` : `Turn on the week of ${formatWeekRange(week)}.`}
+              >
+                {status === 'on' ? 'Off' : 'On'}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function WeekVisibilityToggle({
+  weekStart,
+  status,
+  onToggle,
+}: {
+  weekStart: string
+  status: WeekStatus
+  onToggle: (weekStart: string, status: WeekStatus) => void
+}) {
+  if (!weekStart) return null
+  const on = status === 'on'
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(weekStart, on ? 'off' : 'on')}
+      aria-pressed={on}
+      title={on ? 'Hide this week from staff.' : 'Show this week to staff once shared.'}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${
+        on ? 'border-green-300 bg-green-50 text-green-900' : 'border-zinc-300 bg-zinc-100 text-zinc-600'
+      }`}
+    >
+      <span aria-hidden="true" className={`h-2 w-2 rounded-full ${on ? 'bg-green-600' : 'bg-zinc-400'}`} />
+      Week {on ? 'on' : 'off'}
+    </button>
+  )
+}
+
 function VariantControls({
   selectedVariant,
   onGenerate,
@@ -1860,8 +2087,8 @@ function ScheduleRules({ slots }: { slots: StaffingSlot[] }) {
   return (
     <Disclosure summary="Schedule rules" tone="quiet">
       <p className="text-sm text-zinc-600">Who the restaurant needs on each shift. The schedule maker follows this list.</p>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[700px] text-left text-sm">
+      <div className="mt-3 min-w-0">
+        <table className="w-full table-fixed text-left text-sm">
           <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
             <tr>
               <th className="py-2 pr-3">Day</th>
@@ -2041,35 +2268,31 @@ function WeeklyScheduleBoard({
   onActivateSlot: (slotId: string) => void
 }) {
   return (
-    <div className="mt-4">
-      <div className="divide-y divide-zinc-100">
+    <div className="mt-4 min-w-0">
+      <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-7">
         {DAYS.map((day) => {
           const daySlots = slots.filter((slot) => slot.day === day)
           const filled = daySlots.filter((slot) => assignmentMap.get(slot.id)?.employeeId).length
           const dayComplete = daySlots.length > 0 && filled === daySlots.length
           return (
-          <div
-            key={day}
-            className="py-2 md:grid md:grid-cols-[132px_minmax(0,1fr)] md:items-start md:gap-3"
-          >
-            <h3 className="px-1 py-2 text-base font-bold text-zinc-900">
-              {day}
-              {weekStart && <span className="ml-1.5 text-sm font-normal text-zinc-500">{dayOfMonth(weekStart, day)}</span>}
-              <span
-                className={`ml-2 inline-flex items-center rounded-full border px-2 py-0.5 align-middle text-xs font-semibold ${
-                  daySlots.length === 0
-                    ? 'border-zinc-200 bg-zinc-50 text-zinc-500'
-                    : dayComplete
-                      ? 'border-green-300 bg-green-50 text-green-900'
-                      : hasSchedule
-                        ? 'border-amber-300 bg-amber-50 text-amber-950'
-                        : 'border-zinc-200 bg-zinc-50 text-zinc-600'
-                }`}
-              >
-                {filled}/{daySlots.length} filled
-              </span>
-            </h3>
-            <div className="space-y-1">
+            <div key={day} className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50/60 p-2">
+              <h3 className="flex min-w-0 items-baseline gap-1 px-0.5 text-sm font-bold text-zinc-900">
+                <span className="truncate">{day.slice(0, 3)}</span>
+                {weekStart && <span className="shrink-0 text-xs font-normal text-zinc-500">{dayOfMonth(weekStart, day)}</span>}
+                <span
+                  className={`ml-auto inline-flex shrink-0 items-center rounded-full border px-1.5 py-px text-[11px] font-semibold ${
+                    daySlots.length === 0
+                      ? 'border-zinc-200 bg-zinc-50 text-zinc-500'
+                      : dayComplete
+                        ? 'border-green-300 bg-green-50 text-green-900'
+                        : hasSchedule
+                          ? 'border-amber-300 bg-amber-50 text-amber-950'
+                          : 'border-zinc-200 bg-zinc-50 text-zinc-600'
+                  }`}
+                >
+                  {filled}/{daySlots.length}
+                </span>
+              </h3>
               {PERIODS.map((period) => {
                 const shiftKey = `${day}-${period}` as ShiftKey
                 const shiftSlots = slots.filter((slot) => slot.day === day && slot.period === period)
@@ -2105,10 +2328,31 @@ function WeeklyScheduleBoard({
                 )
               })}
             </div>
-          </div>
           )
         })}
       </div>
+      {openShiftKey && (
+        <OpenShiftDetail
+          shiftKey={openShiftKey}
+          slots={slots}
+          employees={employees}
+          assignments={assignments}
+          assignmentMap={assignmentMap}
+          violations={violations}
+          changedSlotIds={changedSlotIds}
+          activeMove={activeMove}
+          dragOverSlotId={dragOverSlotId}
+          dropFeedback={dropFeedback}
+          movePreviews={movePreviews}
+          onResetShift={onResetShift}
+          onOpenShift={onOpenShift}
+          onAssign={onAssign}
+          onLock={onLock}
+          onDragOverSlot={onDragOverSlot}
+          onDragLeaveSlot={onDragLeaveSlot}
+          onDropAssignment={onDropAssignment}
+        />
+      )}
       <BoardLegend />
     </div>
   )
@@ -2221,19 +2465,25 @@ function ShiftRow({
         : statusMeta[status].shiftLabel
 
   return (
-    <div className={`overflow-hidden rounded ${statusMeta[status].shiftRow}`}>
-      <div className="grid w-full gap-3 px-3 py-3 md:grid-cols-[84px_minmax(0,1fr)_auto]">
+    <div className={`min-w-0 overflow-hidden rounded ${statusMeta[status].shiftRow}`}>
+      <div className="flex min-w-0 flex-col gap-1.5 px-2 py-2">
         <button
           type="button"
-          className="flex items-center gap-2 rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
           onClick={() => onOpenShift(open ? null : shiftKey)}
           aria-expanded={open}
           aria-controls={`${shiftKey}-detail`}
         >
           <Icon name={open ? 'chevronDown' : 'chevronRight'} />
-          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{periodLabels[period]}</span>
+          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{periodLabels[period]}</span>
+          {status !== 'good' && (
+            <span className={`ml-auto inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-px text-[11px] font-semibold ${statusMeta[status].badge}`}>
+              <Icon name={statusMeta[status].icon} />
+              {statusLabel}
+            </span>
+          )}
         </button>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 flex-col gap-1.5">
           {slots.map((slot, index) => (
             <AssignmentChip
               key={slot.id}
@@ -2254,56 +2504,103 @@ function ShiftRow({
             />
           ))}
         </div>
-        {status !== 'good' && (
-          <button
-            type="button"
-            className={`inline-flex items-center gap-1.5 self-start rounded border px-2 py-1 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${statusMeta[status].badge}`}
-            onClick={() => onOpenShift(open ? null : shiftKey)}
-            aria-expanded={open}
-            aria-controls={`${shiftKey}-detail`}
-          >
-            <Icon name={statusMeta[status].icon} />
-            {statusLabel}
-          </button>
-        )}
       </div>
+    </div>
+  )
+}
 
-      {open && (
-        <div id={`${shiftKey}-detail`} className="border-t border-zinc-200 bg-white p-3">
-          <div className="grid gap-3 md:grid-cols-2">
-            {slots.map((slot, index) => (
-              <SlotEditor
-                key={slot.id}
-                slot={slot}
-                status={slotStatuses[index]}
-                activeMove={activeMove}
-                employees={employees}
-                allSlots={allSlots}
-                allAssignments={assignments}
-                assignment={assignmentMap.get(slot.id)}
-                violations={violations.filter((violation) => violation.slotId === slot.id)}
-                dragOverSlotId={dragOverSlotId}
-                movePreview={movePreviews.get(slot.id) ?? null}
-                dropFeedback={dropFeedback?.slotId === slot.id ? dropFeedback.message : null}
-                onAssign={onAssign}
-                onLock={onLock}
-                onDragOverSlot={onDragOverSlot}
-                onDragLeaveSlot={onDragLeaveSlot}
-                onDropAssignment={onDropAssignment}
-              />
-            ))}
-          </div>
-          {slots.some((slot) => changedSlotIds.has(slot.id)) && (
-            <button
-              type="button"
-              className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-              onClick={() => onResetShift(shiftKey)}
-            >
-              <Icon name="reset" />
-              Put this shift back
-            </button>
-          )}
-        </div>
+function OpenShiftDetail({
+  shiftKey,
+  slots,
+  employees,
+  assignments,
+  assignmentMap,
+  violations,
+  changedSlotIds,
+  activeMove,
+  dragOverSlotId,
+  dropFeedback,
+  movePreviews,
+  onResetShift,
+  onOpenShift,
+  onAssign,
+  onLock,
+  onDragOverSlot,
+  onDragLeaveSlot,
+  onDropAssignment,
+}: {
+  shiftKey: ShiftKey
+  slots: StaffingSlot[]
+  employees: Employee[]
+  assignments: ScheduleAssignment[]
+  assignmentMap: Map<string, ScheduleAssignment>
+  violations: ValidationViolation[]
+  changedSlotIds: Set<string>
+  activeMove: DragState | null
+  dragOverSlotId: string | null
+  dropFeedback: DropFeedback
+  movePreviews: Map<string, MovePreview>
+  onResetShift: (shiftKey: ShiftKey) => void
+  onOpenShift: (shiftKey: ShiftKey | null) => void
+  onAssign: (slotId: string, employeeId: string) => void
+  onLock: (slotId: string, locked: boolean) => void
+  onDragOverSlot: (slotId: string) => void
+  onDragLeaveSlot: (slotId: string) => void
+  onDropAssignment: (targetSlotId: string) => void
+}) {
+  const [day, period] = shiftKey.split('-') as [DayOfWeek, ShiftPeriod]
+  const shiftSlots = slots.filter((slot) => slot.day === day && slot.period === period)
+  if (shiftSlots.length === 0) return null
+  return (
+    <div id={`${shiftKey}-detail`} className="mt-2 rounded-lg border border-zinc-200 bg-white p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-bold text-zinc-900">
+          {day} {periodLabels[period]} · {shiftSlots.length} spots
+        </h4>
+        <button
+          type="button"
+          className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+          onClick={() => onOpenShift(null)}
+        >
+          Close
+        </button>
+      </div>
+      <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {shiftSlots.map((slot) => (
+          <SlotEditor
+            key={slot.id}
+            slot={slot}
+            status={spotStatus({
+              hasEmployee: Boolean(assignmentMap.get(slot.id)?.employeeId),
+              hasSchedule: assignments.length > 0,
+              violations: violations.filter((violation) => violation.slotId === slot.id),
+            })}
+            activeMove={activeMove}
+            employees={employees}
+            allSlots={slots}
+            allAssignments={assignments}
+            assignment={assignmentMap.get(slot.id)}
+            violations={violations.filter((violation) => violation.slotId === slot.id)}
+            dragOverSlotId={dragOverSlotId}
+            movePreview={movePreviews.get(slot.id) ?? null}
+            dropFeedback={dropFeedback?.slotId === slot.id ? dropFeedback.message : null}
+            onAssign={onAssign}
+            onLock={onLock}
+            onDragOverSlot={onDragOverSlot}
+            onDragLeaveSlot={onDragLeaveSlot}
+            onDropAssignment={onDropAssignment}
+          />
+        ))}
+      </div>
+      {shiftSlots.some((slot) => changedSlotIds.has(slot.id)) && (
+        <button
+          type="button"
+          className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          onClick={() => onResetShift(shiftKey)}
+        >
+          <Icon name="reset" />
+          Put this shift back
+        </button>
       )}
     </div>
   )
@@ -2640,7 +2937,7 @@ function assignmentChipClass({
   },
 ) {
   const base =
-    'inline-flex min-h-9 max-w-full items-center gap-2 rounded border px-2 py-1.5 text-left transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+    'flex min-h-9 w-full min-w-0 items-center gap-1.5 rounded border px-1.5 py-1.5 text-left transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
 
   if (isSource) {
     return `${base} border-dashed border-zinc-400 bg-zinc-50 text-zinc-500 opacity-70`

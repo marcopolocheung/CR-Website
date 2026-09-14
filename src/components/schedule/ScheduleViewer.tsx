@@ -3,13 +3,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   DAYS,
+  currentMonthKey,
   dateForDay,
   expandTemplate,
   formatDayLabel,
   formatTimeRange,
   formatWeekRange,
   hoursFor,
+  monthLabel,
   seedTemplate,
+  shiftMonth,
   type StaffingSlot,
 } from '@/lib/scheduler'
 import {
@@ -21,7 +24,13 @@ import {
   templateHashForSlots,
   type PublishedWeek,
 } from '@/lib/schedule-share'
-import { StoreNotFoundError, StoreUnavailableError, fetchSharedWeek } from '@/lib/schedule-store'
+import {
+  StoreNotFoundError,
+  StoreUnavailableError,
+  fetchSharedWeek,
+  listVisibleWeeks,
+  type VisibleWeekStub,
+} from '@/lib/schedule-store'
 
 const seenKey = 'chinarose.schedule.seen.v1'
 
@@ -60,12 +69,20 @@ export default function ScheduleViewer() {
   const [updateNote, setUpdateNote] = useState('')
   const [onlyPerson, setOnlyPerson] = useState('')
   const [ready, setReady] = useState(false)
+  const [monthKey, setMonthKey] = useState('')
+  const [stubs, setStubs] = useState<VisibleWeekStub[]>([])
+  const [stubsLoading, setStubsLoading] = useState(false)
+  const [monthCode, setMonthCode] = useState('')
+  const [unlockingMonth, setUnlockingMonth] = useState(false)
+  const [monthNote, setMonthNote] = useState('')
+  const [monthUnlocked, setMonthUnlocked] = useState<PublishedWeek[]>([])
   const isIdLink = rawToken !== null && isShareId(rawToken)
 
   useEffect(() => {
     const readHash = () => window.location.hash.slice(1) || null
     setRawToken(readHash())
     setSeenWeeks(readSeenWeeks())
+    setMonthKey(currentMonthKey())
     setReady(true)
     const onHashChange = () => {
       setRawToken(readHash())
@@ -78,6 +95,67 @@ export default function ScheduleViewer() {
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
+
+  useEffect(() => {
+    if (!ready || !monthKey) return
+    let cancelled = false
+    setStubsLoading(true)
+    listVisibleWeeks(monthKey)
+      .then((visible) => {
+        if (!cancelled) setStubs(visible)
+      })
+      .catch(() => {
+        if (!cancelled) setStubs([])
+      })
+      .finally(() => {
+        if (!cancelled) setStubsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [monthKey, ready])
+
+  async function unlockMonth() {
+    if (!monthCode || stubs.length === 0 || unlockingMonth) return
+    setUnlockingMonth(true)
+    setMonthNote('')
+    let openedCount = 0
+    let lockedCount = 0
+    const opened: PublishedWeek[] = []
+    for (const stub of stubs) {
+      if (monthUnlocked.some((item) => item.weekStart === stub.weekStart)) continue
+      try {
+        const doc = await fetchSharedWeek(stub.id)
+        if (!doc.visible) continue
+        const unlocked = await decryptWeek(doc.ciphertext, monthCode)
+        if (doc.templateHash !== templateHash) {
+          lockedCount += 1
+          continue
+        }
+        opened.push(unlocked)
+        rememberWeek(unlocked)
+        openedCount += 1
+      } catch {
+        lockedCount += 1
+      }
+    }
+    if (opened.length > 0) {
+      setMonthUnlocked((current) => {
+        const merged = new Map(current.map((item) => [item.weekStart, item]))
+        for (const item of opened) merged.set(item.weekStart, item)
+        return [...merged.values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+      })
+      setSeenWeeks(readSeenWeeks())
+    }
+    setMonthNote(
+      openedCount === 0
+        ? 'That code did not open any week in this month. Check with your manager.'
+        : lockedCount > 0
+          ? `${openedCount} week${openedCount === 1 ? '' : 's'} opened. ${lockedCount} still need${lockedCount === 1 ? 's' : ''} a different code.`
+          : `${openedCount} week${openedCount === 1 ? '' : 's'} opened.`,
+    )
+    setUnlockingMonth(false)
+  }
 
   async function unlock() {
     if (!rawToken || !code) return
@@ -159,7 +237,7 @@ export default function ScheduleViewer() {
       <div>
         {viewingShare && (
           <div className="border-b border-zinc-200 bg-white print:hidden">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2">
+            <div className="mx-auto flex w-full max-w-none flex-wrap items-center gap-2 px-4 py-2">
               <span className="text-sm text-zinc-600">This link can change when your manager edits the week.</span>
               <button
                 type="button"
@@ -189,45 +267,63 @@ export default function ScheduleViewer() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-2xl font-bold text-zinc-900">Staff schedule</h1>
+    <div className="mx-auto w-full max-w-none px-4 py-10">
+      <div className="mx-auto max-w-2xl">
+        <h1 className="text-2xl font-bold text-zinc-900">Staff schedule</h1>
 
-      {!ready ? null : rawToken ? (
-        <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-          <label className="block text-sm font-medium text-zinc-800">
-            Type the code your manager gave you
-            <input
-              className="mt-2 w-full rounded border border-zinc-300 px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-              value={code}
-              autoComplete="off"
-              onChange={(event) => setCode(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') unlock()
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            className="mt-4 w-full rounded bg-red-800 px-4 py-3 text-base font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            onClick={unlock}
-            disabled={busy || !code}
-          >
-            {busy ? 'Opening...' : 'Open the schedule'}
-          </button>
-          {error && <p className="mt-3 text-sm font-medium text-red-800">{error}</p>}
-          {isIdLink && !error && (
-            <p className="mt-3 text-sm text-zinc-600">This link stays up to date when your manager edits the week.</p>
-          )}
-        </div>
-      ) : (
-        <p className="mt-4 text-zinc-700">
-          Open the link your manager sent you to see a week. Weeks you have already opened on this device are listed
-          below.
-        </p>
-      )}
+        {!ready ? null : rawToken ? (
+          <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+            <label className="block text-sm font-medium text-zinc-800">
+              Type the code your manager gave you
+              <input
+                className="mt-2 w-full rounded border border-zinc-300 px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                value={code}
+                autoComplete="off"
+                onChange={(event) => setCode(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') unlock()
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="mt-4 w-full rounded bg-red-800 px-4 py-3 text-base font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              onClick={unlock}
+              disabled={busy || !code}
+            >
+              {busy ? 'Opening...' : 'Open the schedule'}
+            </button>
+            {error && <p className="mt-3 text-sm font-medium text-red-800">{error}</p>}
+            {isIdLink && !error && (
+              <p className="mt-3 text-sm text-zinc-600">This link stays up to date when your manager edits the week.</p>
+            )}
+          </div>
+        ) : (
+          <p className="mt-4 text-zinc-700">
+            Open the link your manager sent you to see a week. Weeks you have already opened on this device are listed
+            below.
+          </p>
+        )}
+      </div>
 
-      {ready && seenWeeks.length > 0 && (
-        <div className="mt-8">
+      <MonthBrowser
+        monthKey={monthKey}
+        stubs={stubs}
+        loading={stubsLoading}
+        monthCode={monthCode}
+        unlocking={unlockingMonth}
+        note={monthNote}
+        unlocked={monthUnlocked}
+        seenWeeks={seenWeeks}
+        onMonthChange={setMonthKey}
+        onMonthCodeChange={setMonthCode}
+        onUnlockMonth={unlockMonth}
+        onOpenWeek={setWeek}
+        onCloseWeek={(weekStart) => setMonthUnlocked((current) => current.filter((item) => item.weekStart !== weekStart))}
+      />
+
+      {ready && seenWeeks.length > 0 && monthUnlocked.length === 0 && (
+        <div className="mx-auto mt-8 max-w-2xl">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Weeks on this device</h2>
           <ul className="mt-3 space-y-2">
             {seenWeeks.map((seen) => (
@@ -251,6 +347,159 @@ export default function ScheduleViewer() {
         </div>
       )}
     </div>
+  )
+}
+
+function MonthBrowser({
+  monthKey,
+  stubs,
+  loading,
+  monthCode,
+  unlocking,
+  note,
+  unlocked,
+  seenWeeks,
+  onMonthChange,
+  onMonthCodeChange,
+  onUnlockMonth,
+  onOpenWeek,
+  onCloseWeek,
+}: {
+  monthKey: string
+  stubs: VisibleWeekStub[]
+  loading: boolean
+  monthCode: string
+  unlocking: boolean
+  note: string
+  unlocked: PublishedWeek[]
+  seenWeeks: PublishedWeek[]
+  onMonthChange: (monthKey: string) => void
+  onMonthCodeChange: (code: string) => void
+  onUnlockMonth: () => void
+  onOpenWeek: (week: PublishedWeek) => void
+  onCloseWeek: (weekStart: string) => void
+}) {
+  if (!monthKey) return null
+  const seenByWeek = new Map(seenWeeks.map((seen) => [seen.weekStart, seen]))
+  const unlockedByWeek = new Map(unlocked.map((item) => [item.weekStart, item]))
+  return (
+    <section className="mx-auto mt-8 w-full max-w-none" aria-label="Browse weeks by month">
+      <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100"
+          onClick={() => onMonthChange(shiftMonth(monthKey, -1))}
+          aria-label="Previous month"
+        >
+          &lsaquo;
+        </button>
+        <h2 className="min-w-44 text-center text-lg font-bold text-zinc-900">{monthLabel(monthKey)}</h2>
+        <button
+          type="button"
+          className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100"
+          onClick={() => onMonthChange(shiftMonth(monthKey, 1))}
+          aria-label="Next month"
+        >
+          &rsaquo;
+        </button>
+        <button
+          type="button"
+          className="ml-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+          onClick={() => onMonthChange(currentMonthKey())}
+        >
+          This month
+        </button>
+      </div>
+
+      <div className="mx-auto mt-3 flex max-w-2xl flex-col gap-2 sm:flex-row">
+        <label className="min-w-0 flex-1 text-sm font-medium text-zinc-800">
+          <span className="sr-only">Code for this month&apos;s weeks</span>
+          <input
+            className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-base"
+            value={monthCode}
+            autoComplete="off"
+            placeholder="Type the staff code once to open the month"
+            onChange={(event) => onMonthCodeChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') onUnlockMonth()
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className="rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300"
+          onClick={onUnlockMonth}
+          disabled={unlocking || !monthCode || stubs.length === 0}
+        >
+          {unlocking ? 'Opening...' : 'Open this month'}
+        </button>
+      </div>
+      {note && (
+        <p className="mx-auto mt-2 max-w-2xl text-sm font-medium text-zinc-700" role="status">
+          {note}
+        </p>
+      )}
+
+      <div className="mt-4">
+        {loading ? (
+          <p className="text-center text-sm text-zinc-500">Looking for this month&apos;s weeks...</p>
+        ) : stubs.length === 0 ? (
+          <p className="mx-auto max-w-2xl rounded-lg border border-dashed border-zinc-300 bg-white p-4 text-center text-sm text-zinc-600">
+            No weeks are turned on for {monthLabel(monthKey)} yet. Weeks your manager turns off stay hidden here.
+          </p>
+        ) : (
+          <ul className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {stubs.map((stub) => {
+              const opened = unlockedByWeek.get(stub.weekStart) ?? seenByWeek.get(stub.weekStart) ?? null
+              return (
+                <li
+                  key={stub.id}
+                  className="flex min-w-0 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 shadow-sm"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-zinc-900">
+                      Week of {formatWeekRange(stub.weekStart)}
+                    </span>
+                    <span className="block text-xs text-zinc-500">
+                      {opened ? `On · ${opened.name || 'shared'}` : 'On · code needed'}
+                    </span>
+                  </span>
+                  {opened ? (
+                    <span className="flex shrink-0 gap-1.5">
+                      <button
+                        type="button"
+                        className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100"
+                        onClick={() => onOpenWeek(opened)}
+                      >
+                        Open
+                      </button>
+                      {unlockedByWeek.has(stub.weekStart) && (
+                        <button
+                          type="button"
+                          className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-500 hover:bg-zinc-50"
+                          onClick={() => onCloseWeek(stub.weekStart)}
+                          aria-label={`Hide week of ${formatWeekRange(stub.weekStart)}`}
+                        >
+                          Hide
+                        </button>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                      Locked
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      {unlocked.length > 0 && (
+        <p className="mt-4 text-center text-sm text-zinc-500">Scroll to move through the open weeks below.</p>
+      )}
+    </section>
   )
 }
 
@@ -304,7 +553,7 @@ function WeekView({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto w-full max-w-none min-w-0 px-4 py-8">
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <button
           type="button"
@@ -392,11 +641,11 @@ function WeekView({
         })}
       </div>
 
-      <div className="mt-5 hidden overflow-x-auto md:block print:hidden">
-        <table className="w-full min-w-[1040px] border-collapse text-left">
+      <div className="mt-5 hidden min-w-0 md:block print:hidden">
+        <table className="w-full min-w-0 table-fixed border-collapse text-left">
           <thead>
             <tr>
-              <th scope="col" className="sticky left-0 z-10 border border-zinc-300 bg-zinc-100 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">
+              <th scope="col" className="w-28 border border-zinc-300 bg-zinc-100 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">
                 Who
               </th>
               {DAYS.map((day) => {
@@ -406,17 +655,17 @@ function WeekView({
                   <th
                     key={day}
                     scope="col"
-                    className={`border border-zinc-300 px-2 py-2 text-xs font-semibold uppercase tracking-wide ${
+                    className={`min-w-0 border border-zinc-300 px-1.5 py-2 text-xs font-semibold uppercase tracking-wide ${
                       isToday ? 'bg-red-100 text-red-900' : date < today ? 'bg-zinc-100 text-zinc-400' : 'bg-zinc-100 text-zinc-600'
                     }`}
                   >
-                    {formatDayLabel(week.weekStart, day)}
+                    <span className="block truncate">{formatDayLabel(week.weekStart, day)}</span>
                     {isToday && <span className="ml-1 normal-case">(today)</span>}
                   </th>
                 )
               })}
-              <th scope="col" className="border border-zinc-300 bg-zinc-100 px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                Hours
+              <th scope="col" className="w-16 border border-zinc-300 bg-zinc-100 px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                Hrs
               </th>
             </tr>
           </thead>
@@ -425,9 +674,9 @@ function WeekView({
               <tr key={person} className="align-top">
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 border border-zinc-300 bg-white px-2 py-2 text-sm font-semibold text-zinc-900"
+                  className="w-28 min-w-0 border border-zinc-300 bg-white px-2 py-2 text-sm font-semibold text-zinc-900"
                 >
-                  {person}
+                  <span className="block truncate">{person}</span>
                 </th>
                 {DAYS.map((day) => (
                   <DayCell
@@ -437,15 +686,15 @@ function WeekView({
                     isPast={dateForDay(week.weekStart, day) < today}
                   />
                 ))}
-                <td className="border border-zinc-300 px-2 py-2 text-right text-sm font-semibold tabular-nums text-zinc-900">
-                  {shifts.length === 0 ? '\u2014' : `${shifts.reduce((total, slot) => total + hoursFor(slot), 0).toFixed(1)}`}
+                <td className="w-16 border border-zinc-300 px-2 py-2 text-right text-sm font-semibold tabular-nums text-zinc-900">
+                  {shifts.length === 0 ? '—' : `${shifts.reduce((total, slot) => total + hoursFor(slot), 0).toFixed(1)}`}
                 </td>
               </tr>
             ))}
           </tbody>
           <tfoot aria-hidden="true">
             <tr>
-              <td className="sticky left-0 z-10 border border-zinc-300 bg-zinc-100 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">
+              <td className="border border-zinc-300 bg-zinc-100 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">
                 Who
               </td>
               {DAYS.map((day) => {
@@ -454,16 +703,16 @@ function WeekView({
                 return (
                   <td
                     key={day}
-                    className={`border border-zinc-300 px-2 py-2 text-xs font-semibold uppercase tracking-wide ${
+                    className={`min-w-0 border border-zinc-300 px-1.5 py-2 text-xs font-semibold uppercase tracking-wide ${
                       isToday ? 'bg-red-100 text-red-900' : date < today ? 'bg-zinc-100 text-zinc-400' : 'bg-zinc-100 text-zinc-600'
                     }`}
                   >
-                    {formatDayLabel(week.weekStart, day)}
+                    <span className="block truncate">{formatDayLabel(week.weekStart, day)}</span>
                   </td>
                 )
               })}
               <td className="border border-zinc-300 bg-zinc-100 px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                Hours
+                Hrs
               </td>
             </tr>
           </tfoot>
@@ -508,14 +757,14 @@ function DayCell({ shifts, isToday, isPast }: { shifts: StaffingSlot[]; isToday:
   }
 
   return (
-    <td className={`border border-zinc-300 px-2 py-2 ${isToday ? 'bg-red-50' : 'bg-white'} ${isPast ? 'opacity-60' : ''}`}>
-      <ul className="space-y-1">
+    <td className={`min-w-0 border border-zinc-300 px-1.5 py-2 ${isToday ? 'bg-red-50' : 'bg-white'} ${isPast ? 'opacity-60' : ''}`}>
+      <ul className="min-w-0 space-y-1">
         {shifts.map((slot) => (
-          <li key={slot.id}>
-            <span className="block whitespace-nowrap text-sm font-semibold tabular-nums text-zinc-900">
+          <li key={slot.id} className="min-w-0">
+            <span className="block truncate text-xs font-semibold tabular-nums text-zinc-900">
               {formatTimeRange(slot)}
             </span>
-            <span className="block text-xs text-zinc-500">{positionName(slot.label)}</span>
+            <span className="block truncate text-[11px] text-zinc-500">{positionName(slot.label)}</span>
           </li>
         ))}
       </ul>
