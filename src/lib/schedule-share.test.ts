@@ -2,13 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   SHARE_VERSION,
-  UnreadableShareError,
-  WrongCodeError,
-  decryptWeek,
-  deserializePublishedWeek,
-  encryptWeek,
-  isShareId,
-  serializePublishedWeek,
   templateHashForSlots,
   type PublishedWeek,
   buildPublishedWeek,
@@ -25,56 +18,21 @@ const week: PublishedWeek = {
   slotPeople: [0, 1, 2, -1, 0, 2, 1],
 }
 
-test('a published week survives a round trip through a link', async () => {
-  const token = await encryptWeek(week, 'break room')
-  assert.deepEqual(await decryptWeek(token, 'break room'), week)
+test('a built week carries the current share version', () => {
+  const slots = expandTemplate(seedTemplate)
+  const published = buildPublishedWeek({
+    weekStart: '2026-03-01',
+    name: 'Front of house',
+    slots,
+    employees: seedEmployees,
+    assignments: [],
+  })
+  assert.equal(published.version, SHARE_VERSION)
+  assert.equal(published.slotPeople.length, slots.length)
+  assert.ok(published.slotPeople.every((index) => index === -1))
 })
 
-test('the wrong code is rejected rather than returning garbage', async () => {
-  const token = await encryptWeek(week, 'break room')
-  await assert.rejects(() => decryptWeek(token, 'break rooms'), WrongCodeError)
-})
-
-test('the token reveals nothing without the code', async () => {
-  const token = await encryptWeek(week, 'break room')
-  for (const secret of [...week.people, week.name, week.weekStart]) {
-    assert.ok(!token.includes(secret), `${secret} should not appear in the token`)
-  }
-})
-
-test('the same week encrypts differently every time', async () => {
-  const first = await encryptWeek(week, 'break room')
-  const second = await encryptWeek(week, 'break room')
-  assert.notEqual(first, second, 'a fresh salt and IV should make the tokens differ')
-})
-
-test('a token stays URL safe', async () => {
-  const token = await encryptWeek(week, 'break room')
-  assert.match(token, /^[A-Za-z0-9_-]+$/)
-  assert.equal(encodeURIComponent(token), token)
-})
-
-test('junk links fail as unreadable, not as a wrong code', async () => {
-  await assert.rejects(() => decryptWeek('not-a-real-token', 'break room'), UnreadableShareError)
-  await assert.rejects(() => decryptWeek('', 'break room'), UnreadableShareError)
-})
-
-test('a payload from a future format version is refused', () => {
-  const future = serializePublishedWeek({ ...week, version: SHARE_VERSION + 1 })
-  assert.throws(() => deserializePublishedWeek(future), UnreadableShareError)
-})
-
-test('a link stays small enough to print as a QR code', async () => {
-  const fullWeek: PublishedWeek = {
-    ...week,
-    people: ['Mary', 'Chela', 'Pam', 'Aurora', 'Eileen', 'Stephanie', 'Emerie', 'Javier', 'Serenity', 'Desiree', 'Shorty', 'Dolores'],
-    slotPeople: Array.from({ length: 52 }, (_, index) => index % 12),
-  }
-  const token = await encryptWeek(fullWeek, 'break room')
-  assert.ok(token.length < 900, `token was ${token.length} characters`)
-})
-
-test('a real generated week survives publish, encrypt, decrypt and read back', async () => {
+test('a real generated week maps every assignment back by name', () => {
   const slots = expandTemplate(seedTemplate)
   const generated = generateSchedule({ employees: seedEmployees, template: seedTemplate })
   assert.equal(generated.status, 'FEASIBLE')
@@ -90,21 +48,21 @@ test('a real generated week survives publish, encrypt, decrypt and read back', a
   // The reader rebuilds slot order from the same template, so the lengths must line up.
   assert.equal(published.slotPeople.length, slots.length)
 
-  const reopened = await decryptWeek(await encryptWeek(published, 'break room'), 'break room')
-
   // Every assignment the scheduler made must come back against the same slot, by name.
   const nameById = new Map(seedEmployees.map((employee) => [employee.id, employee.name]))
   for (const assignment of generated.assignments) {
     const slotIndex = slots.findIndex((slot) => slot.id === assignment.slotId)
     assert.notEqual(slotIndex, -1)
-    assert.equal(reopened.people[reopened.slotPeople[slotIndex]], nameById.get(assignment.employeeId))
+    assert.equal(published.people[published.slotPeople[slotIndex]], nameById.get(assignment.employeeId))
   }
 
   // Nobody is stored twice, however many shifts they work.
-  assert.equal(new Set(reopened.people).size, reopened.people.length)
+  assert.equal(new Set(published.people).size, published.people.length)
 
   // Anyone rostered but unscheduled still gets a row to be marked OFF against.
-  assert.equal(reopened.people.length, seedEmployees.filter((employee) => employee.active).length)
+  assert.equal(published.people.length, seedEmployees.filter((employee) => employee.active).length)
+
+  assert.deepEqual(week.people, ['Mary', 'Desiree', 'Aurora'])
 })
 
 test('unfilled spots travel as nobody rather than as a stray name', async () => {
@@ -122,14 +80,6 @@ test('unfilled spots travel as nobody rather than as a stray name', async () => 
 
   // Everyone active is listed even with nothing assigned, so the reader can show them as OFF.
   assert.deepEqual(published.people, seedEmployees.filter((employee) => employee.active).map((employee) => employee.name))
-})
-
-test('short ids are detected without confusing them with legacy link tokens', async () => {
-  assert.ok(isShareId('Ab3x9QzY2k'))
-  assert.equal(isShareId('short'), false)
-  assert.equal(isShareId(''), false)
-  const token = await encryptWeek(week, 'break room')
-  assert.equal(isShareId(token), false)
 })
 
 test('the template hash is stable and changes with the shift layout', () => {

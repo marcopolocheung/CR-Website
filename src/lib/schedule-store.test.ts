@@ -3,15 +3,10 @@ import test from 'node:test'
 import {
   StoreAuthError,
   StoreConflictError,
-  StoreNotFoundError,
   StoreUnavailableError,
-  createSharedWeek,
   fetchGoldenMonth,
   fetchGoldenWeek,
-  fetchSharedWeek,
-  listVisibleWeeks,
   saveGoldenWeek,
-  updateSharedWeek,
 } from './schedule-store'
 
 function mockFetchOnce(handler: (url: string, init?: RequestInit) => { status: number; payload: unknown }) {
@@ -24,66 +19,6 @@ function mockFetchOnce(handler: (url: string, init?: RequestInit) => { status: n
     globalThis.fetch = original
   }
 }
-
-test('create returns the new same-link id and revision', async () => {
-  const restore = mockFetchOnce((url, init) => {
-    assert.ok(url.endsWith('/api/weeks'))
-    assert.equal(init?.method, 'POST')
-    return { status: 201, payload: { id: 'Ab3x9QzY2k', rev: 1 } }
-  })
-  try {
-    assert.deepEqual(
-      await createSharedWeek({ ciphertext: 'tok', templateHash: 'a1b2c3d4', weekStart: '2026-09-13' }),
-      { id: 'Ab3x9QzY2k', rev: 1 },
-    )
-  } finally {
-    restore()
-  }
-})
-
-test('fetch maps 404 to not-found and network failure to unavailable', async () => {
-  let restore = mockFetchOnce(() => ({ status: 404, payload: { error: 'not_found' } }))
-  try {
-    await assert.rejects(() => fetchSharedWeek('Ab3x9QzY2k'), StoreNotFoundError)
-  } finally {
-    restore()
-  }
-
-  const original = globalThis.fetch
-  globalThis.fetch = (async () => {
-    throw new Error('down')
-  }) as typeof fetch
-  try {
-    await assert.rejects(() => fetchSharedWeek('Ab3x9QzY2k'), StoreUnavailableError)
-  } finally {
-    globalThis.fetch = original
-  }
-  restore = mockFetchOnce(() => ({ status: 200, payload: { error: 'x' } }))
-  restore()
-})
-
-test('update maps 409 to a conflict carrying the server revision', async () => {
-  const restore = mockFetchOnce(() => ({ status: 409, payload: { error: 'conflict', rev: 4 } }))
-  try {
-    const caught = await updateSharedWeek('Ab3x9QzY2k', { ciphertext: 'tok', baseRev: 2 }).then(
-      () => null,
-      (error: unknown) => error,
-    )
-    assert.ok(caught instanceof StoreConflictError)
-    assert.equal((caught as StoreConflictError).rev, 4)
-  } finally {
-    restore()
-  }
-})
-
-test('update returns the bumped revision on success', async () => {
-  const restore = mockFetchOnce(() => ({ status: 200, payload: { rev: 3 } }))
-  try {
-    assert.deepEqual(await updateSharedWeek('Ab3x9QzY2k', { ciphertext: 'tok', baseRev: 2 }), { rev: 3 })
-  } finally {
-    restore()
-  }
-})
 
 const goldenWeek = {
   version: 1,
@@ -117,8 +52,34 @@ test('fetchGoldenWeek returns null on 404 and the doc on 200', async () => {
   }
 })
 
-test('fetchGoldenMonth returns an empty list for a bad month', async () => {
-  const restore = mockFetchOnce(() => ({ status: 400, payload: { error: 'invalid_month' } }))
+test('golden reads map network failure to unavailable', async () => {
+  const original = globalThis.fetch
+  globalThis.fetch = (async () => {
+    throw new Error('down')
+  }) as typeof fetch
+  try {
+    await assert.rejects(() => fetchGoldenWeek('2026-09-13'), StoreUnavailableError)
+    await assert.rejects(() => fetchGoldenMonth('2026-09'), StoreUnavailableError)
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('fetchGoldenMonth returns weeks on 200 and an empty list for a bad month', async () => {
+  let restore = mockFetchOnce((url) => {
+    assert.ok(url.includes('/api/schedule?month=2026-09'))
+    return {
+      status: 200,
+      payload: { weeks: [{ v: 3, weekStart: '2026-09-13', rev: 1, week: goldenWeek, visible: true, templateHash: 'a1b2', updatedAt: 'x' }] },
+    }
+  })
+  try {
+    assert.equal((await fetchGoldenMonth('2026-09')).length, 1)
+  } finally {
+    restore()
+  }
+
+  restore = mockFetchOnce(() => ({ status: 400, payload: { error: 'invalid_month' } }))
   try {
     assert.deepEqual(await fetchGoldenMonth('september'), [])
   } finally {
@@ -162,24 +123,20 @@ test('saveGoldenWeek sends the write token and maps 401 to auth', async () => {
   }
 })
 
-test('month listing returns visible stubs and tolerates a bad month', async () => {
-  const restore = mockFetchOnce((url) => {
-    if (url.includes('month=bad')) return { status: 400, payload: { error: 'invalid_month' } }
-    assert.ok(url.includes('/api/weeks?month=2026-09'))
-    return {
-      status: 200,
-      payload: { weeks: [{ id: 'Ab3x9QzY2k', weekStart: '2026-09-13', rev: 1, updatedAt: 'x', templateHash: 'a1b2' }] },
-    }
-  })
+test('saveGoldenWeek maps 409 to a conflict carrying the server revision', async () => {
+  const restore = mockFetchOnce(() => ({ status: 409, payload: { error: 'conflict', rev: 4 } }))
   try {
-    assert.equal((await listVisibleWeeks('2026-09')).length, 1)
+    const caught = await saveGoldenWeek(
+      '2026-09-13',
+      { week: goldenWeek, templateHash: 'a1b2c3d4', visible: true, baseRev: 2 },
+      'manager-token',
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    )
+    assert.ok(caught instanceof StoreConflictError)
+    assert.equal((caught as StoreConflictError).rev, 4)
   } finally {
     restore()
-  }
-  const restoreBad = mockFetchOnce(() => ({ status: 400, payload: { error: 'invalid_month' } }))
-  try {
-    assert.deepEqual(await listVisibleWeeks('bad'), [])
-  } finally {
-    restoreBad()
   }
 })

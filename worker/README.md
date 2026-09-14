@@ -66,8 +66,11 @@ Golden schedule (public read, token-guarded write):
 
 ## Notes
 
-- IDs are 10-char unguessable strings. Anyone with the link ID can fetch the
-  ciphertext, but reading it still needs the manager code.
+- Legacy IDs are 10-char unguessable strings. Anyone with an old link ID can
+  fetch its ciphertext, but reading it still needs the old manager code.
+- Golden week URLs are predictable (`/api/schedule/2026-09-13`) and public —
+  that is the point. Name visibility is accepted; writes are what the token
+  guards.
 - `PUT` uses optimistic concurrency: send the `rev` you read as `baseRev`.
   A `409` means someone else saved first — reload, then save again.
 - Docs live a year (`expirationTtl`) and refresh on every save.
