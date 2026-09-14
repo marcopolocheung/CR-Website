@@ -1099,7 +1099,7 @@ export default function SchedulerDemo() {
             <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Scheduler demo</p>
             <h1 className="text-2xl font-bold md:text-3xl">Weekly staff schedule</h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Button
               tone="primary"
               onClick={() => generate()}
@@ -1230,12 +1230,12 @@ export default function SchedulerDemo() {
                   </button>
                 )}
               </div>
-              <p className="text-sm text-zinc-600">Click a name to move it, then click where it goes.</p>
+              <p className="text-sm text-zinc-600 print:hidden">Click a name to move it, then click where it goes.</p>
             </div>
 
             {movingEmployee && (
               <div
-                className="mt-3 flex flex-col gap-2 rounded border border-green-300 bg-green-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                className="mt-3 flex flex-col gap-2 rounded border border-green-300 bg-green-50 p-3 sm:flex-row sm:items-center sm:justify-between print:hidden"
                 role="status"
               >
                 <p className="flex items-center gap-2 text-sm font-semibold text-green-950">
@@ -1272,29 +1272,33 @@ export default function SchedulerDemo() {
               onDropAssignment={moveAssignmentTo}
               onActivateSlot={activateSlot}
             />
-            <VariantControls selectedVariant={selectedVariant} onGenerate={generate} />
+            <div className="print:hidden">
+              <VariantControls selectedVariant={selectedVariant} onGenerate={generate} />
+            </div>
           </section>
 
           {changes.length > 0 && (
-            <Disclosure summary={`Changes since you made the schedule (${changes.length})`}>
-              <ul className="space-y-1 text-sm text-zinc-700">
-                {changes.map((change) => (
-                  <li key={change.slotId}>{change.text}</li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                onClick={restoreEverything}
-              >
-                <Icon name="reset" />
-                Put the whole week back
-              </button>
-            </Disclosure>
+            <div className="print:hidden">
+              <Disclosure summary={`Changes since you made the schedule (${changes.length})`}>
+                <ul className="space-y-1 text-sm text-zinc-700">
+                  {changes.map((change) => (
+                    <li key={change.slotId}>{change.text}</li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={restoreEverything}
+                >
+                  <Icon name="reset" />
+                  Put the whole week back
+                </button>
+              </Disclosure>
+            </div>
           )}
 
           {diagnostics.length > 0 && (
-            <div aria-live="polite">
+            <div aria-live="polite" className="print:hidden">
               <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
                 <ul className="space-y-1 text-sm text-zinc-700">
                   {diagnostics.map((message, index) => (
@@ -1305,7 +1309,7 @@ export default function SchedulerDemo() {
             </div>
           )}
 
-          <div className="space-y-1 pt-2">
+          <div className="space-y-1 pt-2 print:hidden">
             <Disclosure summary="Hours for each person" tone="quiet">
               <HoursSummary stats={stats} employees={employees} />
             </Disclosure>
@@ -1330,7 +1334,7 @@ export default function SchedulerDemo() {
           </div>
         </main>
 
-        <aside className="order-2 space-y-4">
+        <aside className="order-2 space-y-4 print:hidden">
           <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1644,7 +1648,7 @@ function GuidedFixPanel({
 }) {
   if (!nextIssue) {
     return (
-      <section className="rounded-lg border border-green-300 bg-green-50 p-4 shadow-sm">
+      <section className="rounded-lg border border-green-300 bg-green-50 p-4 shadow-sm print:hidden">
         <div className="flex flex-wrap items-start gap-3">
           <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-700 text-white">
             <Icon name="check" />
@@ -1673,7 +1677,7 @@ function GuidedFixPanel({
   const position = totalCount > 0 ? totalCount - issueCount + 1 : 1
   return (
     <section
-      className={`rounded-lg border p-4 shadow-sm ${isBlocker ? 'border-red-400 bg-red-50' : 'border-amber-400 bg-amber-50'}`}
+      className={`rounded-lg border p-4 shadow-sm print:hidden ${isBlocker ? 'border-red-400 bg-red-50' : 'border-amber-400 bg-amber-50'}`}
       aria-live="polite"
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

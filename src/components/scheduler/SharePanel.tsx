@@ -46,6 +46,14 @@ function writePublished(next: Record<string, PublishedMeta>) {
   }
 }
 
+const codeWords = ['salsa', 'limon', 'wok', 'mesa', 'arroz', 'pollo', 'fiesta', 'comal', 'taco', 'verde']
+
+function suggestCode() {
+  const pick = () => codeWords[Math.floor(Math.random() * codeWords.length)]
+  const digits = String(Math.floor(100 + Math.random() * 900))
+  return `${pick()}-${digits}-${pick()}`
+}
+
 export default function SharePanel({
   weekStart,
   weekLabel,
@@ -63,17 +71,21 @@ export default function SharePanel({
 }) {
   const [name, setName] = useState(`Week of ${weekLabel}`)
   const [code, setCode] = useState('')
+  const [showCode, setShowCode] = useState(false)
+  const [confirmingFresh, setConfirmingFresh] = useState(false)
   const [published, setPublished] = useState<PublishedMeta | null>(null)
   const [busy, setBusy] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const filled = assignments.filter((assignment) => assignment.employeeId).length
   const codeTooShort = code.length > 0 && code.length < minimumCodeLength
 
+  // Renaming the week does not change what staff see on shift, so it never marks the link dirty.
   const fingerprint = useMemo(
-    () => serializePublishedWeek(buildPublishedWeek({ weekStart, name, slots, employees, assignments })),
-    [weekStart, name, slots, employees, assignments],
+    () => serializePublishedWeek(buildPublishedWeek({ weekStart, name: '', slots, employees, assignments })),
+    [weekStart, slots, employees, assignments],
   )
   const dirty = published !== null && published.fingerprint !== fingerprint
   const link = useMemo(() => {
@@ -86,7 +98,9 @@ export default function SharePanel({
     setPublished(readPublished()[weekStart] ?? null)
     setError('')
     setNotice('')
-    setCopied(false)
+    setCopiedLink(false)
+    setCopiedCode(false)
+    setConfirmingFresh(false)
   }, [weekStart])
 
   function persist(next: PublishedMeta | null) {
@@ -111,7 +125,8 @@ export default function SharePanel({
         weekStart,
       })
       persist({ id: created.id, rev: created.rev, fingerprint })
-      setCopied(false)
+      setCopiedLink(false)
+      setCopiedCode(false)
       setNotice('Link made. Send it once — later edits save to this same link.')
     } catch {
       setError('Could not save the schedule. Check your connection — your edits are still safe on this device.')
@@ -152,20 +167,31 @@ export default function SharePanel({
     persist(null)
     setError('')
     setNotice('')
-    setCopied(false)
+    setCopiedLink(false)
+    setCopiedCode(false)
+    setConfirmingFresh(false)
   }
 
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(link)
-      setCopied(true)
+      setCopiedLink(true)
     } catch {
-      setCopied(false)
+      setCopiedLink(false)
+    }
+  }
+
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedCode(true)
+    } catch {
+      setCopiedCode(false)
     }
   }
 
   return (
-    <section className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm print:hidden">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Share {weekLabel} with staff</h2>
@@ -191,15 +217,44 @@ export default function SharePanel({
             onChange={(event) => setName(event.target.value)}
           />
         </label>
-        <label className="text-sm font-medium text-zinc-800">
-          Code for staff
-          <input
-            className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            placeholder={`At least ${minimumCodeLength} characters`}
-          />
-        </label>
+        <div>
+          <label className="text-sm font-medium text-zinc-800" htmlFor="share-code">
+            Code for staff
+          </label>
+          <div className="mt-1 flex gap-2">
+            <input
+              id="share-code"
+              className="min-w-0 flex-1 rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              value={code}
+              type={showCode ? 'text' : 'password'}
+              autoComplete="off"
+              onChange={(event) => {
+                setCode(event.target.value)
+                setCopiedCode(false)
+              }}
+              placeholder={`At least ${minimumCodeLength} characters`}
+            />
+            <button
+              type="button"
+              className="shrink-0 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              onClick={() => setShowCode((show) => !show)}
+              aria-pressed={showCode}
+            >
+              {showCode ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          <button
+            type="button"
+            className="mt-2 text-xs font-semibold text-red-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            onClick={() => {
+              setCode(suggestCode())
+              setShowCode(true)
+              setCopiedCode(false)
+            }}
+          >
+            Suggest a code
+          </button>
+        </div>
       </div>
 
       {codeTooShort && (
@@ -232,13 +287,33 @@ export default function SharePanel({
           >
             {busy ? 'Saving...' : 'Save updates to this link'}
           </button>
-          <button
-            type="button"
-            className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            onClick={freshLink}
-          >
-            Make a fresh link instead
-          </button>
+          {confirmingFresh ? (
+            <span className="inline-flex flex-wrap items-center gap-2 rounded border border-red-300 bg-red-50 px-2 py-1">
+              <span className="text-xs font-semibold text-red-900">Old link stops updating. Continue?</span>
+              <button
+                type="button"
+                className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                onClick={freshLink}
+              >
+                Yes, fresh link
+              </button>
+              <button
+                type="button"
+                className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                onClick={() => setConfirmingFresh(false)}
+              >
+                Keep this link
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              onClick={() => setConfirmingFresh(true)}
+            >
+              Make a fresh link instead
+            </button>
+          )}
           {!dirty && <span className="text-sm text-green-800">This link is up to date.</span>}
           {dirty && <span className="text-sm font-medium text-amber-800">You have changes that staff cannot see yet.</span>}
         </div>
@@ -260,13 +335,24 @@ export default function SharePanel({
                   onFocus={(event) => event.target.select()}
                 />
               </label>
-              <button
-                type="button"
-                className="mt-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                onClick={copyLink}
-              >
-                {copied ? 'Copied' : 'Copy link'}
-              </button>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={copyLink}
+                >
+                  {copiedLink ? 'Link copied' : 'Copy link'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={copyCode}
+                  disabled={code.length === 0}
+                  title={code.length === 0 ? 'Type the staff code first.' : 'Copy only the code.'}
+                >
+                  {copiedCode ? 'Code copied' : 'Copy code'}
+                </button>
+              </div>
               <p className="mt-3 text-sm text-zinc-700">
                 Tell staff the code yourself. Do not send it with the link, or anyone who sees the message can read the
                 schedule.
