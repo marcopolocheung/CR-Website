@@ -570,6 +570,7 @@ export default function SchedulerDemo() {
   const [ignoredIssueIds, setIgnoredIssueIds] = useState<string[]>([])
   const [guidedChoosing, setGuidedChoosing] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [confirmingReset, setConfirmingReset] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
   const assignments = weeks[weekStart] ?? emptyAssignments
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
@@ -642,6 +643,7 @@ export default function SchedulerDemo() {
   )
   const ignoredCount = fixIssues.filter((issue) => ignoredIssueIds.includes(issue.id)).length
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
+  const keptCount = assignments.filter((assignment) => assignment.locked && assignment.employeeId).length
   const schedulePassing = assignments.length > 0 && violations.length === 0
   const blockers = [
     activeEmployeeCount === 0 ? 'Nobody is marked as working.' : null,
@@ -691,6 +693,7 @@ export default function SchedulerDemo() {
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setSharing(false)
+    setConfirmingReset(false)
     setOpenShiftKey(null)
     setDropFeedback(null)
     setMoveSource(null)
@@ -721,6 +724,7 @@ export default function SchedulerDemo() {
     setDropFeedback(null)
     setDragState(null)
     setDragOverSlotId(null)
+    setConfirmingReset(false)
   }
 
   function restoreEverything() {
@@ -838,7 +842,8 @@ export default function SchedulerDemo() {
   }
 
   function reset() {
-    if (!window.confirm('Start over? This clears the schedule and every change to the staff list.')) return
+    // Inline confirm in the header calls this only after an explicit second click.
+    // remember() keeps the pre-reset state so Undo can bring it back.
     remember('reset demo')
     setEmployees(cloneEmployees())
     setWeeks({})
@@ -849,6 +854,7 @@ export default function SchedulerDemo() {
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setSelectedVariant('balanced')
+    setConfirmingReset(false)
   }
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
@@ -996,7 +1002,13 @@ export default function SchedulerDemo() {
             <h1 className="text-2xl font-bold md:text-3xl">Weekly staff schedule</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button tone="primary" onClick={() => generate()} icon="spark">
+            <Button
+              tone="primary"
+              onClick={() => generate()}
+              icon="spark"
+              disabled={activeEmployeeCount === 0}
+              title={activeEmployeeCount === 0 ? 'Add someone to the staff list first.' : 'Build the week from the staff list.'}
+            >
               Make schedule
             </Button>
             <Button onClick={fixNextIssue} icon="target" disabled={!nextIssue} badge={visibleFixIssues.length}>
@@ -1005,18 +1017,62 @@ export default function SchedulerDemo() {
             <Button onClick={() => setSharing((open) => !open)} icon="share" disabled={!weekStart}>
               Share with staff
             </Button>
+            {keptCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                <Icon name="lock" />
+                Keep: {keptCount}
+              </span>
+            )}
             <span aria-hidden="true" className="mx-1 hidden h-8 w-px bg-zinc-200 sm:block" />
-            <IconButton
-              icon="undo"
-              label={history[0] ? `Undo ${history[0].label}` : 'Undo last change'}
+            <Button
               onClick={undoLastChange}
+              icon="undo"
               disabled={history.length === 0}
-            />
-            <IconButton icon="plus" label="Add employee" onClick={openEmployeePanelForGap} />
-            <IconButton icon="print" label="Print schedule" onClick={() => window.print()} />
-            <IconButton icon="reset" label="Start over" onClick={reset} />
+              title={history[0] ? `Undo ${history[0].label}` : 'Nothing to undo yet.'}
+            >
+              Undo
+            </Button>
+            <Button onClick={openEmployeePanelForGap} icon="plus">
+              Add employee
+            </Button>
+            <Button
+              onClick={() => window.print()}
+              icon="print"
+              disabled={!schedulePassing}
+              title={!schedulePassing ? 'Fix every spot before printing.' : 'Print the passing schedule.'}
+            >
+              Print
+            </Button>
+            {confirmingReset ? (
+              <span className="inline-flex flex-wrap items-center gap-2 rounded border border-red-300 bg-red-50 px-2 py-1">
+                <span className="text-xs font-semibold text-red-900">Clear everything? You can undo.</span>
+                <button
+                  type="button"
+                  className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={reset}
+                >
+                  Yes, start over
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={() => setConfirmingReset(false)}
+                >
+                  Keep everything
+                </button>
+              </span>
+            ) : (
+              <Button onClick={() => setConfirmingReset(true)} icon="reset">
+                Start over
+              </Button>
+            )}
           </div>
         </div>
+        {activeEmployeeCount === 0 && (
+          <p className="mx-auto max-w-[1400px] px-4 pb-3 text-sm text-zinc-600">
+            Add someone to the staff list before making a schedule.
+          </p>
+        )}
       </header>
 
       <div className="mx-auto grid max-w-[1400px] gap-5 px-4 py-5 xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -1623,6 +1679,7 @@ function Button({
   badge,
   onClick,
   disabled = false,
+  title,
 }: {
   children: React.ReactNode
   icon: IconName
@@ -1630,6 +1687,7 @@ function Button({
   badge?: number
   onClick: () => void
   disabled?: boolean
+  title?: string
 }) {
   const className =
     tone === 'primary'
@@ -1637,7 +1695,7 @@ function Button({
       : 'inline-flex items-center justify-center gap-2 rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
 
   return (
-    <button type="button" className={className} onClick={onClick} disabled={disabled}>
+    <button type="button" className={className} onClick={onClick} disabled={disabled} title={title}>
       <Icon name={icon} />
       {children}
       {badge !== undefined && badge > 0 && (
