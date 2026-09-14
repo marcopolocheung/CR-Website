@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import handler, {
+  goldenMonthsForWeek,
   goldenWeeksForMonth,
   isValidId,
   newShareId,
@@ -224,6 +225,60 @@ test('golden writes fail closed without a configured token', async () => {
     env,
   )
   assert.equal(response.status, 503)
+})
+
+test('golden month revs answer cheap change checks', async () => {
+  assert.deepEqual(goldenMonthsForWeek('2026-09-13'), ['2026-09'])
+  assert.deepEqual(goldenMonthsForWeek('2026-08-30'), ['2026-08', '2026-09'])
+  assert.deepEqual(goldenMonthsForWeek('nope'), [])
+
+  const env = mockEnv()
+  await handler.fetch(
+    goldenPut('2026-09-13', { week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }),
+    env,
+  )
+
+  const listed = await handler.fetch(new Request('https://api.test/api/schedule?month=2026-09'), env)
+  assert.equal(listed.status, 200)
+  const first = (await listed.json()) as { weeks: unknown[]; rev: number; notModified: boolean }
+  assert.equal(first.weeks.length, 1)
+  assert.equal(first.rev, 1)
+  assert.equal(first.notModified, false)
+
+  const unchanged = await handler.fetch(new Request('https://api.test/api/schedule?month=2026-09&knownRev=1'), env)
+  assert.equal(unchanged.status, 200)
+  const cached = (await unchanged.json()) as { weeks: unknown[]; rev: number; notModified: boolean }
+  assert.deepEqual(cached.weeks, [])
+  assert.equal(cached.rev, 1)
+  assert.equal(cached.notModified, true)
+
+  await handler.fetch(
+    goldenPut('2026-09-13', { week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 1 }),
+    env,
+  )
+  const changed = await handler.fetch(new Request('https://api.test/api/schedule?month=2026-09&knownRev=1'), env)
+  const second = (await changed.json()) as { weeks: unknown[]; rev: number; notModified: boolean }
+  assert.equal(second.weeks.length, 1)
+  assert.equal(second.rev, 2)
+  assert.equal(second.notModified, false)
+
+  const garbage = await handler.fetch(new Request('https://api.test/api/schedule?month=2026-09&knownRev=lots'), env)
+  assert.equal(((await garbage.json()) as { notModified: boolean }).notModified, false)
+})
+
+test('golden saves spanning two months bump both revs', async () => {
+  const env = mockEnv()
+  await handler.fetch(
+    goldenPut(
+      '2026-08-30',
+      { week: goldenPayload({ weekStart: '2026-08-30' }), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 },
+    ),
+    env,
+  )
+  for (const month of ['2026-08', '2026-09']) {
+    const listed = await handler.fetch(new Request(`https://api.test/api/schedule?month=${month}`), env)
+    assert.equal(((await listed.json()) as { rev: number }).rev, 1)
+  }
 })
 
 test('visibility can toggle without re-encrypting', async () => {

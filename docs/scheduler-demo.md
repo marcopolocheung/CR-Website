@@ -56,7 +56,11 @@ concurrency (`409 conflict` means someone else saved first — saving again
 overwrites with your copy, and the first save of a week uses `baseRev: 0`).
 
 Reads are public: `/schedule` lists visible weeks for a month and needs no
-link or code. Writes need the manager token (`SCHEDULE_WRITE_TOKEN`
+link or code. The viewer never polls — it revalidates with a cheap month-rev
+check when the tab becomes visible, regains focus, or reconnects, and swaps
+content only when a save actually bumped the rev. A save from the demo also
+pings open `/schedule` tabs on the same device over a BroadcastChannel, so a
+manager previewing the page sees it update immediately. Writes need the manager token (`SCHEDULE_WRITE_TOKEN`
 Worker secret), typed into the publish panel when saving; it lives in the
 tab only. Nothing schedule-related persists in `localStorage` anymore —
 the Worker is the source of truth. Legacy `/api/weeks` link blobs are

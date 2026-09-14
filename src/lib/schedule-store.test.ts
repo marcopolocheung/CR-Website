@@ -65,23 +65,43 @@ test('golden reads map network failure to unavailable', async () => {
   }
 })
 
-test('fetchGoldenMonth returns weeks on 200 and an empty list for a bad month', async () => {
+test('fetchGoldenMonth returns weeks and rev on 200 and an empty list for a bad month', async () => {
   let restore = mockFetchOnce((url) => {
     assert.ok(url.includes('/api/schedule?month=2026-09'))
+    assert.ok(!url.includes('knownRev'))
     return {
       status: 200,
-      payload: { weeks: [{ v: 3, weekStart: '2026-09-13', rev: 1, week: goldenWeek, visible: true, templateHash: 'a1b2', updatedAt: 'x' }] },
+      payload: {
+        weeks: [{ v: 3, weekStart: '2026-09-13', rev: 1, week: goldenWeek, visible: true, templateHash: 'a1b2', updatedAt: 'x' }],
+        rev: 3,
+        notModified: false,
+      },
     }
   })
   try {
-    assert.equal((await fetchGoldenMonth('2026-09')).length, 1)
+    const month = await fetchGoldenMonth('2026-09')
+    assert.equal(month.weeks.length, 1)
+    assert.equal(month.rev, 3)
+    assert.equal(month.notModified, false)
   } finally {
     restore()
   }
 
   restore = mockFetchOnce(() => ({ status: 400, payload: { error: 'invalid_month' } }))
   try {
-    assert.deepEqual(await fetchGoldenMonth('september'), [])
+    assert.deepEqual(await fetchGoldenMonth('september'), { weeks: [], rev: 0, notModified: false })
+  } finally {
+    restore()
+  }
+})
+
+test('fetchGoldenMonth sends knownRev and honors notModified', async () => {
+  const restore = mockFetchOnce((url) => {
+    assert.ok(url.includes('knownRev=3'))
+    return { status: 200, payload: { weeks: [], rev: 3, notModified: true } }
+  })
+  try {
+    assert.deepEqual(await fetchGoldenMonth('2026-09', 3), { weeks: [], rev: 3, notModified: true })
   } finally {
     restore()
   }

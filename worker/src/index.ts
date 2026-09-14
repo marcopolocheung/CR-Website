@@ -149,6 +149,42 @@ export function goldenKey(weekStart: string): string {
   return `golden:${weekStart}`
 }
 
+export function goldenMonthRevKey(monthKey: string): string {
+  return `golden:month-rev:${monthKey}`
+}
+
+function shiftGoldenDate(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day) + days * 86400000).toISOString().slice(0, 10)
+}
+
+/** Every month grid that shows this Sunday week: its own month plus the month its Saturday falls in. */
+export function goldenMonthsForWeek(weekStart: string): string[] {
+  if (!WEEK_RE.test(weekStart)) return []
+  return [...new Set([weekStart.slice(0, 7), shiftGoldenDate(weekStart, 6).slice(0, 7)])]
+}
+
+export async function readGoldenMonthRev(env: Env, monthKey: string): Promise<number> {
+  try {
+    const raw = await env.SCHEDULES.get(goldenMonthRevKey(monthKey))
+    const rev = raw ? Number.parseInt(raw, 10) : 0
+    return Number.isInteger(rev) && rev > 0 ? rev : 0
+  } catch {
+    return 0
+  }
+}
+
+async function bumpGoldenMonthRevs(env: Env, weekStart: string): Promise<void> {
+  for (const month of goldenMonthsForWeek(weekStart)) {
+    const rev = await readGoldenMonthRev(env, month)
+    try {
+      await env.SCHEDULES.put(goldenMonthRevKey(month), String(rev + 1), { expirationTtl: DOC_TTL_SECONDS })
+    } catch {
+      return
+    }
+  }
+}
+
 export function validateGoldenWeekBody(
   body: unknown,
 ): { week: GoldenWeekPayload; visible: boolean; baseRev: number } | null {
@@ -403,6 +439,12 @@ export default {
     if (request.method === 'GET' && path === '/api/schedule') {
       const month = url.searchParams.get('month') ?? ''
       if (!MONTH_RE.test(month)) return json({ error: 'invalid_month' }, 400, request, env)
+      const knownRaw = url.searchParams.get('knownRev') ?? ''
+      const knownRev = /^\d+$/.test(knownRaw) ? Number.parseInt(knownRaw, 10) : 0
+      const rev = await readGoldenMonthRev(env, month)
+      if (knownRev > 0 && rev > 0 && rev === knownRev) {
+        return json({ weeks: [], rev, notModified: true }, 200, request, env, { 'Cache-Control': 'no-store' })
+      }
       const weeks: GoldenWeekDoc[] = []
       for (const weekStart of goldenWeeksForMonth(month)) {
         const raw = await env.SCHEDULES.get(goldenKey(weekStart))
@@ -418,7 +460,7 @@ export default {
         weeks.push(doc)
       }
       weeks.sort((a, b) => a.weekStart.localeCompare(b.weekStart))
-      return json({ weeks }, 200, request, env)
+      return json({ weeks, rev, notModified: false }, 200, request, env, { 'Cache-Control': 'no-store' })
     }
 
     const goldenMatch = path.match(/^\/api\/schedule\/(\d{4}-\d{2}-\d{2})$/)
@@ -477,6 +519,7 @@ export default {
             updatedAt: new Date().toISOString(),
           }
           await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
+          await bumpGoldenMonthRevs(env, weekStart)
           return json({ rev: next.rev, updatedAt: next.updatedAt }, 201, request, env)
         }
         let parsed: unknown
@@ -499,6 +542,7 @@ export default {
           updatedAt: new Date().toISOString(),
         }
         await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
+        await bumpGoldenMonthRevs(env, weekStart)
         return json({ rev: next.rev, updatedAt: next.updatedAt }, 200, request, env)
       }
     }

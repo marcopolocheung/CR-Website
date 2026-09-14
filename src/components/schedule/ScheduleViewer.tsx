@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   DAYS,
   currentMonthKey,
@@ -25,12 +25,18 @@ export default function ScheduleViewer() {
   const templateHash = useMemo(() => templateHashForSlots(slots), [slots])
   const [monthKey, setMonthKey] = useState('')
   const [docs, setDocs] = useState<GoldenWeekDoc[]>([])
+  const [monthRev, setMonthRev] = useState(0)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [statusNote, setStatusNote] = useState('')
   const [openWeekStart, setOpenWeekStart] = useState<string | null>(null)
   const [onlyPerson, setOnlyPerson] = useState('')
   const [ready, setReady] = useState(false)
+  const liveRef = useRef({ monthKey: '', monthRev: 0, ready: false, busy: false })
+  liveRef.current = { monthKey, monthRev, ready, busy: loading || refreshing }
+  const openWeekStartRef = useRef<string | null>(null)
+  openWeekStartRef.current = openWeekStart
 
   useEffect(() => {
     setMonthKey(currentMonthKey())
@@ -42,13 +48,17 @@ export default function ScheduleViewer() {
     let cancelled = false
     setLoading(true)
     setLoadError('')
+    setStatusNote('')
     fetchGoldenMonth(monthKey)
-      .then((weeks) => {
-        if (!cancelled) setDocs(weeks)
+      .then((month) => {
+        if (cancelled) return
+        setDocs(month.weeks)
+        setMonthRev(month.rev)
       })
       .catch(() => {
         if (!cancelled) {
           setDocs([])
+          setMonthRev(0)
           setLoadError('Could not reach the schedule store. Check your connection and try again.')
         }
       })
@@ -60,27 +70,76 @@ export default function ScheduleViewer() {
     }
   }, [monthKey, ready])
 
-  function goToMonth(next: string) {
-    if (!next || next === monthKey) return
-    setMonthKey(next)
-    setOpenWeekStart(null)
-    setOnlyPerson('')
-  }
-
-  async function refresh() {
-    if (!monthKey || refreshing) return
+  async function revalidate(source: 'focus' | 'visible' | 'online' | 'push' | 'manual') {
+    const live = liveRef.current
+    if (!live.ready || !live.monthKey || live.busy || document.hidden) return
     setRefreshing(true)
     try {
-      const weeks = await fetchGoldenMonth(monthKey)
-      setDocs(weeks)
-      if (openWeekStart && !weeks.some((doc) => doc.weekStart === openWeekStart)) {
+      const month = await fetchGoldenMonth(live.monthKey, live.monthRev)
+      if (month.notModified) {
+        if (source === 'manual') setStatusNote('You are up to date.')
+        return
+      }
+      setDocs(month.weeks)
+      setMonthRev(month.rev)
+      setLoadError('')
+      if (openWeekStartRef.current && !month.weeks.some((doc) => doc.weekStart === openWeekStartRef.current)) {
         setOpenWeekStart(null)
       }
+      setStatusNote(source === 'manual' ? 'Updated to the latest schedule.' : 'Updated just now.')
     } catch {
       setLoadError('Could not check for updates. Try again in a moment.')
     } finally {
       setRefreshing(false)
     }
+  }
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void revalidate('visible')
+    }
+    const onFocus = () => {
+      void revalidate('focus')
+    }
+    const onOnline = () => {
+      void revalidate('online')
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('online', onOnline)
+    let channel: BroadcastChannel | null = null
+    try {
+      channel = new BroadcastChannel('chinarose-schedule')
+      channel.onmessage = (event) => {
+        const data = event.data as { type?: unknown } | null
+        if (data?.type === 'golden-saved') void revalidate('push')
+      }
+    } catch {
+      channel = null
+    }
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('online', onOnline)
+      try {
+        channel?.close()
+      } catch {
+        return
+      }
+    }
+  }, [])
+
+  function goToMonth(next: string) {
+    if (!next || next === monthKey) return
+    setMonthKey(next)
+    setMonthRev(0)
+    setOpenWeekStart(null)
+    setOnlyPerson('')
+    setStatusNote('')
+  }
+
+  function refresh() {
+    void revalidate('manual')
   }
 
   function goBack() {
@@ -97,7 +156,7 @@ export default function ScheduleViewer() {
       <div>
         <div className="border-b border-zinc-200 bg-white print:hidden">
           <div className="mx-auto flex w-full max-w-none flex-wrap items-center gap-2 px-4 py-2">
-            <span className="text-sm text-zinc-600">This schedule can change when your manager publishes updates.</span>
+            <span className="text-sm text-zinc-600">This schedule updates itself when your manager publishes changes.</span>
             <button
               type="button"
               className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
@@ -106,6 +165,11 @@ export default function ScheduleViewer() {
             >
               {refreshing ? 'Checking...' : 'Check for updates'}
             </button>
+            {statusNote && (
+              <span className="text-sm font-medium text-zinc-700" role="status">
+                {statusNote}
+              </span>
+            )}
           </div>
         </div>
         <WeekView
@@ -159,6 +223,7 @@ export default function ScheduleViewer() {
         loading={loading}
         refreshing={refreshing}
         loadError={loadError}
+        statusNote={statusNote}
         templateHash={templateHash}
         selectedWeekStart={openWeekStart}
         onMonthChange={goToMonth}
@@ -175,6 +240,7 @@ function MonthBrowser({
   loading,
   refreshing,
   loadError,
+  statusNote,
   templateHash,
   selectedWeekStart,
   onMonthChange,
@@ -186,6 +252,7 @@ function MonthBrowser({
   loading: boolean
   refreshing: boolean
   loadError: string
+  statusNote: string
   templateHash: string
   selectedWeekStart: string | null
   onMonthChange: (monthKey: string) => void
@@ -231,6 +298,11 @@ function MonthBrowser({
         >
           {refreshing ? 'Checking...' : 'Check for updates'}
         </button>
+        {statusNote && (
+          <span className="text-xs font-medium text-zinc-600" role="status">
+            {statusNote}
+          </span>
+        )}
       </div>
 
       {loadError && (

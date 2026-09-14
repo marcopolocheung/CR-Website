@@ -75,12 +75,27 @@ export async function fetchGoldenWeek(weekStart: string): Promise<GoldenWeekDoc 
   throw new StoreUnavailableError()
 }
 
-export async function fetchGoldenMonth(month: string): Promise<GoldenWeekDoc[]> {
-  const { status, body } = await requestJson(`/api/schedule?month=${encodeURIComponent(month)}`)
-  if (status === 400) return []
+export type GoldenMonth = {
+  weeks: GoldenWeekDoc[]
+  /** Month revision: bumped by every golden save touching this month. */
+  rev: number
+  /** True when the server confirms nothing changed since knownRev — weeks is empty. */
+  notModified: boolean
+}
+
+export async function fetchGoldenMonth(month: string, knownRev = 0): Promise<GoldenMonth> {
+  const query = knownRev > 0 ? `?month=${encodeURIComponent(month)}&knownRev=${knownRev}` : `?month=${encodeURIComponent(month)}`
+  const { status, body } = await requestJson(`/api/schedule${query}`)
+  if (status === 400) return { weeks: [], rev: 0, notModified: false }
   if (status === 200 && body && typeof body === 'object' && 'weeks' in body) {
-    const { weeks } = body as { weeks: unknown }
-    if (Array.isArray(weeks)) return weeks.filter(isGoldenWeekDoc)
+    const { weeks, rev, notModified } = body as { weeks: unknown; rev: unknown; notModified: unknown }
+    if (Array.isArray(weeks)) {
+      return {
+        weeks: notModified === true ? [] : weeks.filter(isGoldenWeekDoc),
+        rev: typeof rev === 'number' ? rev : 0,
+        notModified: notModified === true,
+      }
+    }
   }
   throw new StoreUnavailableError()
 }
@@ -126,6 +141,7 @@ async function requestJson(path: string, init?: RequestInit): Promise<{ status: 
   try {
     const response = await fetch(`${getScheduleApiBase()}${path}`, {
       ...init,
+      cache: 'no-store',
       signal: controller.signal,
       headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     })
