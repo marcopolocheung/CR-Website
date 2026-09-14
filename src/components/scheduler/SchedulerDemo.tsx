@@ -689,6 +689,18 @@ export default function SchedulerDemo() {
         : [],
     [assignments, employees, nextIssue, slots],
   )
+  const fixExcluded = useMemo(() => {
+    if (!nextIssue?.slot) return [] as { employee: Employee; reason: string }[]
+    const candidateIds = new Set(fixCandidates.map((candidate) => candidate.id))
+    return employees
+      .filter((employee) => !candidateIds.has(employee.id))
+      .map((employee) => ({
+        employee,
+        reason:
+          unassignableReason({ slot: nextIssue.slot as StaffingSlot, employee, employees, slots, assignments }) ??
+          'not available',
+      }))
+  }, [assignments, employees, fixCandidates, nextIssue, slots])
   const ignoredCount = fixIssues.filter((issue) => ignoredIssueIds.includes(issue.id)).length
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
   const keptCount = assignments.filter((assignment) => assignment.locked && assignment.employeeId).length
@@ -1148,8 +1160,10 @@ export default function SchedulerDemo() {
           <GuidedFixPanel
             nextIssue={nextIssue}
             issueCount={visibleFixIssues.length}
+            totalCount={fixIssues.length}
             ignoredCount={ignoredCount}
             candidates={fixCandidates}
+            excluded={fixExcluded}
             choosing={guidedChoosing}
             hasSchedule={assignments.length > 0}
             onChooseEmployee={fixNextIssue}
@@ -1251,18 +1265,20 @@ export default function SchedulerDemo() {
           )}
 
           {diagnostics.length > 0 && (
-            <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
-              <ul className="space-y-1 text-sm text-zinc-700">
-                {diagnostics.map((message, index) => (
-                  <li key={`${message}-${index}`}>{message}</li>
-                ))}
-              </ul>
-            </Disclosure>
+            <div aria-live="polite">
+              <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
+                <ul className="space-y-1 text-sm text-zinc-700">
+                  {diagnostics.map((message, index) => (
+                    <li key={`${message}-${index}`}>{message}</li>
+                  ))}
+                </ul>
+              </Disclosure>
+            </div>
           )}
 
           <div className="space-y-1 pt-2">
             <Disclosure summary="Hours for each person" tone="quiet">
-              <HoursSummary stats={stats} />
+              <HoursSummary stats={stats} employees={employees} />
             </Disclosure>
 
             <ScheduleRules slots={slots} />
@@ -1525,8 +1541,10 @@ function EmployeeCard({ employee, onUpdate }: { employee: Employee; onUpdate: (e
 function GuidedFixPanel({
   nextIssue,
   issueCount,
+  totalCount,
   ignoredCount,
   candidates,
+  excluded,
   choosing,
   hasSchedule,
   onChooseEmployee,
@@ -1537,8 +1555,10 @@ function GuidedFixPanel({
 }: {
   nextIssue?: FixIssue
   issueCount: number
+  totalCount: number
   ignoredCount: number
   candidates: Employee[]
+  excluded: { employee: Employee; reason: string }[]
   choosing: boolean
   hasSchedule: boolean
   onChooseEmployee: () => void
@@ -1574,16 +1594,31 @@ function GuidedFixPanel({
     )
   }
 
+  const isBlocker = nextIssue.id.includes('missing_assignment') || nextIssue.id.startsWith('ready:')
+  const position = totalCount > 0 ? totalCount - issueCount + 1 : 1
   return (
-    <section className="rounded-lg border border-amber-400 bg-amber-50 p-4 shadow-sm">
+    <section
+      className={`rounded-lg border p-4 shadow-sm ${isBlocker ? 'border-red-400 bg-red-50' : 'border-amber-400 bg-amber-50'}`}
+      aria-live="polite"
+    >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-amber-900">
-            {issueCount} spot{issueCount === 1 ? '' : 's'} need fixing
+          <p className={`text-sm font-semibold ${isBlocker ? 'text-red-900' : 'text-amber-900'}`}>
+            Fix {position} of {totalCount}
             {ignoredCount > 0 && ` · ${ignoredCount} skipped`}
           </p>
-          <h2 className="mt-1 text-lg font-semibold text-amber-950">{nextIssue.title}</h2>
-          <p className="mt-1 text-sm text-amber-900">{nextIssue.detail}</p>
+          <p className="mt-1">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-bold ${
+                isBlocker ? 'border-red-300 bg-white text-red-900' : 'border-amber-300 bg-white text-amber-950'
+              }`}
+            >
+              <Icon name={isBlocker ? 'warning' : 'target'} />
+              {isBlocker ? 'Must fix before printing' : 'You can skip this'}
+            </span>
+          </p>
+          <h2 className={`mt-1 text-lg font-semibold ${isBlocker ? 'text-red-950' : 'text-amber-950'}`}>{nextIssue.title}</h2>
+          <p className={`mt-1 text-sm ${isBlocker ? 'text-red-900' : 'text-amber-900'}`}>{nextIssue.detail}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button tone="primary" onClick={onChooseEmployee} icon="target" disabled={!nextIssue.slot}>
@@ -1592,11 +1627,16 @@ function GuidedFixPanel({
           <Button onClick={onAddEmployee} icon="plus">
             Add employee
           </Button>
-          <Button onClick={onIgnore} icon="close">
+          <Button onClick={onIgnore} icon="close" disabled={isBlocker} title={isBlocker ? 'An empty spot must be filled — skipping would hide missing cover.' : 'Skip this for now.'}>
             Ignore for now
           </Button>
         </div>
       </div>
+      {isBlocker && (
+        <p className="mt-2 text-xs font-medium text-red-900">
+          Empty spots block printing. Skipping is turned off so missing cover stays visible.
+        </p>
+      )}
 
       {choosing && nextIssue.slot && (
         <div className="mt-4 rounded border border-amber-300 bg-white p-3">
@@ -1619,11 +1659,36 @@ function GuidedFixPanel({
                 ))}
               </div>
               <p className="mt-2 text-xs text-zinc-500">Everyone here is free and trained for this position.</p>
+              {excluded.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-semibold text-zinc-700 hover:text-zinc-900">
+                    Why {excluded.length} other{excluded.length === 1 ? '' : 's'} can&apos;t cover this
+                  </summary>
+                  <ul className="mt-1 space-y-1 text-xs text-zinc-600">
+                    {excluded.map(({ employee, reason }) => (
+                      <li key={employee.id}>
+                        <span className="font-medium text-zinc-800">{employee.name}</span> — {reason}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </>
           ) : (
-            <p className="text-sm text-zinc-700">
-              Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.
-            </p>
+            <>
+              <p className="text-sm text-zinc-700">
+                Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.
+              </p>
+              {excluded.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs text-zinc-600">
+                  {excluded.map(({ employee, reason }) => (
+                    <li key={employee.id}>
+                      <span className="font-medium text-zinc-800">{employee.name}</span> — {reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </div>
       )}
@@ -1663,7 +1728,7 @@ function VariantControls({
   )
 }
 
-function HoursSummary({ stats }: { stats: ScheduleStats[] }) {
+function HoursSummary({ stats, employees }: { stats: ScheduleStats[]; employees: Employee[] }) {
   const working = stats.filter((stat) => stat.shifts > 0)
   if (working.length === 0) {
     return <p className="text-sm text-zinc-600">Make a schedule to see how the hours land.</p>
@@ -1671,25 +1736,37 @@ function HoursSummary({ stats }: { stats: ScheduleStats[] }) {
 
   const mostHours = Math.max(...working.map((stat) => stat.hours))
   const idle = stats.filter((stat) => stat.shifts === 0)
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee]))
 
   return (
     <div>
       <ul className="divide-y divide-zinc-100">
-        {working.map((stat) => (
-          <li key={stat.employeeId} className="flex items-center gap-3 py-1.5 text-sm">
-            <span className="w-24 shrink-0 truncate font-medium text-zinc-900">{stat.name}</span>
-            <span aria-hidden="true" className="h-1.5 min-w-0 flex-1 rounded-full bg-zinc-100">
-              <span
-                className="block h-full rounded-full bg-zinc-400"
-                style={{ width: `${Math.round((stat.hours / mostHours) * 100)}%` }}
-              />
-            </span>
-            <span className="w-14 shrink-0 text-right font-semibold text-zinc-900">{stat.hours.toFixed(1)}h</span>
-            <span className="w-20 shrink-0 text-right text-xs text-zinc-500">
-              {stat.days}d · {stat.shifts} shift{stat.shifts === 1 ? '' : 's'}
-            </span>
-          </li>
-        ))}
+        {working.map((stat) => {
+          const employee = employeeById.get(stat.employeeId)
+          const maxDays = employee?.maxDaysPerWeek ?? 7
+          const maxShifts = employee?.maxShiftsPerWeek
+          const overloaded = stat.days > maxDays || (maxShifts !== undefined && stat.shifts > maxShifts)
+          return (
+            <li key={stat.employeeId} className="flex items-center gap-3 py-1.5 text-sm">
+              <span className="w-24 shrink-0 truncate font-medium text-zinc-900">
+                {stat.name}
+                {overloaded && <span className="ml-1 font-bold text-red-700">· over</span>}
+              </span>
+              <span aria-hidden="true" className={`h-1.5 min-w-0 flex-1 rounded-full ${overloaded ? 'bg-red-100' : 'bg-zinc-100'}`}>
+                <span
+                  className={`block h-full rounded-full ${overloaded ? 'bg-red-600' : 'bg-zinc-400'}`}
+                  style={{ width: `${Math.round((stat.hours / mostHours) * 100)}%` }}
+                />
+              </span>
+              <span className={`w-14 shrink-0 text-right font-semibold ${overloaded ? 'text-red-800' : 'text-zinc-900'}`}>
+                {stat.hours.toFixed(1)}h
+              </span>
+              <span className={`w-20 shrink-0 text-right text-xs ${overloaded ? 'font-semibold text-red-700' : 'text-zinc-500'}`}>
+                {stat.days}d · {stat.shifts} shift{stat.shifts === 1 ? '' : 's'}
+              </span>
+            </li>
+          )
+        })}
       </ul>
       {idle.length > 0 && (
         <p className="mt-2 text-xs text-zinc-500">
