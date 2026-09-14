@@ -1,5 +1,17 @@
 Deployment for chinarosesa.com
 
+dashboard:
+    sales, customer complaints
+
+SW - zarzamora locaiton
+military location
+
+featured dishes slide 2, no combo meal, emph lemon chicken golden wok and china rose 
+
+no curbside pickup
+
+voicebit delivery, ask if pick up or delivery, will send link to pay online, then voicebit will search for driver to come to chia rose to delivery
+
 ## Environment variables
 
 Both are `NEXT_PUBLIC_`, so they are inlined into the static export at build
