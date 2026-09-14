@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { version } from '../../package.json'
 import LocationOpenStatus from './LocationOpenStatus'
 import TrackedLink from '@/components/analytics/TrackedLink'
 
@@ -60,6 +61,7 @@ export default function Footer() {
       </div>
       <div className="border-t border-red-700 text-center py-3 text-xs text-red-300">
         &copy; {new Date().getFullYear()} China Rose. All rights reserved.
+        <span className="ml-2 text-red-400">v{version}</span>
       </div>
     </footer>
   )
