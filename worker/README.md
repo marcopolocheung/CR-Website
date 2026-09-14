@@ -60,7 +60,7 @@ Legacy links:
 
 Golden schedule (public read, token-guarded write):
 
-- `GET /api/schedule?month=YYYY-MM` → `200 { weeks: GoldenWeekDoc[] }` (visible only, sorted)
+- `GET /api/schedule?month=YYYY-MM` → `200 { weeks, rev, notModified }` (visible only, sorted). Pass `knownRev=<rev>` and the Worker answers `notModified: true` with no weeks when nothing changed — every golden save bumps the month rev (including the neighboring month when a week spans two), so readers revalidate with one tiny read instead of refetching.
 - `GET /api/schedule/:weekStart` → `200 GoldenWeekDoc` or `404`
 - `PUT /api/schedule/:weekStart { week, templateHash, visible, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`.
 

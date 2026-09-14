@@ -26,6 +26,18 @@ function canonicalWeek(week: { weekStart: string; people: string[]; slotPeople: 
   return JSON.stringify({ w: week.weekStart, p: week.people, s: week.slotPeople })
 }
 
+const scheduleChannelName = 'chinarose-schedule'
+
+function broadcastSave(weekStart: string) {
+  try {
+    const channel = new BroadcastChannel(scheduleChannelName)
+    channel.postMessage({ type: 'golden-saved', weekStart })
+    channel.close()
+  } catch {
+    return
+  }
+}
+
 export default function PublishPanel({
   weekStart,
   weekLabel,
@@ -115,6 +127,7 @@ export default function PublishPanel({
       setBaseRev(result.rev)
       setServerFingerprint(fingerprint)
       setServerVisible(visible)
+      broadcastSave(weekStart)
       setNotice(
         visible
           ? 'Saved. Staff now see this week on /schedule.'
