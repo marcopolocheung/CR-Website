@@ -39,7 +39,7 @@ import {
   type ValidationViolation,
   type WeekStatus,
 } from '@/lib/scheduler'
-import SharePanel from './SharePanel'
+import PublishPanel from './PublishPanel'
 
 type AvailabilityMode = 'all' | 'am' | 'pm' | 'weekdayPm' | 'weekend' | 'gap'
 
@@ -792,8 +792,8 @@ export default function SchedulerDemo() {
     setWeekStatus((current) => ({ ...current, [targetWeek]: status }))
     setDiagnostics([
       status === 'on'
-        ? 'That week is now on. Staff can see it once it is shared.'
-        : 'That week is now off and hidden from staff.',
+        ? 'That week is now on. Staff see it on /schedule once you save.'
+        : 'That week is now off. Staff stop seeing it once you save.',
     ])
   }
 
@@ -808,7 +808,7 @@ export default function SchedulerDemo() {
     remember('copied the prior week')
     setWeeks((current) => ({ ...current, [weekStart]: cloneAssignmentList(source) }))
     setWeekStatus((current) => ({ ...current, [weekStart]: 'on' }))
-    setDiagnostics(['Prior week copied here. Review it, then share when it looks right.'])
+    setDiagnostics(['Prior week copied here. Review it, then publish when it looks right.'])
   }
 
   function remember(label: string) {
@@ -1141,10 +1141,10 @@ export default function SchedulerDemo() {
             <Button
               onClick={() => setSharing((open) => !open)}
               icon="share"
-              disabled={!weekStart || weekVisibility === 'off'}
-              title={weekVisibility === 'off' ? 'Turn this week on before sharing it with staff.' : 'Share this week with staff.'}
+              disabled={!weekStart}
+              title="Save this week to the /schedule golden schedule."
             >
-              Share with staff
+              Publish to staff
             </Button>
             {keptCount > 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-700">
@@ -1207,13 +1207,14 @@ export default function SchedulerDemo() {
       <div className="mx-auto grid w-full max-w-none min-w-0 gap-5 overflow-x-clip px-4 py-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
         <main className="order-1 min-w-0 space-y-4">
           {sharing && weekStart && (
-            <SharePanel
+            <PublishPanel
               weekStart={weekStart}
               weekLabel={formatWeekRange(weekStart)}
               slots={slots}
               employees={employees}
               assignments={assignments}
               visible={weekVisibility === 'on'}
+              onVisibilityChange={(status) => setWeekVisibility(weekStart, status)}
               onClose={() => setSharing(false)}
             />
           )}
