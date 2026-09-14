@@ -1,11 +1,50 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { buildPublishedWeek, encryptWeek, minimumCodeLength } from '@/lib/schedule-share'
+import {
+  buildPublishedWeek,
+  encryptWeek,
+  minimumCodeLength,
+  serializePublishedWeek,
+  templateHashForSlots,
+} from '@/lib/schedule-share'
+import {
+  StoreConflictError,
+  StoreNotFoundError,
+  createSharedWeek,
+  updateSharedWeek,
+} from '@/lib/schedule-store'
 import type { Employee, ScheduleAssignment, StaffingSlot } from '@/lib/scheduler'
 
 const QRCodeSVG = dynamic(() => import('qrcode.react').then((module) => module.QRCodeSVG), { ssr: false })
+
+type PublishedMeta = {
+  id: string
+  rev: number
+  fingerprint: string
+}
+
+const publishedKey = 'chinarose.schedule.published.v1'
+
+function readPublished(): Record<string, PublishedMeta> {
+  try {
+    const raw = window.localStorage.getItem(publishedKey)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, PublishedMeta>
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writePublished(next: Record<string, PublishedMeta>) {
+  try {
+    window.localStorage.setItem(publishedKey, JSON.stringify(next))
+  } catch {
+    return
+  }
+}
 
 export default function SharePanel({
   weekStart,
@@ -24,23 +63,96 @@ export default function SharePanel({
 }) {
   const [name, setName] = useState(`Week of ${weekLabel}`)
   const [code, setCode] = useState('')
-  const [link, setLink] = useState('')
+  const [published, setPublished] = useState<PublishedMeta | null>(null)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const filled = assignments.filter((assignment) => assignment.employeeId).length
   const codeTooShort = code.length > 0 && code.length < minimumCodeLength
 
-  async function createLink() {
-    if (code.length < minimumCodeLength) return
+  const fingerprint = useMemo(
+    () => serializePublishedWeek(buildPublishedWeek({ weekStart, name, slots, employees, assignments })),
+    [weekStart, name, slots, employees, assignments],
+  )
+  const dirty = published !== null && published.fingerprint !== fingerprint
+  const link = useMemo(() => {
+    if (!published) return ''
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
+    return `${window.location.origin}${basePath}/schedule#${published.id}`
+  }, [published])
+
+  useEffect(() => {
+    setPublished(readPublished()[weekStart] ?? null)
+    setError('')
+    setNotice('')
+    setCopied(false)
+  }, [weekStart])
+
+  function persist(next: PublishedMeta | null) {
+    setPublished(next)
+    const all = readPublished()
+    if (next) all[weekStart] = next
+    else delete all[weekStart]
+    writePublished(all)
+  }
+
+  async function publish() {
+    if (code.length < minimumCodeLength || filled === 0) return
     setBusy(true)
+    setError('')
+    setNotice('')
     try {
-      const token = await encryptWeek(buildPublishedWeek({ weekStart, name, slots, employees, assignments }), code)
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
-      setLink(`${window.location.origin}${basePath}/schedule#${token}`)
+      const week = buildPublishedWeek({ weekStart, name, slots, employees, assignments })
+      const ciphertext = await encryptWeek(week, code)
+      const created = await createSharedWeek({
+        ciphertext,
+        templateHash: templateHashForSlots(slots),
+        weekStart,
+      })
+      persist({ id: created.id, rev: created.rev, fingerprint })
       setCopied(false)
+      setNotice('Link made. Send it once — later edits save to this same link.')
+    } catch {
+      setError('Could not save the schedule. Check your connection — your edits are still safe on this device.')
     } finally {
       setBusy(false)
     }
+  }
+
+  async function saveUpdates() {
+    if (!published || code.length < minimumCodeLength) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const week = buildPublishedWeek({ weekStart, name, slots, employees, assignments })
+      const ciphertext = await encryptWeek(week, code)
+      const result = await updateSharedWeek(published.id, { ciphertext, baseRev: published.rev })
+      persist({ ...published, rev: result.rev, fingerprint })
+      setNotice('Saved. Everyone opening this link now sees the update.')
+    } catch (caught) {
+      if (caught instanceof StoreConflictError) {
+        persist({ ...published, rev: caught.rev })
+        setError(
+          'Someone else saved this week first. What is on your screen has not been shared yet — press Save updates again to overwrite with your copy.',
+        )
+      } else if (caught instanceof StoreNotFoundError) {
+        persist(null)
+        setError('That saved link is gone. Make a fresh link below.')
+      } else {
+        setError('Could not save the update. Check your connection — your edits are still safe on this device.')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function freshLink() {
+    persist(null)
+    setError('')
+    setNotice('')
+    setCopied(false)
   }
 
   async function copyLink() {
@@ -76,10 +188,7 @@ export default function SharePanel({
           <input
             className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             value={name}
-            onChange={(event) => {
-              setName(event.target.value)
-              setLink('')
-            }}
+            onChange={(event) => setName(event.target.value)}
           />
         </label>
         <label className="text-sm font-medium text-zinc-800">
@@ -87,10 +196,7 @@ export default function SharePanel({
           <input
             className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             value={code}
-            onChange={(event) => {
-              setCode(event.target.value)
-              setLink('')
-            }}
+            onChange={(event) => setCode(event.target.value)}
             placeholder={`At least ${minimumCodeLength} characters`}
           />
         </label>
@@ -101,23 +207,52 @@ export default function SharePanel({
           Use at least {minimumCodeLength} characters. A short code is easy to guess for anyone who gets the link.
         </p>
       )}
+      {published && (
+        <p className="mt-2 text-sm text-zinc-600">
+          Always use the same code for this link. Staff cannot open updates saved with a different code.
+        </p>
+      )}
 
-      <button
-        type="button"
-        className="mt-4 inline-flex items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-        onClick={createLink}
-        disabled={busy || code.length < minimumCodeLength || filled === 0}
-      >
-        {busy ? 'Making the link...' : 'Make the link'}
-      </button>
+      {!published ? (
+        <button
+          type="button"
+          className="mt-4 inline-flex items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          onClick={publish}
+          disabled={busy || code.length < minimumCodeLength || filled === 0}
+        >
+          {busy ? 'Making the link...' : 'Make the link'}
+        </button>
+      ) : (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            onClick={saveUpdates}
+            disabled={busy || code.length < minimumCodeLength || !dirty}
+          >
+            {busy ? 'Saving...' : 'Save updates to this link'}
+          </button>
+          <button
+            type="button"
+            className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            onClick={freshLink}
+          >
+            Make a fresh link instead
+          </button>
+          {!dirty && <span className="text-sm text-green-800">This link is up to date.</span>}
+          {dirty && <span className="text-sm font-medium text-amber-800">You have changes that staff cannot see yet.</span>}
+        </div>
+      )}
       {filled === 0 && <p className="mt-2 text-sm text-zinc-600">Make a schedule for this week first.</p>}
+      {error && <p className="mt-2 text-sm font-medium text-red-800">{error}</p>}
+      {notice && !error && <p className="mt-2 text-sm font-medium text-green-800">{notice}</p>}
 
       {link && (
         <div className="mt-4 border-t border-zinc-100 pt-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="min-w-0 flex-1">
               <label className="text-sm font-medium text-zinc-800">
-                Link for staff
+                Link for staff — send it once, it stays the same
                 <input
                   readOnly
                   className="mt-1 w-full rounded border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm"

@@ -15,6 +15,23 @@ import type { Employee, ScheduleAssignment, StaffingSlot } from './scheduler'
 
 export const SHARE_VERSION = 1
 export const minimumCodeLength = 6
+export const SHARE_ID_LENGTH = 10
+
+const SHARE_ID_RE = /^[A-Za-z0-9_-]{10}$/
+
+export function isShareId(value: string): boolean {
+  return SHARE_ID_RE.test(value)
+}
+
+export function templateHashForSlots(slots: Pick<StaffingSlot, 'id'>[]): string {
+  let hash = 0x811c9dc5
+  const input = slots.map((slot) => slot.id).join('\n')
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}
 
 const KEY_ITERATIONS = 250_000
 const SALT_BYTES = 16
