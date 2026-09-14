@@ -97,6 +97,11 @@ export async function saveGoldenWeek(
   })
   if (status === 404) throw new StoreNotFoundError()
   if (status === 401) throw new StoreAuthError()
+  if (status === 503) {
+    throw new StoreUnavailableError(
+      'The schedule store is not set up for saving yet. Set the SCHEDULE_WRITE_TOKEN secret on the Worker and try again.',
+    )
+  }
   if (status === 409) {
     const rev = body && typeof body === 'object' && 'rev' in body ? (body as { rev: unknown }).rev : 0
     throw new StoreConflictError(typeof rev === 'number' ? rev : 0)
@@ -109,8 +114,8 @@ export async function saveGoldenWeek(
 }
 
 export class StoreUnavailableError extends Error {
-  constructor() {
-    super('Could not reach the schedule store.')
+  constructor(message = 'Could not reach the schedule store.') {
+    super(message)
     this.name = 'StoreUnavailableError'
   }
 }
