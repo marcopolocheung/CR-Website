@@ -1,8 +1,28 @@
 # Schedule store Worker (Cloudflare, free tier)
 
-Zero-knowledge blob store for one published week. The Worker never sees names,
-shifts, or the manager code — it only holds the encrypted `ciphertext` the
-browser already made with `encryptWeek`, plus `rev` for same-link updates.
+Two stores in one Worker:
+
+- Legacy per-link blobs (`/api/weeks`): kept read/write compatible so old
+  staff links keep working. New development should use the golden schedule.
+- Golden schedule (`/api/schedule`): one persistent codeless schedule keyed
+  by week start (`golden:YYYY-MM-DD`), edited by `/scheduler-demo` and read
+  by `/schedule`. Docs hold the plaintext week plus `visible` for the
+  manager's week on/off toggle and `rev` for optimistic concurrency.
+
+## Write token (golden schedule)
+
+Golden writes require a manager token. Set it as a Worker secret (never in
+code or in a `NEXT_PUBLIC_` variable):
+
+```sh
+wrangler secret put SCHEDULE_WRITE_TOKEN --config worker/wrangler.toml
+```
+
+Dashboard deploys: Worker → Settings → Variables → Add secret
+`SCHEDULE_WRITE_TOKEN`. Without it, golden `PUT`s answer `503
+write_not_configured`; with a wrong token they answer `401 unauthorized`.
+The manager types the token into the demo when saving — it lives in the tab
+only, never in `localStorage`.
 
 ## Deploy option A: dashboard paste (what you already did)
 
@@ -31,10 +51,18 @@ wrangler deploy --config worker/wrangler.toml
 
 ## API
 
+Legacy links:
+
 - `POST /api/weeks { ciphertext, templateHash, weekStart }` → `201 { id, rev }`
 - `GET /api/weeks/:id` → `200 { v, id, rev, ciphertext, templateHash, weekStart, updatedAt }`
 - `PUT /api/weeks/:id { ciphertext, baseRev }` → `200 { rev }` or `409 { error: "conflict", rev }`
 - `GET /api/health` → `{"ok":true}`
+
+Golden schedule (public read, token-guarded write):
+
+- `GET /api/schedule?month=YYYY-MM` → `200 { weeks: GoldenWeekDoc[] }` (visible only, sorted)
+- `GET /api/schedule/:weekStart` → `200 GoldenWeekDoc` or `404`
+- `PUT /api/schedule/:weekStart { week, templateHash, visible, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`.
 
 ## Notes
 
