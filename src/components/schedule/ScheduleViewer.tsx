@@ -32,29 +32,6 @@ import {
   type VisibleWeekStub,
 } from '@/lib/schedule-store'
 
-const seenKey = 'chinarose.schedule.seen.v1'
-
-function readSeenWeeks(): PublishedWeek[] {
-  try {
-    const raw = window.localStorage.getItem(seenKey)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as PublishedWeek[]) : []
-  } catch {
-    return []
-  }
-}
-
-function rememberWeek(week: PublishedWeek) {
-  try {
-    const others = readSeenWeeks().filter((seen) => seen.weekStart !== week.weekStart)
-    const next = [...others, week].sort((a, b) => b.weekStart.localeCompare(a.weekStart)).slice(0, 12)
-    window.localStorage.setItem(seenKey, JSON.stringify(next))
-  } catch {
-    return
-  }
-}
-
 export default function ScheduleViewer() {
   const slots = useMemo(() => expandTemplate(seedTemplate), [])
   const templateHash = useMemo(() => templateHashForSlots(slots), [slots])
@@ -62,7 +39,6 @@ export default function ScheduleViewer() {
   const [code, setCode] = useState('')
   const [week, setWeek] = useState<PublishedWeek | null>(null)
   const [viewingShare, setViewingShare] = useState<{ id: string; rev: number } | null>(null)
-  const [seenWeeks, setSeenWeeks] = useState<PublishedWeek[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [checking, setChecking] = useState(false)
@@ -81,7 +57,6 @@ export default function ScheduleViewer() {
   useEffect(() => {
     const readHash = () => window.location.hash.slice(1) || null
     setRawToken(readHash())
-    setSeenWeeks(readSeenWeeks())
     setMonthKey(currentMonthKey())
     setReady(true)
     const onHashChange = () => {
@@ -133,7 +108,6 @@ export default function ScheduleViewer() {
           continue
         }
         opened.push(unlocked)
-        rememberWeek(unlocked)
         openedCount += 1
       } catch {
         lockedCount += 1
@@ -145,7 +119,6 @@ export default function ScheduleViewer() {
         for (const item of opened) merged.set(item.weekStart, item)
         return [...merged.values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart))
       })
-      setSeenWeeks(readSeenWeeks())
     }
     setMonthNote(
       openedCount === 0
@@ -172,8 +145,6 @@ export default function ScheduleViewer() {
         }
         setWeek(opened)
         setViewingShare({ id: rawToken, rev: doc.rev })
-        rememberWeek(opened)
-        setSeenWeeks(readSeenWeeks())
       } else {
         const opened = await decryptWeek(rawToken, code)
         if (opened.slotPeople.length !== slots.length) {
@@ -182,8 +153,6 @@ export default function ScheduleViewer() {
         }
         setWeek(opened)
         setViewingShare(null)
-        rememberWeek(opened)
-        setSeenWeeks(readSeenWeeks())
       }
     } catch (caught) {
       if (caught instanceof WrongCodeError) setError('That code did not work. Check with your manager.')
@@ -211,8 +180,6 @@ export default function ScheduleViewer() {
       const opened = await decryptWeek(doc.ciphertext, code)
       if (serializePublishedWeek(opened) !== (week ? serializePublishedWeek(week) : '')) {
         setWeek(opened)
-        rememberWeek(opened)
-        setSeenWeeks(readSeenWeeks())
       }
       setViewingShare({ id: viewingShare.id, rev: doc.rev })
       setUpdateNote('Updated to the latest schedule.')
@@ -299,10 +266,10 @@ export default function ScheduleViewer() {
             )}
           </div>
         ) : (
-          <p className="mt-4 text-zinc-700">
-            Open the link your manager sent you to see a week. Weeks you have already opened on this device are listed
-            below.
-          </p>
+      <p className="mt-4 text-zinc-700">
+          Open the link your manager sent you to see a week. Use the month browser below to open
+          weeks that are turned on.
+        </p>
         )}
       </div>
 
@@ -314,38 +281,12 @@ export default function ScheduleViewer() {
         unlocking={unlockingMonth}
         note={monthNote}
         unlocked={monthUnlocked}
-        seenWeeks={seenWeeks}
         onMonthChange={setMonthKey}
         onMonthCodeChange={setMonthCode}
         onUnlockMonth={unlockMonth}
         onOpenWeek={setWeek}
         onCloseWeek={(weekStart) => setMonthUnlocked((current) => current.filter((item) => item.weekStart !== weekStart))}
       />
-
-      {ready && seenWeeks.length > 0 && monthUnlocked.length === 0 && (
-        <div className="mx-auto mt-8 max-w-2xl">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Weeks on this device</h2>
-          <ul className="mt-3 space-y-2">
-            {seenWeeks.map((seen) => (
-              <li key={seen.weekStart}>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                  onClick={() => setWeek(seen)}
-                >
-                  <span>
-                    <span className="block font-semibold text-zinc-900">Week of {formatWeekRange(seen.weekStart)}</span>
-                    <span className="block text-sm text-zinc-600">{seen.name}</span>
-                  </span>
-                  <span aria-hidden="true" className="text-zinc-400">
-                    &rsaquo;
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   )
 }
@@ -358,7 +299,6 @@ function MonthBrowser({
   unlocking,
   note,
   unlocked,
-  seenWeeks,
   onMonthChange,
   onMonthCodeChange,
   onUnlockMonth,
@@ -372,7 +312,6 @@ function MonthBrowser({
   unlocking: boolean
   note: string
   unlocked: PublishedWeek[]
-  seenWeeks: PublishedWeek[]
   onMonthChange: (monthKey: string) => void
   onMonthCodeChange: (code: string) => void
   onUnlockMonth: () => void
@@ -380,7 +319,6 @@ function MonthBrowser({
   onCloseWeek: (weekStart: string) => void
 }) {
   if (!monthKey) return null
-  const seenByWeek = new Map(seenWeeks.map((seen) => [seen.weekStart, seen]))
   const unlockedByWeek = new Map(unlocked.map((item) => [item.weekStart, item]))
   return (
     <section className="mx-auto mt-8 w-full max-w-none" aria-label="Browse weeks by month">
@@ -450,7 +388,7 @@ function MonthBrowser({
         ) : (
           <ul className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {stubs.map((stub) => {
-              const opened = unlockedByWeek.get(stub.weekStart) ?? seenByWeek.get(stub.weekStart) ?? null
+              const opened = unlockedByWeek.get(stub.weekStart) ?? null
               return (
                 <li
                   key={stub.id}

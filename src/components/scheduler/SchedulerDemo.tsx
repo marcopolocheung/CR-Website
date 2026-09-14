@@ -302,23 +302,6 @@ function cloneEmployeeList(employees: Employee[]) {
 }
 
 const emptyAssignments: ScheduleAssignment[] = []
-const storageKey = 'chinarose.scheduler.v2'
-const legacyStorageKey = 'chinarose.scheduler.v1'
-
-type SavedState = {
-  version: 2
-  employees: Employee[]
-  weeks: WeekAssignments
-  generatedWeeks: WeekAssignments
-  weekStatus: Record<string, WeekStatus>
-}
-
-type LegacySavedState = {
-  version: 1
-  employees: Employee[]
-  weeks: WeekAssignments
-  generatedWeeks: WeekAssignments
-}
 
 function statusForWeek(
   weekStatus: Record<string, WeekStatus>,
@@ -328,42 +311,6 @@ function statusForWeek(
   const explicit = weekStatus[weekStart]
   if (explicit) return explicit
   return assignments.length > 0 ? 'on' : 'off'
-}
-
-function readSavedState(): SavedState | null {
-  try {
-    const raw = window.localStorage.getItem(storageKey)
-    if (raw) {
-      const parsed = JSON.parse(raw) as SavedState
-      if (parsed.version !== 2 || !Array.isArray(parsed.employees)) return null
-      return {
-        ...parsed,
-        weeks: parsed.weeks ?? {},
-        generatedWeeks: parsed.generatedWeeks ?? {},
-        weekStatus: parsed.weekStatus ?? {},
-      }
-    }
-    const legacyRaw = window.localStorage.getItem(legacyStorageKey)
-    if (!legacyRaw) return null
-    const legacy = JSON.parse(legacyRaw) as LegacySavedState
-    if (legacy.version !== 1 || !Array.isArray(legacy.employees)) return null
-    const weekStatus: Record<string, WeekStatus> = {}
-    for (const [weekStart, assignments] of Object.entries(legacy.weeks ?? {})) {
-      weekStatus[weekStart] = Array.isArray(assignments) && assignments.length > 0 ? 'on' : 'off'
-    }
-    return { version: 2, employees: legacy.employees, weeks: legacy.weeks ?? {}, generatedWeeks: legacy.generatedWeeks ?? {}, weekStatus }
-  } catch {
-    // A private window, cleared site data, or a browser that blocks storage.
-    return null
-  }
-}
-
-function writeSavedState(state: SavedState) {
-  try {
-    window.localStorage.setItem(storageKey, JSON.stringify(state))
-  } catch {
-    // Nothing to do; the demo still works for this session.
-  }
 }
 
 function cloneWeeks(weeks: WeekAssignments): WeekAssignments {
@@ -782,28 +729,14 @@ export default function SchedulerDemo() {
   const selectedRoles = ROLES.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && selectedRoles.length > 0
 
-  const [restored, setRestored] = useState(false)
-
   useEffect(() => {
-    // Date and storage both have to wait for the browser: this page is prerendered,
-    // so reading either during render would not match the HTML that shipped.
+    // The date has to wait for the browser: this page is prerendered,
+    // so reading it during render would not match the HTML that shipped.
+    // Drafts live only in memory now; the Worker store is the source of truth.
     const start = currentWeekStart()
     setWeekStart(start)
     setMonthKey(monthKeyForWeek(start))
-    const saved = readSavedState()
-    if (saved) {
-      setEmployees(saved.employees)
-      setWeeks(saved.weeks ?? {})
-      setGeneratedWeeks(saved.generatedWeeks ?? {})
-      setWeekStatus(saved.weekStatus ?? {})
-    }
-    setRestored(true)
   }, [])
-
-  useEffect(() => {
-    if (!restored) return
-    writeSavedState({ version: 2, employees, weeks, generatedWeeks, weekStatus })
-  }, [employees, generatedWeeks, restored, weeks, weekStatus])
 
   useEffect(() => {
     if (!dragState && !moveSource) return
