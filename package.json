@@ -1,12 +1,12 @@
 {
   "name": "chinarose",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build && node scripts/mirror-trailing-slash.mjs",
     "start": "next start",
-    "scheduler:test": "node --import jiti/register --test src/lib/scheduler/scheduler.test.ts src/lib/schedule-share.test.ts src/lib/schedule-store.test.ts worker/src/index.test.ts",
+    "scheduler:test": "node --import jiti/register --test src/lib/scheduler/scheduler.test.ts src/lib/scheduler/week-visibility.test.ts src/lib/schedule-share.test.ts src/lib/schedule-store.test.ts worker/src/index.test.ts",
     "seo:check": "node scripts/seo-check.mjs"
   },
   "dependencies": {

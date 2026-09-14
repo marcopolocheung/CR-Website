@@ -23,6 +23,7 @@ type PublishedMeta = {
   id: string
   rev: number
   fingerprint: string
+  visible: boolean
 }
 
 const publishedKey = 'chinarose.schedule.published.v1'
@@ -32,7 +33,13 @@ function readPublished(): Record<string, PublishedMeta> {
     const raw = window.localStorage.getItem(publishedKey)
     if (!raw) return {}
     const parsed = JSON.parse(raw) as Record<string, PublishedMeta>
-    return parsed && typeof parsed === 'object' ? parsed : {}
+    if (!parsed || typeof parsed !== 'object') return {}
+    for (const [weekStart, meta] of Object.entries(parsed)) {
+      if (meta && typeof meta.visible !== 'boolean') {
+        parsed[weekStart] = { ...meta, visible: true }
+      }
+    }
+    return parsed
   } catch {
     return {}
   }
@@ -60,6 +67,7 @@ export default function SharePanel({
   slots,
   employees,
   assignments,
+  visible,
   onClose,
 }: {
   weekStart: string
@@ -67,6 +75,7 @@ export default function SharePanel({
   slots: StaffingSlot[]
   employees: Employee[]
   assignments: ScheduleAssignment[]
+  visible: boolean
   onClose: () => void
 }) {
   const [name, setName] = useState(`Week of ${weekLabel}`)
@@ -87,7 +96,8 @@ export default function SharePanel({
     () => serializePublishedWeek(buildPublishedWeek({ weekStart, name: '', slots, employees, assignments })),
     [weekStart, slots, employees, assignments],
   )
-  const dirty = published !== null && published.fingerprint !== fingerprint
+  const dirty =
+    published !== null && (published.fingerprint !== fingerprint || published.visible !== visible)
   const link = useMemo(() => {
     if (!published) return ''
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
@@ -123,8 +133,9 @@ export default function SharePanel({
         ciphertext,
         templateHash: templateHashForSlots(slots),
         weekStart,
+        visible,
       })
-      persist({ id: created.id, rev: created.rev, fingerprint })
+      persist({ id: created.id, rev: created.rev, fingerprint, visible })
       setCopiedLink(false)
       setCopiedCode(false)
       setNotice('Link made. Send it once — later edits save to this same link.')
@@ -143,8 +154,8 @@ export default function SharePanel({
     try {
       const week = buildPublishedWeek({ weekStart, name, slots, employees, assignments })
       const ciphertext = await encryptWeek(week, code)
-      const result = await updateSharedWeek(published.id, { ciphertext, baseRev: published.rev })
-      persist({ ...published, rev: result.rev, fingerprint })
+      const result = await updateSharedWeek(published.id, { ciphertext, visible, baseRev: published.rev })
+      persist({ ...published, rev: result.rev, fingerprint, visible })
       setNotice('Saved. Everyone opening this link now sees the update.')
     } catch (caught) {
       if (caught instanceof StoreConflictError) {
