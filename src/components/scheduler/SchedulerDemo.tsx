@@ -410,6 +410,8 @@ function buildMovePreview({
   const targetAssignment = assignmentMap.get(targetSlotId)
   const replacedEmployee = employees.find((candidate) => candidate.id === targetAssignment?.employeeId)
   const isEmptyTarget = !targetAssignment?.employeeId
+  const sourceSlot = slots.find((slot) => slot.id === move.fromSlotId)
+  const sourceLabel = sourceSlot ? `${sourceSlot.day} ${periodLabels[sourceSlot.period]} ${sourceSlot.label}` : 'the open spot'
 
   if (assignmentMap.get(move.fromSlotId)?.locked) {
     return { status: 'invalid', employeeName: employee.name, isEmptyTarget, message: `${employee.name} is marked Keep and cannot move yet.` }
@@ -440,9 +442,11 @@ function buildMovePreview({
     employeeName: employee.name,
     replacedName: replacedEmployee?.name,
     isEmptyTarget,
-    message: replacedEmployee
-      ? `${employee.name} would replace ${replacedEmployee.name}.`
-      : `${employee.name} fits here.`,
+    message: replacedEmployee && sourceSlot
+      ? `${employee.name} replaces ${replacedEmployee.name} here; ${replacedEmployee.name} goes to ${sourceLabel}.`
+      : replacedEmployee
+        ? `${employee.name} would replace ${replacedEmployee.name}.`
+        : `${employee.name} moves here from ${sourceLabel}.`,
   }
 }
 
@@ -529,6 +533,37 @@ function candidatesForSlot({
       ).length === 0
     )
   })
+}
+
+/** Short reason an employee cannot take a slot, for disabled dropdown options. Null means they fit. */
+function unassignableReason({
+  slot,
+  employee,
+  employees,
+  slots,
+  assignments,
+}: {
+  slot: StaffingSlot
+  employee: Employee
+  employees: Employee[]
+  slots: StaffingSlot[]
+  assignments: ScheduleAssignment[]
+}): string | null {
+  if (!employee.active) return 'off the list'
+  if (!isEmployeeQualified(employee, slot)) return 'not trained'
+  if (!isEmployeeAvailableForSlot(employee, slot)) return 'not free'
+  const others = assignments.filter((assignment) => assignment.slotId !== slot.id)
+  const proposed = [...others, { slotId: slot.id, employeeId: employee.id }]
+  const problems = validateSchedule({ employees, slots, assignments: proposed, requireCoverage: false }).filter(
+    (violation) => violation.slotId === slot.id || violation.employeeId === employee.id,
+  )
+  if (problems.length === 0) return null
+  const code = problems[0].code
+  if (code === 'max_days_exceeded' || code === 'max_shifts_exceeded') return 'over limit'
+  if (code === 'prohibited_double') return 'double that day'
+  if (code === 'overlapping_assignment') return 'already working then'
+  if (code === 'incompatible_pair') return 'not with teammate'
+  return 'breaks a rule'
 }
 
 function buildFixIssues(
@@ -690,13 +725,17 @@ export default function SchedulerDemo() {
   }, [employees, generatedWeeks, restored, weeks])
 
   useEffect(() => {
-    if (!moveSource) return
+    if (!dragState && !moveSource) return
     function cancelOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setMoveSource(null)
+      if (event.key === 'Escape') {
+        setDragState(null)
+        setMoveSource(null)
+        setDragOverSlotId(null)
+      }
     }
     window.addEventListener('keydown', cancelOnEscape)
     return () => window.removeEventListener('keydown', cancelOnEscape)
-  }, [moveSource])
+  }, [dragState, moveSource])
 
   // Messages, skipped issues and an open shift all describe the week that was on screen.
   function goToWeek(nextWeekStart: string) {
@@ -710,6 +749,7 @@ export default function SchedulerDemo() {
     setOpenShiftKey(null)
     setDropFeedback(null)
     setMoveSource(null)
+    setDragState(null)
     setDragOverSlotId(null)
   }
 
@@ -736,6 +776,7 @@ export default function SchedulerDemo() {
     setHistory(rest)
     setDropFeedback(null)
     setDragState(null)
+    setMoveSource(null)
     setDragOverSlotId(null)
     setConfirmingReset(false)
   }
@@ -896,6 +937,7 @@ export default function SchedulerDemo() {
     const move = activeMove
     setDragOverSlotId(null)
     setMoveSource(null)
+    setDragState(null)
     if (!move || move.fromSlotId === targetSlotId) return
     const targetSlot = slots.find((slot) => slot.id === targetSlotId)
     const employee = employees.find((candidate) => candidate.id === move.employeeId)
@@ -944,6 +986,8 @@ export default function SchedulerDemo() {
 
   function cancelMove() {
     setMoveSource(null)
+    setDragState(null)
+    setDragOverSlotId(null)
     setDropFeedback(null)
   }
 
@@ -1165,6 +1209,7 @@ export default function SchedulerDemo() {
               weekStart={weekStart}
               hasSchedule={assignments.length > 0}
               employees={employees}
+              assignments={assignments}
               assignmentMap={assignmentMap}
               violations={violations}
               openShiftKey={openShiftKey}
@@ -1795,6 +1840,7 @@ function WeeklyScheduleBoard({
   weekStart,
   hasSchedule,
   employees,
+  assignments,
   assignmentMap,
   violations,
   openShiftKey,
@@ -1818,6 +1864,7 @@ function WeeklyScheduleBoard({
   weekStart: string
   hasSchedule: boolean
   employees: Employee[]
+  assignments: ScheduleAssignment[]
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
   openShiftKey: ShiftKey | null
@@ -1876,8 +1923,10 @@ function WeeklyScheduleBoard({
                     shiftKey={shiftKey}
                     period={period}
                     slots={shiftSlots}
+                    allSlots={slots}
                     hasSchedule={hasSchedule}
                     employees={employees}
+                    assignments={assignments}
                     assignmentMap={assignmentMap}
                     violations={violations}
                     open={openShiftKey === shiftKey}
@@ -1949,8 +1998,10 @@ function ShiftRow({
   shiftKey,
   period,
   slots,
+  allSlots,
   hasSchedule,
   employees,
+  assignments,
   assignmentMap,
   violations,
   open,
@@ -1973,8 +2024,10 @@ function ShiftRow({
   shiftKey: ShiftKey
   period: ShiftPeriod
   slots: StaffingSlot[]
+  allSlots: StaffingSlot[]
   hasSchedule: boolean
   employees: Employee[]
+  assignments: ScheduleAssignment[]
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
   open: boolean
@@ -2069,6 +2122,8 @@ function ShiftRow({
                 status={slotStatuses[index]}
                 activeMove={activeMove}
                 employees={employees}
+                allSlots={allSlots}
+                allAssignments={assignments}
                 assignment={assignmentMap.get(slot.id)}
                 violations={violations.filter((violation) => violation.slotId === slot.id)}
                 dragOverSlotId={dragOverSlotId}
@@ -2195,9 +2250,6 @@ function AssignmentChip({
         if (!leftDropTarget(event)) return
         onDragLeaveSlot(slot.id)
       }}
-      onFocus={() => {
-        if (isMoveActive) onDragOverSlot(slot.id)
-      }}
       onMouseEnter={() => {
         if (isMoveActive) onDragOverSlot(slot.id)
       }}
@@ -2245,6 +2297,8 @@ function SlotEditor({
   status,
   activeMove,
   employees,
+  allSlots,
+  allAssignments,
   assignment,
   violations,
   dragOverSlotId,
@@ -2260,6 +2314,8 @@ function SlotEditor({
   status: SpotStatus
   activeMove: DragState | null
   employees: Employee[]
+  allSlots: StaffingSlot[]
+  allAssignments: ScheduleAssignment[]
   assignment?: ScheduleAssignment
   violations: ValidationViolation[]
   dragOverSlotId: string | null
@@ -2271,8 +2327,22 @@ function SlotEditor({
   onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
 }) {
-  const eligibleEmployees = employees.filter((employee) => employee.active && isEmployeeQualified(employee, slot) && isEmployeeAvailableForSlot(employee, slot))
+  const currentId = assignment?.employeeId ?? ''
+  const eligibleEmployees = employees.filter(
+    (employee) =>
+      unassignableReason({ slot, employee, employees, slots: allSlots, assignments: allAssignments }) === null,
+  )
   const otherEmployees = employees.filter((employee) => !eligibleEmployees.includes(employee))
+  const currentReason = employees.find((employee) => employee.id === currentId)
+    ? unassignableReason({
+        slot,
+        employee: employees.find((employee) => employee.id === currentId) as Employee,
+        employees,
+        slots: allSlots,
+        assignments: allAssignments,
+      })
+    : null
+  const showInvalidKept = Boolean(currentId && currentReason)
   const isSource = activeMove?.fromSlotId === slot.id
   const isDropTarget = dragOverSlotId === slot.id && Boolean(activeMove) && !isSource
   const panelTone =
@@ -2331,7 +2401,7 @@ function SlotEditor({
       >
         <option value="">Unassigned</option>
         {eligibleEmployees.length > 0 && (
-          <optgroup label="Best choices">
+          <optgroup label="Best choices — free and trained">
             {eligibleEmployees.map((employee) => (
               <option key={employee.id} value={employee.id}>
                 {employee.name}
@@ -2340,15 +2410,25 @@ function SlotEditor({
           </optgroup>
         )}
         {otherEmployees.length > 0 && (
-          <optgroup label="Other employees">
-            {otherEmployees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.name}
-              </option>
-            ))}
+          <optgroup label="Other employees — needs a fix">
+            {otherEmployees.map((employee) => {
+              const reason = unassignableReason({ slot, employee, employees, slots: allSlots, assignments: allAssignments })
+              const isCurrent = employee.id === currentId
+              return (
+                <option key={employee.id} value={employee.id} disabled={!isCurrent}>
+                  {employee.name} — {reason}
+                </option>
+              )
+            })}
           </optgroup>
         )}
       </select>
+      {showInvalidKept && (
+        <p className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-950" role="note">
+          {employees.find((employee) => employee.id === currentId)?.name} is kept here but {currentReason}. Pick someone from
+          Best choices to fix it.
+        </p>
+      )}
       <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
         <input
           type="checkbox"
