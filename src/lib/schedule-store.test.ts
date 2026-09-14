@@ -6,6 +6,7 @@ import {
   StoreUnavailableError,
   createSharedWeek,
   fetchSharedWeek,
+  listVisibleWeeks,
   updateSharedWeek,
 } from './schedule-store'
 
@@ -77,5 +78,27 @@ test('update returns the bumped revision on success', async () => {
     assert.deepEqual(await updateSharedWeek('Ab3x9QzY2k', { ciphertext: 'tok', baseRev: 2 }), { rev: 3 })
   } finally {
     restore()
+  }
+})
+
+test('month listing returns visible stubs and tolerates a bad month', async () => {
+  const restore = mockFetchOnce((url) => {
+    if (url.includes('month=bad')) return { status: 400, payload: { error: 'invalid_month' } }
+    assert.ok(url.includes('/api/weeks?month=2026-09'))
+    return {
+      status: 200,
+      payload: { weeks: [{ id: 'Ab3x9QzY2k', weekStart: '2026-09-13', rev: 1, updatedAt: 'x', templateHash: 'a1b2' }] },
+    }
+  })
+  try {
+    assert.equal((await listVisibleWeeks('2026-09')).length, 1)
+  } finally {
+    restore()
+  }
+  const restoreBad = mockFetchOnce(() => ({ status: 400, payload: { error: 'invalid_month' } }))
+  try {
+    assert.deepEqual(await listVisibleWeeks('bad'), [])
+  } finally {
+    restoreBad()
   }
 })
