@@ -110,10 +110,10 @@ type SpotStatus = 'good' | 'review' | 'missing' | 'idle'
 const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: string; row: string; shiftRow: string; shiftLabel: string }> = {
   good: {
     icon: 'check',
-    chip: 'border-zinc-200 bg-white text-zinc-900',
+    chip: 'border-green-200 bg-green-50 text-green-950',
     badge: 'border-green-300 bg-green-50 text-green-900',
-    row: 'border-zinc-200 border-l-4 border-l-green-600',
-    shiftRow: 'border-l-4 border-l-transparent bg-zinc-50',
+    row: 'border-green-200 border-l-4 border-l-green-600',
+    shiftRow: 'border-l-4 border-l-green-600 bg-green-50',
     shiftLabel: 'Ready',
   },
   review: {
@@ -153,6 +153,19 @@ const roleInitials: Record<Role, string> = {
 function slotBadge(slot: StaffingSlot) {
   const position = slot.label.match(/(\d+)$/)?.[1] ?? ''
   return `${roleInitials[slot.role]}${position}`
+}
+
+/** Compact shift time for chips: 9:30a-4p, 4-11p. Full range stays in the shift editor. */
+function shortHour(totalMinutes: number) {
+  const hour24 = Math.floor(totalMinutes / 60)
+  const minute = totalMinutes % 60
+  const suffix = hour24 >= 12 ? 'p' : 'a'
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+  return minute === 0 ? `${hour12}${suffix}` : `${hour12}:${String(minute).padStart(2, '0')}${suffix}`
+}
+
+function shortTimeRange(slot: StaffingSlot) {
+  return `${shortHour(slot.start)}-${shortHour(slot.end)}`
 }
 
 function spotStatus({
@@ -397,6 +410,8 @@ function buildMovePreview({
   const targetAssignment = assignmentMap.get(targetSlotId)
   const replacedEmployee = employees.find((candidate) => candidate.id === targetAssignment?.employeeId)
   const isEmptyTarget = !targetAssignment?.employeeId
+  const sourceSlot = slots.find((slot) => slot.id === move.fromSlotId)
+  const sourceLabel = sourceSlot ? `${sourceSlot.day} ${periodLabels[sourceSlot.period]} ${sourceSlot.label}` : 'the open spot'
 
   if (assignmentMap.get(move.fromSlotId)?.locked) {
     return { status: 'invalid', employeeName: employee.name, isEmptyTarget, message: `${employee.name} is marked Keep and cannot move yet.` }
@@ -427,9 +442,11 @@ function buildMovePreview({
     employeeName: employee.name,
     replacedName: replacedEmployee?.name,
     isEmptyTarget,
-    message: replacedEmployee
-      ? `${employee.name} would replace ${replacedEmployee.name}.`
-      : `${employee.name} fits here.`,
+    message: replacedEmployee && sourceSlot
+      ? `${employee.name} replaces ${replacedEmployee.name} here; ${replacedEmployee.name} goes to ${sourceLabel}.`
+      : replacedEmployee
+        ? `${employee.name} would replace ${replacedEmployee.name}.`
+        : `${employee.name} moves here from ${sourceLabel}.`,
   }
 }
 
@@ -518,6 +535,37 @@ function candidatesForSlot({
   })
 }
 
+/** Short reason an employee cannot take a slot, for disabled dropdown options. Null means they fit. */
+function unassignableReason({
+  slot,
+  employee,
+  employees,
+  slots,
+  assignments,
+}: {
+  slot: StaffingSlot
+  employee: Employee
+  employees: Employee[]
+  slots: StaffingSlot[]
+  assignments: ScheduleAssignment[]
+}): string | null {
+  if (!employee.active) return 'off the list'
+  if (!isEmployeeQualified(employee, slot)) return 'not trained'
+  if (!isEmployeeAvailableForSlot(employee, slot)) return 'not free'
+  const others = assignments.filter((assignment) => assignment.slotId !== slot.id)
+  const proposed = [...others, { slotId: slot.id, employeeId: employee.id }]
+  const problems = validateSchedule({ employees, slots, assignments: proposed, requireCoverage: false }).filter(
+    (violation) => violation.slotId === slot.id || violation.employeeId === employee.id,
+  )
+  if (problems.length === 0) return null
+  const code = problems[0].code
+  if (code === 'max_days_exceeded' || code === 'max_shifts_exceeded') return 'over limit'
+  if (code === 'prohibited_double') return 'double that day'
+  if (code === 'overlapping_assignment') return 'already working then'
+  if (code === 'incompatible_pair') return 'not with teammate'
+  return 'breaks a rule'
+}
+
 function buildFixIssues(
   readinessProblems: Diagnostic[],
   violations: ValidationViolation[],
@@ -570,6 +618,7 @@ export default function SchedulerDemo() {
   const [ignoredIssueIds, setIgnoredIssueIds] = useState<string[]>([])
   const [guidedChoosing, setGuidedChoosing] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [confirmingReset, setConfirmingReset] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
   const assignments = weeks[weekStart] ?? emptyAssignments
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
@@ -640,8 +689,21 @@ export default function SchedulerDemo() {
         : [],
     [assignments, employees, nextIssue, slots],
   )
+  const fixExcluded = useMemo(() => {
+    if (!nextIssue?.slot) return [] as { employee: Employee; reason: string }[]
+    const candidateIds = new Set(fixCandidates.map((candidate) => candidate.id))
+    return employees
+      .filter((employee) => !candidateIds.has(employee.id))
+      .map((employee) => ({
+        employee,
+        reason:
+          unassignableReason({ slot: nextIssue.slot as StaffingSlot, employee, employees, slots, assignments }) ??
+          'not available',
+      }))
+  }, [assignments, employees, fixCandidates, nextIssue, slots])
   const ignoredCount = fixIssues.filter((issue) => ignoredIssueIds.includes(issue.id)).length
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
+  const keptCount = assignments.filter((assignment) => assignment.locked && assignment.employeeId).length
   const schedulePassing = assignments.length > 0 && violations.length === 0
   const blockers = [
     activeEmployeeCount === 0 ? 'Nobody is marked as working.' : null,
@@ -675,13 +737,17 @@ export default function SchedulerDemo() {
   }, [employees, generatedWeeks, restored, weeks])
 
   useEffect(() => {
-    if (!moveSource) return
+    if (!dragState && !moveSource) return
     function cancelOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setMoveSource(null)
+      if (event.key === 'Escape') {
+        setDragState(null)
+        setMoveSource(null)
+        setDragOverSlotId(null)
+      }
     }
     window.addEventListener('keydown', cancelOnEscape)
     return () => window.removeEventListener('keydown', cancelOnEscape)
-  }, [moveSource])
+  }, [dragState, moveSource])
 
   // Messages, skipped issues and an open shift all describe the week that was on screen.
   function goToWeek(nextWeekStart: string) {
@@ -691,9 +757,11 @@ export default function SchedulerDemo() {
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setSharing(false)
+    setConfirmingReset(false)
     setOpenShiftKey(null)
     setDropFeedback(null)
     setMoveSource(null)
+    setDragState(null)
     setDragOverSlotId(null)
   }
 
@@ -720,7 +788,9 @@ export default function SchedulerDemo() {
     setHistory(rest)
     setDropFeedback(null)
     setDragState(null)
+    setMoveSource(null)
     setDragOverSlotId(null)
+    setConfirmingReset(false)
   }
 
   function restoreEverything() {
@@ -838,7 +908,8 @@ export default function SchedulerDemo() {
   }
 
   function reset() {
-    if (!window.confirm('Start over? This clears the schedule and every change to the staff list.')) return
+    // Inline confirm in the header calls this only after an explicit second click.
+    // remember() keeps the pre-reset state so Undo can bring it back.
     remember('reset demo')
     setEmployees(cloneEmployees())
     setWeeks({})
@@ -849,6 +920,7 @@ export default function SchedulerDemo() {
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setSelectedVariant('balanced')
+    setConfirmingReset(false)
   }
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
@@ -877,6 +949,7 @@ export default function SchedulerDemo() {
     const move = activeMove
     setDragOverSlotId(null)
     setMoveSource(null)
+    setDragState(null)
     if (!move || move.fromSlotId === targetSlotId) return
     const targetSlot = slots.find((slot) => slot.id === targetSlotId)
     const employee = employees.find((candidate) => candidate.id === move.employeeId)
@@ -925,6 +998,8 @@ export default function SchedulerDemo() {
 
   function cancelMove() {
     setMoveSource(null)
+    setDragState(null)
+    setDragOverSlotId(null)
     setDropFeedback(null)
   }
 
@@ -996,7 +1071,13 @@ export default function SchedulerDemo() {
             <h1 className="text-2xl font-bold md:text-3xl">Weekly staff schedule</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button tone="primary" onClick={() => generate()} icon="spark">
+            <Button
+              tone="primary"
+              onClick={() => generate()}
+              icon="spark"
+              disabled={activeEmployeeCount === 0}
+              title={activeEmployeeCount === 0 ? 'Add someone to the staff list first.' : 'Build the week from the staff list.'}
+            >
               Make schedule
             </Button>
             <Button onClick={fixNextIssue} icon="target" disabled={!nextIssue} badge={visibleFixIssues.length}>
@@ -1005,18 +1086,62 @@ export default function SchedulerDemo() {
             <Button onClick={() => setSharing((open) => !open)} icon="share" disabled={!weekStart}>
               Share with staff
             </Button>
+            {keptCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                <Icon name="lock" />
+                Keep: {keptCount}
+              </span>
+            )}
             <span aria-hidden="true" className="mx-1 hidden h-8 w-px bg-zinc-200 sm:block" />
-            <IconButton
-              icon="undo"
-              label={history[0] ? `Undo ${history[0].label}` : 'Undo last change'}
+            <Button
               onClick={undoLastChange}
+              icon="undo"
               disabled={history.length === 0}
-            />
-            <IconButton icon="plus" label="Add employee" onClick={openEmployeePanelForGap} />
-            <IconButton icon="print" label="Print schedule" onClick={() => window.print()} />
-            <IconButton icon="reset" label="Start over" onClick={reset} />
+              title={history[0] ? `Undo ${history[0].label}` : 'Nothing to undo yet.'}
+            >
+              Undo
+            </Button>
+            <Button onClick={openEmployeePanelForGap} icon="plus">
+              Add employee
+            </Button>
+            <Button
+              onClick={() => window.print()}
+              icon="print"
+              disabled={!schedulePassing}
+              title={!schedulePassing ? 'Fix every spot before printing.' : 'Print the passing schedule.'}
+            >
+              Print
+            </Button>
+            {confirmingReset ? (
+              <span className="inline-flex flex-wrap items-center gap-2 rounded border border-red-300 bg-red-50 px-2 py-1">
+                <span className="text-xs font-semibold text-red-900">Clear everything? You can undo.</span>
+                <button
+                  type="button"
+                  className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={reset}
+                >
+                  Yes, start over
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={() => setConfirmingReset(false)}
+                >
+                  Keep everything
+                </button>
+              </span>
+            ) : (
+              <Button onClick={() => setConfirmingReset(true)} icon="reset">
+                Start over
+              </Button>
+            )}
           </div>
         </div>
+        {activeEmployeeCount === 0 && (
+          <p className="mx-auto max-w-[1400px] px-4 pb-3 text-sm text-zinc-600">
+            Add someone to the staff list before making a schedule.
+          </p>
+        )}
       </header>
 
       <div className="mx-auto grid max-w-[1400px] gap-5 px-4 py-5 xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -1035,8 +1160,10 @@ export default function SchedulerDemo() {
           <GuidedFixPanel
             nextIssue={nextIssue}
             issueCount={visibleFixIssues.length}
+            totalCount={fixIssues.length}
             ignoredCount={ignoredCount}
             candidates={fixCandidates}
+            excluded={fixExcluded}
             choosing={guidedChoosing}
             hasSchedule={assignments.length > 0}
             onChooseEmployee={fixNextIssue}
@@ -1096,6 +1223,7 @@ export default function SchedulerDemo() {
               weekStart={weekStart}
               hasSchedule={assignments.length > 0}
               employees={employees}
+              assignments={assignments}
               assignmentMap={assignmentMap}
               violations={violations}
               openShiftKey={openShiftKey}
@@ -1137,18 +1265,20 @@ export default function SchedulerDemo() {
           )}
 
           {diagnostics.length > 0 && (
-            <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
-              <ul className="space-y-1 text-sm text-zinc-700">
-                {diagnostics.map((message, index) => (
-                  <li key={`${message}-${index}`}>{message}</li>
-                ))}
-              </ul>
-            </Disclosure>
+            <div aria-live="polite">
+              <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
+                <ul className="space-y-1 text-sm text-zinc-700">
+                  {diagnostics.map((message, index) => (
+                    <li key={`${message}-${index}`}>{message}</li>
+                  ))}
+                </ul>
+              </Disclosure>
+            </div>
           )}
 
           <div className="space-y-1 pt-2">
             <Disclosure summary="Hours for each person" tone="quiet">
-              <HoursSummary stats={stats} />
+              <HoursSummary stats={stats} employees={employees} />
             </Disclosure>
 
             <ScheduleRules slots={slots} />
@@ -1411,8 +1541,10 @@ function EmployeeCard({ employee, onUpdate }: { employee: Employee; onUpdate: (e
 function GuidedFixPanel({
   nextIssue,
   issueCount,
+  totalCount,
   ignoredCount,
   candidates,
+  excluded,
   choosing,
   hasSchedule,
   onChooseEmployee,
@@ -1423,8 +1555,10 @@ function GuidedFixPanel({
 }: {
   nextIssue?: FixIssue
   issueCount: number
+  totalCount: number
   ignoredCount: number
   candidates: Employee[]
+  excluded: { employee: Employee; reason: string }[]
   choosing: boolean
   hasSchedule: boolean
   onChooseEmployee: () => void
@@ -1460,16 +1594,31 @@ function GuidedFixPanel({
     )
   }
 
+  const isBlocker = nextIssue.id.includes('missing_assignment') || nextIssue.id.startsWith('ready:')
+  const position = totalCount > 0 ? totalCount - issueCount + 1 : 1
   return (
-    <section className="rounded-lg border border-amber-400 bg-amber-50 p-4 shadow-sm">
+    <section
+      className={`rounded-lg border p-4 shadow-sm ${isBlocker ? 'border-red-400 bg-red-50' : 'border-amber-400 bg-amber-50'}`}
+      aria-live="polite"
+    >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-amber-900">
-            {issueCount} spot{issueCount === 1 ? '' : 's'} need fixing
+          <p className={`text-sm font-semibold ${isBlocker ? 'text-red-900' : 'text-amber-900'}`}>
+            Fix {position} of {totalCount}
             {ignoredCount > 0 && ` · ${ignoredCount} skipped`}
           </p>
-          <h2 className="mt-1 text-lg font-semibold text-amber-950">{nextIssue.title}</h2>
-          <p className="mt-1 text-sm text-amber-900">{nextIssue.detail}</p>
+          <p className="mt-1">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-bold ${
+                isBlocker ? 'border-red-300 bg-white text-red-900' : 'border-amber-300 bg-white text-amber-950'
+              }`}
+            >
+              <Icon name={isBlocker ? 'warning' : 'target'} />
+              {isBlocker ? 'Must fix before printing' : 'You can skip this'}
+            </span>
+          </p>
+          <h2 className={`mt-1 text-lg font-semibold ${isBlocker ? 'text-red-950' : 'text-amber-950'}`}>{nextIssue.title}</h2>
+          <p className={`mt-1 text-sm ${isBlocker ? 'text-red-900' : 'text-amber-900'}`}>{nextIssue.detail}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button tone="primary" onClick={onChooseEmployee} icon="target" disabled={!nextIssue.slot}>
@@ -1478,11 +1627,16 @@ function GuidedFixPanel({
           <Button onClick={onAddEmployee} icon="plus">
             Add employee
           </Button>
-          <Button onClick={onIgnore} icon="close">
+          <Button onClick={onIgnore} icon="close" disabled={isBlocker} title={isBlocker ? 'An empty spot must be filled — skipping would hide missing cover.' : 'Skip this for now.'}>
             Ignore for now
           </Button>
         </div>
       </div>
+      {isBlocker && (
+        <p className="mt-2 text-xs font-medium text-red-900">
+          Empty spots block printing. Skipping is turned off so missing cover stays visible.
+        </p>
+      )}
 
       {choosing && nextIssue.slot && (
         <div className="mt-4 rounded border border-amber-300 bg-white p-3">
@@ -1505,11 +1659,36 @@ function GuidedFixPanel({
                 ))}
               </div>
               <p className="mt-2 text-xs text-zinc-500">Everyone here is free and trained for this position.</p>
+              {excluded.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-semibold text-zinc-700 hover:text-zinc-900">
+                    Why {excluded.length} other{excluded.length === 1 ? '' : 's'} can&apos;t cover this
+                  </summary>
+                  <ul className="mt-1 space-y-1 text-xs text-zinc-600">
+                    {excluded.map(({ employee, reason }) => (
+                      <li key={employee.id}>
+                        <span className="font-medium text-zinc-800">{employee.name}</span> — {reason}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </>
           ) : (
-            <p className="text-sm text-zinc-700">
-              Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.
-            </p>
+            <>
+              <p className="text-sm text-zinc-700">
+                Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.
+              </p>
+              {excluded.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs text-zinc-600">
+                  {excluded.map(({ employee, reason }) => (
+                    <li key={employee.id}>
+                      <span className="font-medium text-zinc-800">{employee.name}</span> — {reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </div>
       )}
@@ -1549,7 +1728,7 @@ function VariantControls({
   )
 }
 
-function HoursSummary({ stats }: { stats: ScheduleStats[] }) {
+function HoursSummary({ stats, employees }: { stats: ScheduleStats[]; employees: Employee[] }) {
   const working = stats.filter((stat) => stat.shifts > 0)
   if (working.length === 0) {
     return <p className="text-sm text-zinc-600">Make a schedule to see how the hours land.</p>
@@ -1557,25 +1736,37 @@ function HoursSummary({ stats }: { stats: ScheduleStats[] }) {
 
   const mostHours = Math.max(...working.map((stat) => stat.hours))
   const idle = stats.filter((stat) => stat.shifts === 0)
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee]))
 
   return (
     <div>
       <ul className="divide-y divide-zinc-100">
-        {working.map((stat) => (
-          <li key={stat.employeeId} className="flex items-center gap-3 py-1.5 text-sm">
-            <span className="w-24 shrink-0 truncate font-medium text-zinc-900">{stat.name}</span>
-            <span aria-hidden="true" className="h-1.5 min-w-0 flex-1 rounded-full bg-zinc-100">
-              <span
-                className="block h-full rounded-full bg-zinc-400"
-                style={{ width: `${Math.round((stat.hours / mostHours) * 100)}%` }}
-              />
-            </span>
-            <span className="w-14 shrink-0 text-right font-semibold text-zinc-900">{stat.hours.toFixed(1)}h</span>
-            <span className="w-20 shrink-0 text-right text-xs text-zinc-500">
-              {stat.days}d · {stat.shifts} shift{stat.shifts === 1 ? '' : 's'}
-            </span>
-          </li>
-        ))}
+        {working.map((stat) => {
+          const employee = employeeById.get(stat.employeeId)
+          const maxDays = employee?.maxDaysPerWeek ?? 7
+          const maxShifts = employee?.maxShiftsPerWeek
+          const overloaded = stat.days > maxDays || (maxShifts !== undefined && stat.shifts > maxShifts)
+          return (
+            <li key={stat.employeeId} className="flex items-center gap-3 py-1.5 text-sm">
+              <span className="w-24 shrink-0 truncate font-medium text-zinc-900">
+                {stat.name}
+                {overloaded && <span className="ml-1 font-bold text-red-700">· over</span>}
+              </span>
+              <span aria-hidden="true" className={`h-1.5 min-w-0 flex-1 rounded-full ${overloaded ? 'bg-red-100' : 'bg-zinc-100'}`}>
+                <span
+                  className={`block h-full rounded-full ${overloaded ? 'bg-red-600' : 'bg-zinc-400'}`}
+                  style={{ width: `${Math.round((stat.hours / mostHours) * 100)}%` }}
+                />
+              </span>
+              <span className={`w-14 shrink-0 text-right font-semibold ${overloaded ? 'text-red-800' : 'text-zinc-900'}`}>
+                {stat.hours.toFixed(1)}h
+              </span>
+              <span className={`w-20 shrink-0 text-right text-xs ${overloaded ? 'font-semibold text-red-700' : 'text-zinc-500'}`}>
+                {stat.days}d · {stat.shifts} shift{stat.shifts === 1 ? '' : 's'}
+              </span>
+            </li>
+          )
+        })}
       </ul>
       {idle.length > 0 && (
         <p className="mt-2 text-xs text-zinc-500">
@@ -1623,6 +1814,7 @@ function Button({
   badge,
   onClick,
   disabled = false,
+  title,
 }: {
   children: React.ReactNode
   icon: IconName
@@ -1630,6 +1822,7 @@ function Button({
   badge?: number
   onClick: () => void
   disabled?: boolean
+  title?: string
 }) {
   const className =
     tone === 'primary'
@@ -1637,7 +1830,7 @@ function Button({
       : 'inline-flex items-center justify-center gap-2 rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
 
   return (
-    <button type="button" className={className} onClick={onClick} disabled={disabled}>
+    <button type="button" className={className} onClick={onClick} disabled={disabled} title={title}>
       <Icon name={icon} />
       {children}
       {badge !== undefined && badge > 0 && (
@@ -1724,6 +1917,7 @@ function WeeklyScheduleBoard({
   weekStart,
   hasSchedule,
   employees,
+  assignments,
   assignmentMap,
   violations,
   openShiftKey,
@@ -1747,6 +1941,7 @@ function WeeklyScheduleBoard({
   weekStart: string
   hasSchedule: boolean
   employees: Employee[]
+  assignments: ScheduleAssignment[]
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
   openShiftKey: ShiftKey | null
@@ -1769,14 +1964,31 @@ function WeeklyScheduleBoard({
   return (
     <div className="mt-4">
       <div className="divide-y divide-zinc-100">
-        {DAYS.map((day) => (
+        {DAYS.map((day) => {
+          const daySlots = slots.filter((slot) => slot.day === day)
+          const filled = daySlots.filter((slot) => assignmentMap.get(slot.id)?.employeeId).length
+          const dayComplete = daySlots.length > 0 && filled === daySlots.length
+          return (
           <div
             key={day}
-            className="py-2 md:grid md:grid-cols-[92px_minmax(0,1fr)] md:items-start md:gap-3"
+            className="py-2 md:grid md:grid-cols-[132px_minmax(0,1fr)] md:items-start md:gap-3"
           >
             <h3 className="px-1 py-2 text-base font-bold text-zinc-900">
               {day}
               {weekStart && <span className="ml-1.5 text-sm font-normal text-zinc-500">{dayOfMonth(weekStart, day)}</span>}
+              <span
+                className={`ml-2 inline-flex items-center rounded-full border px-2 py-0.5 align-middle text-xs font-semibold ${
+                  daySlots.length === 0
+                    ? 'border-zinc-200 bg-zinc-50 text-zinc-500'
+                    : dayComplete
+                      ? 'border-green-300 bg-green-50 text-green-900'
+                      : hasSchedule
+                        ? 'border-amber-300 bg-amber-50 text-amber-950'
+                        : 'border-zinc-200 bg-zinc-50 text-zinc-600'
+                }`}
+              >
+                {filled}/{daySlots.length} filled
+              </span>
             </h3>
             <div className="space-y-1">
               {PERIODS.map((period) => {
@@ -1788,8 +2000,10 @@ function WeeklyScheduleBoard({
                     shiftKey={shiftKey}
                     period={period}
                     slots={shiftSlots}
+                    allSlots={slots}
                     hasSchedule={hasSchedule}
                     employees={employees}
+                    assignments={assignments}
                     assignmentMap={assignmentMap}
                     violations={violations}
                     open={openShiftKey === shiftKey}
@@ -1813,7 +2027,8 @@ function WeeklyScheduleBoard({
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
       <BoardLegend />
     </div>
@@ -1821,7 +2036,7 @@ function WeeklyScheduleBoard({
 }
 
 function BoardLegend() {
-  const statusOrder: SpotStatus[] = ['review', 'missing']
+  const statusOrder: SpotStatus[] = ['good', 'review', 'missing', 'idle']
 
   return (
     <div className="space-y-2 border-t border-zinc-100 pt-3 text-xs">
@@ -1837,13 +2052,20 @@ function BoardLegend() {
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-zinc-500">Marked only when:</span>
+        <span className="text-zinc-500">Spot:</span>
         {statusOrder.map((status) => (
-          <span key={status} className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium ${statusMeta[status].badge}`}>
+          <span key={status} className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium ${statusMeta[status].chip}`}>
             <Icon name={statusMeta[status].icon} />
             {statusMeta[status].shiftLabel}
           </span>
         ))}
+        <span className="inline-flex items-center gap-1.5 rounded border border-zinc-300 bg-white px-2 py-1 font-medium text-zinc-700">
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+          Changed
+        </span>
+        <span className="inline-flex items-center gap-1 rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold text-white">
+          Keep
+        </span>
       </div>
     </div>
   )
@@ -1853,8 +2075,10 @@ function ShiftRow({
   shiftKey,
   period,
   slots,
+  allSlots,
   hasSchedule,
   employees,
+  assignments,
   assignmentMap,
   violations,
   open,
@@ -1877,8 +2101,10 @@ function ShiftRow({
   shiftKey: ShiftKey
   period: ShiftPeriod
   slots: StaffingSlot[]
+  allSlots: StaffingSlot[]
   hasSchedule: boolean
   employees: Employee[]
+  assignments: ScheduleAssignment[]
   assignmentMap: Map<string, ScheduleAssignment>
   violations: ValidationViolation[]
   open: boolean
@@ -1973,6 +2199,8 @@ function ShiftRow({
                 status={slotStatuses[index]}
                 activeMove={activeMove}
                 employees={employees}
+                allSlots={allSlots}
+                allAssignments={assignments}
                 assignment={assignmentMap.get(slot.id)}
                 violations={violations.filter((violation) => violation.slotId === slot.id)}
                 dragOverSlotId={dragOverSlotId}
@@ -2099,9 +2327,6 @@ function AssignmentChip({
         if (!leftDropTarget(event)) return
         onDragLeaveSlot(slot.id)
       }}
-      onFocus={() => {
-        if (isMoveActive) onDragOverSlot(slot.id)
-      }}
       onMouseEnter={() => {
         if (isMoveActive) onDragOverSlot(slot.id)
       }}
@@ -2118,17 +2343,28 @@ function AssignmentChip({
       >
         {slotBadge(slot)}
       </span>
-      <span className={`truncate text-sm ${primaryTone}${isGhosted ? ' italic opacity-80' : ''}`}>{primaryText}</span>
+      <span className={`truncate text-sm ${primaryTone}${isGhosted ? ' italic opacity-80' : ''}`}>
+        {primaryText}
+        <span aria-hidden="true" className="ml-1 font-normal opacity-70">
+          · {shortTimeRange(slot)}
+        </span>
+      </span>
       {!isMoveActive && isChanged && (
         <>
-          <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500" />
+          <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600 ring-2 ring-white" />
           <span className="sr-only">Changed since the schedule was made.</span>
         </>
       )}
       {!isMoveActive && status !== 'good' && status !== 'idle' && <Icon name={statusMeta[status].icon} />}
       {isMoveActive && !isSource && preview && <Icon name={preview.status === 'valid' ? 'check' : 'close'} />}
-      {assignment?.locked && <Icon name="lock" />}
-      <span className="sr-only">{`${slot.label}. ${statusMeta[status].shiftLabel}.`}</span>
+      {assignment?.locked && (
+        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white [&>svg]:h-3 [&>svg]:w-3">
+          <Icon name="lock" />
+          <span aria-hidden="true">Keep</span>
+          <span className="sr-only">Kept in place.</span>
+        </span>
+      )}
+      <span className="sr-only">{`${slot.label} ${shortTimeRange(slot)}. ${statusMeta[status].shiftLabel}.`}</span>
     </button>
   )
 }
@@ -2138,6 +2374,8 @@ function SlotEditor({
   status,
   activeMove,
   employees,
+  allSlots,
+  allAssignments,
   assignment,
   violations,
   dragOverSlotId,
@@ -2153,6 +2391,8 @@ function SlotEditor({
   status: SpotStatus
   activeMove: DragState | null
   employees: Employee[]
+  allSlots: StaffingSlot[]
+  allAssignments: ScheduleAssignment[]
   assignment?: ScheduleAssignment
   violations: ValidationViolation[]
   dragOverSlotId: string | null
@@ -2164,8 +2404,22 @@ function SlotEditor({
   onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
 }) {
-  const eligibleEmployees = employees.filter((employee) => employee.active && isEmployeeQualified(employee, slot) && isEmployeeAvailableForSlot(employee, slot))
+  const currentId = assignment?.employeeId ?? ''
+  const eligibleEmployees = employees.filter(
+    (employee) =>
+      unassignableReason({ slot, employee, employees, slots: allSlots, assignments: allAssignments }) === null,
+  )
   const otherEmployees = employees.filter((employee) => !eligibleEmployees.includes(employee))
+  const currentReason = employees.find((employee) => employee.id === currentId)
+    ? unassignableReason({
+        slot,
+        employee: employees.find((employee) => employee.id === currentId) as Employee,
+        employees,
+        slots: allSlots,
+        assignments: allAssignments,
+      })
+    : null
+  const showInvalidKept = Boolean(currentId && currentReason)
   const isSource = activeMove?.fromSlotId === slot.id
   const isDropTarget = dragOverSlotId === slot.id && Boolean(activeMove) && !isSource
   const panelTone =
@@ -2224,7 +2478,7 @@ function SlotEditor({
       >
         <option value="">Unassigned</option>
         {eligibleEmployees.length > 0 && (
-          <optgroup label="Best choices">
+          <optgroup label="Best choices — free and trained">
             {eligibleEmployees.map((employee) => (
               <option key={employee.id} value={employee.id}>
                 {employee.name}
@@ -2233,15 +2487,25 @@ function SlotEditor({
           </optgroup>
         )}
         {otherEmployees.length > 0 && (
-          <optgroup label="Other employees">
-            {otherEmployees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.name}
-              </option>
-            ))}
+          <optgroup label="Other employees — needs a fix">
+            {otherEmployees.map((employee) => {
+              const reason = unassignableReason({ slot, employee, employees, slots: allSlots, assignments: allAssignments })
+              const isCurrent = employee.id === currentId
+              return (
+                <option key={employee.id} value={employee.id} disabled={!isCurrent}>
+                  {employee.name} — {reason}
+                </option>
+              )
+            })}
           </optgroup>
         )}
       </select>
+      {showInvalidKept && (
+        <p className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-950" role="note">
+          {employees.find((employee) => employee.id === currentId)?.name} is kept here but {currentReason}. Pick someone from
+          Best choices to fix it.
+        </p>
+      )}
       <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
         <input
           type="checkbox"
