@@ -110,10 +110,10 @@ type SpotStatus = 'good' | 'review' | 'missing' | 'idle'
 const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: string; row: string; shiftRow: string; shiftLabel: string }> = {
   good: {
     icon: 'check',
-    chip: 'border-zinc-200 bg-white text-zinc-900',
+    chip: 'border-green-200 bg-green-50 text-green-950',
     badge: 'border-green-300 bg-green-50 text-green-900',
-    row: 'border-zinc-200 border-l-4 border-l-green-600',
-    shiftRow: 'border-l-4 border-l-transparent bg-zinc-50',
+    row: 'border-green-200 border-l-4 border-l-green-600',
+    shiftRow: 'border-l-4 border-l-green-600 bg-green-50',
     shiftLabel: 'Ready',
   },
   review: {
@@ -153,6 +153,19 @@ const roleInitials: Record<Role, string> = {
 function slotBadge(slot: StaffingSlot) {
   const position = slot.label.match(/(\d+)$/)?.[1] ?? ''
   return `${roleInitials[slot.role]}${position}`
+}
+
+/** Compact shift time for chips: 9:30a-4p, 4-11p. Full range stays in the shift editor. */
+function shortHour(totalMinutes: number) {
+  const hour24 = Math.floor(totalMinutes / 60)
+  const minute = totalMinutes % 60
+  const suffix = hour24 >= 12 ? 'p' : 'a'
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+  return minute === 0 ? `${hour12}${suffix}` : `${hour12}:${String(minute).padStart(2, '0')}${suffix}`
+}
+
+function shortTimeRange(slot: StaffingSlot) {
+  return `${shortHour(slot.start)}-${shortHour(slot.end)}`
 }
 
 function spotStatus({
@@ -1827,14 +1840,31 @@ function WeeklyScheduleBoard({
   return (
     <div className="mt-4">
       <div className="divide-y divide-zinc-100">
-        {DAYS.map((day) => (
+        {DAYS.map((day) => {
+          const daySlots = slots.filter((slot) => slot.day === day)
+          const filled = daySlots.filter((slot) => assignmentMap.get(slot.id)?.employeeId).length
+          const dayComplete = daySlots.length > 0 && filled === daySlots.length
+          return (
           <div
             key={day}
-            className="py-2 md:grid md:grid-cols-[92px_minmax(0,1fr)] md:items-start md:gap-3"
+            className="py-2 md:grid md:grid-cols-[132px_minmax(0,1fr)] md:items-start md:gap-3"
           >
             <h3 className="px-1 py-2 text-base font-bold text-zinc-900">
               {day}
               {weekStart && <span className="ml-1.5 text-sm font-normal text-zinc-500">{dayOfMonth(weekStart, day)}</span>}
+              <span
+                className={`ml-2 inline-flex items-center rounded-full border px-2 py-0.5 align-middle text-xs font-semibold ${
+                  daySlots.length === 0
+                    ? 'border-zinc-200 bg-zinc-50 text-zinc-500'
+                    : dayComplete
+                      ? 'border-green-300 bg-green-50 text-green-900'
+                      : hasSchedule
+                        ? 'border-amber-300 bg-amber-50 text-amber-950'
+                        : 'border-zinc-200 bg-zinc-50 text-zinc-600'
+                }`}
+              >
+                {filled}/{daySlots.length} filled
+              </span>
             </h3>
             <div className="space-y-1">
               {PERIODS.map((period) => {
@@ -1871,7 +1901,8 @@ function WeeklyScheduleBoard({
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
       <BoardLegend />
     </div>
@@ -1879,7 +1910,7 @@ function WeeklyScheduleBoard({
 }
 
 function BoardLegend() {
-  const statusOrder: SpotStatus[] = ['review', 'missing']
+  const statusOrder: SpotStatus[] = ['good', 'review', 'missing', 'idle']
 
   return (
     <div className="space-y-2 border-t border-zinc-100 pt-3 text-xs">
@@ -1895,13 +1926,20 @@ function BoardLegend() {
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-zinc-500">Marked only when:</span>
+        <span className="text-zinc-500">Spot:</span>
         {statusOrder.map((status) => (
-          <span key={status} className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium ${statusMeta[status].badge}`}>
+          <span key={status} className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium ${statusMeta[status].chip}`}>
             <Icon name={statusMeta[status].icon} />
             {statusMeta[status].shiftLabel}
           </span>
         ))}
+        <span className="inline-flex items-center gap-1.5 rounded border border-zinc-300 bg-white px-2 py-1 font-medium text-zinc-700">
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+          Changed
+        </span>
+        <span className="inline-flex items-center gap-1 rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold text-white">
+          Keep
+        </span>
       </div>
     </div>
   )
@@ -2176,17 +2214,28 @@ function AssignmentChip({
       >
         {slotBadge(slot)}
       </span>
-      <span className={`truncate text-sm ${primaryTone}${isGhosted ? ' italic opacity-80' : ''}`}>{primaryText}</span>
+      <span className={`truncate text-sm ${primaryTone}${isGhosted ? ' italic opacity-80' : ''}`}>
+        {primaryText}
+        <span aria-hidden="true" className="ml-1 font-normal opacity-70">
+          · {shortTimeRange(slot)}
+        </span>
+      </span>
       {!isMoveActive && isChanged && (
         <>
-          <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500" />
+          <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600 ring-2 ring-white" />
           <span className="sr-only">Changed since the schedule was made.</span>
         </>
       )}
       {!isMoveActive && status !== 'good' && status !== 'idle' && <Icon name={statusMeta[status].icon} />}
       {isMoveActive && !isSource && preview && <Icon name={preview.status === 'valid' ? 'check' : 'close'} />}
-      {assignment?.locked && <Icon name="lock" />}
-      <span className="sr-only">{`${slot.label}. ${statusMeta[status].shiftLabel}.`}</span>
+      {assignment?.locked && (
+        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white [&>svg]:h-3 [&>svg]:w-3">
+          <Icon name="lock" />
+          <span aria-hidden="true">Keep</span>
+          <span className="sr-only">Kept in place.</span>
+        </span>
+      )}
+      <span className="sr-only">{`${slot.label} ${shortTimeRange(slot)}. ${statusMeta[status].shiftLabel}.`}</span>
     </button>
   )
 }
