@@ -1095,10 +1095,6 @@ export default function SchedulerDemo() {
     )
   }
 
-  function openEmployeePanelForGap() {
-    addEmployeeForSlot(gapSlot)
-  }
-
   function addEmployee() {
     if (!canAddEmployee) return
     remember('added employee')
@@ -1174,48 +1170,49 @@ export default function SchedulerDemo() {
               </span>
             )}
             <span aria-hidden="true" className="mx-1 hidden h-8 w-px bg-zinc-200 sm:block" />
-            <Button
-              onClick={undoLastChange}
-              icon="undo"
-              disabled={history.length === 0}
-              title={history[0] ? `Undo ${history[0].label}` : 'Nothing to undo yet.'}
-            >
-              Undo
-            </Button>
-            <Button onClick={openEmployeePanelForGap} icon="plus">
-              Add employee
-            </Button>
-            <Button
-              onClick={() => window.print()}
-              icon="print"
-              disabled={!schedulePassing}
-              title={!schedulePassing ? 'Fix every spot before printing.' : 'Print the passing schedule.'}
-            >
-              Print
-            </Button>
-            {confirmingReset ? (
-              <span className="inline-flex flex-wrap items-center gap-2 rounded border border-red-300 bg-red-50 px-2 py-1">
-                <span className="text-xs font-semibold text-red-900">Clear everything? You can undo.</span>
-                <button
-                  type="button"
-                  className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                  onClick={reset}
+            <Disclosure summary="More actions" tone="quiet">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={undoLastChange}
+                  icon="undo"
+                  disabled={history.length === 0}
+                  title={history[0] ? `Undo ${history[0].label}` : 'Nothing to undo yet.'}
                 >
-                  Yes, start over
-                </button>
-                <button
-                  type="button"
-                  className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                  onClick={() => setConfirmingReset(false)}
+                  Undo
+                </Button>
+                <Button
+                  onClick={() => window.print()}
+                  icon="print"
+                  disabled={!schedulePassing}
+                  title={!schedulePassing ? 'Fix every spot before printing.' : 'Print the passing schedule.'}
                 >
-                  Keep everything
-                </button>
-              </span>
-            ) : (
-              <Button onClick={() => setConfirmingReset(true)} icon="reset">
-                Start over
-              </Button>
-            )}
+                  Print
+                </Button>
+                {confirmingReset ? (
+                  <span className="inline-flex flex-wrap items-center gap-2 rounded border border-red-300 bg-red-50 px-2 py-1">
+                    <span className="text-xs font-semibold text-red-900">Clear everything? You can undo.</span>
+                    <button
+                      type="button"
+                      className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      onClick={reset}
+                    >
+                      Yes, start over
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      onClick={() => setConfirmingReset(false)}
+                    >
+                      Keep everything
+                    </button>
+                  </span>
+                ) : (
+                  <Button onClick={() => setConfirmingReset(true)} icon="reset">
+                    Start over
+                  </Button>
+                )}
+              </div>
+            </Disclosure>
           </div>
         </div>
         {activeEmployeeCount === 0 && (
