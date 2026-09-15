@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildPublishedWeek, templateHashForSlots } from '@/lib/schedule-share'
 import {
   StoreAuthError,
@@ -11,16 +11,6 @@ import {
   saveGoldenWeek,
 } from '@/lib/schedule-store'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeekStatus } from '@/lib/scheduler'
-
-const tokenSessionKey = 'chinarose.schedule.writeToken'
-
-function readToken(): string {
-  try {
-    return window.sessionStorage.getItem(tokenSessionKey) ?? ''
-  } catch {
-    return ''
-  }
-}
 
 function canonicalWeek(week: { weekStart: string; people: string[]; slotPeople: number[] }) {
   return JSON.stringify({ w: week.weekStart, p: week.people, s: week.slotPeople })
@@ -60,6 +50,7 @@ export default function PublishPanel({
   const [name, setName] = useState(`Week of ${weekLabel}`)
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
+  const tokenInputRef = useRef<HTMLInputElement>(null)
   const [baseRev, setBaseRev] = useState<number | null>(null)
   const [serverFingerprint, setServerFingerprint] = useState<string | null>(null)
   const [serverVisible, setServerVisible] = useState<boolean | null>(null)
@@ -84,7 +75,8 @@ export default function PublishPanel({
     setServerVisible(null)
     setError('')
     setNotice('')
-    setToken(readToken())
+    setToken('')
+    tokenInputRef.current?.focus()
     let cancelled = false
     setLoading(true)
     fetchGoldenWeek(weekStart)
@@ -114,11 +106,6 @@ export default function PublishPanel({
     setError('')
     setNotice('')
     try {
-      try {
-        window.sessionStorage.setItem(tokenSessionKey, token)
-      } catch {
-        return
-      }
       const result = await saveGoldenWeek(
         weekStart,
         { week, templateHash: templateHashForSlots(slots), visible, baseRev: baseRev ?? 0 },
@@ -128,6 +115,7 @@ export default function PublishPanel({
       setServerFingerprint(fingerprint)
       setServerVisible(visible)
       broadcastSave(weekStart)
+      setToken('')
       setNotice(
         visible
           ? 'Saved. Staff now see this week on /schedule.'
@@ -135,7 +123,7 @@ export default function PublishPanel({
       )
     } catch (caught) {
       if (caught instanceof StoreAuthError) {
-        setError('That write token did not work. Ask for the current one and try again.')
+        setError('That token was not accepted. Check for typos and try again, or ask whoever runs the Worker for the current one.')
       } else if (caught instanceof StoreConflictError) {
         setBaseRev(caught.rev)
         setError(
@@ -228,12 +216,14 @@ export default function PublishPanel({
         <div className="mt-1 flex gap-2">
           <input
             id="publish-token"
+            ref={tokenInputRef}
             className="min-w-0 flex-1 rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             value={token}
             type={showToken ? 'text' : 'password'}
             autoComplete="off"
+            spellCheck={false}
             onChange={(event) => setToken(event.target.value)}
-            placeholder="Type the token once per tab"
+            placeholder="Type the token to save"
           />
           <button
             type="button"
@@ -244,7 +234,7 @@ export default function PublishPanel({
             {showToken ? 'Hide' : 'Show'}
           </button>
         </div>
-        <p className="mt-1 text-xs text-zinc-500">Kept in this tab only. Ask whoever runs the Worker for it.</p>
+        <p className="mt-1 text-xs text-zinc-500">Not saved anywhere — you'll type it again next time too. Ask whoever runs the Worker for it.</p>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
