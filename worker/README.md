@@ -21,8 +21,8 @@ wrangler secret put SCHEDULE_WRITE_TOKEN --config worker/wrangler.toml
 Dashboard deploys: Worker → Settings → Variables → Add secret
 `SCHEDULE_WRITE_TOKEN`. Without it, golden `PUT`s answer `503
 write_not_configured`; with a wrong token they answer `401 unauthorized`.
-The manager types the token into the demo when saving — it lives in the tab
-only, never in `localStorage`.
+The manager types the token into the demo on every save — it is never stored
+in `sessionStorage` or `localStorage`, by design.
 
 ## Deploy option A: dashboard paste (what you already did)
 

@@ -61,9 +61,9 @@ check when the tab becomes visible, regains focus, or reconnects, and swaps
 content only when a save actually bumped the rev. A save from the demo also
 pings open `/schedule` tabs on the same device over a BroadcastChannel, so a
 manager previewing the page sees it update immediately. Writes need the manager token (`SCHEDULE_WRITE_TOKEN`
-Worker secret), typed into the publish panel when saving; it lives in the
-tab only. Nothing schedule-related persists in `localStorage` anymore —
-the Worker is the source of truth. Legacy `/api/weeks` link blobs are
+Worker secret), typed into the publish panel on every save — it is never
+stored in `sessionStorage` or `localStorage`, by design. The Worker is the
+source of truth for the schedule itself. Legacy `/api/weeks` link blobs are
 still served so old staff links open, but the UI no longer makes them.
 
 ## Commands
