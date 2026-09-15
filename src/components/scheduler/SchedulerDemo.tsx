@@ -2668,7 +2668,7 @@ function AssignmentChip({
     >
       <span
         aria-hidden="true"
-        className={`inline-flex h-5 shrink-0 items-center justify-center rounded-sm border px-1 text-[10px] font-bold leading-none ${roleChipClasses[slot.role]}`}
+        className={`inline-flex h-6 shrink-0 items-center justify-center rounded-sm border px-1 text-xs font-bold leading-none ${roleChipClasses[slot.role]}`}
       >
         {slotBadge(slot)}
       </span>
@@ -2687,7 +2687,7 @@ function AssignmentChip({
       {!isMoveActive && status !== 'good' && status !== 'idle' && <Icon name={statusMeta[status].icon} />}
       {isMoveActive && !isSource && preview && <Icon name={preview.status === 'valid' ? 'check' : 'close'} />}
       {assignment?.locked && (
-        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white [&>svg]:h-3 [&>svg]:w-3">
+        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-zinc-900 px-1.5 py-0.5 text-xs font-bold leading-none text-white [&>svg]:h-3 [&>svg]:w-3">
           <Icon name="lock" />
           <span aria-hidden="true">Keep</span>
           <span className="sr-only">Kept in place.</span>
@@ -2890,7 +2890,7 @@ function assignmentChipClass({
   },
 ) {
   const base =
-    'flex min-h-9 w-full min-w-0 items-center gap-1.5 rounded border px-1.5 py-1.5 text-left transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+    'flex min-h-11 w-full min-w-0 items-center gap-1.5 rounded border px-1.5 py-1.5 text-left transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
 
   if (isSource) {
     return `${base} border-dashed border-zinc-400 bg-zinc-50 text-zinc-500 opacity-70`
