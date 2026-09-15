@@ -303,6 +303,16 @@ function cloneEmployeeList(employees: Employee[]) {
 
 const emptyAssignments: ScheduleAssignment[] = []
 
+const onboardingStorageKey = 'chinarose.scheduler.onboardingDismissed'
+
+function readOnboardingDismissed() {
+  try {
+    return window.localStorage.getItem(onboardingStorageKey) === '1'
+  } catch {
+    return false
+  }
+}
+
 function statusForWeek(
   weekStatus: Record<string, WeekStatus>,
   weekStart: string,
@@ -627,6 +637,7 @@ export default function SchedulerDemo() {
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [staffQuery, setStaffQuery] = useState('')
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
+  const [onboardingDismissed, setOnboardingDismissed] = useState(true)
   const assignments = weeks[weekStart] ?? emptyAssignments
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
   const weekVisibility = weekStart ? statusForWeek(weekStatus, weekStart, assignments) : 'off'
@@ -736,7 +747,17 @@ export default function SchedulerDemo() {
     const start = currentWeekStart()
     setWeekStart(start)
     setMonthKey(monthKeyForWeek(start))
+    setOnboardingDismissed(readOnboardingDismissed())
   }, [])
+
+  function dismissOnboarding() {
+    setOnboardingDismissed(true)
+    try {
+      window.localStorage.setItem(onboardingStorageKey, '1')
+    } catch {
+      return
+    }
+  }
 
   useEffect(() => {
     if (!dragState && !moveSource) return
@@ -1206,6 +1227,10 @@ export default function SchedulerDemo() {
 
       <div className="mx-auto grid w-full max-w-none min-w-0 gap-5 overflow-x-clip px-4 py-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
         <main className="order-1 min-w-0 space-y-4">
+          {!onboardingDismissed && assignments.length === 0 && (
+            <OnboardingBanner activeEmployeeCount={activeEmployeeCount} onDismiss={dismissOnboarding} />
+          )}
+
           {sharing && weekStart && (
             <PublishPanel
               weekStart={weekStart}
@@ -1675,6 +1700,32 @@ function EmployeeCard({
         </label>
       </div>
     </div>
+  )
+}
+
+function OnboardingBanner({
+  activeEmployeeCount,
+  onDismiss,
+}: {
+  activeEmployeeCount: number
+  onDismiss: () => void
+}) {
+  return (
+    <section className="rounded-lg border border-sky-200 bg-sky-50 p-4 shadow-sm print:hidden" aria-label="Getting started">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-sky-950">Getting started</h2>
+          <p className="mt-1 text-sm text-sky-900">Four steps to a published schedule:</p>
+        </div>
+        <IconButton icon="close" label="Dismiss getting-started tips" onClick={onDismiss} />
+      </div>
+      <div className="mt-3 space-y-2">
+        <ChecklistItem complete={activeEmployeeCount > 0} label="Add everyone working this week to the Staff list" />
+        <ChecklistItem complete={false} label={'Press "Make schedule" to build the week'} />
+        <ChecklistItem complete={false} label={'Use "Fix next issue" to settle anything that needs a decision'} />
+        <ChecklistItem complete={false} label={'Press "Publish to staff" when it looks right'} />
+      </div>
+    </section>
   )
 }
 
