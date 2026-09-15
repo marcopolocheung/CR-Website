@@ -58,7 +58,13 @@ export default function PublishPanel({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [scheduleUrl, setScheduleUrl] = useState('')
   const filled = assignments.filter((assignment) => assignment.employeeId).length
+
+  useEffect(() => {
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
+    setScheduleUrl(`${window.location.origin}${base}/schedule`)
+  }, [])
 
   const week = useMemo(
     () => buildPublishedWeek({ weekStart, name, slots, employees, assignments }),
@@ -257,7 +263,22 @@ export default function PublishPanel({
       {filled === 0 && <p className="mt-2 text-sm text-zinc-600">Make a schedule for this week first.</p>}
       {loading && <p className="mt-2 text-sm text-zinc-600">Checking what is on the server...</p>}
       {error && <p className="mt-2 text-sm font-medium text-red-800">{error}</p>}
-      {notice && !error && <p className="mt-2 text-sm font-medium text-green-800">{notice}</p>}
+      {notice && !error && (
+        <div className="mt-2 space-y-2">
+          <p className="text-sm font-medium text-green-800">{notice}</p>
+          {visible && scheduleUrl && (
+            <div>
+              <a
+                href={`sms:?&body=${encodeURIComponent(`Schedule for ${weekLabel} is up: ${scheduleUrl}`)}`}
+                className="inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              >
+                Text my contacts
+              </a>
+              <p className="mt-1 text-xs text-zinc-500">Opens your phone&apos;s messaging app with the schedule link ready to send.</p>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   )
 }
