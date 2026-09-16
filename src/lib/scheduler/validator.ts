@@ -33,7 +33,7 @@ export function isEmployeeAvailableForSlot(employee: Employee, slot: StaffingSlo
 }
 
 export function isEmployeeQualified(employee: Employee, slot: StaffingSlot) {
-  return employee.roles.includes(slot.role)
+  return Boolean(employee.newHire) || employee.roles.includes(slot.role)
 }
 
 export function areEmployeesIncompatible(a: Employee, b: Employee) {

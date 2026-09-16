@@ -47,6 +47,30 @@ test('validator catches unqualified employees', () => {
   assert.ok(violations.some((violation) => violation.code === 'unqualified_employee'))
 })
 
+test('new hires bypass the role check but still need to be available', () => {
+  const target = slot('Tuesday', 'AM', 'Cashier 1')
+  const newHireEmployees = seedEmployees.map((candidate) =>
+    candidate.id === 'eileen' ? { ...candidate, newHire: true } : candidate,
+  )
+
+  const violations = validateSchedule({
+    employees: newHireEmployees,
+    slots: [target],
+    assignments: [assignment(target, 'eileen')],
+  })
+
+  assert.ok(!violations.some((violation) => violation.code === 'unqualified_employee'))
+
+  const unavailableTarget = slot('Thursday', 'PM', 'Cashier 1')
+  const unavailableViolations = validateSchedule({
+    employees: newHireEmployees,
+    slots: [unavailableTarget],
+    assignments: [assignment(unavailableTarget, 'eileen')],
+  })
+
+  assert.ok(unavailableViolations.some((violation) => violation.code === 'unavailable_employee'))
+})
+
 test('validator catches max days exceeded', () => {
   const marySlots = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Friday'].map((day) => slot(day, 'AM', 'Cashier 1'))
   const violations = validateSchedule({
