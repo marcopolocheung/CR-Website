@@ -8,6 +8,7 @@ import handler, {
   validateGoldenWeekBody,
   validatePublishBody,
   validateRosterBody,
+  validateTemplateBody,
   validateUpdateBody,
 } from './index'
 
@@ -165,6 +166,25 @@ function rosterPut(body: unknown, token = 'manager-token'): Request {
   })
 }
 
+const ALL_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+function templatePayload(overrides: Record<string, unknown[]> = {}) {
+  const base: Record<string, unknown[]> = Object.fromEntries(ALL_DAYS.map((day) => [day, []]))
+  return {
+    ...base,
+    Sunday: [{ period: 'AM', role: 'lead', label: 'Shift lead', start: 570, end: 960, required: true }],
+    ...overrides,
+  }
+}
+
+function templatePut(body: unknown, token = 'manager-token'): Request {
+  return new Request('https://api.test/api/template', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  })
+}
+
 test('golden week bodies are strictly validated', () => {
   const good = { week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }
   assert.equal(validateGoldenWeekBody(good)?.baseRev, 0)
@@ -303,6 +323,68 @@ test('roster writes fail closed without a configured token', async () => {
   const env = mockEnv('')
   const response = await handler.fetch(rosterPut({ employees: [rosterEmployee()], baseRev: 0 }), env)
   assert.equal(response.status, 503)
+})
+
+test('staffing template bodies are strictly validated', () => {
+  const good = { template: templatePayload(), baseRev: 0 }
+  assert.ok(validateTemplateBody(good))
+  assert.equal(validateTemplateBody({ ...good, baseRev: -1 }), null)
+  assert.equal(validateTemplateBody({ template: templatePayload({ Someday: [] }), baseRev: 0 }), null, 'unknown day key rejected')
+  assert.equal(
+    validateTemplateBody({
+      template: templatePayload({ Monday: [{ period: 'EVENING', role: 'server', label: 'Server', start: 570, end: 960, required: true }] }),
+      baseRev: 0,
+    }),
+    null,
+  )
+  assert.equal(
+    validateTemplateBody({
+      template: templatePayload({ Monday: [{ period: 'AM', role: 'chef', label: 'Server', start: 570, end: 960, required: true }] }),
+      baseRev: 0,
+    }),
+    null,
+  )
+  assert.equal(
+    validateTemplateBody({
+      template: templatePayload({ Monday: [{ period: 'AM', role: 'server', label: 'Server', start: 960, end: 570, required: true }] }),
+      baseRev: 0,
+    }),
+    null,
+    'end before start rejected',
+  )
+})
+
+test('template writes need the manager token, create on first save, and round-trip', async () => {
+  const env = mockEnv()
+  const body = { template: templatePayload(), baseRev: 0 }
+
+  const noToken = await handler.fetch(new Request('https://api.test/api/template', { method: 'PUT', body: JSON.stringify(body) }), env)
+  assert.equal(noToken.status, 401)
+
+  const created = await handler.fetch(templatePut(body), env)
+  assert.equal(created.status, 201)
+  assert.equal(((await created.json()) as { rev: number }).rev, 1)
+
+  const fetched = await handler.fetch(new Request('https://api.test/api/template'), env)
+  assert.equal(fetched.status, 200)
+  const doc = (await fetched.json()) as { rev: number; template: Record<string, unknown[]> }
+  assert.equal(doc.rev, 1)
+  assert.equal(doc.template.Sunday.length, 1)
+
+  const stale = await handler.fetch(templatePut({ ...body, baseRev: 0 }), env)
+  assert.equal(stale.status, 409)
+
+  const updated = await handler.fetch(templatePut({ template: templatePayload({ Sunday: [] }), baseRev: 1 }), env)
+  assert.equal(updated.status, 200)
+  assert.equal(((await updated.json()) as { rev: number }).rev, 2)
+})
+
+test('template GET answers rev 0 and null template before anything is saved', async () => {
+  const env = mockEnv()
+  const fetched = await handler.fetch(new Request('https://api.test/api/template'), env)
+  const doc = (await fetched.json()) as { rev: number; template: unknown }
+  assert.equal(doc.rev, 0)
+  assert.equal(doc.template, null)
 })
 
 test('golden month revs answer cheap change checks', async () => {

@@ -9,11 +9,17 @@ Two stores in one Worker:
   by `/schedule`. Docs hold the plaintext week plus `visible` for the
   manager's week on/off toggle and `rev` for optimistic concurrency.
 
-Plus a third store, keyed separately:
+Plus two more stores, keyed separately:
 
 - Employee roster (`/api/employees`): one persistent staff list (`roster:current`),
   edited by `/scheduler-demo`. Public read, token-guarded write, same optimistic
   concurrency (`rev`/`baseRev`) as the golden schedule.
+- Staffing template (`/api/template`): one persistent set of weekly shift rules
+  (`template:current`) — which roles are needed on each day/shift, and their hours.
+  Edited by `/scheduler-demo`, read by both `/scheduler-demo` and `/schedule` so
+  they always agree on shift layout. Same public-read, token-guarded-write,
+  optimistic-concurrency pattern. Falls back to the app's built-in default layout
+  when nothing has been saved yet (`rev: 0`).
 
 ## Write token (golden schedule)
 
@@ -74,6 +80,11 @@ Employee roster (public read, token-guarded write, same token as the golden sche
 
 - `GET /api/employees` → `200 { employees, rev, updatedAt }` (empty roster if nothing saved yet)
 - `PUT /api/employees { employees, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev, updatedAt }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`. Removing an employee from `employees` and saving is a real, persisted delete.
+
+Staffing template (public read, token-guarded write, same token as the golden schedule):
+
+- `GET /api/template` → `200 { template, rev, updatedAt }` (`template: null`, `rev: 0` if nothing saved yet — callers should fall back to their own default layout)
+- `PUT /api/template { template, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev, updatedAt }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`.
 
 ## Notes
 

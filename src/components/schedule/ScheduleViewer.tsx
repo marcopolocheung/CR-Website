@@ -16,12 +16,15 @@ import {
   shiftMonth,
   todayIsoDate,
   type StaffingSlot,
+  type WeeklyStaffingTemplate,
 } from '@/lib/scheduler'
 import { templateHashForSlots, type PublishedWeek } from '@/lib/schedule-share'
 import { fetchGoldenMonth, type GoldenWeekDoc } from '@/lib/schedule-store'
+import { fetchTemplate } from '@/lib/template-store'
 
 export default function ScheduleViewer() {
-  const slots = useMemo(() => expandTemplate(seedTemplate), [])
+  const [template, setTemplate] = useState<WeeklyStaffingTemplate>(seedTemplate)
+  const slots = useMemo(() => expandTemplate(template), [template])
   const templateHash = useMemo(() => templateHashForSlots(slots), [slots])
   const [monthKey, setMonthKey] = useState('')
   const [docs, setDocs] = useState<GoldenWeekDoc[]>([])
@@ -41,6 +44,23 @@ export default function ScheduleViewer() {
   useEffect(() => {
     setMonthKey(currentMonthKey())
     setReady(true)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchTemplate()
+      .then((doc) => {
+        if (!cancelled && doc.rev > 0 && doc.template) {
+          setTemplate(doc.template)
+        }
+      })
+      .catch(() => {
+        // Keep the built-in default layout — the templateHash mismatch banner
+        // below already tells staff when a published week no longer matches it.
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {

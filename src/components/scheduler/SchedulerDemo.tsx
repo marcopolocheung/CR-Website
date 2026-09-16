@@ -36,13 +36,17 @@ import {
   type ScheduleStrategy,
   type ShiftPeriod,
   type StaffingSlot,
+  type StaffingTemplateSlot,
   type TimeRange,
   type ValidationViolation,
+  type WeeklyStaffingTemplate,
   type WeekStatus,
 } from '@/lib/scheduler'
 import { fetchRoster, rosterFingerprint } from '@/lib/employee-store'
+import { fetchTemplate, templateFingerprint } from '@/lib/template-store'
 import PublishPanel from './PublishPanel'
 import RosterPanel from './RosterPanel'
+import TemplatePanel from './TemplatePanel'
 
 type EmployeeDraft = {
   name: string
@@ -68,6 +72,7 @@ type DropFeedback = {
 type HistorySnapshot = {
   label: string
   employees: Employee[]
+  template: WeeklyStaffingTemplate
   weeks: WeekAssignments
   generatedWeeks: WeekAssignments
   weekStatus: Record<string, WeekStatus>
@@ -685,6 +690,13 @@ export default function SchedulerDemo() {
   const [rosterLoadError, setRosterLoadError] = useState('')
   const [rosterPanelOpen, setRosterPanelOpen] = useState(false)
   const rosterDirty = rosterServerSnapshot === null ? employees.length > 0 : rosterFingerprint(employees) !== rosterServerSnapshot
+  const [template, setTemplate] = useState<WeeklyStaffingTemplate>(seedTemplate)
+  const [templateRev, setTemplateRev] = useState(0)
+  const [templateServerSnapshot, setTemplateServerSnapshot] = useState<string | null>(null)
+  const [templateLoadError, setTemplateLoadError] = useState('')
+  const [templatePanelOpen, setTemplatePanelOpen] = useState(false)
+  const templateDirty =
+    templateServerSnapshot === null ? template !== seedTemplate : templateFingerprint(template) !== templateServerSnapshot
   const assignments = weeks[weekStart] ?? emptyAssignments
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
   const weekVisibility = weekStart ? statusForWeek(weekStatus, weekStart, assignments) : 'off'
@@ -705,7 +717,7 @@ export default function SchedulerDemo() {
     setGeneratedWeeks((current) => ({ ...current, [weekStart]: next }))
   }
 
-  const slots = useMemo(() => expandTemplate(seedTemplate), [])
+  const slots = useMemo(() => expandTemplate(template), [template])
   const readinessProblems = useMemo(() => preflightDiagnostics(employees, slots), [employees, slots])
   const firstGap = readinessProblems.find((problem) => problem.day && problem.period && problem.role)
   const gapSlot = useMemo(
@@ -824,6 +836,27 @@ export default function SchedulerDemo() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    fetchTemplate()
+      .then((doc) => {
+        if (cancelled) return
+        if (doc.rev > 0 && doc.template) {
+          setTemplate(doc.template)
+          setTemplateServerSnapshot(templateFingerprint(doc.template))
+        }
+        setTemplateRev(doc.rev)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTemplateLoadError('Could not reach the schedule-rules store. Showing the built-in default rules — save once the connection works to keep changes.')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   function dismissOnboarding() {
     setOnboardingDismissed(true)
     try {
@@ -911,6 +944,7 @@ export default function SchedulerDemo() {
       {
         label,
         employees: cloneEmployeeList(employees),
+        template,
         weeks: cloneWeeks(weeks),
         generatedWeeks: cloneWeeks(generatedWeeks),
         weekStatus: { ...weekStatus },
@@ -924,6 +958,7 @@ export default function SchedulerDemo() {
     const [snapshot, ...rest] = history
     if (!snapshot) return
     setEmployees(cloneEmployeeList(snapshot.employees))
+    setTemplate(snapshot.template)
     setWeeks(cloneWeeks(snapshot.weeks))
     setGeneratedWeeks(cloneWeeks(snapshot.generatedWeeks))
     setWeekStatus({ ...snapshot.weekStatus })
@@ -1062,6 +1097,7 @@ export default function SchedulerDemo() {
     // remember() keeps the pre-reset state so Undo can bring it back.
     remember('reset demo')
     setEmployees(cloneEmployees())
+    setTemplate(seedTemplate)
     setWeeks({})
     setGeneratedWeeks({})
     setWeekStatus({})
@@ -1485,7 +1521,27 @@ export default function SchedulerDemo() {
               <HoursSummary stats={stats} employees={employees} />
             </Disclosure>
 
-            <ScheduleRules slots={slots} />
+            <TemplateEditor
+              template={template}
+              onChange={(next) => {
+                remember('changed schedule rules')
+                setTemplate(next)
+              }}
+              onUseDefault={() => {
+                remember('reset to default template')
+                setTemplate(seedTemplate)
+              }}
+              rev={templateRev}
+              dirty={templateDirty}
+              loadError={templateLoadError}
+              panelOpen={templatePanelOpen}
+              onTogglePanel={() => setTemplatePanelOpen((open) => !open)}
+              onSaved={(rev) => {
+                setTemplateRev(rev)
+                setTemplateServerSnapshot(templateFingerprint(template))
+              }}
+              onClosePanel={() => setTemplatePanelOpen(false)}
+            />
 
           <Disclosure summary="About this demo" tone="quiet">
             <ul className="space-y-2 text-sm text-zinc-700">
@@ -2308,31 +2364,165 @@ function HoursSummary({ stats, employees }: { stats: ScheduleStats[]; employees:
   )
 }
 
-function ScheduleRules({ slots }: { slots: StaffingSlot[] }) {
+function minutesToTimeValue(totalMinutes: number) {
+  const hour = Math.floor(totalMinutes / 60)
+  const minute = totalMinutes % 60
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+function timeValueToMinutes(value: string) {
+  const [hour, minute] = value.split(':').map(Number)
+  return (hour || 0) * 60 + (minute || 0)
+}
+
+function blankTemplateSlot(): StaffingTemplateSlot {
+  return { period: 'AM', role: 'server', label: 'Server', start: minutes(9, 30), end: minutes(16), required: true }
+}
+
+function TemplateEditor({
+  template,
+  onChange,
+  onUseDefault,
+  rev,
+  dirty,
+  loadError,
+  panelOpen,
+  onTogglePanel,
+  onSaved,
+  onClosePanel,
+}: {
+  template: WeeklyStaffingTemplate
+  onChange: (template: WeeklyStaffingTemplate) => void
+  onUseDefault: () => void
+  rev: number
+  dirty: boolean
+  loadError: string
+  panelOpen: boolean
+  onTogglePanel: () => void
+  onSaved: (rev: number) => void
+  onClosePanel: () => void
+}) {
+  function updateDay(day: DayOfWeek, daySlots: StaffingTemplateSlot[]) {
+    onChange({ ...template, [day]: daySlots })
+  }
+
+  function updateSlot(day: DayOfWeek, index: number, update: Partial<StaffingTemplateSlot>) {
+    updateDay(day, template[day].map((slot, candidate) => (candidate === index ? { ...slot, ...update } : slot)))
+  }
+
+  function removeSlot(day: DayOfWeek, index: number) {
+    updateDay(day, template[day].filter((_, candidate) => candidate !== index))
+  }
+
+  function addSlot(day: DayOfWeek) {
+    updateDay(day, [...template[day], blankTemplateSlot()])
+  }
+
   return (
     <Disclosure summary="Schedule rules" tone="quiet">
-      <p className="text-sm text-zinc-600">Who the restaurant needs on each shift. The schedule maker follows this list.</p>
-      <div className="mt-3 min-w-0">
-        <table className="w-full table-fixed text-left text-sm">
-          <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
-            <tr>
-              <th className="py-2 pr-3">Day</th>
-              <th className="py-2 pr-3">Shift</th>
-              <th className="py-2 pr-3">Position</th>
-              <th className="py-2 pr-3">Hours</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {slots.map((slot) => (
-              <tr key={slot.id}>
-                <td className="py-2 pr-3 font-medium text-zinc-900">{slot.day}</td>
-                <td className="py-2 pr-3 text-zinc-700">{periodLabels[slot.period]}</td>
-                <td className="py-2 pr-3 text-zinc-700">{slot.label}</td>
-                <td className="py-2 pr-3 text-zinc-700">{formatTimeRange(slot)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-zinc-600">Who the restaurant needs on each shift. Add, remove, or change any spot.</p>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            onClick={onUseDefault}
+          >
+            Use default template
+          </button>
+          <button
+            type="button"
+            className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            onClick={onTogglePanel}
+          >
+            {panelOpen ? 'Close save rules' : 'Save rules'}
+          </button>
+        </div>
+      </div>
+      {loadError && <p className="mt-2 text-xs font-medium text-amber-800">{loadError}</p>}
+      {panelOpen && (
+        <div className="mt-2">
+          <TemplatePanel template={template} rev={rev} dirty={dirty} onSaved={onSaved} onClose={onClosePanel} />
+        </div>
+      )}
+      <div className="mt-3 space-y-3">
+        {DAYS.map((day) => (
+          <div key={day} className="rounded border border-zinc-200 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold text-zinc-900">{day}</h4>
+              <button
+                type="button"
+                className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                onClick={() => addSlot(day)}
+              >
+                + Add spot
+              </button>
+            </div>
+            <div className="mt-2 space-y-2">
+              {template[day].length === 0 && <p className="text-xs text-zinc-500">No spots this day.</p>}
+              {template[day].map((slot, index) => (
+                <div key={index} className="flex flex-wrap items-center gap-1.5 rounded bg-zinc-50 p-1.5">
+                  <select
+                    className="rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs"
+                    value={slot.period}
+                    onChange={(event) => updateSlot(day, index, { period: event.target.value as ShiftPeriod })}
+                  >
+                    {PERIODS.map((period) => (
+                      <option key={period} value={period}>
+                        {periodLabels[period]}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs"
+                    value={slot.role}
+                    onChange={(event) => updateSlot(day, index, { role: event.target.value as Role })}
+                  >
+                    {ROLES.map((role) => (
+                      <option key={role} value={role}>
+                        {roleLabels[role]}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs"
+                    value={slot.label}
+                    onChange={(event) => updateSlot(day, index, { label: event.target.value })}
+                    placeholder="Label"
+                  />
+                  <input
+                    type="time"
+                    className="rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs"
+                    value={minutesToTimeValue(slot.start)}
+                    onChange={(event) => updateSlot(day, index, { start: timeValueToMinutes(event.target.value) })}
+                  />
+                  <span aria-hidden="true" className="text-xs text-zinc-500">to</span>
+                  <input
+                    type="time"
+                    className="rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs"
+                    value={minutesToTimeValue(slot.end)}
+                    onChange={(event) => updateSlot(day, index, { end: timeValueToMinutes(event.target.value) })}
+                  />
+                  <label className="flex items-center gap-1 text-xs text-zinc-700">
+                    <input
+                      type="checkbox"
+                      checked={slot.required}
+                      onChange={(event) => updateSlot(day, index, { required: event.target.checked })}
+                    />
+                    Required
+                  </label>
+                  <button
+                    type="button"
+                    className="ml-auto rounded border border-red-300 bg-white px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={() => removeSlot(day, index)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </Disclosure>
   )
