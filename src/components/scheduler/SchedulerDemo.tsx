@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   DAYS,
   PERIODS,
@@ -13,10 +13,11 @@ import {
   isEmployeeQualified,
   minutes,
   preflightDiagnostics,
+  rangesOverlap,
   schedulerAssumptions,
   seedEmployees,
   currentWeekStart,
-  dayOfMonth,
+  formatDayLabel,
   formatWeekRange,
   monthKeyForWeek,
   monthLabel,
@@ -47,14 +48,13 @@ import PublishPanel from './PublishPanel'
 import RosterPanel from './RosterPanel'
 import TemplatePanel from './TemplatePanel'
 
-type AvailabilityMode = 'all' | 'am' | 'pm' | 'weekdayPm' | 'weekend' | 'gap'
-
 type EmployeeDraft = {
   name: string
   roles: Record<Role, boolean>
-  availabilityMode: AvailabilityMode
+  recurringAvailability: Employee['recurringAvailability']
   maxDaysPerWeek: number
   allowDoubles: boolean
+  newHire: boolean
 }
 
 type ShiftKey = `${DayOfWeek}-${ShiftPeriod}`
@@ -88,6 +88,7 @@ type FixIssue = {
   title: string
   detail: string
   slot?: StaffingSlot
+  relatedSlot?: StaffingSlot
   employee?: Employee
 }
 
@@ -244,13 +245,14 @@ function cloneEmployees() {
   }))
 }
 
-function blankDraft(role: Role = 'server', availabilityMode: AvailabilityMode = 'all'): EmployeeDraft {
+function blankDraft(role: Role = 'server', recurringAvailability: Employee['recurringAvailability'] = allDays([fullDay])): EmployeeDraft {
   return {
     name: '',
     roles: Object.fromEntries(ROLES.map((candidate) => [candidate, candidate === role])) as Record<Role, boolean>,
-    availabilityMode,
+    recurringAvailability,
     maxDaysPerWeek: 5,
     allowDoubles: false,
+    newHire: false,
   }
 }
 
@@ -262,19 +264,36 @@ function onlyDays(days: DayOfWeek[], ranges: TimeRange[]) {
   return Object.fromEntries(days.map((day) => [day, ranges])) as Employee['recurringAvailability']
 }
 
-function availabilityFromDraft(draft: EmployeeDraft, gapSlot?: StaffingSlot): Employee['recurringAvailability'] {
-  if (draft.availabilityMode === 'gap' && gapSlot) {
-    return onlyDays([gapSlot.day], [{ start: gapSlot.start, end: gapSlot.end }])
-  }
-
-  if (draft.availabilityMode === 'am') return allDays([amShift])
-  if (draft.availabilityMode === 'pm') return allDays([pmShift])
-  if (draft.availabilityMode === 'weekdayPm') {
-    return onlyDays(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], [pmShift])
-  }
-  if (draft.availabilityMode === 'weekend') return onlyDays(['Saturday', 'Sunday'], [fullDay])
-  return allDays([fullDay])
+function gapAvailability(slot: StaffingSlot): Employee['recurringAvailability'] {
+  return onlyDays([slot.day], [{ start: slot.start, end: slot.end }])
 }
+
+// The per-day AM/PM grid works in canonical shift halves, not arbitrary ranges:
+// toggling a checkbox rewrites that day to [amShift]/[pmShift]/[fullDay]/[], and
+// reading a day's checkbox state back is "does it overlap that half" so a slot-specific
+// gap range (e.g. a 5pm start) still shows as PM-checked before it's ever touched.
+function dayAvailabilityFromRanges(ranges: TimeRange[] | undefined) {
+  const list = ranges ?? []
+  return {
+    am: list.some((range) => rangesOverlap(range, amShift)),
+    pm: list.some((range) => rangesOverlap(range, pmShift)),
+  }
+}
+
+function rangesForDayToggle(am: boolean, pm: boolean): TimeRange[] {
+  if (am && pm) return [fullDay]
+  if (am) return [amShift]
+  if (pm) return [pmShift]
+  return []
+}
+
+const availabilityPresets: { label: string; build: () => Employee['recurringAvailability'] }[] = [
+  { label: 'Any day, any shift', build: () => allDays([fullDay]) },
+  { label: 'Morning shifts', build: () => allDays([amShift]) },
+  { label: 'Dinner shifts', build: () => allDays([pmShift]) },
+  { label: 'Weekday dinner shifts', build: () => onlyDays(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], [pmShift]) },
+  { label: 'Saturday and Sunday', build: () => onlyDays(['Saturday', 'Sunday'], [fullDay]) },
+]
 
 function createEmployeeId(name: string, employees: Employee[]) {
   const base = name
@@ -342,8 +361,9 @@ function uniqueMessages(messages: string[]) {
   return Array.from(new Set(messages))
 }
 
-function diagnosticLabel(diagnostic: Diagnostic) {
-  const where = diagnostic.day && diagnostic.period ? `${diagnostic.day} ${periodLabels[diagnostic.period]}` : null
+function diagnosticLabel(diagnostic: Diagnostic, weekStart: string) {
+  const day = diagnostic.day && weekStart ? formatDayLabel(weekStart, diagnostic.day) : diagnostic.day
+  const where = day && diagnostic.period ? `${day} ${periodLabels[diagnostic.period]}` : null
   const role = diagnostic.role ? roleLabels[diagnostic.role] : null
 
   if (diagnostic.code === 'search_exhausted') {
@@ -368,14 +388,20 @@ function diagnosticLabel(diagnostic: Diagnostic) {
   return diagnostic.message
 }
 
-function dragErrorMessage(employee: Employee, slot: StaffingSlot, violations: ValidationViolation[]) {
+function dragErrorMessage(employee: Employee, slot: StaffingSlot, violations: ValidationViolation[], weekStart: string, slots: StaffingSlot[]) {
+  const day = weekStart ? formatDayLabel(weekStart, slot.day) : slot.day
   const first = violations[0]
-  if (!first) return `${employee.name} cannot work ${slot.day} ${periodLabels[slot.period]}.`
+  if (!first) return `${employee.name} cannot work ${day} ${periodLabels[slot.period]}.`
 
   if (first.code === 'unqualified_employee') return `${employee.name} is not set up for ${slot.label}.`
-  if (first.code === 'unavailable_employee') return `${employee.name} cannot work ${slot.day} ${periodLabels[slot.period]}.`
+  if (first.code === 'unavailable_employee') return `${employee.name} cannot work ${day} ${periodLabels[slot.period]}.`
   if (first.code === 'inactive_employee') return `${employee.name} is inactive.`
-  if (first.code === 'overlapping_assignment') return `${employee.name} is already working at that time.`
+  if (first.code === 'overlapping_assignment') {
+    const conflict = slots.find((candidate) => candidate.id === first.relatedSlotId)
+    return conflict
+      ? `${employee.name} is already working ${day} ${periodLabels[conflict.period]} (${conflict.label}, ${formatTimeRange(conflict)}).`
+      : `${employee.name} is already working at that time.`
+  }
   if (first.code === 'max_days_exceeded') return `${employee.name} would go over the weekly day limit.`
   if (first.code === 'max_shifts_exceeded') return `${employee.name} would go over the weekly shift limit.`
   if (first.code === 'prohibited_double') return `${employee.name} cannot work both shifts that day.`
@@ -415,6 +441,7 @@ function buildMovePreview({
   slots,
   assignments,
   assignmentMap,
+  weekStart,
 }: {
   move: DragState
   targetSlotId: string
@@ -422,6 +449,7 @@ function buildMovePreview({
   slots: StaffingSlot[]
   assignments: ScheduleAssignment[]
   assignmentMap: Map<string, ScheduleAssignment>
+  weekStart: string
 }): MovePreview | null {
   if (move.fromSlotId === targetSlotId) return null
   const targetSlot = slots.find((slot) => slot.id === targetSlotId)
@@ -432,7 +460,8 @@ function buildMovePreview({
   const replacedEmployee = employees.find((candidate) => candidate.id === targetAssignment?.employeeId)
   const isEmptyTarget = !targetAssignment?.employeeId
   const sourceSlot = slots.find((slot) => slot.id === move.fromSlotId)
-  const sourceLabel = sourceSlot ? `${sourceSlot.day} ${periodLabels[sourceSlot.period]} ${sourceSlot.label}` : 'the open spot'
+  const sourceDay = sourceSlot && weekStart ? formatDayLabel(weekStart, sourceSlot.day) : sourceSlot?.day
+  const sourceLabel = sourceSlot ? `${sourceDay} ${periodLabels[sourceSlot.period]} ${sourceSlot.label}` : 'the open spot'
 
   if (assignmentMap.get(move.fromSlotId)?.locked) {
     return { status: 'invalid', employeeName: employee.name, isEmptyTarget, message: `${employee.name} is marked Keep and cannot move yet.` }
@@ -454,7 +483,7 @@ function buildMovePreview({
       employeeName: employee.name,
       replacedName: replacedEmployee?.name,
       isEmptyTarget,
-      message: dragErrorMessage(employee, targetSlot, moveViolations),
+      message: dragErrorMessage(employee, targetSlot, moveViolations, weekStart, slots),
     }
   }
 
@@ -471,8 +500,9 @@ function buildMovePreview({
   }
 }
 
-function reviewLabel(violation: ValidationViolation, slot?: StaffingSlot, employee?: Employee) {
-  const shift = slot ? `${slot.day} ${periodLabels[slot.period]}` : 'This schedule'
+function reviewLabel(violation: ValidationViolation, slot: StaffingSlot | undefined, employee: Employee | undefined, weekStart: string, slots: StaffingSlot[]) {
+  const day = slot && weekStart ? formatDayLabel(weekStart, slot.day) : slot?.day
+  const shift = slot ? `${day} ${periodLabels[slot.period]}` : 'This schedule'
   const position = slot?.label ?? 'this spot'
   const name = employee?.name ?? 'Someone'
 
@@ -480,7 +510,12 @@ function reviewLabel(violation: ValidationViolation, slot?: StaffingSlot, employ
   if (violation.code === 'unqualified_employee') return `${name} is not set up for ${position}.`
   if (violation.code === 'unavailable_employee') return `${name} cannot work ${shift}.`
   if (violation.code === 'inactive_employee') return `${name} is inactive.`
-  if (violation.code === 'overlapping_assignment') return `${name} is already working at that time.`
+  if (violation.code === 'overlapping_assignment') {
+    const conflict = slots.find((candidate) => candidate.id === violation.relatedSlotId)
+    return conflict
+      ? `${name} is already working ${day} ${periodLabels[conflict.period]} (${conflict.label}, ${formatTimeRange(conflict)}).`
+      : `${name} is already working at that time.`
+  }
   if (violation.code === 'max_days_exceeded') return `${name} has too many work days.`
   if (violation.code === 'max_shifts_exceeded') return `${name} has too many shifts.`
   if (violation.code === 'prohibited_double') return `${name} cannot work both shifts that day.`
@@ -501,6 +536,7 @@ function changesSince(
   current: ScheduleAssignment[],
   slots: StaffingSlot[],
   employees: Employee[],
+  weekStart: string,
 ): ScheduleChange[] {
   if (generated.length === 0) return []
   const generatedBySlot = new Map(generated.map((assignment) => [assignment.slotId, assignment.employeeId]))
@@ -511,7 +547,8 @@ function changesSince(
     const before = nameFor(generatedBySlot.get(slot.id))
     const after = nameFor(currentBySlot.get(slot.id))
     if (before === after) return []
-    const where = `${slot.day} ${periodLabels[slot.period]} ${slot.label}`
+    const day = weekStart ? formatDayLabel(weekStart, slot.day) : slot.day
+    const where = `${day} ${periodLabels[slot.period]} ${slot.label}`
     const text = before && after ? `${where}: ${before} to ${after}` : after ? `${where}: ${after} added` : `${where}: ${before} removed`
 
     return [{ slotId: slot.id, shiftKey: `${slot.day}-${slot.period}` as ShiftKey, text }]
@@ -592,6 +629,7 @@ function buildFixIssues(
   violations: ValidationViolation[],
   slots: StaffingSlot[],
   employees: Employee[],
+  weekStart: string,
 ) {
   const issues: FixIssue[] = []
 
@@ -601,7 +639,7 @@ function buildFixIssues(
       : slots.find((candidate) => candidate.day === problem.day && candidate.period === problem.period && candidate.role === problem.role)
     issues.push({
       id: `ready:${problem.code}:${problem.slotId ?? problem.day ?? ''}:${problem.period ?? ''}:${problem.role ?? ''}`,
-      title: diagnosticLabel(problem),
+      title: diagnosticLabel(problem, weekStart),
       detail: fixAdvice(problem.code),
       slot,
     })
@@ -609,12 +647,14 @@ function buildFixIssues(
 
   for (const violation of violations) {
     const slot = slots.find((candidate) => candidate.id === violation.slotId)
+    const relatedSlot = slots.find((candidate) => candidate.id === violation.relatedSlotId)
     const employee = employees.find((candidate) => candidate.id === violation.employeeId)
     issues.push({
       id: `review:${violation.code}:${violation.slotId ?? ''}:${violation.employeeId ?? ''}:${violation.message}`,
-      title: reviewLabel(violation, slot, employee),
+      title: reviewLabel(violation, slot, employee, weekStart, slots),
       detail: fixAdvice(violation.code),
       slot,
+      relatedSlot,
       employee,
     })
   }
@@ -707,22 +747,28 @@ export default function SchedulerDemo() {
     const previews = new Map<string, MovePreview>()
     if (!activeMove) return previews
     for (const slot of slots) {
-      const preview = buildMovePreview({ move: activeMove, targetSlotId: slot.id, employees, slots, assignments, assignmentMap })
+      const preview = buildMovePreview({ move: activeMove, targetSlotId: slot.id, employees, slots, assignments, assignmentMap, weekStart })
       if (preview) previews.set(slot.id, preview)
     }
     return previews
-  }, [activeMove, assignmentMap, assignments, employees, slots])
+  }, [activeMove, assignmentMap, assignments, employees, slots, weekStart])
   const movingEmployee = employees.find((employee) => employee.id === moveSource?.employeeId)
 
   const fixIssues = useMemo(
-    () => buildFixIssues(readinessProblems, violations, slots, employees),
-    [employees, readinessProblems, slots, violations],
+    () => buildFixIssues(readinessProblems, violations, slots, employees, weekStart),
+    [employees, readinessProblems, slots, violations, weekStart],
   )
   const visibleFixIssues = fixIssues.filter((issue) => !ignoredIssueIds.includes(issue.id))
   const nextIssue = visibleFixIssues[0]
+  const highlightedSlotIds = useMemo(() => {
+    const ids = new Set<string>()
+    if (nextIssue?.slot) ids.add(nextIssue.slot.id)
+    if (nextIssue?.relatedSlot) ids.add(nextIssue.relatedSlot.id)
+    return ids
+  }, [nextIssue])
   const changes = useMemo(
-    () => changesSince(generatedAssignments, assignments, slots, employees),
-    [assignments, employees, generatedAssignments, slots],
+    () => changesSince(generatedAssignments, assignments, slots, employees, weekStart),
+    [assignments, employees, generatedAssignments, slots, weekStart],
   )
   const changedSlotIds = useMemo(() => new Set(changes.map((change) => change.slotId)), [changes])
   const fixCandidates = useMemo(
@@ -757,7 +803,7 @@ export default function SchedulerDemo() {
     assignments.length > 0 && !schedulePassing ? 'Some spots still need fixing.' : null,
   ].filter((blocker): blocker is string => Boolean(blocker))
   const selectedRoles = ROLES.filter((role) => draft.roles[role])
-  const canAddEmployee = draft.name.trim().length > 0 && selectedRoles.length > 0
+  const canAddEmployee = draft.name.trim().length > 0 && (selectedRoles.length > 0 || draft.newHire)
 
   useEffect(() => {
     // The date has to wait for the browser: this page is prerendered,
@@ -955,10 +1001,10 @@ export default function SchedulerDemo() {
 
   function addEmployeeForSlot(slot?: StaffingSlot) {
     if (slot) {
-      setDraft(blankDraft(slot.role, 'gap'))
+      setDraft(blankDraft(slot.role, gapAvailability(slot)))
       setOpenShiftKey(`${slot.day}-${slot.period}`)
-    } else if (firstGap?.role) {
-      setDraft(blankDraft(firstGap.role, 'gap'))
+    } else if (firstGap?.role && gapSlot) {
+      setDraft(blankDraft(firstGap.role, gapAvailability(gapSlot)))
     } else {
       setDraft(blankDraft())
     }
@@ -969,6 +1015,12 @@ export default function SchedulerDemo() {
     if (!nextIssue) return
     setGuidedChoosing(true)
     openSlot(nextIssue.slot?.id)
+    const shiftKey = nextIssue.slot ? `${nextIssue.slot.day}-${nextIssue.slot.period}` : null
+    if (shiftKey) {
+      requestAnimationFrame(() => {
+        document.getElementById(`${shiftKey}-detail`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+    }
   }
 
   // Staying in guided mode after a pick walks the manager straight to the next spot.
@@ -1025,7 +1077,7 @@ export default function SchedulerDemo() {
     if (result.status === 'INFEASIBLE') {
       setDiagnostics([
         'The schedule could not be made with these rules.',
-        ...uniqueMessages(result.diagnostics.map(diagnosticLabel)),
+        ...uniqueMessages(result.diagnostics.map((diagnostic) => diagnosticLabel(diagnostic, weekStart))),
       ])
       return
     }
@@ -1033,7 +1085,7 @@ export default function SchedulerDemo() {
     const summary = summarizeSchedule(employees, slots, result.assignments, previousAssignments)
     setDiagnostics([
       generationMessage(variant, summary, previousAssignments.length || result.assignments.length),
-      ...uniqueMessages(result.diagnostics.map(diagnosticLabel)),
+      ...uniqueMessages(result.diagnostics.map((diagnostic) => diagnosticLabel(diagnostic, weekStart))),
     ])
     setAssignments(result.assignments)
     setGeneratedAssignments(cloneAssignmentList(result.assignments))
@@ -1171,15 +1223,16 @@ export default function SchedulerDemo() {
       id: createEmployeeId(draft.name, employees),
       name: draft.name.trim(),
       roles: selectedRoles,
-      recurringAvailability: availabilityFromDraft(draft, gapSlot),
+      recurringAvailability: draft.recurringAvailability,
       maxDaysPerWeek: draft.maxDaysPerWeek,
       allowDoubles: draft.allowDoubles,
+      newHire: draft.newHire,
       incompatibleEmployeeIds: [],
       active: true,
     }
 
     setEmployees((current) => [...current, employee])
-    setDraft(blankDraft(firstGap?.role ?? selectedRoles[0], firstGap ? 'gap' : 'all'))
+    setDraft(blankDraft(firstGap?.role ?? selectedRoles[0], firstGap && gapSlot ? gapAvailability(gapSlot) : undefined))
     setEmployeePanelOpen(false)
     setIgnoredIssueIds([])
     setDiagnostics([`${employee.name} was added. Make the schedule again when the staff list looks right.`])
@@ -1312,6 +1365,7 @@ export default function SchedulerDemo() {
 
           <GuidedFixPanel
             nextIssue={nextIssue}
+            weekStart={weekStart}
             issueCount={visibleFixIssues.length}
             totalCount={fixIssues.length}
             ignoredCount={ignoredCount}
@@ -1410,6 +1464,7 @@ export default function SchedulerDemo() {
               openShiftKey={openShiftKey}
               activeMove={activeMove}
               changedSlotIds={changedSlotIds}
+              highlightedSlotIds={highlightedSlotIds}
               onResetShift={restoreShift}
               dragOverSlotId={dragOverSlotId}
               dropFeedback={dropFeedback}
@@ -1549,6 +1604,7 @@ export default function SchedulerDemo() {
               <EmployeeForm
                 draft={draft}
                 gapSlot={gapSlot}
+                weekStart={weekStart}
                 canAddEmployee={canAddEmployee}
                 onDraftChange={setDraft}
                 onAdd={addEmployee}
@@ -1609,24 +1665,65 @@ export default function SchedulerDemo() {
   )
 }
 
+function AvailabilityGridEditor({
+  recurringAvailability,
+  onToggle,
+}: {
+  recurringAvailability: Employee['recurringAvailability']
+  onToggle: (day: DayOfWeek, period: 'am' | 'pm', checked: boolean) => void
+}) {
+  return (
+    <div className="mt-2 grid grid-cols-[2.5rem_1fr_1fr] items-center gap-x-3 gap-y-1.5">
+      <span />
+      <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">AM</span>
+      <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">PM</span>
+      {DAYS.map((day) => {
+        const { am, pm } = dayAvailabilityFromRanges(recurringAvailability[day])
+        return (
+          <Fragment key={day}>
+            <span className="text-xs text-zinc-700">{day.slice(0, 3)}</span>
+            <label className="flex items-center justify-start">
+              <input type="checkbox" checked={am} onChange={(event) => onToggle(day, 'am', event.target.checked)} />
+            </label>
+            <label className="flex items-center justify-start">
+              <input type="checkbox" checked={pm} onChange={(event) => onToggle(day, 'pm', event.target.checked)} />
+            </label>
+          </Fragment>
+        )
+      })}
+    </div>
+  )
+}
+
 function EmployeeForm({
   draft,
   gapSlot,
+  weekStart,
   canAddEmployee,
   onDraftChange,
   onAdd,
 }: {
   draft: EmployeeDraft
   gapSlot?: StaffingSlot
+  weekStart: string
   canAddEmployee: boolean
   onDraftChange: (draft: EmployeeDraft) => void
   onAdd: () => void
 }) {
   const saveHint = !draft.name.trim()
     ? 'Add a name to save.'
-    : ROLES.every((role) => !draft.roles[role])
-      ? 'Pick at least one position to save.'
+    : ROLES.every((role) => !draft.roles[role]) && !draft.newHire
+      ? 'Pick at least one position, or mark them a new hire, to save.'
       : null
+
+  function toggleAvailabilityDay(day: DayOfWeek, period: 'am' | 'pm', checked: boolean) {
+    const current = dayAvailabilityFromRanges(draft.recurringAvailability[day])
+    const next = { ...current, [period]: checked }
+    onDraftChange({
+      ...draft,
+      recurringAvailability: { ...draft.recurringAvailability, [day]: rangesForDayToggle(next.am, next.pm) },
+    })
+  }
   return (
     <div className="mt-4 rounded border border-zinc-200 bg-zinc-50 p-3">
       <label className="block text-sm font-medium text-zinc-800">
@@ -1660,25 +1757,31 @@ function EmployeeForm({
         </div>
       </fieldset>
 
-      <label className="mt-3 block text-sm font-medium text-zinc-800">
-        Availability
-        <select
-          className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-          value={draft.availabilityMode === 'gap' && !gapSlot ? 'all' : draft.availabilityMode}
-          onChange={(event) => onDraftChange({ ...draft, availabilityMode: event.target.value as AvailabilityMode })}
-        >
-          <option value="all">Any day, any shift</option>
-          <option value="am">Morning shifts</option>
-          <option value="pm">Dinner shifts</option>
-          <option value="weekdayPm">Weekday dinner shifts</option>
-          <option value="weekend">Saturday and Sunday</option>
-          {(gapSlot || draft.availabilityMode === 'gap') && (
-            <option value="gap">
-              {gapSlot ? `${gapSlot.day} ${periodLabels[gapSlot.period]} only` : 'Coverage gap only'}
-            </option>
+      <fieldset className="mt-3">
+        <legend className="text-sm font-medium text-zinc-800">Availability</legend>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {availabilityPresets.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+              onClick={() => onDraftChange({ ...draft, recurringAvailability: preset.build() })}
+            >
+              {preset.label}
+            </button>
+          ))}
+          {gapSlot && (
+            <button
+              type="button"
+              className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+              onClick={() => onDraftChange({ ...draft, recurringAvailability: gapAvailability(gapSlot) })}
+            >
+              {weekStart ? formatDayLabel(weekStart, gapSlot.day) : gapSlot.day} {periodLabels[gapSlot.period]} only
+            </button>
           )}
-        </select>
-      </label>
+        </div>
+        <AvailabilityGridEditor recurringAvailability={draft.recurringAvailability} onToggle={toggleAvailabilityDay} />
+      </fieldset>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <label className="text-sm font-medium text-zinc-800">
@@ -1701,6 +1804,15 @@ function EmployeeForm({
           Can work doubles
         </label>
       </div>
+
+      <label className="mt-3 flex items-center gap-2 text-sm font-medium text-zinc-800">
+        <input
+          type="checkbox"
+          checked={draft.newHire}
+          onChange={(event) => onDraftChange({ ...draft, newHire: event.target.checked })}
+        />
+        New hire (can be placed in any position, still limited by max days)
+      </label>
 
       <button
         type="button"
@@ -1812,7 +1924,7 @@ function EmployeeCard({
         </div>
       </fieldset>
 
-      {employee.roles.length === 0 && (
+      {employee.roles.length === 0 && !employee.newHire && (
         <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-800">
           <Icon name="warning" />
           No positions picked, so {employee.name} cannot be scheduled.
@@ -1840,6 +1952,28 @@ function EmployeeCard({
           Doubles
         </label>
       </div>
+
+      <label className="mt-2 flex items-center gap-2 text-sm text-zinc-700">
+        <input
+          type="checkbox"
+          checked={Boolean(employee.newHire)}
+          onChange={(event) => onUpdate(employee.id, { newHire: event.target.checked })}
+        />
+        New hire (any position, still limited by max days)
+      </label>
+
+      <Disclosure summary="Edit availability" tone="quiet">
+        <AvailabilityGridEditor
+          recurringAvailability={employee.recurringAvailability}
+          onToggle={(day, period, checked) => {
+            const current = dayAvailabilityFromRanges(employee.recurringAvailability[day])
+            const next = { ...current, [period]: checked }
+            onUpdate(employee.id, {
+              recurringAvailability: { ...employee.recurringAvailability, [day]: rangesForDayToggle(next.am, next.pm) },
+            })
+          }}
+        />
+      </Disclosure>
     </div>
   )
 }
@@ -1872,6 +2006,7 @@ function OnboardingBanner({
 
 function GuidedFixPanel({
   nextIssue,
+  weekStart,
   issueCount,
   totalCount,
   ignoredCount,
@@ -1886,6 +2021,7 @@ function GuidedFixPanel({
   onShowIgnored,
 }: {
   nextIssue?: FixIssue
+  weekStart: string
   issueCount: number
   totalCount: number
   ignoredCount: number
@@ -1975,7 +2111,7 @@ function GuidedFixPanel({
           {candidates.length > 0 ? (
             <>
               <p className="text-sm font-semibold text-zinc-900">
-                Who should work {nextIssue.slot.day} {periodLabels[nextIssue.slot.period]} as {nextIssue.slot.label}?
+                Who should work {weekStart ? formatDayLabel(weekStart, nextIssue.slot.day) : nextIssue.slot.day} {periodLabels[nextIssue.slot.period]} as {nextIssue.slot.label}?
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {candidates.map((candidate) => (
@@ -2511,6 +2647,7 @@ function WeeklyScheduleBoard({
   movePreviews,
   activeMove,
   changedSlotIds,
+  highlightedSlotIds,
   onResetShift,
   onOpenShift,
   onAssign,
@@ -2535,6 +2672,7 @@ function WeeklyScheduleBoard({
   movePreviews: Map<string, MovePreview>
   activeMove: DragState | null
   changedSlotIds: Set<string>
+  highlightedSlotIds: Set<string>
   onResetShift: (shiftKey: ShiftKey) => void
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
@@ -2556,8 +2694,7 @@ function WeeklyScheduleBoard({
           return (
             <div key={day} className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50/60 p-2">
               <h3 className="flex min-w-0 items-baseline gap-1 px-0.5 text-sm font-bold text-zinc-900">
-                <span className="truncate">{day.slice(0, 3)}</span>
-                {weekStart && <span className="shrink-0 text-xs font-normal text-zinc-500">{dayOfMonth(weekStart, day)}</span>}
+                <span className="truncate">{weekStart ? formatDayLabel(weekStart, day) : day.slice(0, 3)}</span>
                 <span
                   className={`ml-auto inline-flex shrink-0 items-center rounded-full border px-1.5 py-px text-[11px] font-semibold ${
                     daySlots.length === 0
@@ -2579,6 +2716,7 @@ function WeeklyScheduleBoard({
                   <ShiftRow
                     key={shiftKey}
                     shiftKey={shiftKey}
+                    weekStart={weekStart}
                     period={period}
                     slots={shiftSlots}
                     allSlots={slots}
@@ -2593,6 +2731,7 @@ function WeeklyScheduleBoard({
                     movePreviews={movePreviews}
                     activeMove={activeMove}
                     changedSlotIds={changedSlotIds}
+                    highlightedSlotIds={highlightedSlotIds}
                     onResetShift={onResetShift}
                     onOpenShift={onOpenShift}
                     onAssign={onAssign}
@@ -2613,6 +2752,7 @@ function WeeklyScheduleBoard({
       {openShiftKey && (
         <OpenShiftDetail
           shiftKey={openShiftKey}
+          weekStart={weekStart}
           slots={slots}
           employees={employees}
           assignments={assignments}
@@ -2675,6 +2815,7 @@ function BoardLegend() {
 
 function ShiftRow({
   shiftKey,
+  weekStart,
   period,
   slots,
   allSlots,
@@ -2689,6 +2830,7 @@ function ShiftRow({
   movePreviews,
   activeMove,
   changedSlotIds,
+  highlightedSlotIds,
   onResetShift,
   onOpenShift,
   onAssign,
@@ -2701,6 +2843,7 @@ function ShiftRow({
   onActivateSlot,
 }: {
   shiftKey: ShiftKey
+  weekStart: string
   period: ShiftPeriod
   slots: StaffingSlot[]
   allSlots: StaffingSlot[]
@@ -2715,6 +2858,7 @@ function ShiftRow({
   movePreviews: Map<string, MovePreview>
   activeMove: DragState | null
   changedSlotIds: Set<string>
+  highlightedSlotIds: Set<string>
   onResetShift: (shiftKey: ShiftKey) => void
   onOpenShift: (shiftKey: ShiftKey | null) => void
   onAssign: (slotId: string, employeeId: string) => void
@@ -2767,10 +2911,12 @@ function ShiftRow({
             <AssignmentChip
               key={slot.id}
               slot={slot}
+              weekStart={weekStart}
               assignment={assignmentMap.get(slot.id)}
               employee={employees.find((candidate) => candidate.id === assignmentMap.get(slot.id)?.employeeId)}
               status={slotStatuses[index]}
               isChanged={changedSlotIds.has(slot.id)}
+              isHighlighted={highlightedSlotIds.has(slot.id)}
               activeMove={activeMove}
               dragOverSlotId={dragOverSlotId}
               movePreview={movePreviews.get(slot.id) ?? null}
@@ -2790,6 +2936,7 @@ function ShiftRow({
 
 function OpenShiftDetail({
   shiftKey,
+  weekStart,
   slots,
   employees,
   assignments,
@@ -2809,6 +2956,7 @@ function OpenShiftDetail({
   onDropAssignment,
 }: {
   shiftKey: ShiftKey
+  weekStart: string
   slots: StaffingSlot[]
   employees: Employee[]
   assignments: ScheduleAssignment[]
@@ -2834,7 +2982,7 @@ function OpenShiftDetail({
     <div id={`${shiftKey}-detail`} className="mt-2 rounded-lg border border-zinc-200 bg-white p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-bold text-zinc-900">
-          {day} {periodLabels[period]} · {shiftSlots.length} spots
+          {weekStart ? formatDayLabel(weekStart, day) : day} {periodLabels[period]} · {shiftSlots.length} spots
         </h4>
         <button
           type="button"
@@ -2849,6 +2997,7 @@ function OpenShiftDetail({
           <SlotEditor
             key={slot.id}
             slot={slot}
+            weekStart={weekStart}
             status={spotStatus({
               hasEmployee: Boolean(assignmentMap.get(slot.id)?.employeeId),
               hasSchedule: assignments.length > 0,
@@ -2887,10 +3036,12 @@ function OpenShiftDetail({
 
 function AssignmentChip({
   slot,
+  weekStart,
   assignment,
   employee,
   status,
   isChanged,
+  isHighlighted,
   activeMove,
   dragOverSlotId,
   movePreview,
@@ -2902,10 +3053,12 @@ function AssignmentChip({
   onActivateSlot,
 }: {
   slot: StaffingSlot
+  weekStart: string
   assignment?: ScheduleAssignment
   employee?: Employee
   status: SpotStatus
   isChanged: boolean
+  isHighlighted: boolean
   activeMove: DragState | null
   dragOverSlotId: string | null
   movePreview: MovePreview | null
@@ -2923,6 +3076,7 @@ function AssignmentChip({
   const preview = isSource ? null : movePreview
   const isGhosted = isHovered && preview?.status === 'valid'
   const movingName = activeMove ? preview?.employeeName : undefined
+  const day = weekStart ? formatDayLabel(weekStart, slot.day) : slot.day
 
   // Whatever matters most for this spot gets the big text: a name when there is one,
   // otherwise the position that still needs filling.
@@ -2937,10 +3091,10 @@ function AssignmentChip({
   const label = isSource
     ? `Stop moving ${employee?.name ?? 'this person'}`
     : isMoveActive && preview
-      ? `Move ${movingName} to ${slot.day} ${periodLabels[slot.period]} ${slot.label}. ${preview.message}`
+      ? `Move ${movingName} to ${day} ${periodLabels[slot.period]} ${slot.label}. ${preview.message}`
       : canDrag
-        ? `Move ${employee?.name} out of ${slot.day} ${periodLabels[slot.period]} ${slot.label}`
-        : `Open ${slot.day} ${periodLabels[slot.period]} to fill ${slot.label}`
+        ? `Move ${employee?.name} out of ${day} ${periodLabels[slot.period]} ${slot.label}`
+        : `Open ${day} ${periodLabels[slot.period]} to fill ${slot.label}`
 
   return (
     <button
@@ -2952,6 +3106,7 @@ function AssignmentChip({
         isHovered,
         preview,
         wouldReplace: Boolean(employee),
+        isHighlighted,
       })}
       draggable={canDrag}
       aria-label={label}
@@ -3026,6 +3181,7 @@ function AssignmentChip({
 
 function SlotEditor({
   slot,
+  weekStart,
   status,
   activeMove,
   employees,
@@ -3043,6 +3199,7 @@ function SlotEditor({
   onDropAssignment,
 }: {
   slot: StaffingSlot
+  weekStart: string
   status: SpotStatus
   activeMove: DragState | null
   employees: Employee[]
@@ -3190,7 +3347,7 @@ function SlotEditor({
         <ul className="mt-2 space-y-1 text-xs leading-4 text-amber-900">
           {violations.map((violation) => (
             <li key={`${slot.id}-${violation.code}-${violation.employeeId ?? ''}`}>
-              {reviewLabel(violation, slot, employees.find((candidate) => candidate.id === violation.employeeId))}
+              {reviewLabel(violation, slot, employees.find((candidate) => candidate.id === violation.employeeId), weekStart, allSlots)}
             </li>
           ))}
         </ul>
@@ -3206,6 +3363,7 @@ function assignmentChipClass({
     isHovered,
     preview,
     wouldReplace,
+    isHighlighted,
   }: {
     status: SpotStatus
     isMoveActive: boolean
@@ -3213,10 +3371,12 @@ function assignmentChipClass({
     isHovered: boolean
     preview: MovePreview | null
     wouldReplace: boolean
+    isHighlighted: boolean
   },
 ) {
   const base =
-    'flex min-h-11 w-full min-w-0 items-center gap-1.5 rounded border px-1.5 py-1.5 text-left transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+    'flex min-h-11 w-full min-w-0 items-center gap-1.5 rounded border px-1.5 py-1.5 text-left transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700' +
+    (isHighlighted ? ' ring-2 ring-offset-1 ring-blue-500' : '')
 
   if (isSource) {
     return `${base} border-dashed border-zinc-400 bg-zinc-50 text-zinc-500 opacity-70`

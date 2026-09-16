@@ -47,6 +47,30 @@ test('validator catches unqualified employees', () => {
   assert.ok(violations.some((violation) => violation.code === 'unqualified_employee'))
 })
 
+test('new hires bypass the role check but still need to be available', () => {
+  const target = slot('Tuesday', 'AM', 'Cashier 1')
+  const newHireEmployees = seedEmployees.map((candidate) =>
+    candidate.id === 'eileen' ? { ...candidate, newHire: true } : candidate,
+  )
+
+  const violations = validateSchedule({
+    employees: newHireEmployees,
+    slots: [target],
+    assignments: [assignment(target, 'eileen')],
+  })
+
+  assert.ok(!violations.some((violation) => violation.code === 'unqualified_employee'))
+
+  const unavailableTarget = slot('Thursday', 'PM', 'Cashier 1')
+  const unavailableViolations = validateSchedule({
+    employees: newHireEmployees,
+    slots: [unavailableTarget],
+    assignments: [assignment(unavailableTarget, 'eileen')],
+  })
+
+  assert.ok(unavailableViolations.some((violation) => violation.code === 'unavailable_employee'))
+})
+
 test('validator catches max days exceeded', () => {
   const marySlots = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Friday'].map((day) => slot(day, 'AM', 'Cashier 1'))
   const violations = validateSchedule({
@@ -83,6 +107,40 @@ test('validator allows doubles for employees configured to allow them', () => {
   })
 
   assert.deepEqual(violations, [])
+})
+
+test('overlapping assignment violation references both conflicting slots', () => {
+  const first: StaffingSlot = {
+    id: 'overlap-a',
+    day: 'Monday',
+    period: 'AM',
+    role: 'lead',
+    label: 'Shift lead',
+    start: minutes(9, 30),
+    end: minutes(16),
+    required: true,
+  }
+  const second: StaffingSlot = {
+    id: 'overlap-b',
+    day: 'Monday',
+    period: 'AM',
+    role: 'lead',
+    label: 'Shift lead (extra)',
+    start: minutes(12),
+    end: minutes(18),
+    required: true,
+  }
+  const violations = validateSchedule({
+    employees: [employee('dolores')],
+    slots: [first, second],
+    assignments: [assignment(first, 'dolores'), assignment(second, 'dolores')],
+    requireCoverage: false,
+  })
+
+  const overlap = violations.find((violation) => violation.code === 'overlapping_assignment')
+  assert.ok(overlap)
+  assert.equal(overlap?.slotId, 'overlap-b')
+  assert.equal(overlap?.relatedSlotId, 'overlap-a')
 })
 
 test('validator catches employee incompatibility', () => {
