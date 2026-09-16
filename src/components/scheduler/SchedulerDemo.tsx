@@ -245,6 +245,10 @@ function cloneEmployees() {
   }))
 }
 
+function cloneTemplate(source: WeeklyStaffingTemplate = seedTemplate): WeeklyStaffingTemplate {
+  return Object.fromEntries(DAYS.map((day) => [day, source[day].map((slot) => ({ ...slot }))])) as WeeklyStaffingTemplate
+}
+
 function blankDraft(role: Role = 'server', recurringAvailability: Employee['recurringAvailability'] = allDays([fullDay])): EmployeeDraft {
   return {
     name: '',
@@ -696,7 +700,11 @@ export default function SchedulerDemo() {
   const [templateLoadError, setTemplateLoadError] = useState('')
   const [templatePanelOpen, setTemplatePanelOpen] = useState(false)
   const templateDirty =
-    templateServerSnapshot === null ? template !== seedTemplate : templateFingerprint(template) !== templateServerSnapshot
+    templateServerSnapshot === null
+      ? templateFingerprint(template) !== templateFingerprint(seedTemplate)
+      : templateFingerprint(template) !== templateServerSnapshot
+  const isDefaultRoster = useMemo(() => rosterFingerprint(employees) === rosterFingerprint(seedEmployees), [employees])
+  const isDefaultTemplate = useMemo(() => templateFingerprint(template) === templateFingerprint(seedTemplate), [template])
   const assignments = weeks[weekStart] ?? emptyAssignments
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
   const weekVisibility = weekStart ? statusForWeek(weekStatus, weekStart, assignments) : 'off'
@@ -1097,7 +1105,7 @@ export default function SchedulerDemo() {
     // remember() keeps the pre-reset state so Undo can bring it back.
     remember('reset demo')
     setEmployees(cloneEmployees())
-    setTemplate(seedTemplate)
+    setTemplate(cloneTemplate())
     setWeeks({})
     setGeneratedWeeks({})
     setWeekStatus({})
@@ -1108,6 +1116,24 @@ export default function SchedulerDemo() {
     setGuidedChoosing(false)
     setSelectedVariant('balanced')
     setConfirmingReset(false)
+  }
+
+  function restoreDefaultRoster() {
+    if (isDefaultRoster) return
+    remember('restored default staff list')
+    setEmployees(cloneEmployees())
+    setIgnoredIssueIds([])
+    setGuidedChoosing(false)
+    setDiagnostics(['Staff list restored to the built-in defaults. Save to keep them — Undo brings back your list.'])
+  }
+
+  function restoreDefaultTemplate() {
+    if (isDefaultTemplate) return
+    remember('restored default schedule rules')
+    setTemplate(cloneTemplate())
+    setIgnoredIssueIds([])
+    setGuidedChoosing(false)
+    setDiagnostics(['Schedule rules restored to the built-in defaults. Save to keep them — Undo brings back your rules.'])
   }
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
@@ -1527,10 +1553,8 @@ export default function SchedulerDemo() {
                 remember('changed schedule rules')
                 setTemplate(next)
               }}
-              onUseDefault={() => {
-                remember('reset to default template')
-                setTemplate(seedTemplate)
-              }}
+              onUseDefault={restoreDefaultTemplate}
+              isDefaultTemplate={isDefaultTemplate}
               rev={templateRev}
               dirty={templateDirty}
               loadError={templateLoadError}
@@ -1610,6 +1634,23 @@ export default function SchedulerDemo() {
                 onAdd={addEmployee}
               />
             )}
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-zinc-600">Mistake? Bring back the built-in demo list.</p>
+              <button
+                type="button"
+                className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                onClick={restoreDefaultRoster}
+                disabled={isDefaultRoster}
+                title={
+                  isDefaultRoster
+                    ? 'Already using the built-in demo staff list.'
+                    : 'Replace the staff list with the built-in demo list. You can undo, then save to keep it.'
+                }
+              >
+                Restore default staff
+              </button>
+            </div>
 
             <div className="mt-3 border-t border-zinc-100 pt-3">
               <label className="block text-sm font-medium text-zinc-800">
@@ -2383,6 +2424,7 @@ function TemplateEditor({
   template,
   onChange,
   onUseDefault,
+  isDefaultTemplate,
   rev,
   dirty,
   loadError,
@@ -2394,6 +2436,7 @@ function TemplateEditor({
   template: WeeklyStaffingTemplate
   onChange: (template: WeeklyStaffingTemplate) => void
   onUseDefault: () => void
+  isDefaultTemplate: boolean
   rev: number
   dirty: boolean
   loadError: string
@@ -2425,10 +2468,16 @@ function TemplateEditor({
         <div className="flex shrink-0 gap-2">
           <button
             type="button"
-            className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             onClick={onUseDefault}
+            disabled={isDefaultTemplate}
+            title={
+              isDefaultTemplate
+                ? 'Already using the built-in default rules.'
+                : 'Replace these rules with the built-in defaults. You can undo, then save to keep them.'
+            }
           >
-            Use default template
+            Restore default rules
           </button>
           <button
             type="button"
