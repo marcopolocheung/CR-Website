@@ -9,6 +9,12 @@ Two stores in one Worker:
   by `/schedule`. Docs hold the plaintext week plus `visible` for the
   manager's week on/off toggle and `rev` for optimistic concurrency.
 
+Plus a third store, keyed separately:
+
+- Employee roster (`/api/employees`): one persistent staff list (`roster:current`),
+  edited by `/scheduler-demo`. Public read, token-guarded write, same optimistic
+  concurrency (`rev`/`baseRev`) as the golden schedule.
+
 ## Write token (golden schedule)
 
 Golden writes require a manager token. Set it as a Worker secret (never in
@@ -63,6 +69,11 @@ Golden schedule (public read, token-guarded write):
 - `GET /api/schedule?month=YYYY-MM` → `200 { weeks, rev, notModified }` (visible only, sorted). Pass `knownRev=<rev>` and the Worker answers `notModified: true` with no weeks when nothing changed — every golden save bumps the month rev (including the neighboring month when a week spans two), so readers revalidate with one tiny read instead of refetching.
 - `GET /api/schedule/:weekStart` → `200 GoldenWeekDoc` or `404`
 - `PUT /api/schedule/:weekStart { week, templateHash, visible, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`.
+
+Employee roster (public read, token-guarded write, same token as the golden schedule):
+
+- `GET /api/employees` → `200 { employees, rev, updatedAt }` (empty roster if nothing saved yet)
+- `PUT /api/employees { employees, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev, updatedAt }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`. Removing an employee from `employees` and saving is a real, persisted delete.
 
 ## Notes
 

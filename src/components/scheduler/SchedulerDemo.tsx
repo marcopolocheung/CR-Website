@@ -39,7 +39,9 @@ import {
   type ValidationViolation,
   type WeekStatus,
 } from '@/lib/scheduler'
+import { fetchRoster, rosterFingerprint } from '@/lib/employee-store'
 import PublishPanel from './PublishPanel'
+import RosterPanel from './RosterPanel'
 
 type AvailabilityMode = 'all' | 'am' | 'pm' | 'weekdayPm' | 'weekend' | 'gap'
 
@@ -638,6 +640,11 @@ export default function SchedulerDemo() {
   const [staffQuery, setStaffQuery] = useState('')
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
   const [onboardingDismissed, setOnboardingDismissed] = useState(true)
+  const [rosterRev, setRosterRev] = useState(0)
+  const [rosterServerSnapshot, setRosterServerSnapshot] = useState<string | null>(null)
+  const [rosterLoadError, setRosterLoadError] = useState('')
+  const [rosterPanelOpen, setRosterPanelOpen] = useState(false)
+  const rosterDirty = rosterServerSnapshot === null ? employees.length > 0 : rosterFingerprint(employees) !== rosterServerSnapshot
   const assignments = weeks[weekStart] ?? emptyAssignments
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
   const weekVisibility = weekStart ? statusForWeek(weekStatus, weekStart, assignments) : 'off'
@@ -748,6 +755,27 @@ export default function SchedulerDemo() {
     setWeekStart(start)
     setMonthKey(monthKeyForWeek(start))
     setOnboardingDismissed(readOnboardingDismissed())
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchRoster()
+      .then((doc) => {
+        if (cancelled) return
+        if (doc.rev > 0) {
+          setEmployees(doc.employees)
+          setRosterServerSnapshot(rosterFingerprint(doc.employees))
+        }
+        setRosterRev(doc.rev)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRosterLoadError('Could not reach the staff list store. Showing the built-in demo list — save once the connection works to keep changes.')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   function dismissOnboarding() {
@@ -1095,6 +1123,11 @@ export default function SchedulerDemo() {
     )
   }
 
+  function removeEmployee(employeeId: string) {
+    remember('removed employee')
+    setEmployees((current) => current.filter((employee) => employee.id !== employeeId))
+  }
+
   function addEmployee() {
     if (!canAddEmployee) return
     remember('added employee')
@@ -1426,13 +1459,35 @@ export default function SchedulerDemo() {
                   {activeEmployeeCount} working, {employees.length - activeEmployeeCount} off the list
                 </p>
               </div>
-              <IconButton
-                icon={employeePanelOpen ? 'close' : 'plus'}
-                label={employeePanelOpen ? 'Close employee form' : 'Add employee'}
-                tone="accent"
-                onClick={() => setEmployeePanelOpen((open) => !open)}
-              />
+              <div className="flex shrink-0 items-center gap-1.5">
+                <IconButton
+                  icon="check"
+                  label={rosterPanelOpen ? 'Close save staff list' : 'Save staff list'}
+                  onClick={() => setRosterPanelOpen((open) => !open)}
+                />
+                <IconButton
+                  icon={employeePanelOpen ? 'close' : 'plus'}
+                  label={employeePanelOpen ? 'Close employee form' : 'Add employee'}
+                  tone="accent"
+                  onClick={() => setEmployeePanelOpen((open) => !open)}
+                />
+              </div>
             </div>
+
+            {rosterLoadError && <p className="mt-2 text-xs font-medium text-amber-800">{rosterLoadError}</p>}
+
+            {rosterPanelOpen && (
+              <RosterPanel
+                employees={employees}
+                rev={rosterRev}
+                dirty={rosterDirty}
+                onSaved={(rev) => {
+                  setRosterRev(rev)
+                  setRosterServerSnapshot(rosterFingerprint(employees))
+                }}
+                onClose={() => setRosterPanelOpen(false)}
+              />
+            )}
 
             {employeePanelOpen && (
               <EmployeeForm
@@ -1465,6 +1520,7 @@ export default function SchedulerDemo() {
                       employee={employee}
                       stat={staffStatsById.get(employee.id)}
                       onUpdate={updateEmployee}
+                      onRemove={removeEmployee}
                     />
                   ))}
                   {filteredEmployees.length === 0 && (
@@ -1614,11 +1670,15 @@ function EmployeeCard({
   employee,
   stat,
   onUpdate,
+  onRemove,
 }: {
   employee: Employee
   stat?: ScheduleStats
   onUpdate: (employeeId: string, update: Partial<Employee>) => void
+  onRemove: (employeeId: string) => void
 }) {
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
+
   function toggleRole(role: Role, enabled: boolean) {
     const roles = enabled ? [...employee.roles, role] : employee.roles.filter((candidate) => candidate !== role)
     onUpdate(employee.id, { roles: ROLES.filter((candidate) => roles.includes(candidate)) })
@@ -1642,6 +1702,34 @@ function EmployeeCard({
           Working
         </label>
       </div>
+
+      {confirmingRemove ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-red-300 bg-red-50 px-2 py-1.5">
+          <span className="text-xs font-semibold text-red-900">Remove {employee.name} from the staff list?</span>
+          <button
+            type="button"
+            className="rounded bg-red-800 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            onClick={() => onRemove(employee.id)}
+          >
+            Yes, remove
+          </button>
+          <button
+            type="button"
+            className="rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            onClick={() => setConfirmingRemove(false)}
+          >
+            Keep them
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="mt-2 text-xs font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          onClick={() => setConfirmingRemove(true)}
+        >
+          Remove from staff list
+        </button>
+      )}
 
       <fieldset className="mt-2">
         <legend className="sr-only">Positions {employee.name} can work</legend>

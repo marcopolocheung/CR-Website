@@ -7,6 +7,7 @@ import handler, {
   newShareId,
   validateGoldenWeekBody,
   validatePublishBody,
+  validateRosterBody,
   validateUpdateBody,
 } from './index'
 
@@ -141,6 +142,29 @@ function goldenPut(weekStart: string, body: unknown, token = 'manager-token'): R
   })
 }
 
+function rosterEmployee(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'mary',
+    name: 'Mary',
+    roles: ['server', 'cashier'],
+    recurringAvailability: { Sunday: [{ start: 570, end: 960 }] },
+    maxDaysPerWeek: 5,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+    newHire: false,
+    ...overrides,
+  }
+}
+
+function rosterPut(body: unknown, token = 'manager-token'): Request {
+  return new Request('https://api.test/api/employees', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  })
+}
+
 test('golden week bodies are strictly validated', () => {
   const good = { week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }
   assert.equal(validateGoldenWeekBody(good)?.baseRev, 0)
@@ -224,6 +248,60 @@ test('golden writes fail closed without a configured token', async () => {
     goldenPut('2026-09-13', { week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }),
     env,
   )
+  assert.equal(response.status, 503)
+})
+
+test('employee roster bodies are strictly validated', () => {
+  const good = { employees: [rosterEmployee()], baseRev: 0 }
+  assert.equal(validateRosterBody(good)?.baseRev, 0)
+  assert.equal(validateRosterBody({ ...good, baseRev: -1 }), null)
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ id: 'Not Valid!' })], baseRev: 0 }), null)
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ roles: ['chef'] })], baseRev: 0 }), null)
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ recurringAvailability: { Someday: [] } })], baseRev: 0 }), null)
+  assert.equal(
+    validateRosterBody({ employees: [rosterEmployee({ recurringAvailability: { Sunday: [{ start: 100, end: 50 }] } })], baseRev: 0 }),
+    null,
+  )
+  assert.equal(validateRosterBody({ employees: [rosterEmployee(), rosterEmployee()], baseRev: 0 }), null, 'duplicate ids rejected')
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ active: 'yes' })], baseRev: 0 }), null)
+})
+
+test('roster writes need the manager token and create on first save, and real deletes persist', async () => {
+  const env = mockEnv()
+  const body = { employees: [rosterEmployee()], baseRev: 0 }
+
+  const noToken = await handler.fetch(new Request('https://api.test/api/employees', { method: 'PUT', body: JSON.stringify(body) }), env)
+  assert.equal(noToken.status, 401)
+
+  const wrongToken = await handler.fetch(rosterPut(body, 'wrong'), env)
+  assert.equal(wrongToken.status, 401)
+
+  const created = await handler.fetch(rosterPut(body), env)
+  assert.equal(created.status, 201)
+  assert.equal(((await created.json()) as { rev: number }).rev, 1)
+
+  const fetched = await handler.fetch(new Request('https://api.test/api/employees'), env)
+  assert.equal(fetched.status, 200)
+  const doc = (await fetched.json()) as { rev: number; employees: { id: string }[] }
+  assert.equal(doc.rev, 1)
+  assert.deepEqual(doc.employees.map((employee) => employee.id), ['mary'])
+
+  const stale = await handler.fetch(rosterPut({ employees: [], baseRev: 0 }), env)
+  assert.equal(stale.status, 409)
+
+  // A real delete: the roster shrinks and that shrinkage persists.
+  const deleted = await handler.fetch(rosterPut({ employees: [], baseRev: 1 }), env)
+  assert.equal(deleted.status, 200)
+  assert.equal(((await deleted.json()) as { rev: number }).rev, 2)
+
+  const afterDelete = await handler.fetch(new Request('https://api.test/api/employees'), env)
+  const afterDeleteDoc = (await afterDelete.json()) as { employees: unknown[] }
+  assert.deepEqual(afterDeleteDoc.employees, [])
+})
+
+test('roster writes fail closed without a configured token', async () => {
+  const env = mockEnv('')
+  const response = await handler.fetch(rosterPut({ employees: [rosterEmployee()], baseRev: 0 }), env)
   assert.equal(response.status, 503)
 })
 
