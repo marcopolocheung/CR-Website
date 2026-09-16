@@ -36,6 +36,7 @@ export type Employee = {
   preferences?: ShiftPreference[]
   incompatibleEmployeeIds?: string[]
   active: boolean
+  newHire?: boolean
 }
 
 export type StaffingSlot = {
