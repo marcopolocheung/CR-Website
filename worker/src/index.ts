@@ -269,6 +269,122 @@ export function goldenWeeksForMonth(monthKey: string): string[] {
   return weeks
 }
 
+// --- Employee roster (one persistent staff list, edited by scheduler-demo) ---
+
+const ROSTER_KEY = 'roster:current'
+const ROSTER_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const ROSTER_ROLES = ['server', 'cashier', 'lead', 'manager']
+const MAX_EMPLOYEES = 100
+const MAX_RANGES_PER_DAY = 6
+const MAX_MINUTES_PER_DAY = 24 * 60
+const MAX_EMPLOYEE_ID_CHARS = 64
+const MAX_INCOMPATIBLE_IDS = 20
+
+export type StoredTimeRange = { start: number; end: number }
+
+export type StoredEmployee = {
+  id: string
+  name: string
+  roles: string[]
+  recurringAvailability: Record<string, StoredTimeRange[]>
+  maxDaysPerWeek?: number
+  maxShiftsPerWeek?: number
+  allowDoubles: boolean
+  incompatibleEmployeeIds: string[]
+  active: boolean
+  newHire: boolean
+}
+
+export type RosterDoc = {
+  v: 1
+  rev: number
+  employees: StoredEmployee[]
+  updatedAt: string
+}
+
+function isValidStoredTimeRange(value: unknown): value is StoredTimeRange {
+  if (!value || typeof value !== 'object') return false
+  const { start, end } = value as Record<string, unknown>
+  return (
+    typeof start === 'number' &&
+    typeof end === 'number' &&
+    Number.isInteger(start) &&
+    Number.isInteger(end) &&
+    start >= 0 &&
+    end <= MAX_MINUTES_PER_DAY &&
+    start < end
+  )
+}
+
+function isValidStoredEmployee(value: unknown): value is StoredEmployee {
+  if (!value || typeof value !== 'object') return false
+  const employee = value as Record<string, unknown>
+  if (
+    typeof employee.id !== 'string' ||
+    employee.id.length === 0 ||
+    employee.id.length > MAX_EMPLOYEE_ID_CHARS ||
+    !/^[a-z0-9-]+$/.test(employee.id)
+  ) {
+    return false
+  }
+  if (typeof employee.name !== 'string' || employee.name.length === 0 || employee.name.length > MAX_NAME_CHARS) return false
+  if (!Array.isArray(employee.roles) || !employee.roles.every((role) => typeof role === 'string' && ROSTER_ROLES.includes(role))) {
+    return false
+  }
+  if (!employee.recurringAvailability || typeof employee.recurringAvailability !== 'object') return false
+  const availability = employee.recurringAvailability as Record<string, unknown>
+  for (const [day, ranges] of Object.entries(availability)) {
+    if (!ROSTER_DAYS.includes(day)) return false
+    if (!Array.isArray(ranges) || ranges.length > MAX_RANGES_PER_DAY || !ranges.every(isValidStoredTimeRange)) return false
+  }
+  if (employee.maxDaysPerWeek !== undefined) {
+    if (typeof employee.maxDaysPerWeek !== 'number' || !Number.isInteger(employee.maxDaysPerWeek) || employee.maxDaysPerWeek < 1 || employee.maxDaysPerWeek > 7) {
+      return false
+    }
+  }
+  if (employee.maxShiftsPerWeek !== undefined) {
+    if (typeof employee.maxShiftsPerWeek !== 'number' || !Number.isInteger(employee.maxShiftsPerWeek) || employee.maxShiftsPerWeek < 1 || employee.maxShiftsPerWeek > 21) {
+      return false
+    }
+  }
+  if (typeof employee.allowDoubles !== 'boolean') return false
+  if (
+    !Array.isArray(employee.incompatibleEmployeeIds) ||
+    employee.incompatibleEmployeeIds.length > MAX_INCOMPATIBLE_IDS ||
+    !employee.incompatibleEmployeeIds.every((id) => typeof id === 'string')
+  ) {
+    return false
+  }
+  if (typeof employee.active !== 'boolean') return false
+  if (employee.newHire !== undefined && typeof employee.newHire !== 'boolean') return false
+  return true
+}
+
+export function validateRosterBody(body: unknown): { employees: StoredEmployee[]; baseRev: number } | null {
+  if (!body || typeof body !== 'object') return null
+  const { employees, baseRev } = body as Record<string, unknown>
+  if (typeof baseRev !== 'number' || !Number.isInteger(baseRev) || baseRev < 0) return null
+  if (!Array.isArray(employees) || employees.length > MAX_EMPLOYEES) return null
+  if (!employees.every(isValidStoredEmployee)) return null
+  const ids = new Set((employees as StoredEmployee[]).map((employee) => employee.id))
+  if (ids.size !== employees.length) return null
+  return {
+    employees: (employees as StoredEmployee[]).map((employee) => ({ ...employee, newHire: employee.newHire ?? false })),
+    baseRev,
+  }
+}
+
+export function normalizeRosterDoc(raw: unknown): RosterDoc | null {
+  if (!raw || typeof raw !== 'object') return null
+  const doc = raw as Record<string, unknown>
+  if (doc.v !== 1) return null
+  if (typeof doc.rev !== 'number' || !Number.isInteger(doc.rev) || doc.rev < 1) return null
+  if (typeof doc.updatedAt !== 'string') return null
+  const valid = validateRosterBody({ employees: doc.employees, baseRev: doc.rev })
+  if (!valid) return null
+  return { v: 1, rev: doc.rev, employees: valid.employees, updatedAt: doc.updatedAt }
+}
+
 export function goldenWriteError(env: Env): 'write_not_configured' | null {
   return env.SCHEDULE_WRITE_TOKEN ? null : 'write_not_configured'
 }
@@ -544,6 +660,61 @@ export default {
         await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
         await bumpGoldenMonthRevs(env, weekStart)
         return json({ rev: next.rev, updatedAt: next.updatedAt }, 200, request, env)
+      }
+    }
+
+    if (path === '/api/employees') {
+      if (request.method === 'GET') {
+        const raw = await env.SCHEDULES.get(ROSTER_KEY)
+        const doc = raw ? normalizeRosterDoc(JSON.parse(raw)) : null
+        return json(
+          { employees: doc?.employees ?? [], rev: doc?.rev ?? 0, updatedAt: doc?.updatedAt ?? null },
+          200,
+          request,
+          env,
+          { 'Cache-Control': 'no-store' },
+        )
+      }
+
+      if (request.method === 'PUT') {
+        if (goldenWriteError(env)) return json({ error: 'write_not_configured' }, 503, request, env)
+        if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
+        if (!(await checkWriteThrottle(env, clientIp(request)))) {
+          return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
+        }
+        let body: unknown
+        try {
+          body = await readBody(request)
+        } catch {
+          return json({ error: 'body_too_large' }, 413, request, env)
+        }
+        const valid = validateRosterBody(body)
+        if (!valid) return json({ error: 'invalid_body' }, 400, request, env)
+        const existingRaw = await env.SCHEDULES.get(ROSTER_KEY)
+        let currentRev = 0
+        let currentUpdatedAt: string | undefined
+        if (existingRaw) {
+          let parsed: unknown
+          try {
+            parsed = JSON.parse(existingRaw)
+          } catch {
+            parsed = null
+          }
+          const current = normalizeRosterDoc(parsed)
+          currentRev = current?.rev ?? 0
+          currentUpdatedAt = current?.updatedAt
+        }
+        if (valid.baseRev !== currentRev) {
+          return json({ error: 'conflict', rev: currentRev, updatedAt: currentUpdatedAt }, 409, request, env)
+        }
+        const next: RosterDoc = {
+          v: 1,
+          rev: currentRev + 1,
+          employees: valid.employees,
+          updatedAt: new Date().toISOString(),
+        }
+        await env.SCHEDULES.put(ROSTER_KEY, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
+        return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env)
       }
     }
 
