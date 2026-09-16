@@ -385,6 +385,69 @@ export function normalizeRosterDoc(raw: unknown): RosterDoc | null {
   return { v: 1, rev: doc.rev, employees: valid.employees, updatedAt: doc.updatedAt }
 }
 
+// --- Staffing template (one persistent set of weekly shift rules, edited by scheduler-demo) ---
+
+const TEMPLATE_KEY = 'template:current'
+const MAX_SLOTS_PER_DAY = 20
+const MAX_LABEL_CHARS = 60
+
+export type StoredTemplateSlot = {
+  period: 'AM' | 'PM'
+  role: string
+  label: string
+  start: number
+  end: number
+  required: boolean
+}
+
+export type StoredTemplate = Record<string, StoredTemplateSlot[]>
+
+export type TemplateDoc = {
+  v: 1
+  rev: number
+  template: StoredTemplate
+  updatedAt: string
+}
+
+function isValidStoredTemplateSlot(value: unknown): value is StoredTemplateSlot {
+  if (!value || typeof value !== 'object') return false
+  const slot = value as Record<string, unknown>
+  if (slot.period !== 'AM' && slot.period !== 'PM') return false
+  if (typeof slot.role !== 'string' || !ROSTER_ROLES.includes(slot.role)) return false
+  if (typeof slot.label !== 'string' || slot.label.length === 0 || slot.label.length > MAX_LABEL_CHARS) return false
+  if (typeof slot.start !== 'number' || !Number.isInteger(slot.start) || slot.start < 0 || slot.start >= MAX_MINUTES_PER_DAY) return false
+  if (typeof slot.end !== 'number' || !Number.isInteger(slot.end) || slot.end <= slot.start || slot.end > MAX_MINUTES_PER_DAY) return false
+  if (typeof slot.required !== 'boolean') return false
+  return true
+}
+
+export function validateTemplateBody(body: unknown): { template: StoredTemplate; baseRev: number } | null {
+  if (!body || typeof body !== 'object') return null
+  const { template, baseRev } = body as Record<string, unknown>
+  if (typeof baseRev !== 'number' || !Number.isInteger(baseRev) || baseRev < 0) return null
+  if (!template || typeof template !== 'object') return null
+  const candidate = template as Record<string, unknown>
+  if (Object.keys(candidate).some((key) => !ROSTER_DAYS.includes(key))) return null
+  const result: StoredTemplate = {}
+  for (const day of ROSTER_DAYS) {
+    const slots = candidate[day] ?? []
+    if (!Array.isArray(slots) || slots.length > MAX_SLOTS_PER_DAY || !slots.every(isValidStoredTemplateSlot)) return null
+    result[day] = slots as StoredTemplateSlot[]
+  }
+  return { template: result, baseRev }
+}
+
+export function normalizeTemplateDoc(raw: unknown): TemplateDoc | null {
+  if (!raw || typeof raw !== 'object') return null
+  const doc = raw as Record<string, unknown>
+  if (doc.v !== 1) return null
+  if (typeof doc.rev !== 'number' || !Number.isInteger(doc.rev) || doc.rev < 1) return null
+  if (typeof doc.updatedAt !== 'string') return null
+  const valid = validateTemplateBody({ template: doc.template, baseRev: doc.rev })
+  if (!valid) return null
+  return { v: 1, rev: doc.rev, template: valid.template, updatedAt: doc.updatedAt }
+}
+
 export function goldenWriteError(env: Env): 'write_not_configured' | null {
   return env.SCHEDULE_WRITE_TOKEN ? null : 'write_not_configured'
 }
@@ -714,6 +777,61 @@ export default {
           updatedAt: new Date().toISOString(),
         }
         await env.SCHEDULES.put(ROSTER_KEY, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
+        return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env)
+      }
+    }
+
+    if (path === '/api/template') {
+      if (request.method === 'GET') {
+        const raw = await env.SCHEDULES.get(TEMPLATE_KEY)
+        const doc = raw ? normalizeTemplateDoc(JSON.parse(raw)) : null
+        return json(
+          { template: doc?.template ?? null, rev: doc?.rev ?? 0, updatedAt: doc?.updatedAt ?? null },
+          200,
+          request,
+          env,
+          { 'Cache-Control': 'no-store' },
+        )
+      }
+
+      if (request.method === 'PUT') {
+        if (goldenWriteError(env)) return json({ error: 'write_not_configured' }, 503, request, env)
+        if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
+        if (!(await checkWriteThrottle(env, clientIp(request)))) {
+          return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
+        }
+        let body: unknown
+        try {
+          body = await readBody(request)
+        } catch {
+          return json({ error: 'body_too_large' }, 413, request, env)
+        }
+        const valid = validateTemplateBody(body)
+        if (!valid) return json({ error: 'invalid_body' }, 400, request, env)
+        const existingRaw = await env.SCHEDULES.get(TEMPLATE_KEY)
+        let currentRev = 0
+        let currentUpdatedAt: string | undefined
+        if (existingRaw) {
+          let parsed: unknown
+          try {
+            parsed = JSON.parse(existingRaw)
+          } catch {
+            parsed = null
+          }
+          const current = normalizeTemplateDoc(parsed)
+          currentRev = current?.rev ?? 0
+          currentUpdatedAt = current?.updatedAt
+        }
+        if (valid.baseRev !== currentRev) {
+          return json({ error: 'conflict', rev: currentRev, updatedAt: currentUpdatedAt }, 409, request, env)
+        }
+        const next: TemplateDoc = {
+          v: 1,
+          rev: currentRev + 1,
+          template: valid.template,
+          updatedAt: new Date().toISOString(),
+        }
+        await env.SCHEDULES.put(TEMPLATE_KEY, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
         return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env)
       }
     }
