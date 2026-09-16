@@ -109,6 +109,40 @@ test('validator allows doubles for employees configured to allow them', () => {
   assert.deepEqual(violations, [])
 })
 
+test('overlapping assignment violation references both conflicting slots', () => {
+  const first: StaffingSlot = {
+    id: 'overlap-a',
+    day: 'Monday',
+    period: 'AM',
+    role: 'lead',
+    label: 'Shift lead',
+    start: minutes(9, 30),
+    end: minutes(16),
+    required: true,
+  }
+  const second: StaffingSlot = {
+    id: 'overlap-b',
+    day: 'Monday',
+    period: 'AM',
+    role: 'lead',
+    label: 'Shift lead (extra)',
+    start: minutes(12),
+    end: minutes(18),
+    required: true,
+  }
+  const violations = validateSchedule({
+    employees: [employee('dolores')],
+    slots: [first, second],
+    assignments: [assignment(first, 'dolores'), assignment(second, 'dolores')],
+    requireCoverage: false,
+  })
+
+  const overlap = violations.find((violation) => violation.code === 'overlapping_assignment')
+  assert.ok(overlap)
+  assert.equal(overlap?.slotId, 'overlap-b')
+  assert.equal(overlap?.relatedSlotId, 'overlap-a')
+})
+
 test('validator catches employee incompatibility', () => {
   const cashier = slot('Friday', 'PM', 'Cashier 1')
   const server = slot('Friday', 'PM', 'Server')
