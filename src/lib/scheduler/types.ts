@@ -82,6 +82,7 @@ export type ValidationViolation = {
   code: ValidationCode
   message: string
   slotId?: string
+  relatedSlotId?: string
   employeeId?: string
 }
 

@@ -196,6 +196,7 @@ export function validateSchedule({
               code: 'overlapping_assignment',
               employeeId,
               slotId: second.id,
+              relatedSlotId: first.id,
               message: `${employee.name} has overlapping assignments on ${day}: ${first.label} and ${second.label}.`,
             })
           }
