@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { DAYS } from './types'
 import { seedEmployees, seedTemplate, expandTemplate } from './data'
 import { SCHEDULE_STRATEGIES, generateSchedule, summarizeSchedule } from './solver'
 import { validateSchedule } from './validator'
-import type { Employee, ScheduleAssignment, StaffingSlot } from './types'
+import type { Employee, ScheduleAssignment, StaffingSlot, WeeklyStaffingTemplate } from './types'
 import { formatTime, formatTimeRange, minutes } from './time'
 import { dateForDay, dayOfMonth, formatDayLabel, formatWeekRange, shiftWeek, weekStartFor, weeksBetween } from './week'
 
@@ -356,4 +357,132 @@ test('times always read as a padded 12 hour clock with AM or PM', () => {
   // A morning and an evening shift must never render the same way.
   assert.notEqual(formatTime(minutes(4)), formatTime(minutes(16)))
   assert.equal(formatTimeRange({ start: minutes(16), end: minutes(23) }), '04:00 PM - 11:00 PM')
+})
+
+const midAvailability = [{ start: minutes(12), end: minutes(19) }]
+const eveningAvailability = [{ start: minutes(16), end: minutes(19) }]
+
+function customWorker(id: string, ranges: { start: number; end: number }[], allowDoubles: boolean): Employee {
+  return {
+    id,
+    name: id,
+    roles: ['cashier'],
+    recurringAvailability: Object.fromEntries(DAYS.map((day) => [day, ranges.map((range) => ({ ...range }))])),
+    maxDaysPerWeek: 7,
+    allowDoubles,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }
+}
+
+function customSlot(id: string, period: 'AM' | 'PM', startHour: number, startMinute: number, endHour: number, endMinute: number): StaffingSlot {
+  return {
+    id,
+    day: 'Monday',
+    period,
+    role: 'cashier',
+    label: id,
+    start: minutes(startHour, startMinute),
+    end: minutes(endHour, endMinute),
+    required: true,
+  }
+}
+
+function emptyTemplate(): WeeklyStaffingTemplate {
+  return Object.fromEntries(DAYS.map((day) => [day, []])) as unknown as WeeklyStaffingTemplate
+}
+
+test('mid 12-7 worker fits a 12-4 extra slot but not full AM or PM halves', () => {
+  const mid = customWorker('mid', midAvailability, true)
+  const midSlot = customSlot('mid-extra', 'AM', 12, 0, 16, 0)
+  const fullAm = customSlot('full-am', 'AM', 9, 30, 16, 0)
+  const fullPm = customSlot('full-pm', 'PM', 16, 0, 23, 0)
+
+  assert.deepEqual(
+    validateSchedule({ employees: [mid], slots: [midSlot], assignments: [assignment(midSlot, 'mid')] }),
+    [],
+  )
+  assert.ok(
+    validateSchedule({ employees: [mid], slots: [fullAm], assignments: [assignment(fullAm, 'mid')] }).some(
+      (violation) => violation.code === 'unavailable_employee',
+    ),
+  )
+  assert.ok(
+    validateSchedule({ employees: [mid], slots: [fullPm], assignments: [assignment(fullPm, 'mid')] }).some(
+      (violation) => violation.code === 'unavailable_employee',
+    ),
+  )
+})
+
+test('evening 4-7 worker fits a 4-7 extra slot but not the full 4-11 PM', () => {
+  const evening = customWorker('evening', eveningAvailability, false)
+  const eveningSlot = customSlot('evening-extra', 'PM', 16, 0, 19, 0)
+  const fullPm = customSlot('full-pm', 'PM', 16, 0, 23, 0)
+
+  assert.deepEqual(
+    validateSchedule({ employees: [evening], slots: [eveningSlot], assignments: [assignment(eveningSlot, 'evening')] }),
+    [],
+  )
+  assert.ok(
+    validateSchedule({ employees: [evening], slots: [fullPm], assignments: [assignment(fullPm, 'evening')] }).some(
+      (violation) => violation.code === 'unavailable_employee',
+    ),
+  )
+})
+
+test('mid worker spanning AM and PM extra slots needs doubles allowed', () => {
+  const noDoubles = customWorker('mid-no-doubles', midAvailability, false)
+  const allowsDoubles = customWorker('mid-doubles', midAvailability, true)
+  const amExtra = customSlot('am-extra', 'AM', 12, 0, 16, 0)
+  const pmExtra = customSlot('pm-extra', 'PM', 16, 0, 19, 0)
+
+  const prohibited = validateSchedule({
+    employees: [noDoubles],
+    slots: [amExtra, pmExtra],
+    assignments: [assignment(amExtra, 'mid-no-doubles'), assignment(pmExtra, 'mid-no-doubles')],
+    requireCoverage: false,
+  })
+  assert.ok(prohibited.some((violation) => violation.code === 'prohibited_double'))
+
+  assert.deepEqual(
+    validateSchedule({
+      employees: [allowsDoubles],
+      slots: [amExtra, pmExtra],
+      assignments: [assignment(amExtra, 'mid-doubles'), assignment(pmExtra, 'mid-doubles')],
+      requireCoverage: false,
+    }),
+    [],
+  )
+})
+
+test('extra mid and evening slots schedule on top of core AM/PM coverage', () => {
+  const coreAm = { ...customWorker('core-am', [{ start: minutes(9, 30), end: minutes(16) }], false), roles: ['cashier' as const] }
+  const corePm = { ...customWorker('core-pm', [{ start: minutes(16), end: minutes(23) }], false), roles: ['cashier' as const] }
+  const mid = customWorker('mid', midAvailability, true)
+  const evening = customWorker('evening', eveningAvailability, false)
+  const employees = [coreAm, corePm, mid, evening]
+
+  const template = emptyTemplate()
+  template.Monday = [
+    { period: 'AM', role: 'cashier', label: 'Cashier 1', start: minutes(10, 30), end: minutes(16), required: true },
+    { period: 'AM', role: 'cashier', label: 'Mid support', start: minutes(12), end: minutes(16), required: true },
+    { period: 'PM', role: 'cashier', label: 'Cashier 1', start: minutes(16), end: minutes(23), required: true },
+    { period: 'PM', role: 'cashier', label: 'Evening support', start: minutes(16), end: minutes(19), required: true },
+  ]
+
+  const result = generateSchedule({ employees, template })
+  assert.equal(result.status, 'FEASIBLE')
+  if (result.status !== 'FEASIBLE') return
+
+  const slotsForCheck = expandTemplate(template)
+  assert.deepEqual(validateSchedule({ employees, slots: slotsForCheck, assignments: result.assignments }), [])
+
+  const bySlot = new Map(result.assignments.map((candidate) => [candidate.slotId, candidate.employeeId]))
+  const slotIdFor = (label: string, period: 'AM' | 'PM') =>
+    slotsForCheck.find((candidate) => candidate.label === label && candidate.period === period)?.id ?? ''
+  // Core halves stay with full-half workers; extras go to the custom-hour workers.
+  assert.equal(bySlot.get(slotIdFor('Cashier 1', 'AM')), 'core-am')
+  assert.equal(bySlot.get(slotIdFor('Cashier 1', 'PM')), 'core-pm')
+  assert.equal(bySlot.get(slotIdFor('Mid support', 'AM')), 'mid')
+  assert.equal(bySlot.get(slotIdFor('Evening support', 'PM')), 'evening')
 })
