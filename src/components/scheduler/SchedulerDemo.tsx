@@ -2450,6 +2450,44 @@ function AvailabilityGridEditor({
     if (next) onChange(day, [next])
   }
 
+  function updateRangeTime(day: DayOfWeek, index: number, field: 'start' | 'end', value: string) {
+    if (!onChange) return
+    const current = [...(recurringAvailability[day] ?? [])]
+    const base = current[index]
+    if (!base) return
+    const nextMinutes = timeValueToMinutes(value)
+    const next =
+      field === 'start'
+        ? clampAvailabilityRange(nextMinutes, base.end)
+        : clampAvailabilityRange(base.start, nextMinutes === 0 ? minutes(23, 59) : nextMinutes)
+    if (!next) return
+    current[index] = next
+    onChange(day, current)
+  }
+
+  function removeRange(day: DayOfWeek, index: number) {
+    if (!onChange) return
+    onChange(
+      day,
+      (recurringAvailability[day] ?? []).filter((_, candidate) => candidate !== index),
+    )
+  }
+
+  function addRange(day: DayOfWeek) {
+    if (!onChange) return
+    const current = recurringAvailability[day] ?? []
+    if (current.length >= 3) return
+    onChange(day, [...current, { ...fullDay }])
+  }
+
+  function isSingleCustomRange(range: TimeRange) {
+    return !(
+      (range.start === amShift.start && range.end === amShift.end) ||
+      (range.start === pmShift.start && range.end === pmShift.end) ||
+      (range.start === fullDay.start && range.end === fullDay.end)
+    )
+  }
+
   return (
     <div className="mt-2 space-y-1.5">
       <div className="grid grid-cols-[2.5rem_2rem_2rem_1fr] items-center gap-x-3">
@@ -2473,38 +2511,63 @@ function AvailabilityGridEditor({
               <label className="flex items-center justify-start">
                 <input type="checkbox" checked={pm} onChange={(event) => onToggle(day, 'pm', event.target.checked)} />
               </label>
-              <div className="flex min-w-0 flex-wrap items-center gap-1">
-                {single ? (
-                  <>
+              <div className="min-w-0 space-y-1">
+                {ranges.length === 0 && <span className="text-xs text-zinc-400">Off</span>}
+                {ranges.map((range, index) => (
+                  <div key={index} className="flex min-w-0 flex-wrap items-center gap-1">
                     <input
                       type="time"
-                      aria-label={`${day} availability start`}
+                      aria-label={`${day} availability ${index + 1} start`}
                       className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
-                      value={minutesToTimeValue(single.start)}
+                      value={minutesToTimeValue(range.start)}
                       disabled={!onChange}
-                      onChange={(event) => updateDayTime(day, 'start', event.target.value)}
+                      onChange={(event) => updateRangeTime(day, index, 'start', event.target.value)}
                     />
                     <span aria-hidden="true" className="text-xs text-zinc-500">
                       to
                     </span>
                     <input
                       type="time"
-                      aria-label={`${day} availability end`}
+                      aria-label={`${day} availability ${index + 1} end`}
                       className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
-                      value={minutesToTimeValue(single.end)}
+                      value={minutesToTimeValue(range.end)}
                       disabled={!onChange}
-                      onChange={(event) => updateDayTime(day, 'end', event.target.value)}
+                      onChange={(event) => updateRangeTime(day, index, 'end', event.target.value)}
                     />
-                    {custom && (
+                    {isSingleCustomRange(range) && (
                       <span className="rounded border border-sky-200 bg-sky-50 px-1 py-px text-[10px] font-semibold text-sky-900">
                         Custom
                       </span>
                     )}
-                  </>
-                ) : ranges.length > 1 ? (
-                  <span className="text-xs text-zinc-500">{ranges.length} ranges · edit via presets</span>
-                ) : (
-                  <span className="text-xs text-zinc-400">Off</span>
+                    {onChange && ranges.length > 1 && (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${day} hours ${index + 1}`}
+                        className="rounded border border-zinc-300 bg-white px-1 py-px text-[11px] font-semibold text-zinc-600 hover:bg-zinc-100"
+                        onClick={() => removeRange(day, index)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {onChange && ranges.length >= 1 && ranges.length < 3 && (
+                  <button
+                    type="button"
+                    className="text-[11px] font-semibold text-sky-800 hover:text-sky-900"
+                    onClick={() => addRange(day)}
+                  >
+                    + Add hours
+                  </button>
+                )}
+                {onChange && ranges.length === 0 && (
+                  <button
+                    type="button"
+                    className="text-[11px] font-semibold text-sky-800 hover:text-sky-900"
+                    onClick={() => addRange(day)}
+                  >
+                    + Add hours
+                  </button>
                 )}
               </div>
             </div>
