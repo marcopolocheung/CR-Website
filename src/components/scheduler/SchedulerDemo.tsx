@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   DAYS,
   PERIODS,
@@ -2429,15 +2429,70 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   )
 }
 
+function AvailabilityPresetBar({
+  onApply,
+  gapSlot,
+  weekStart,
+}: {
+  onApply: (availability: Employee['recurringAvailability']) => void
+  gapSlot?: StaffingSlot
+  weekStart?: string
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {availabilityPresets.map((preset) => (
+        <button
+          key={preset.label}
+          type="button"
+          className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+          onClick={() => onApply(preset.build())}
+        >
+          {preset.label}
+        </button>
+      ))}
+      {gapSlot && (
+        <button
+          type="button"
+          className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+          onClick={() => onApply(gapAvailability(gapSlot))}
+        >
+          {weekStart ? formatDayLabel(weekStart, gapSlot.day) : gapSlot.day} {periodLabels[gapSlot.period]} only
+        </button>
+      )}
+    </div>
+  )
+}
+
 function AvailabilityGridEditor({
   recurringAvailability,
   onToggle,
   onChange,
+  showCustomControls = false,
+  onToggleCustomControls,
+  presets,
 }: {
   recurringAvailability: Employee['recurringAvailability']
   onToggle: (day: DayOfWeek, period: 'am' | 'pm', checked: boolean) => void
   onChange?: (day: DayOfWeek, ranges: TimeRange[]) => void
+  showCustomControls?: boolean
+  onToggleCustomControls?: () => void
+  presets?: React.ReactNode
 }) {
+  const [pendingReset, setPendingReset] = useState<{ day: DayOfWeek; period: 'am' | 'pm'; checked: boolean } | null>(null)
+  const customControlsId = useId()
+  const canCustomize = Boolean(onChange && onToggleCustomControls)
+  const expanded = canCustomize ? showCustomControls : true
+
+  function requestToggle(day: DayOfWeek, period: 'am' | 'pm', checked: boolean) {
+    const current = recurringAvailability[day] ?? []
+    if (isCustomDayRanges(current)) {
+      setPendingReset({ day, period, checked })
+      return
+    }
+    setPendingReset(null)
+    onToggle(day, period, checked)
+  }
+
   function updateDayTime(day: DayOfWeek, field: 'start' | 'end', value: string) {
     if (!onChange) return
     const current = recurringAvailability[day] ?? []
@@ -2490,6 +2545,7 @@ function AvailabilityGridEditor({
 
   return (
     <div className="mt-2 space-y-1.5">
+      {expanded && presets ? presets : null}
       <div className="grid grid-cols-[2.5rem_2rem_2rem_1fr] items-center gap-x-3">
         <span />
         <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">AM</span>
@@ -2570,15 +2626,51 @@ function AvailabilityGridEditor({
                   </button>
                 )}
               </div>
-            </div>
-            {custom && single && (
-              <p className="ml-10 text-[11px] text-zinc-500">
-                Custom {formatTimeRange(single)} — AM/PM boxes only show overlap; changing them resets to standard halves.
-              </p>
-            )}
-          </Fragment>
-        )
-      })}
+              {confirming && (
+                <div className="ml-10 mt-1 flex flex-wrap items-center gap-2 rounded border border-amber-300 bg-amber-50 px-2 py-1.5">
+                  <span className="text-[11px] font-medium text-amber-900">
+                    Replace {customLabel || 'custom hours'} with standard halves?
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100"
+                    onClick={() => setPendingReset(null)}
+                  >
+                    Keep custom
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded bg-zinc-900 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-zinc-700"
+                    onClick={() => {
+                      const pending = pendingReset
+                      setPendingReset(null)
+                      if (pending) onToggle(pending.day, pending.period, pending.checked)
+                    }}
+                  >
+                    Use standard
+                  </button>
+                </div>
+              )}
+              {expanded && custom && single && !confirming && (
+                <p className="ml-10 text-[11px] text-zinc-500">
+                  Custom {formatTimeRange(single)} — AM/PM boxes only show overlap; changing them resets to standard halves.
+                </p>
+              )}
+            </Fragment>
+          )
+        })}
+      </div>
+      {canCustomize && onToggleCustomControls && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={customControlsId}
+          className="text-[11px] font-semibold text-sky-800 hover:text-sky-900"
+          onClick={onToggleCustomControls}
+        >
+          {expanded ? 'Hide custom hours' : 'Customize hours / Apply presets'}
+        </button>
+      )}
     </div>
   )
 }
@@ -2603,6 +2695,7 @@ function EmployeeForm({
     : ROLES.every((role) => !draft.roles[role]) && !draft.newHire
       ? 'Pick at least one position, or mark them a new hire, to save.'
       : null
+  const [customizing, setCustomizing] = useState(false)
 
   function toggleAvailabilityDay(day: DayOfWeek, period: 'am' | 'pm', checked: boolean) {
     const current = dayAvailabilityFromRanges(draft.recurringAvailability[day])
@@ -2655,34 +2748,22 @@ function EmployeeForm({
       <fieldset className="mt-3">
         <legend className="text-sm font-medium text-zinc-800">Availability</legend>
         <p className="mt-1 text-xs text-zinc-500">
-          For 12-7 or 4-7 workers, use a preset then fine-tune per-day hours. 12-7 spans both halves: keep doubles on if
-          they can take one morning plus one dinner spot the same day.
+          Pick AM/PM per day. For 12-7 or 4-7 workers, customize hours then fine-tune per-day. 12-7 spans both halves:
+          keep doubles on if they can take one morning plus one dinner spot the same day.
         </p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {availabilityPresets.map((preset) => (
-            <button
-              key={preset.label}
-              type="button"
-              className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
-              onClick={() => onDraftChange({ ...draft, recurringAvailability: preset.build() })}
-            >
-              {preset.label}
-            </button>
-          ))}
-          {gapSlot && (
-            <button
-              type="button"
-              className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
-              onClick={() => onDraftChange({ ...draft, recurringAvailability: gapAvailability(gapSlot) })}
-            >
-              {weekStart ? formatDayLabel(weekStart, gapSlot.day) : gapSlot.day} {periodLabels[gapSlot.period]} only
-            </button>
-          )}
-        </div>
         <AvailabilityGridEditor
           recurringAvailability={draft.recurringAvailability}
           onToggle={toggleAvailabilityDay}
           onChange={changeAvailabilityDay}
+          showCustomControls={customizing}
+          onToggleCustomControls={() => setCustomizing((value) => !value)}
+          presets={
+            <AvailabilityPresetBar
+              onApply={(availability) => onDraftChange({ ...draft, recurringAvailability: availability })}
+              gapSlot={gapSlot}
+              weekStart={weekStart}
+            />
+          }
         />
       </fieldset>
 
@@ -2749,6 +2830,7 @@ function EmployeeCard({
   onRemove: (employeeId: string) => void
 }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [customizing, setCustomizing] = useState(false)
 
   function toggleRole(role: Role, enabled: boolean) {
     const roles = enabled ? [...employee.roles, role] : employee.roles.filter((candidate) => candidate !== role)
@@ -2880,6 +2962,13 @@ function EmployeeCard({
               recurringAvailability: { ...employee.recurringAvailability, [day]: ranges },
             })
           }}
+          showCustomControls={customizing}
+          onToggleCustomControls={() => setCustomizing((value) => !value)}
+          presets={
+            <AvailabilityPresetBar
+              onApply={(availability) => onUpdate(employee.id, { recurringAvailability: availability })}
+            />
+          }
         />
       </Disclosure>
     </div>
