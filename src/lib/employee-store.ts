@@ -47,8 +47,9 @@ export type RosterDoc = {
   updatedAt: string | null
 }
 
-export async function fetchRoster(): Promise<RosterDoc> {
-  const { status, body } = await requestJson('/api/employees')
+export async function fetchRoster(restaurantId?: string): Promise<RosterDoc> {
+  const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
+  const { status, body } = await requestJson(`/api/employees${suffix}`)
   if (status === 200 && body && typeof body === 'object' && 'employees' in body) {
     const { employees, rev, updatedAt } = body as { employees: unknown; rev: unknown; updatedAt: unknown }
     if (Array.isArray(employees) && employees.every(isRosterEmployee)) {
@@ -58,8 +59,14 @@ export async function fetchRoster(): Promise<RosterDoc> {
   throw new StoreUnavailableError()
 }
 
-export async function saveRoster(employees: Employee[], baseRev: number, token: string): Promise<{ rev: number }> {
-  const { status, body } = await requestJson('/api/employees', {
+export async function saveRoster(
+  employees: Employee[],
+  baseRev: number,
+  token: string,
+  restaurantId?: string,
+): Promise<{ rev: number }> {
+  const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
+  const { status, body } = await requestJson(`/api/employees${suffix}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ employees: employees.map(toRosterEmployee), baseRev }),

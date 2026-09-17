@@ -22,7 +22,7 @@ import { templateHashForSlots, type PublishedWeek } from '@/lib/schedule-share'
 import { fetchGoldenMonth, type GoldenWeekDoc } from '@/lib/schedule-store'
 import { fetchTemplate } from '@/lib/template-store'
 
-export default function ScheduleViewer() {
+export default function ScheduleViewer({ restaurantId }: { restaurantId?: string } = {}) {
   const [template, setTemplate] = useState<WeeklyStaffingTemplate>(seedTemplate)
   const slots = useMemo(() => expandTemplate(template), [template])
   const templateHash = useMemo(() => templateHashForSlots(slots), [slots])
@@ -48,7 +48,7 @@ export default function ScheduleViewer() {
 
   useEffect(() => {
     let cancelled = false
-    fetchTemplate()
+    fetchTemplate(restaurantId)
       .then((doc) => {
         if (!cancelled && doc.rev > 0 && doc.template) {
           setTemplate(doc.template)
@@ -61,7 +61,7 @@ export default function ScheduleViewer() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [restaurantId])
 
   useEffect(() => {
     if (!ready || !monthKey) return
@@ -69,7 +69,7 @@ export default function ScheduleViewer() {
     setLoading(true)
     setLoadError('')
     setStatusNote('')
-    fetchGoldenMonth(monthKey)
+    fetchGoldenMonth(monthKey, 0, restaurantId)
       .then((month) => {
         if (cancelled) return
         setDocs(month.weeks)
@@ -88,14 +88,14 @@ export default function ScheduleViewer() {
     return () => {
       cancelled = true
     }
-  }, [monthKey, ready])
+  }, [monthKey, ready, restaurantId])
 
   async function revalidate(source: 'focus' | 'visible' | 'online' | 'push' | 'manual') {
     const live = liveRef.current
     if (!live.ready || !live.monthKey || live.busy || document.hidden) return
     setRefreshing(true)
     try {
-      const month = await fetchGoldenMonth(live.monthKey, live.monthRev)
+      const month = await fetchGoldenMonth(live.monthKey, live.monthRev, restaurantId)
       if (month.notModified) {
         if (source === 'manual') setStatusNote('You are up to date.')
         return
@@ -131,8 +131,11 @@ export default function ScheduleViewer() {
     try {
       channel = new BroadcastChannel('chinarose-schedule')
       channel.onmessage = (event) => {
-        const data = event.data as { type?: unknown } | null
-        if (data?.type === 'golden-saved') void revalidate('push')
+        const data = event.data as { type?: unknown; restaurantId?: unknown } | null
+        if (data?.type === 'golden-saved') {
+          if (restaurantId && data.restaurantId && data.restaurantId !== restaurantId) return
+          void revalidate('push')
+        }
       }
     } catch {
       channel = null
@@ -147,7 +150,7 @@ export default function ScheduleViewer() {
         return
       }
     }
-  }, [])
+  }, [restaurantId])
 
   function goToMonth(next: string) {
     if (!next || next === monthKey) return

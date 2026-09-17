@@ -48,12 +48,16 @@ Add new structured fields to `types.ts`, enforce generation behavior in `solver.
 
 ## Sharing
 
-The demo edits one persistent golden schedule in the free Cloudflare Worker
-+ KV (`worker/`). Each week is stored in plaintext under
-`golden:YYYY-MM-DD` with `visible` (the week on/off switch), a
+The demo edits one persistent golden schedule per station in the free
+Cloudflare Worker + KV (`worker/`). Each week is stored in plaintext under
+`r:{restaurant}:golden:YYYY-MM-DD` with `visible` (the week on/off switch), a
 `templateHash` guard against shift-layout drift, and `rev` for optimistic
 concurrency (`409 conflict` means someone else saved first — saving again
 overwrites with your copy, and the first save of a week uses `baseRev: 0`).
+Stations are `CR3-diningroom`, `CR3-kitchen`, `CR2-kitchen`, `CR2-diningroom`
+(see `src/data/restaurants.ts`); roster and template are likewise namespaced
+per station. New stations start from the built-in China Rose template with a
+one-click Start blank option.
 
 Reads are public: `/schedule` lists visible weeks for a month and needs no
 link or code. The viewer never polls — it revalidates with a cheap month-rev

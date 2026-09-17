@@ -11,12 +11,14 @@ export default function TemplatePanel({
   dirty,
   onSaved,
   onClose,
+  restaurantId,
 }: {
   template: WeeklyStaffingTemplate
   rev: number
   dirty: boolean
   onSaved: (rev: number) => void
   onClose: () => void
+  restaurantId?: string
 }) {
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
@@ -30,7 +32,7 @@ export default function TemplatePanel({
     setError('')
     setNotice('')
     try {
-      const result = await saveTemplate(template, rev, token)
+      const result = await saveTemplate(template, rev, token, restaurantId)
       setToken('')
       setNotice('Saved. Both the scheduler and the published /schedule page use these rules now.')
       onSaved(result.rev)

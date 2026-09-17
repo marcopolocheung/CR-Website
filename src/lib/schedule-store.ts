@@ -66,8 +66,9 @@ function isGoldenWeekDoc(body: unknown): body is GoldenWeekDoc {
   )
 }
 
-export async function fetchGoldenWeek(weekStart: string): Promise<GoldenWeekDoc | null> {
-  const { status, body } = await requestJson(`/api/schedule/${weekStart}`)
+export async function fetchGoldenWeek(weekStart: string, restaurantId?: string): Promise<GoldenWeekDoc | null> {
+  const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
+  const { status, body } = await requestJson(`/api/schedule/${weekStart}${suffix}`)
   if (status === 404) return null
   if (status === 200 && isGoldenWeekDoc(body)) {
     return { ...body, visible: body.visible !== false }
@@ -83,8 +84,12 @@ export type GoldenMonth = {
   notModified: boolean
 }
 
-export async function fetchGoldenMonth(month: string, knownRev = 0): Promise<GoldenMonth> {
-  const query = knownRev > 0 ? `?month=${encodeURIComponent(month)}&knownRev=${knownRev}` : `?month=${encodeURIComponent(month)}`
+export async function fetchGoldenMonth(month: string, knownRev = 0, restaurantId?: string): Promise<GoldenMonth> {
+  const restaurantQuery = restaurantId ? `&restaurant=${encodeURIComponent(restaurantId)}` : ''
+  const query =
+    knownRev > 0
+      ? `?month=${encodeURIComponent(month)}&knownRev=${knownRev}${restaurantQuery}`
+      : `?month=${encodeURIComponent(month)}${restaurantQuery}`
   const { status, body } = await requestJson(`/api/schedule${query}`)
   if (status === 400) return { weeks: [], rev: 0, notModified: false }
   if (status === 200 && body && typeof body === 'object' && 'weeks' in body) {
@@ -104,8 +109,10 @@ export async function saveGoldenWeek(
   weekStart: string,
   input: { week: GoldenWeekPayload; templateHash: string; visible: boolean; baseRev: number },
   token: string,
+  restaurantId?: string,
 ): Promise<{ rev: number }> {
-  const { status, body } = await requestJson(`/api/schedule/${weekStart}`, {
+  const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
+  const { status, body } = await requestJson(`/api/schedule/${weekStart}${suffix}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(input),
