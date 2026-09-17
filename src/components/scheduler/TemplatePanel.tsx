@@ -16,7 +16,7 @@ export default function TemplatePanel({
   template: WeeklyStaffingTemplate
   rev: number
   dirty: boolean
-  onSaved: (rev: number) => void
+  onSaved: (rev: number, updatedAt: string | null) => void
   onClose: () => void
   restaurantId?: string
 }) {
@@ -35,7 +35,7 @@ export default function TemplatePanel({
       const result = await saveTemplate(template, rev, token, restaurantId)
       setToken('')
       setNotice('Saved. Both the scheduler and the published /schedule page use these rules now.')
-      onSaved(result.rev)
+      onSaved(result.rev, result.updatedAt)
     } catch (caught) {
       if (caught instanceof StoreAuthError) {
         setError('That token was not accepted. Check for typos and try again.')

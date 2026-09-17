@@ -64,7 +64,7 @@ export async function saveRoster(
   baseRev: number,
   token: string,
   restaurantId?: string,
-): Promise<{ rev: number }> {
+): Promise<{ rev: number; updatedAt: string | null }> {
   const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
   const { status, body } = await requestJson(`/api/employees${suffix}`, {
     method: 'PUT',
@@ -82,8 +82,8 @@ export async function saveRoster(
     throw new StoreConflictError(typeof rev === 'number' ? rev : 0)
   }
   if ((status === 200 || status === 201) && body && typeof body === 'object' && 'rev' in body) {
-    const { rev } = body as { rev: unknown }
-    if (typeof rev === 'number') return { rev }
+    const { rev, updatedAt } = body as { rev: unknown; updatedAt: unknown }
+    if (typeof rev === 'number') return { rev, updatedAt: typeof updatedAt === 'string' ? updatedAt : null }
   }
   throw new StoreUnavailableError()
 }
