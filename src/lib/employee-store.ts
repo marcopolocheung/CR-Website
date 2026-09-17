@@ -45,15 +45,35 @@ export type RosterDoc = {
   employees: RosterEmployee[]
   rev: number
   updatedAt: string | null
+  weekStart?: string
+  inherited?: boolean
 }
 
-export async function fetchRoster(restaurantId?: string): Promise<RosterDoc> {
-  const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
-  const { status, body } = await requestJson(`/api/employees${suffix}`)
+function rosterQuery(restaurantId?: string, weekStart?: string): string {
+  const params = new URLSearchParams()
+  if (restaurantId) params.set('restaurant', restaurantId)
+  if (weekStart) params.set('weekStart', weekStart)
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export async function fetchRoster(restaurantId?: string, weekStart?: string): Promise<RosterDoc> {
+  const { status, body } = await requestJson(`/api/employees${rosterQuery(restaurantId, weekStart)}`)
   if (status === 200 && body && typeof body === 'object' && 'employees' in body) {
-    const { employees, rev, updatedAt } = body as { employees: unknown; rev: unknown; updatedAt: unknown }
+    const { employees, rev, updatedAt, inherited } = body as {
+      employees: unknown
+      rev: unknown
+      updatedAt: unknown
+      inherited: unknown
+    }
     if (Array.isArray(employees) && employees.every(isRosterEmployee)) {
-      return { employees, rev: typeof rev === 'number' ? rev : 0, updatedAt: typeof updatedAt === 'string' ? updatedAt : null }
+      return {
+        employees,
+        rev: typeof rev === 'number' ? rev : 0,
+        updatedAt: typeof updatedAt === 'string' ? updatedAt : null,
+        weekStart,
+        inherited: inherited === true,
+      }
     }
   }
   throw new StoreUnavailableError()
@@ -64,9 +84,9 @@ export async function saveRoster(
   baseRev: number,
   token: string,
   restaurantId?: string,
+  weekStart?: string,
 ): Promise<{ rev: number; updatedAt: string | null }> {
-  const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
-  const { status, body } = await requestJson(`/api/employees${suffix}`, {
+  const { status, body } = await requestJson(`/api/employees${rosterQuery(restaurantId, weekStart)}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ employees: employees.map(toRosterEmployee), baseRev }),

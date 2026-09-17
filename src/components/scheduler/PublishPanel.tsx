@@ -143,7 +143,7 @@ export default function PublishPanel({
     try {
       if (willSaveRoster) {
         try {
-          const rosterResult = await saveRoster(employees, rosterRev ?? 0, token, restaurantId)
+          const rosterResult = await saveRoster(employees, rosterRev ?? 0, token, restaurantId, weekStart)
           onRosterSaved?.(rosterResult.rev, rosterResult.updatedAt)
         } catch (caught) {
           if (caught instanceof StoreConflictError) {
@@ -160,7 +160,7 @@ export default function PublishPanel({
       }
       if (willSaveTemplate && template) {
         try {
-          const templateResult = await saveTemplate(template, templateRev ?? 0, token, restaurantId)
+          const templateResult = await saveTemplate(template, templateRev ?? 0, token, restaurantId, weekStart)
           onTemplateSaved?.(templateResult.rev, templateResult.updatedAt)
         } catch (caught) {
           if (caught instanceof StoreConflictError) {

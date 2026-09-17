@@ -13,6 +13,7 @@ export default function TemplatePanel({
   onSaved,
   onClose,
   restaurantId,
+  weekStart,
 }: {
   template: WeeklyStaffingTemplate
   rev: number
@@ -21,6 +22,7 @@ export default function TemplatePanel({
   onSaved: (rev: number, updatedAt: string | null) => void
   onClose: () => void
   restaurantId?: string
+  weekStart?: string
 }) {
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
@@ -34,9 +36,9 @@ export default function TemplatePanel({
     setError('')
     setNotice('')
     try {
-      const result = await saveTemplate(template, rev, token, restaurantId)
+      const result = await saveTemplate(template, rev, token, restaurantId, weekStart)
       setToken('')
-      setNotice('Saved. Both the scheduler and the published /schedule page use these rules now.')
+      setNotice('Saved. These rules apply to this week only.')
       onSaved(result.rev, result.updatedAt)
     } catch (caught) {
       if (caught instanceof StoreAuthError) {

@@ -76,6 +76,7 @@ type DropFeedback = {
 
 type HistorySnapshot = {
   label: string
+  weekStart: string
   employees: Employee[]
   template: WeeklyStaffingTemplate
   weeks: WeekAssignments
@@ -772,11 +773,71 @@ function buildFixIssues(
 
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
   const restaurantName = restaurantId && isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
-  const [employees, setEmployees] = useState<Employee[]>(cloneEmployees)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
   const [generatedWeeks, setGeneratedWeeks] = useState<WeekAssignments>({})
   const [weekStatus, setWeekStatus] = useState<Record<string, WeekStatus>>({})
+  // Staff lists and shift rules are per-week. Each weekStart gets its own roster
+  // and template so edits to week 1 never bleed into week 2. The global docs on
+  // the server act as the seed for weeks that have never been customized.
+  const [rosters, setRosters] = useState<Record<string, Employee[]>>({})
+  const [rosterRevs, setRosterRevs] = useState<Record<string, number>>({})
+  const [rosterSnapshots, setRosterSnapshots] = useState<Record<string, string | null>>({})
+  const [rosterUpdatedAts, setRosterUpdatedAts] = useState<Record<string, string | null>>({})
+  const [rosterLoadedWeeks, setRosterLoadedWeeks] = useState<Record<string, boolean>>({})
+  const [defaultRoster, setDefaultRoster] = useState<Employee[]>(cloneEmployees)
+  const [defaultRosterLoaded, setDefaultRosterLoaded] = useState(false)
+  const [defaultRosterRev, setDefaultRosterRev] = useState(0)
+  const [templates, setTemplates] = useState<Record<string, WeeklyStaffingTemplate>>({})
+  const [templateRevs, setTemplateRevs] = useState<Record<string, number>>({})
+  const [templateSnapshots, setTemplateSnapshots] = useState<Record<string, string | null>>({})
+  const [templateUpdatedAts, setTemplateUpdatedAts] = useState<Record<string, string | null>>({})
+  const [templateLoadedWeeks, setTemplateLoadedWeeks] = useState<Record<string, boolean>>({})
+  const [defaultTemplate, setDefaultTemplate] = useState<WeeklyStaffingTemplate>(() => cloneTemplate())
+  const [defaultTemplateLoaded, setDefaultTemplateLoaded] = useState(false)
+  const [defaultTemplateRev, setDefaultTemplateRev] = useState(0)
+  const employees = weekStart ? (rosters[weekStart] ?? defaultRoster) : defaultRoster
+  const template = weekStart ? (templates[weekStart] ?? defaultTemplate) : defaultTemplate
+  const rosterRev = weekStart ? (rosterRevs[weekStart] ?? 0) : 0
+  const rosterServerSnapshot = weekStart ? (rosterSnapshots[weekStart] ?? null) : null
+  const rosterUpdatedAt = weekStart ? (rosterUpdatedAts[weekStart] ?? null) : null
+  const templateRev = weekStart ? (templateRevs[weekStart] ?? 0) : 0
+  const templateServerSnapshot = weekStart ? (templateSnapshots[weekStart] ?? null) : null
+  const templateUpdatedAt = weekStart ? (templateUpdatedAts[weekStart] ?? null) : null
+  const rosterLoaded = Boolean(weekStart && defaultRosterLoaded && rosterLoadedWeeks[weekStart])
+  const templateLoaded = Boolean(weekStart && defaultTemplateLoaded && templateLoadedWeeks[weekStart])
+
+  function setEmployees(next: Employee[] | ((current: Employee[]) => Employee[])) {
+    const target = weekStart
+    if (!target) return
+    setRosters((current) => {
+      const existing = current[target] ?? defaultRoster
+      const value = typeof next === 'function' ? (next as (c: Employee[]) => Employee[])(existing) : next
+      return { ...current, [target]: value }
+    })
+  }
+
+  function setTemplate(next: WeeklyStaffingTemplate | ((current: WeeklyStaffingTemplate) => WeeklyStaffingTemplate)) {
+    const target = weekStart
+    if (!target) return
+    setTemplates((current) => {
+      const existing = current[target] ?? defaultTemplate
+      const value = typeof next === 'function' ? (next as (c: WeeklyStaffingTemplate) => WeeklyStaffingTemplate)(existing) : next
+      return { ...current, [target]: value }
+    })
+  }
+
+  function setRosterSaved(target: string, rev: number, updatedAt: string | null, snapshot: string) {
+    setRosterRevs((current) => ({ ...current, [target]: rev }))
+    setRosterSnapshots((current) => ({ ...current, [target]: snapshot }))
+    setRosterUpdatedAts((current) => ({ ...current, [target]: updatedAt }))
+  }
+
+  function setTemplateSaved(target: string, rev: number, updatedAt: string | null, snapshot: string) {
+    setTemplateRevs((current) => ({ ...current, [target]: rev }))
+    setTemplateSnapshots((current) => ({ ...current, [target]: snapshot }))
+    setTemplateUpdatedAts((current) => ({ ...current, [target]: updatedAt }))
+  }
   const [monthKey, setMonthKey] = useState('')
   const [diagnostics, setDiagnostics] = useState<string[]>([])
   const [draft, setDraft] = useState<EmployeeDraft>(() => blankDraft())
@@ -798,11 +859,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [lastReport, setLastReport] = useState<GenerationReport | null>(null)
   const reportId = useRef(0)
   const [onboardingDismissed, setOnboardingDismissed] = useState(true)
-  const [rosterRev, setRosterRev] = useState(0)
-  const [rosterServerSnapshot, setRosterServerSnapshot] = useState<string | null>(null)
-  const [rosterUpdatedAt, setRosterUpdatedAt] = useState<string | null>(null)
   const [rosterLoadError, setRosterLoadError] = useState('')
-  const [rosterLoaded, setRosterLoaded] = useState(false)
   const [confirmingClearStaff, setConfirmingClearStaff] = useState(false)
   const [staffSnapshots, setStaffSnapshots] = useState<StaffSnapshot[]>([])
   const [snapshotName, setSnapshotName] = useState('')
@@ -815,13 +872,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     : rosterServerSnapshot === null
       ? employees.length > 0
       : rosterFingerprint(employees) !== rosterServerSnapshot
-  const [template, setTemplate] = useState<WeeklyStaffingTemplate>(seedTemplate)
-  const [templateRev, setTemplateRev] = useState(0)
-  const [templateServerSnapshot, setTemplateServerSnapshot] = useState<string | null>(null)
-  const [templateUpdatedAt, setTemplateUpdatedAt] = useState<string | null>(null)
   const [templateLoadError, setTemplateLoadError] = useState('')
   const [confirmingClearWeek, setConfirmingClearWeek] = useState(false)
-  const [templateLoaded, setTemplateLoaded] = useState(false)
   const [publishedWeeks, setPublishedWeeks] = useState<Record<string, GoldenWeekDoc | null>>({})
   const [hydratedWeeks, setHydratedWeeks] = useState<Record<string, boolean>>({})
   const [templatePanelOpen, setTemplatePanelOpen] = useState(false)
@@ -951,8 +1003,22 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }, [])
 
   useEffect(() => {
-    setEmployees(cloneEmployees())
-    setTemplate(cloneTemplate())
+    setRosters({})
+    setRosterRevs({})
+    setRosterSnapshots({})
+    setRosterUpdatedAts({})
+    setRosterLoadedWeeks({})
+    setDefaultRoster(cloneEmployees())
+    setDefaultRosterLoaded(false)
+    setDefaultRosterRev(0)
+    setTemplates({})
+    setTemplateRevs({})
+    setTemplateSnapshots({})
+    setTemplateUpdatedAts({})
+    setTemplateLoadedWeeks({})
+    setDefaultTemplate(cloneTemplate())
+    setDefaultTemplateLoaded(false)
+    setDefaultTemplateRev(0)
     setWeeks({})
     setGeneratedWeeks({})
     setWeekStatus({})
@@ -960,12 +1026,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setSharing(false)
-    setRosterLoaded(false)
-    setTemplateLoaded(false)
     setPublishedWeeks({})
     setHydratedWeeks({})
-    setRosterUpdatedAt(null)
-    setTemplateUpdatedAt(null)
     setConfirmingClearStaff(false)
     setConfirmingClearWeek(false)
     setSnapshotName('')
@@ -975,25 +1037,20 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   useEffect(() => {
     let cancelled = false
     setRosterLoadError('')
-    setRosterServerSnapshot(null)
-    setRosterRev(0)
-    setRosterUpdatedAt(null)
-    setRosterLoaded(false)
+    setDefaultRosterLoaded(false)
     fetchRoster(restaurantId)
       .then((doc) => {
         if (cancelled) return
-        if (doc.rev > 0) {
-          setEmployees(doc.employees)
-          setRosterServerSnapshot(rosterFingerprint(doc.employees))
+        if (doc.rev > 0 && doc.employees.length > 0) {
+          setDefaultRoster(doc.employees as Employee[])
         }
-        setRosterRev(doc.rev)
-        setRosterUpdatedAt(doc.updatedAt)
-        setRosterLoaded(true)
+        setDefaultRosterRev(doc.rev)
+        setDefaultRosterLoaded(true)
       })
       .catch(() => {
         if (!cancelled) {
           setRosterLoadError('Could not reach the staff list store. Showing the built-in demo list — save once the connection works to keep changes.')
-          setRosterLoaded(true)
+          setDefaultRosterLoaded(true)
         }
       })
     return () => {
@@ -1004,31 +1061,98 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   useEffect(() => {
     let cancelled = false
     setTemplateLoadError('')
-    setTemplateServerSnapshot(null)
-    setTemplateRev(0)
-    setTemplateUpdatedAt(null)
-    setTemplateLoaded(false)
+    setDefaultTemplateLoaded(false)
     fetchTemplate(restaurantId)
       .then((doc) => {
         if (cancelled) return
         if (doc.rev > 0 && doc.template) {
-          setTemplate(doc.template)
-          setTemplateServerSnapshot(templateFingerprint(doc.template))
+          setDefaultTemplate(doc.template)
         }
-        setTemplateRev(doc.rev)
-        setTemplateUpdatedAt(doc.updatedAt)
-        setTemplateLoaded(true)
+        setDefaultTemplateRev(doc.rev)
+        setDefaultTemplateLoaded(true)
       })
       .catch(() => {
         if (!cancelled) {
           setTemplateLoadError('Could not reach the schedule-rules store. Showing the built-in default rules — save once the connection works to keep changes.')
-          setTemplateLoaded(true)
+          setDefaultTemplateLoaded(true)
         }
       })
     return () => {
       cancelled = true
     }
   }, [restaurantId])
+
+  useEffect(() => {
+    if (!weekStart || !defaultRosterLoaded || rosterLoadedWeeks[weekStart]) return
+    let cancelled = false
+    fetchRoster(restaurantId, weekStart)
+      .then((doc) => {
+        if (cancelled) return
+        if (doc.rev > 0) {
+          setRosters((current) => ({ ...current, [weekStart]: cloneEmployeeList(doc.employees as Employee[]) }))
+          setRosterRevs((current) => ({ ...current, [weekStart]: doc.rev }))
+          setRosterSnapshots((current) => ({ ...current, [weekStart]: rosterFingerprint(doc.employees as Employee[]) }))
+          setRosterUpdatedAts((current) => ({ ...current, [weekStart]: doc.updatedAt }))
+        } else {
+          setRosters((current) => {
+            if (current[weekStart]) return current
+            const seed = (doc.employees.length > 0 ? (doc.employees as Employee[]) : defaultRoster) ?? []
+            return { ...current, [weekStart]: cloneEmployeeList(seed) }
+          })
+          setRosterRevs((current) => (current[weekStart] !== undefined ? current : { ...current, [weekStart]: 0 }))
+          setRosterSnapshots((current) => (current[weekStart] !== undefined ? current : { ...current, [weekStart]: null }))
+          setRosterUpdatedAts((current) => (current[weekStart] !== undefined ? current : { ...current, [weekStart]: null }))
+        }
+        setRosterLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setRosters((current) =>
+          current[weekStart] ? current : { ...current, [weekStart]: cloneEmployeeList(defaultRoster) },
+        )
+        setRosterLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
+        setRosterLoadError('Could not reach the staff list store. Showing the built-in demo list — save once the connection works to keep changes.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [weekStart, restaurantId, defaultRosterLoaded, defaultRoster, rosterLoadedWeeks])
+
+  useEffect(() => {
+    if (!weekStart || !defaultTemplateLoaded || templateLoadedWeeks[weekStart]) return
+    let cancelled = false
+    fetchTemplate(restaurantId, weekStart)
+      .then((doc) => {
+        if (cancelled) return
+        if (doc.rev > 0 && doc.template) {
+          setTemplates((current) => ({ ...current, [weekStart]: cloneTemplate(doc.template as WeeklyStaffingTemplate) }))
+          setTemplateRevs((current) => ({ ...current, [weekStart]: doc.rev }))
+          setTemplateSnapshots((current) => ({ ...current, [weekStart]: templateFingerprint(doc.template as WeeklyStaffingTemplate) }))
+          setTemplateUpdatedAts((current) => ({ ...current, [weekStart]: doc.updatedAt }))
+        } else {
+          setTemplates((current) => {
+            if (current[weekStart]) return current
+            const seed = (doc.template as WeeklyStaffingTemplate | null) ?? defaultTemplate
+            return { ...current, [weekStart]: cloneTemplate(seed) }
+          })
+          setTemplateRevs((current) => (current[weekStart] !== undefined ? current : { ...current, [weekStart]: 0 }))
+          setTemplateSnapshots((current) => (current[weekStart] !== undefined ? current : { ...current, [weekStart]: null }))
+          setTemplateUpdatedAts((current) => (current[weekStart] !== undefined ? current : { ...current, [weekStart]: null }))
+        }
+        setTemplateLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setTemplates((current) =>
+          current[weekStart] ? current : { ...current, [weekStart]: cloneTemplate(defaultTemplate) },
+        )
+        setTemplateLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
+        setTemplateLoadError('Could not reach the schedule-rules store. Showing the built-in default rules — save once the connection works to keep changes.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [weekStart, restaurantId, defaultTemplateLoaded, defaultTemplate, templateLoadedWeeks])
 
   useEffect(() => {
     if (!weekStart) return
@@ -1113,8 +1237,26 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }, [employees, staffQuery])
 
   // Messages, skipped issues and an open shift all describe the week that was on screen.
+  // Staff and rules travel with the week: opening a week with no saved list yet
+  // copies the list and rules from the week being left, so week 1 (11 staff) and
+  // week 2 (12 staff) stay independent.
   function goToWeek(nextWeekStart: string) {
     if (!nextWeekStart || nextWeekStart === weekStart) return
+    const fromWeek = weekStart
+    if (fromWeek) {
+      setRosters((current) => {
+        if (current[nextWeekStart]) return current
+        const source = current[fromWeek] ?? defaultRoster
+        return { ...current, [nextWeekStart]: cloneEmployeeList(source) }
+      })
+      setTemplates((current) => {
+        if (current[nextWeekStart]) return current
+        const source = current[fromWeek] ?? defaultTemplate
+        return { ...current, [nextWeekStart]: cloneTemplate(source) }
+      })
+      setRosterRevs((current) => (current[nextWeekStart] !== undefined ? current : { ...current, [nextWeekStart]: 0 }))
+      setTemplateRevs((current) => (current[nextWeekStart] !== undefined ? current : { ...current, [nextWeekStart]: 0 }))
+    }
     setWeekStart(nextWeekStart)
     setMonthKey(monthKeyForWeek(nextWeekStart))
     setDiagnostics([])
@@ -1160,15 +1302,24 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     remember('copied the prior week')
     setWeeks((current) => ({ ...current, [weekStart]: cloneAssignmentList(source) }))
     setWeekStatus((current) => ({ ...current, [weekStart]: 'on' }))
-    setDiagnostics(['Prior week copied here. Review it, then publish when it looks right.'])
+    const priorRoster = rosters[prior]
+    if (priorRoster) {
+      setRosters((current) => ({ ...current, [weekStart]: cloneEmployeeList(priorRoster) }))
+    }
+    const priorTemplate = templates[prior]
+    if (priorTemplate) {
+      setTemplates((current) => ({ ...current, [weekStart]: cloneTemplate(priorTemplate) }))
+    }
+    setDiagnostics(['Prior week copied here — schedule, staff list, and rules. Review it, then publish when it looks right.'])
   }
 
   function remember(label: string) {
     setHistory((current) => [
       {
         label,
+        weekStart,
         employees: cloneEmployeeList(employees),
-        template,
+        template: cloneTemplate(template),
         weeks: cloneWeeks(weeks),
         generatedWeeks: cloneWeeks(generatedWeeks),
         weekStatus: { ...weekStatus },
@@ -1181,8 +1332,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   function undoLastChange() {
     const [snapshot, ...rest] = history
     if (!snapshot) return
-    setEmployees(cloneEmployeeList(snapshot.employees))
-    setTemplate(snapshot.template)
+    const target = snapshot.weekStart || weekStart
+    if (target) {
+      setRosters((current) => ({ ...current, [target]: cloneEmployeeList(snapshot.employees) }))
+      setTemplates((current) => ({ ...current, [target]: cloneTemplate(snapshot.template) }))
+    }
     setWeeks(cloneWeeks(snapshot.weeks))
     setGeneratedWeeks(cloneWeeks(snapshot.generatedWeeks))
     setWeekStatus({ ...snapshot.weekStatus })
@@ -1373,7 +1527,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setEmployees(cloneEmployees())
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
-    setDiagnostics(['Staff list restored to the built-in defaults. Save to keep them — Undo brings back your list.'])
+    setDiagnostics(['Staff list for this week restored to the built-in defaults. Save to keep it — Undo brings back your list.'])
   }
 
   function restoreDefaultTemplate() {
@@ -1382,7 +1536,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setTemplate(cloneTemplate())
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
-    setDiagnostics(['Schedule rules restored to the built-in defaults. Save to keep them — Undo brings back your rules.'])
+    setDiagnostics(['Schedule rules for this week restored to the built-in defaults. Save to keep them — Undo brings back your rules.'])
   }
 
   function startBlankStation() {
@@ -1393,7 +1547,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setWeekStatus({})
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
-    setDiagnostics(['Blank station ready. Add employees below, then save the staff list to keep it.'])
+    setDiagnostics(['Blank staff list ready for this week. Add employees below, then save the staff list to keep it.'])
   }
 
   function clearWeek() {
@@ -1418,7 +1572,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setEmployeePanelOpen(false)
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
-    setDiagnostics(['Staff list cleared. Undo brings everyone back — saving the staff list makes the empty list permanent.'])
+    setDiagnostics(['Staff list for this week cleared. Undo brings everyone back — saving the staff list makes the empty list permanent for this week.'])
   }
 
   useEffect(() => {
@@ -1463,7 +1617,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // with seeds while the fetch is still in flight.
   const storeLoading = !rosterLoaded || !templateLoaded
   const storeOffline = Boolean(rosterLoadError || templateLoadError)
-  const isNewStation = !storeLoading && rosterRev === 0 && templateRev === 0
+  const isNewStation = !storeLoading && defaultRosterRev === 0 && defaultTemplateRev === 0 && rosterRev === 0 && templateRev === 0
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
     remember('changed one assignment')
@@ -1778,14 +1932,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               rosterDirty={rosterDirty}
               templateDirty={templateDirty}
               onRosterSaved={(rev, updatedAt) => {
-                setRosterRev(rev)
-                setRosterServerSnapshot(rosterFingerprint(employees))
-                setRosterUpdatedAt(updatedAt)
+                setRosterSaved(weekStart, rev, updatedAt, rosterFingerprint(employees))
               }}
               onTemplateSaved={(rev, updatedAt) => {
-                setTemplateRev(rev)
-                setTemplateServerSnapshot(templateFingerprint(template))
-                setTemplateUpdatedAt(updatedAt)
+                setTemplateSaved(weekStart, rev, updatedAt, templateFingerprint(template))
               }}
             />
           )}
@@ -1999,13 +2149,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               panelOpen={templatePanelOpen}
               onTogglePanel={() => setTemplatePanelOpen((open) => !open)}
               onSaved={(rev, updatedAt) => {
-                setTemplateRev(rev)
-                setTemplateServerSnapshot(templateFingerprint(template))
-                setTemplateUpdatedAt(updatedAt)
+                if (weekStart) setTemplateSaved(weekStart, rev, updatedAt, templateFingerprint(template))
               }}
               onClosePanel={() => setTemplatePanelOpen(false)}
               restaurantId={restaurantId}
               updatedAt={templateUpdatedAt}
+              weekStart={weekStart}
             />
 
           <Disclosure summary="About this demo" tone="quiet">
@@ -2030,12 +2179,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-semibold">Staff</h2>
+                <h2 className="font-semibold">Staff{weekStart ? ` — week of ${formatWeekRange(weekStart)}` : ''}</h2>
                 <p className="mt-0.5 text-sm text-zinc-600">
                   {activeEmployeeCount} working, {employees.length - activeEmployeeCount} off the list
                 </p>
                 <p className="mt-0.5 text-xs text-zinc-500">
-                  Last saved: {formatUpdatedAt(rosterUpdatedAt)}{rosterDirty ? ' · unsaved changes' : ''}
+                  Last saved: {formatUpdatedAt(rosterUpdatedAt)}{rosterDirty ? ' · unsaved changes' : ''} · changes stay in this week only
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
@@ -2063,12 +2212,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 dirty={rosterDirty}
                 loadPending={storeLoading}
                 onSaved={(rev, updatedAt) => {
-                  setRosterRev(rev)
-                  setRosterServerSnapshot(rosterFingerprint(employees))
-                  setRosterUpdatedAt(updatedAt)
+                  if (weekStart) setRosterSaved(weekStart, rev, updatedAt, rosterFingerprint(employees))
                 }}
                 onClose={() => setRosterPanelOpen(false)}
                 restaurantId={restaurantId}
+                weekStart={weekStart}
               />
             )}
 
@@ -3017,6 +3165,7 @@ function TemplateEditor({
   onClosePanel,
   restaurantId,
   updatedAt,
+  weekStart,
 }: {
   template: WeeklyStaffingTemplate
   onChange: (template: WeeklyStaffingTemplate) => void
@@ -3032,6 +3181,7 @@ function TemplateEditor({
   onClosePanel: () => void
   restaurantId?: string
   updatedAt: string | null
+  weekStart?: string
 }) {
   function updateDay(day: DayOfWeek, daySlots: StaffingTemplateSlot[]) {
     onChange({ ...template, [day]: daySlots })
@@ -3053,9 +3203,9 @@ function TemplateEditor({
     <Disclosure summary="Schedule rules" tone="quiet">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm text-zinc-600">Who the restaurant needs on each shift. Add, remove, or change any spot.</p>
+          <p className="text-sm text-zinc-600">Who the restaurant needs on each shift for this week. Add, remove, or change any spot.</p>
           <p className="mt-0.5 text-xs text-zinc-500">
-            Last saved: {formatUpdatedAt(updatedAt)}{dirty ? ' · unsaved changes' : ''}
+            Last saved: {formatUpdatedAt(updatedAt)}{dirty ? ' · unsaved changes' : ''} · changes stay in this week only
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -3086,7 +3236,7 @@ function TemplateEditor({
       {loadError && <p className="mt-2 text-xs font-medium text-amber-800">{loadError}</p>}
       {panelOpen && (
         <div className="mt-2">
-          <TemplatePanel template={template} rev={rev} dirty={dirty} loadPending={loadPending} onSaved={onSaved} onClose={onClosePanel} restaurantId={restaurantId} />
+          <TemplatePanel template={template} rev={rev} dirty={dirty} loadPending={loadPending} onSaved={onSaved} onClose={onClosePanel} restaurantId={restaurantId} weekStart={weekStart} />
         </div>
       )}
       <div className="mt-3 space-y-3">

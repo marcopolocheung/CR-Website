@@ -13,6 +13,7 @@ export default function RosterPanel({
   onSaved,
   onClose,
   restaurantId,
+  weekStart,
 }: {
   employees: Employee[]
   rev: number
@@ -21,6 +22,7 @@ export default function RosterPanel({
   onSaved: (rev: number, updatedAt: string | null) => void
   onClose: () => void
   restaurantId?: string
+  weekStart?: string
 }) {
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
@@ -34,9 +36,9 @@ export default function RosterPanel({
     setError('')
     setNotice('')
     try {
-      const result = await saveRoster(employees, rev, token, restaurantId)
+      const result = await saveRoster(employees, rev, token, restaurantId, weekStart)
       setToken('')
-      setNotice('Saved. This staff list is now what everyone editing the scheduler starts from.')
+      setNotice('Saved. This week keeps its own staff list — other weeks are untouched.')
       onSaved(result.rev, result.updatedAt)
     } catch (caught) {
       if (caught instanceof StoreAuthError) {
