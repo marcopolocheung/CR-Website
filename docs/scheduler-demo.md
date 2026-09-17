@@ -42,6 +42,16 @@ Before search, the scheduler runs deterministic preflight checks for missing rol
 
 The UI has a "Show gap example" button that deactivates lead/manager employees so the manager can see concrete diagnostics such as missing shift-lead coverage. The readiness panel can open the add-employee form with the missing role and shift availability preselected.
 
+## Custom Hours (12-7, 4-7) As Extra Coverage
+
+The engine is time-range based: a slot must fit entirely inside employee availability (`rangeContains` in `validator.ts`). Standard AM (`09:30-16:00`) and PM (`16:00-23:00`) halves therefore reject partial-day availability on their own.
+
+To add non-traditional workers on top of core coverage:
+
+- Roster: set exact daily availability, e.g. mid `12:00-19:00`, evening `16:00-19:00`. Use the `Midday 12-7` / `Evening 4-7` presets, then fine-tune per-day start/end in the staff editor. Per-day times are preserved as a single custom range; AM/PM boxes only show overlap and resetting them restores standard halves.
+- Rules: add overlay spots with exact times alongside the core spots, e.g. `AM Mid support 12:00-16:00` plus `PM Evening support 16:00-19:00`. The rules editor already supports arbitrary start/end times.
+- Doubles: a 12-7 span touches both periods. Keep `Can work doubles` on when that worker may take one morning plus one dinner spot the same day (touching at `16:00` is not an overlap, but two periods still count as a double). A single `12:00-19:00` spot avoids double logic but will not count toward both AM and PM minimums.
+
 ## Adding Rules
 
 Add new structured fields to `types.ts`, enforce generation behavior in `solver.ts`, and add a separate validator check in `validator.ts`. Then add a regression case in `src/lib/scheduler/scheduler.test.ts` so manual schedules cannot bypass the rule.
