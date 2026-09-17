@@ -3,13 +3,17 @@ import Link from 'next/link'
 import ScheduleViewer from '@/components/schedule/ScheduleViewer'
 import { RESTAURANTS, RESTAURANT_IDS, isRestaurantId } from '@/data/restaurants'
 
-export const metadata: Metadata = {
-  title: 'Staff Schedule',
-  description: 'Private weekly schedule for China Rose staff.',
-  robots: {
-    index: false,
-    follow: false,
-  },
+export async function generateMetadata({ params }: { params: Promise<{ restaurantId: string }> }): Promise<Metadata> {
+  const { restaurantId } = await params
+  const station = isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
+  return {
+    title: station ? `${station} — Staff Schedule` : 'Staff Schedule',
+    description: 'Private weekly schedule for China Rose staff.',
+    robots: {
+      index: false,
+      follow: false,
+    },
+  }
 }
 
 export function generateStaticParams() {
@@ -35,5 +39,5 @@ export default async function ScheduleStationPage({ params }: { params: Promise<
       </div>
     )
   }
-  return <ScheduleViewer restaurantId={restaurantId} />
+  return <ScheduleViewer restaurantId={restaurantId} restaurantName={RESTAURANTS[restaurantId].name} />
 }

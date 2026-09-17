@@ -3,13 +3,17 @@ import Link from 'next/link'
 import SchedulerDemo from '@/components/scheduler/SchedulerDemo'
 import { RESTAURANTS, RESTAURANT_IDS, isRestaurantId } from '@/data/restaurants'
 
-export const metadata: Metadata = {
-  title: 'Scheduler Demo',
-  description: 'Internal deterministic employee scheduling demo for China Rose.',
-  robots: {
-    index: false,
-    follow: false,
-  },
+export async function generateMetadata({ params }: { params: Promise<{ restaurantId: string }> }): Promise<Metadata> {
+  const { restaurantId } = await params
+  const station = isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
+  return {
+    title: station ? `${station} — Scheduler` : 'Scheduler Demo',
+    description: 'Internal deterministic employee scheduling demo for China Rose.',
+    robots: {
+      index: false,
+      follow: false,
+    },
+  }
 }
 
 export function generateStaticParams() {

@@ -22,7 +22,7 @@ import { templateHashForSlots, type PublishedWeek } from '@/lib/schedule-share'
 import { fetchGoldenMonth, type GoldenWeekDoc } from '@/lib/schedule-store'
 import { fetchTemplate } from '@/lib/template-store'
 
-export default function ScheduleViewer({ restaurantId }: { restaurantId?: string } = {}) {
+export default function ScheduleViewer({ restaurantId, restaurantName }: { restaurantId?: string; restaurantName?: string } = {}) {
   const [template, setTemplate] = useState<WeeklyStaffingTemplate>(seedTemplate)
   const slots = useMemo(() => expandTemplate(template), [template])
   const templateHash = useMemo(() => templateHashForSlots(slots), [slots])
@@ -209,7 +209,10 @@ export default function ScheduleViewer({ restaurantId }: { restaurantId?: string
   return (
     <div className="mx-auto w-full max-w-none px-4 py-10">
       <div className="mx-auto max-w-2xl">
-        <h1 className="text-2xl font-bold text-zinc-900">Staff schedule</h1>
+        {restaurantName && (
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{restaurantName}</p>
+        )}
+        <h1 className="mt-1 text-2xl font-bold text-zinc-900">Staff schedule</h1>
         <p className="mt-2 text-zinc-700">
           The current schedule, straight from your manager. No links or codes — pick a week below.
         </p>

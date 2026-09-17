@@ -48,6 +48,7 @@ import { fetchRoster, rosterFingerprint } from '@/lib/employee-store'
 import { fetchTemplate, templateFingerprint } from '@/lib/template-store'
 import { fetchGoldenWeek, type GoldenWeekDoc } from '@/lib/schedule-store'
 import { assignmentsFromPublishedWeek, templateHashForSlots } from '@/lib/schedule-share'
+import { RESTAURANTS, isRestaurantId } from '@/data/restaurants'
 import PublishPanel from './PublishPanel'
 import RosterPanel from './RosterPanel'
 import TemplatePanel from './TemplatePanel'
@@ -749,6 +750,7 @@ function buildFixIssues(
 }
 
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
+  const restaurantName = restaurantId && isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
   const [employees, setEmployees] = useState<Employee[]>(cloneEmployees)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
@@ -1538,7 +1540,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         <div className="mx-auto flex w-full max-w-none flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-              Scheduler demo{restaurantId ? ` · ${restaurantId}` : ''}
+              {restaurantName ? `${restaurantName} · Scheduler` : 'Scheduler demo'}
             </p>
             <h1 className="text-2xl font-bold md:text-3xl">Weekly staff schedule</h1>
             {onWeeksCount > 0 && (
@@ -1637,7 +1639,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             <section className="rounded-lg border border-sky-300 bg-sky-50 p-4 shadow-sm print:hidden">
               <h2 className="text-sm font-semibold text-sky-950">New station — start from the China Rose template or blank</h2>
               <p className="mt-1 text-sm text-sky-900">
-                Nothing is saved for{restaurantId ? ` ${restaurantId}` : ' this station'} yet. The list below is the built-in
+                Nothing is saved for{restaurantName ? ` ${restaurantName}` : ' this station'} yet. The list below is the built-in
                 template so you have something to work from. Save to keep it, or start blank.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -1670,6 +1672,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               onVisibilityChange={(status) => setWeekVisibility(weekStart, status)}
               onClose={() => setSharing(false)}
               restaurantId={restaurantId}
+              restaurantName={restaurantName ?? undefined}
               template={template}
               rosterRev={rosterRev}
               templateRev={templateRev}
