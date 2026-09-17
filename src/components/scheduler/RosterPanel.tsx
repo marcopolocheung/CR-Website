@@ -16,7 +16,7 @@ export default function RosterPanel({
   employees: Employee[]
   rev: number
   dirty: boolean
-  onSaved: (rev: number) => void
+  onSaved: (rev: number, updatedAt: string | null) => void
   onClose: () => void
   restaurantId?: string
 }) {
@@ -35,7 +35,7 @@ export default function RosterPanel({
       const result = await saveRoster(employees, rev, token, restaurantId)
       setToken('')
       setNotice('Saved. This staff list is now what everyone editing the scheduler starts from.')
-      onSaved(result.rev)
+      onSaved(result.rev, result.updatedAt)
     } catch (caught) {
       if (caught instanceof StoreAuthError) {
         setError('That token was not accepted. Check for typos and try again.')

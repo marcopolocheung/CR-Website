@@ -13,6 +13,7 @@ import {
   saveGoldenWeek,
 } from '@/lib/schedule-store'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeekStatus, WeeklyStaffingTemplate } from '@/lib/scheduler'
+import { formatUpdatedAt } from '@/lib/scheduler/time'
 
 function canonicalWeek(week: { weekStart: string; people: string[]; slotPeople: number[] }) {
   return JSON.stringify({ w: week.weekStart, p: week.people, s: week.slotPeople })
@@ -62,8 +63,8 @@ export default function PublishPanel({
   templateRev?: number
   rosterDirty?: boolean
   templateDirty?: boolean
-  onRosterSaved?: (rev: number) => void
-  onTemplateSaved?: (rev: number) => void
+  onRosterSaved?: (rev: number, updatedAt: string | null) => void
+  onTemplateSaved?: (rev: number, updatedAt: string | null) => void
 }) {
   const [name, setName] = useState(`Week of ${weekLabel}`)
   const [token, setToken] = useState('')
@@ -72,6 +73,7 @@ export default function PublishPanel({
   const [baseRev, setBaseRev] = useState<number | null>(null)
   const [serverFingerprint, setServerFingerprint] = useState<string | null>(null)
   const [serverVisible, setServerVisible] = useState<boolean | null>(null)
+  const [serverUpdatedAt, setServerUpdatedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -99,6 +101,7 @@ export default function PublishPanel({
     setBaseRev(null)
     setServerFingerprint(null)
     setServerVisible(null)
+    setServerUpdatedAt(null)
     setError('')
     setNotice('')
     setToken('')
@@ -111,6 +114,7 @@ export default function PublishPanel({
         setBaseRev(doc.rev)
         setServerFingerprint(canonicalWeek(doc.week))
         setServerVisible(doc.visible)
+        setServerUpdatedAt(doc.updatedAt)
         setName(doc.week.name)
       })
       .catch(() => {
@@ -138,7 +142,7 @@ export default function PublishPanel({
       if (willSaveRoster) {
         try {
           const rosterResult = await saveRoster(employees, rosterRev ?? 0, token, restaurantId)
-          onRosterSaved?.(rosterResult.rev)
+          onRosterSaved?.(rosterResult.rev, rosterResult.updatedAt)
         } catch (caught) {
           if (caught instanceof StoreConflictError) {
             setError('The staff list changed on the server. Reload the page to see it, then publish again.')
@@ -155,7 +159,7 @@ export default function PublishPanel({
       if (willSaveTemplate && template) {
         try {
           const templateResult = await saveTemplate(template, templateRev ?? 0, token, restaurantId)
-          onTemplateSaved?.(templateResult.rev)
+          onTemplateSaved?.(templateResult.rev, templateResult.updatedAt)
         } catch (caught) {
           if (caught instanceof StoreConflictError) {
             setError('The schedule rules changed on the server. Reload the page to see them, then publish again.')
@@ -178,6 +182,7 @@ export default function PublishPanel({
       setBaseRev(result.rev)
       setServerFingerprint(fingerprint)
       setServerVisible(visible)
+      setServerUpdatedAt(result.updatedAt)
       broadcastSave(weekStart, restaurantId)
       setToken('')
       const savedExtras = [willSaveRoster && 'staff list', willSaveTemplate && 'rules'].filter(Boolean).join(' and ')
@@ -221,6 +226,7 @@ export default function PublishPanel({
           <h2 className="text-lg font-semibold">Publish {weekLabel} to /schedule</h2>
           <p className="mt-1 text-sm text-zinc-600">
             {filled} filled spot{filled === 1 ? '' : 's'} will be included. One schedule, no links or codes.
+            Last published: {baseRev === null ? 'never' : formatUpdatedAt(serverUpdatedAt)}.
             {(willSaveRoster || willSaveTemplate) && (
               <> Your unsaved {[willSaveRoster && 'staff list', willSaveTemplate && 'rules'].filter(Boolean).join(' and ')} will save first with the same token, so a reload brings back exactly this setup.</>
             )}

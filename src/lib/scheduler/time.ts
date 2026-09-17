@@ -28,3 +28,11 @@ export function rangeContains(container: TimeRange, contained: TimeRange) {
 export function hoursFor(range: TimeRange) {
   return (range.end - range.start) / 60
 }
+
+/** "Sep 16, 9:41 PM" for last-saved lines. Null means nothing saved yet. */
+export function formatUpdatedAt(isoDate: string | null | undefined) {
+  if (!isoDate) return 'Not saved yet'
+  const date = new Date(isoDate)
+  if (Number.isNaN(date.getTime())) return 'Not saved yet'
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}

@@ -41,6 +41,7 @@ import {
   type ValidationViolation,
   type WeeklyStaffingTemplate,
   type WeekStatus,
+  formatUpdatedAt,
   getEmployeeAvailability,
 } from '@/lib/scheduler'
 import { fetchRoster, rosterFingerprint } from '@/lib/employee-store'
@@ -83,6 +84,36 @@ type HistorySnapshot = {
 }
 
 type WeekAssignments = Record<string, ScheduleAssignment[]>
+
+type StaffSnapshot = {
+  id: string
+  name: string
+  savedAt: string
+  employees: Employee[]
+}
+
+function snapshotStorageKey(restaurantId?: string) {
+  return `chinarose.scheduler.staffSnapshots.${restaurantId ?? 'default'}`
+}
+
+function readStaffSnapshots(restaurantId?: string): StaffSnapshot[] {
+  try {
+    const raw = window.localStorage.getItem(snapshotStorageKey(restaurantId))
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (snapshot): snapshot is StaffSnapshot =>
+        !!snapshot &&
+        typeof snapshot === 'object' &&
+        typeof (snapshot as StaffSnapshot).id === 'string' &&
+        typeof (snapshot as StaffSnapshot).name === 'string' &&
+        Array.isArray((snapshot as StaffSnapshot).employees),
+    )
+  } catch {
+    return []
+  }
+}
 
 type ScheduleVariant = ScheduleStrategy
 
@@ -742,14 +773,20 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [onboardingDismissed, setOnboardingDismissed] = useState(true)
   const [rosterRev, setRosterRev] = useState(0)
   const [rosterServerSnapshot, setRosterServerSnapshot] = useState<string | null>(null)
+  const [rosterUpdatedAt, setRosterUpdatedAt] = useState<string | null>(null)
   const [rosterLoadError, setRosterLoadError] = useState('')
   const [rosterLoaded, setRosterLoaded] = useState(false)
+  const [confirmingClearStaff, setConfirmingClearStaff] = useState(false)
+  const [staffSnapshots, setStaffSnapshots] = useState<StaffSnapshot[]>([])
+  const [snapshotName, setSnapshotName] = useState('')
   const [rosterPanelOpen, setRosterPanelOpen] = useState(false)
   const rosterDirty = rosterServerSnapshot === null ? employees.length > 0 : rosterFingerprint(employees) !== rosterServerSnapshot
   const [template, setTemplate] = useState<WeeklyStaffingTemplate>(seedTemplate)
   const [templateRev, setTemplateRev] = useState(0)
   const [templateServerSnapshot, setTemplateServerSnapshot] = useState<string | null>(null)
+  const [templateUpdatedAt, setTemplateUpdatedAt] = useState<string | null>(null)
   const [templateLoadError, setTemplateLoadError] = useState('')
+  const [confirmingClearWeek, setConfirmingClearWeek] = useState(false)
   const [templateLoaded, setTemplateLoaded] = useState(false)
   const [publishedWeeks, setPublishedWeeks] = useState<Record<string, GoldenWeekDoc | null>>({})
   const [hydratedWeeks, setHydratedWeeks] = useState<Record<string, boolean>>({})
@@ -892,6 +929,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setTemplateLoaded(false)
     setPublishedWeeks({})
     setHydratedWeeks({})
+    setRosterUpdatedAt(null)
+    setTemplateUpdatedAt(null)
+    setConfirmingClearStaff(false)
+    setConfirmingClearWeek(false)
+    setSnapshotName('')
+    setStaffSnapshots(readStaffSnapshots(restaurantId))
   }, [restaurantId])
 
   useEffect(() => {
@@ -899,6 +942,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setRosterLoadError('')
     setRosterServerSnapshot(null)
     setRosterRev(0)
+    setRosterUpdatedAt(null)
     setRosterLoaded(false)
     fetchRoster(restaurantId)
       .then((doc) => {
@@ -908,6 +952,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           setRosterServerSnapshot(rosterFingerprint(doc.employees))
         }
         setRosterRev(doc.rev)
+        setRosterUpdatedAt(doc.updatedAt)
         setRosterLoaded(true)
       })
       .catch(() => {
@@ -926,6 +971,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setTemplateLoadError('')
     setTemplateServerSnapshot(null)
     setTemplateRev(0)
+    setTemplateUpdatedAt(null)
     setTemplateLoaded(false)
     fetchTemplate(restaurantId)
       .then((doc) => {
@@ -935,6 +981,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           setTemplateServerSnapshot(templateFingerprint(doc.template))
         }
         setTemplateRev(doc.rev)
+        setTemplateUpdatedAt(doc.updatedAt)
         setTemplateLoaded(true)
       })
       .catch(() => {
@@ -1045,6 +1092,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setMoveSource(null)
     setDragState(null)
     setDragOverSlotId(null)
+    setConfirmingClearWeek(false)
   }
 
   function goToMonth(nextMonth: string) {
@@ -1277,6 +1325,68 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setDiagnostics(['Blank station ready. Add employees below, then save the staff list to keep it.'])
+  }
+
+  function clearWeek() {
+    if (assignments.length === 0) {
+      setConfirmingClearWeek(false)
+      return
+    }
+    remember('cleared week')
+    setAssignments([])
+    setConfirmingClearWeek(false)
+    setDiagnostics(['This week’s assignments are cleared. Undo brings them back — publishing saves the cleared week.'])
+  }
+
+  function clearStaff() {
+    if (employees.length === 0) {
+      setConfirmingClearStaff(false)
+      return
+    }
+    remember('cleared staff list')
+    setEmployees([])
+    setConfirmingClearStaff(false)
+    setEmployeePanelOpen(false)
+    setIgnoredIssueIds([])
+    setGuidedChoosing(false)
+    setDiagnostics(['Staff list cleared. Undo brings everyone back — saving the staff list makes the empty list permanent.'])
+  }
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(snapshotStorageKey(restaurantId), JSON.stringify(staffSnapshots))
+    } catch {
+      return
+    }
+  }, [staffSnapshots, restaurantId])
+
+  function saveStaffSnapshot() {
+    if (employees.length === 0) {
+      setDiagnostics(['Add someone to the staff list before saving it as a snapshot.'])
+      return
+    }
+    const name = snapshotName.trim() || `Snapshot ${staffSnapshots.length + 1} — ${employees.length} staff`
+    const snapshot: StaffSnapshot = {
+      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      savedAt: new Date().toISOString(),
+      employees: cloneEmployeeList(employees),
+    }
+    setStaffSnapshots((current) => [snapshot, ...current].slice(0, 10))
+    setSnapshotName('')
+    setDiagnostics([`Saved “${name}”. Restore it anytime from Saved staff lists.`])
+  }
+
+  function restoreStaffSnapshot(snapshot: StaffSnapshot) {
+    remember(`restored snapshot ${snapshot.name}`)
+    setEmployees(cloneEmployeeList(snapshot.employees))
+    setIgnoredIssueIds([])
+    setGuidedChoosing(false)
+    setDiagnostics([`Restored “${snapshot.name}” (${snapshot.employees.length} staff). Save the staff list to keep it — Undo brings back the previous list.`])
+  }
+
+  function deleteStaffSnapshot(id: string) {
+    setStaffSnapshots((current) => current.filter((snapshot) => snapshot.id !== id))
   }
 
   const isNewStation = rosterRev === 0 && templateRev === 0
@@ -1565,13 +1675,15 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               templateRev={templateRev}
               rosterDirty={rosterDirty}
               templateDirty={templateDirty}
-              onRosterSaved={(rev) => {
+              onRosterSaved={(rev, updatedAt) => {
                 setRosterRev(rev)
                 setRosterServerSnapshot(rosterFingerprint(employees))
+                setRosterUpdatedAt(updatedAt)
               }}
-              onTemplateSaved={(rev) => {
+              onTemplateSaved={(rev, updatedAt) => {
                 setTemplateRev(rev)
                 setTemplateServerSnapshot(templateFingerprint(template))
+                setTemplateUpdatedAt(updatedAt)
               }}
             />
           )}
@@ -1642,9 +1754,42 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 >
                   Copy last week
                 </button>
+                {confirmingClearWeek ? (
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      className="rounded bg-red-800 px-2 py-1 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      onClick={clearWeek}
+                    >
+                      Yes, clear
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      onClick={() => setConfirmingClearWeek(false)}
+                    >
+                      Keep
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={() => setConfirmingClearWeek(true)}
+                    disabled={!weekStart || assignments.length === 0}
+                    title="Remove every assignment from this week. You can undo."
+                  >
+                    Clear week
+                  </button>
+                )}
               </div>
             </div>
-            <p className="mt-1 text-sm text-zinc-600 print:hidden">Click a name to move it, then click where it goes.</p>
+            <p className="mt-1 text-sm text-zinc-600 print:hidden">
+              Click a name to move it, then click where it goes.
+              {weekStart && publishedWeeks[weekStart] && (
+                <> Last published: {formatUpdatedAt(publishedWeeks[weekStart]?.updatedAt)}.</>
+              )}
+            </p>
 
             {weekVisibility === 'off' && weekStart && (
               <div className="mt-3 rounded border border-zinc-300 bg-zinc-100 p-3 text-sm text-zinc-700" role="status">
@@ -1747,12 +1892,14 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               loadError={templateLoadError}
               panelOpen={templatePanelOpen}
               onTogglePanel={() => setTemplatePanelOpen((open) => !open)}
-              onSaved={(rev) => {
+              onSaved={(rev, updatedAt) => {
                 setTemplateRev(rev)
                 setTemplateServerSnapshot(templateFingerprint(template))
+                setTemplateUpdatedAt(updatedAt)
               }}
               onClosePanel={() => setTemplatePanelOpen(false)}
               restaurantId={restaurantId}
+              updatedAt={templateUpdatedAt}
             />
 
           <Disclosure summary="About this demo" tone="quiet">
@@ -1781,6 +1928,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 <p className="mt-0.5 text-sm text-zinc-600">
                   {activeEmployeeCount} working, {employees.length - activeEmployeeCount} off the list
                 </p>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  Last saved: {formatUpdatedAt(rosterUpdatedAt)}{rosterDirty ? ' · unsaved changes' : ''}
+                </p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <IconButton
@@ -1804,9 +1954,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 employees={employees}
                 rev={rosterRev}
                 dirty={rosterDirty}
-                onSaved={(rev) => {
+                onSaved={(rev, updatedAt) => {
                   setRosterRev(rev)
                   setRosterServerSnapshot(rosterFingerprint(employees))
+                  setRosterUpdatedAt(updatedAt)
                 }}
                 onClose={() => setRosterPanelOpen(false)}
                 restaurantId={restaurantId}
@@ -1834,11 +1985,97 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 title={
                   isDefaultRoster
                     ? 'Already using the built-in demo staff list.'
-                    : 'Replace the staff list with the built-in demo list. You can undo, then save to keep it.'
+                    : 'Replace the staff list with the built-in demo list. You can undo, then save to keep them.'
                 }
               >
                 Restore default staff
               </button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3">
+              <p className="text-xs text-zinc-600">Start fresh with an empty list. Undo brings everyone back.</p>
+              {confirmingClearStaff ? (
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={clearStaff}
+                  >
+                    Yes, clear all
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={() => setConfirmingClearStaff(false)}
+                  >
+                    Keep
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={() => setConfirmingClearStaff(true)}
+                  disabled={employees.length === 0}
+                  title="Remove everyone from the staff list. You can undo, then save to keep it."
+                >
+                  Clear staff list
+                </button>
+              )}
+            </div>
+
+            <div className="mt-3 border-t border-zinc-100 pt-3">
+              <Disclosure summary={`Saved staff lists (${staffSnapshots.length})`} tone="quiet">
+                <p className="text-xs text-zinc-600">Keep a copy of a staff list on this device and bring it back anytime.</p>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    value={snapshotName}
+                    onChange={(event) => setSnapshotName(event.target.value)}
+                    placeholder={`Name this list (${employees.length} staff)`}
+                    aria-label="Snapshot name"
+                  />
+                  <button
+                    type="button"
+                    className="shrink-0 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={saveStaffSnapshot}
+                    disabled={employees.length === 0}
+                    title="Save a copy of the current staff list on this device."
+                  >
+                    Save
+                  </button>
+                </div>
+                {staffSnapshots.length > 0 && (
+                  <ul className="mt-2 space-y-2">
+                    {staffSnapshots.map((snapshot) => (
+                      <li key={snapshot.id} className="flex items-center justify-between gap-2 rounded border border-zinc-200 bg-zinc-50 px-2.5 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-zinc-900">{snapshot.name}</p>
+                          <p className="text-xs text-zinc-500">{snapshot.employees.length} staff · {formatUpdatedAt(snapshot.savedAt)}</p>
+                        </div>
+                        <div className="flex shrink-0 gap-1.5">
+                          <button
+                            type="button"
+                            className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                            onClick={() => restoreStaffSnapshot(snapshot)}
+                            title={`Replace the staff list with “${snapshot.name}”. You can undo.`}
+                          >
+                            Restore
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                            onClick={() => deleteStaffSnapshot(snapshot.id)}
+                            title={`Delete “${snapshot.name}”.`}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Disclosure>
             </div>
 
             <div className="mt-3 border-t border-zinc-100 pt-3">
@@ -2622,6 +2859,7 @@ function TemplateEditor({
   onSaved,
   onClosePanel,
   restaurantId,
+  updatedAt,
 }: {
   template: WeeklyStaffingTemplate
   onChange: (template: WeeklyStaffingTemplate) => void
@@ -2632,9 +2870,10 @@ function TemplateEditor({
   loadError: string
   panelOpen: boolean
   onTogglePanel: () => void
-  onSaved: (rev: number) => void
+  onSaved: (rev: number, updatedAt: string | null) => void
   onClosePanel: () => void
   restaurantId?: string
+  updatedAt: string | null
 }) {
   function updateDay(day: DayOfWeek, daySlots: StaffingTemplateSlot[]) {
     onChange({ ...template, [day]: daySlots })
@@ -2655,7 +2894,12 @@ function TemplateEditor({
   return (
     <Disclosure summary="Schedule rules" tone="quiet">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-zinc-600">Who the restaurant needs on each shift. Add, remove, or change any spot.</p>
+        <div>
+          <p className="text-sm text-zinc-600">Who the restaurant needs on each shift. Add, remove, or change any spot.</p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            Last saved: {formatUpdatedAt(updatedAt)}{dirty ? ' · unsaved changes' : ''}
+          </p>
+        </div>
         <div className="flex shrink-0 gap-2">
           <button
             type="button"

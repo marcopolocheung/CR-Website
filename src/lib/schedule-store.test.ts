@@ -145,7 +145,7 @@ test('golden reads and saves scope to the restaurant query param', async () => {
         'manager-token',
         'CR2-diningroom',
       ),
-      { rev: 1 },
+      { rev: 1, updatedAt: null },
     )
   } finally {
     restore()
@@ -157,7 +157,7 @@ test('saveGoldenWeek sends the write token and maps 401 to auth', async () => {
     assert.ok(url.endsWith('/api/schedule/2026-09-13'))
     assert.equal(init?.method, 'PUT')
     assert.equal((init?.headers as Record<string, string>)?.Authorization, 'Bearer manager-token')
-    return { status: 201, payload: { rev: 1 } }
+    return { status: 201, payload: { rev: 1, updatedAt: '2026-09-14T01:02:03.000Z' } }
   })
   try {
     assert.deepEqual(
@@ -166,7 +166,7 @@ test('saveGoldenWeek sends the write token and maps 401 to auth', async () => {
         { week: goldenWeek, templateHash: 'a1b2c3d4', visible: true, baseRev: 0 },
         'manager-token',
       ),
-      { rev: 1 },
+      { rev: 1, updatedAt: '2026-09-14T01:02:03.000Z' },
     )
   } finally {
     restore()
