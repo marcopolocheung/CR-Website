@@ -11,18 +11,34 @@ export type TemplateDoc = {
   template: WeeklyStaffingTemplate | null
   rev: number
   updatedAt: string | null
+  weekStart?: string
+  inherited?: boolean
 }
 
-export async function fetchTemplate(restaurantId?: string): Promise<TemplateDoc> {
-  const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
-  const { status, body } = await requestJson(`/api/template${suffix}`)
+function templateQuery(restaurantId?: string, weekStart?: string): string {
+  const params = new URLSearchParams()
+  if (restaurantId) params.set('restaurant', restaurantId)
+  if (weekStart) params.set('weekStart', weekStart)
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export async function fetchTemplate(restaurantId?: string, weekStart?: string): Promise<TemplateDoc> {
+  const { status, body } = await requestJson(`/api/template${templateQuery(restaurantId, weekStart)}`)
   if (status === 200 && body && typeof body === 'object' && 'template' in body) {
-    const { template, rev, updatedAt } = body as { template: unknown; rev: unknown; updatedAt: unknown }
+    const { template, rev, updatedAt, inherited } = body as {
+      template: unknown
+      rev: unknown
+      updatedAt: unknown
+      inherited: unknown
+    }
     if (template === null || isValidTemplate(template)) {
       return {
         template: template === null ? null : template,
         rev: typeof rev === 'number' ? rev : 0,
         updatedAt: typeof updatedAt === 'string' ? updatedAt : null,
+        weekStart,
+        inherited: inherited === true,
       }
     }
   }
@@ -34,9 +50,9 @@ export async function saveTemplate(
   baseRev: number,
   token: string,
   restaurantId?: string,
+  weekStart?: string,
 ): Promise<{ rev: number; updatedAt: string | null }> {
-  const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
-  const { status, body } = await requestJson(`/api/template${suffix}`, {
+  const { status, body } = await requestJson(`/api/template${templateQuery(restaurantId, weekStart)}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ template, baseRev }),

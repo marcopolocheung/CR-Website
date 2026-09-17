@@ -6,7 +6,10 @@ import handler, {
   isValidId,
   isValidRestaurant,
   newShareId,
+  parseWeekStartParam,
   restaurantFromUrl,
+  rosterKeyForWeek,
+  templateKeyForWeek,
   validateGoldenWeekBody,
   validatePublishBody,
   validateRosterBody,
@@ -559,4 +562,115 @@ test('legacy singleton docs fall back to the default restaurant only', async () 
   assert.equal(((await templateDefault.json()) as { rev: number }).rev, 1)
   const templateOther = await handler.fetch(new Request('https://api.test/api/template?restaurant=CR2-kitchen'), env)
   assert.equal(((await templateOther.json()) as { rev: number }).rev, 0)
+})
+
+test('weekStart params parse and per-week keys are namespaced', () => {
+  assert.deepEqual(parseWeekStartParam(new URL('https://api.test/api/employees')), { present: false })
+  assert.deepEqual(parseWeekStartParam(new URL('https://api.test/api/employees?weekStart=2026-09-13')), {
+    present: true,
+    valid: true,
+    value: '2026-09-13',
+  })
+  assert.equal(parseWeekStartParam(new URL('https://api.test/api/employees?weekStart=sept-13')).present, true)
+  assert.equal(
+    (parseWeekStartParam(new URL('https://api.test/api/employees?weekStart=sept-13')) as { valid: boolean }).valid,
+    false,
+  )
+  assert.equal(rosterKeyForWeek('CR3-diningroom', '2026-09-13'), 'r:CR3-diningroom:roster:2026-09-13')
+  assert.equal(templateKeyForWeek('CR3-diningroom', '2026-09-13'), 'r:CR3-diningroom:template:2026-09-13')
+})
+
+test('rosters are isolated per week and fall back to the global seed', async () => {
+  const env = mockEnv()
+  const week1 = '2026-09-06'
+  const week2 = '2026-09-13'
+
+  function weekRosterPut(weekStart: string, body: unknown, token = 'manager-token'): Request {
+    return new Request(`https://api.test/api/employees?weekStart=${weekStart}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    })
+  }
+
+  const seed = await handler.fetch(rosterPut({ employees: [rosterEmployee()], baseRev: 0 }), env)
+  assert.equal(seed.status, 201)
+
+  const emptyWeek1 = await handler.fetch(new Request(`https://api.test/api/employees?weekStart=${week1}`), env)
+  assert.equal(emptyWeek1.status, 200)
+  const emptyDoc = (await emptyWeek1.json()) as { employees: unknown[]; rev: number; inherited: boolean }
+  assert.equal(emptyDoc.rev, 0)
+  assert.equal(emptyDoc.inherited, true)
+  assert.equal(emptyDoc.employees.length, 1)
+
+  const eleven = Array.from({ length: 11 }, (_, i) => rosterEmployee({ id: `w1-${i}`, name: `W1 ${i}` }))
+  const created1 = await handler.fetch(weekRosterPut(week1, { employees: eleven, baseRev: 0 }), env)
+  assert.equal(created1.status, 201)
+
+  const twelve = Array.from({ length: 12 }, (_, i) => rosterEmployee({ id: `w2-${i}`, name: `W2 ${i}` }))
+  const created2 = await handler.fetch(weekRosterPut(week2, { employees: twelve, baseRev: 0 }), env)
+  assert.equal(created2.status, 201)
+
+  const fetched1 = await handler.fetch(new Request(`https://api.test/api/employees?weekStart=${week1}`), env)
+  const doc1 = (await fetched1.json()) as { employees: { id: string }[]; rev: number; inherited: boolean }
+  assert.equal(doc1.rev, 1)
+  assert.equal(doc1.inherited, false)
+  assert.equal(doc1.employees.length, 11)
+
+  const fetched2 = await handler.fetch(new Request(`https://api.test/api/employees?weekStart=${week2}`), env)
+  const doc2 = (await fetched2.json()) as { employees: { id: string }[]; rev: number }
+  assert.equal(doc2.employees.length, 12)
+
+  const stale = await handler.fetch(weekRosterPut(week1, { employees: [], baseRev: 0 }), env)
+  assert.equal(stale.status, 409)
+  assert.equal(((await stale.json()) as { rev: number }).rev, 1)
+
+  const global = await handler.fetch(new Request('https://api.test/api/employees'), env)
+  assert.equal(((await global.json()) as { employees: unknown[] }).employees.length, 1)
+
+  const bad = await handler.fetch(new Request('https://api.test/api/employees?weekStart=sept-13'), env)
+  assert.equal(bad.status, 400)
+})
+
+test('templates are isolated per week and fall back to the global seed', async () => {
+  const env = mockEnv()
+  const week1 = '2026-09-06'
+  const week2 = '2026-09-13'
+
+  function weekTemplatePut(weekStart: string, body: unknown): Request {
+    return new Request(`https://api.test/api/template?weekStart=${weekStart}`, {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer manager-token' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  const seed = await handler.fetch(templatePut({ template: templatePayload(), baseRev: 0 }), env)
+  assert.equal(seed.status, 201)
+
+  const emptyWeek = await handler.fetch(new Request(`https://api.test/api/template?weekStart=${week1}`), env)
+  const emptyDoc = (await emptyWeek.json()) as { template: unknown; rev: number; inherited: boolean }
+  assert.equal(emptyDoc.rev, 0)
+  assert.equal(emptyDoc.inherited, true)
+
+  const week1Template = templatePayload({ Sunday: [] })
+  const created1 = await handler.fetch(weekTemplatePut(week1, { template: week1Template, baseRev: 0 }), env)
+  assert.equal(created1.status, 201)
+
+  const fetched1 = await handler.fetch(new Request(`https://api.test/api/template?weekStart=${week1}`), env)
+  const doc1 = (await fetched1.json()) as { template: Record<string, unknown[]>; rev: number; inherited: boolean }
+  assert.equal(doc1.rev, 1)
+  assert.equal(doc1.inherited, false)
+  assert.equal(doc1.template.Sunday.length, 0)
+
+  const fetched2 = await handler.fetch(new Request(`https://api.test/api/template?weekStart=${week2}`), env)
+  const doc2 = (await fetched2.json()) as { rev: number; inherited: boolean }
+  assert.equal(doc2.rev, 0)
+  assert.equal(doc2.inherited, true)
+
+  const stale = await handler.fetch(weekTemplatePut(week1, { template: templatePayload(), baseRev: 0 }), env)
+  assert.equal(stale.status, 409)
+
+  const bad = await handler.fetch(new Request('https://api.test/api/template?weekStart=bad'), env)
+  assert.equal(bad.status, 400)
 })

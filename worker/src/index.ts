@@ -307,12 +307,23 @@ export function goldenWeeksForMonth(monthKey: string): string[] {
   return weeks
 }
 
-// --- Employee roster (one persistent staff list, edited by scheduler-demo) ---
+// --- Employee roster (staff lists are per-week, with the global doc as the seed) ---
 
 const LEGACY_ROSTER_KEY = 'roster:current'
 
 function rosterKey(restaurant: string = DEFAULT_RESTAURANT): string {
   return `r:${restaurant}:roster:current`
+}
+
+export function rosterKeyForWeek(restaurant: string, weekStart: string): string {
+  return `r:${restaurant}:roster:${weekStart}`
+}
+
+export function parseWeekStartParam(url: URL): { present: false } | { present: true; valid: boolean; value: string } {
+  const raw = url.searchParams.get('weekStart')
+  if (raw === null || raw === '') return { present: false }
+  if (!WEEK_RE.test(raw)) return { present: true, valid: false, value: raw }
+  return { present: true, valid: true, value: raw }
 }
 
 async function readRosterRaw(env: Env, restaurant: string): Promise<string | null> {
@@ -436,12 +447,16 @@ export function normalizeRosterDoc(raw: unknown): RosterDoc | null {
   return { v: 1, rev: doc.rev, employees: valid.employees, updatedAt: doc.updatedAt }
 }
 
-// --- Staffing template (one persistent set of weekly shift rules, edited by scheduler-demo) ---
+// --- Staffing template (rules are per-week, with the global doc as the seed) ---
 
 const LEGACY_TEMPLATE_KEY = 'template:current'
 
 function templateKey(restaurant: string = DEFAULT_RESTAURANT): string {
   return `r:${restaurant}:template:current`
+}
+
+export function templateKeyForWeek(restaurant: string, weekStart: string): string {
+  return `r:${restaurant}:template:${weekStart}`
 }
 
 async function readTemplateRaw(env: Env, restaurant: string): Promise<string | null> {
@@ -568,6 +583,14 @@ async function readBody(request: Request): Promise<unknown> {
   if (text.length > MAX_BODY_CHARS) throw new Error('body_too_large')
   try {
     return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+function safeParse(raw: string): unknown {
+  try {
+    return JSON.parse(raw)
   } catch {
     return null
   }
@@ -797,9 +820,41 @@ export default {
     if (path === '/api/employees') {
       const restaurant = restaurantFromUrl(url)
       if (!restaurant) return json({ error: 'invalid_restaurant' }, 400, request, env)
+      const weekParam = parseWeekStartParam(url)
+      if (weekParam.present && !weekParam.valid) return json({ error: 'invalid_weekStart' }, 400, request, env)
+      const weekStart = weekParam.present && weekParam.valid ? weekParam.value : undefined
       if (request.method === 'GET') {
+        if (weekStart) {
+          const weekRaw = await env.SCHEDULES.get(rosterKeyForWeek(restaurant, weekStart))
+          const weekDoc = weekRaw ? normalizeRosterDoc(safeParse(weekRaw)) : null
+          if (weekDoc) {
+            return json(
+              { employees: weekDoc.employees, rev: weekDoc.rev, updatedAt: weekDoc.updatedAt, weekStart, inherited: false },
+              200,
+              request,
+              env,
+              { 'Cache-Control': 'no-store' },
+            )
+          }
+          const globalRaw = await readRosterRaw(env, restaurant)
+          const globalDoc = globalRaw ? normalizeRosterDoc(safeParse(globalRaw)) : null
+          return json(
+            {
+              employees: globalDoc?.employees ?? [],
+              rev: 0,
+              updatedAt: null,
+              weekStart,
+              inherited: true,
+              fallbackRev: globalDoc?.rev ?? 0,
+            },
+            200,
+            request,
+            env,
+            { 'Cache-Control': 'no-store' },
+          )
+        }
         const raw = await readRosterRaw(env, restaurant)
-        const doc = raw ? normalizeRosterDoc(JSON.parse(raw)) : null
+        const doc = raw ? normalizeRosterDoc(safeParse(raw)) : null
         return json(
           { employees: doc?.employees ?? [], rev: doc?.rev ?? 0, updatedAt: doc?.updatedAt ?? null },
           200,
@@ -823,17 +878,12 @@ export default {
         }
         const valid = validateRosterBody(body)
         if (!valid) return json({ error: 'invalid_body' }, 400, request, env)
-        const existingRaw = await readRosterRaw(env, restaurant)
+        const targetKey = weekStart ? rosterKeyForWeek(restaurant, weekStart) : rosterKey(restaurant)
+        const existingRaw = weekStart ? await env.SCHEDULES.get(targetKey) : await readRosterRaw(env, restaurant)
         let currentRev = 0
         let currentUpdatedAt: string | undefined
         if (existingRaw) {
-          let parsed: unknown
-          try {
-            parsed = JSON.parse(existingRaw)
-          } catch {
-            parsed = null
-          }
-          const current = normalizeRosterDoc(parsed)
+          const current = normalizeRosterDoc(safeParse(existingRaw))
           currentRev = current?.rev ?? 0
           currentUpdatedAt = current?.updatedAt
         }
@@ -846,7 +896,7 @@ export default {
           employees: valid.employees,
           updatedAt: new Date().toISOString(),
         }
-        await env.SCHEDULES.put(rosterKey(restaurant), JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
+        await env.SCHEDULES.put(targetKey, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
         return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env)
       }
     }
@@ -854,9 +904,41 @@ export default {
     if (path === '/api/template') {
       const restaurant = restaurantFromUrl(url)
       if (!restaurant) return json({ error: 'invalid_restaurant' }, 400, request, env)
+      const weekParam = parseWeekStartParam(url)
+      if (weekParam.present && !weekParam.valid) return json({ error: 'invalid_weekStart' }, 400, request, env)
+      const weekStart = weekParam.present && weekParam.valid ? weekParam.value : undefined
       if (request.method === 'GET') {
+        if (weekStart) {
+          const weekRaw = await env.SCHEDULES.get(templateKeyForWeek(restaurant, weekStart))
+          const weekDoc = weekRaw ? normalizeTemplateDoc(safeParse(weekRaw)) : null
+          if (weekDoc) {
+            return json(
+              { template: weekDoc.template, rev: weekDoc.rev, updatedAt: weekDoc.updatedAt, weekStart, inherited: false },
+              200,
+              request,
+              env,
+              { 'Cache-Control': 'no-store' },
+            )
+          }
+          const globalRaw = await readTemplateRaw(env, restaurant)
+          const globalDoc = globalRaw ? normalizeTemplateDoc(safeParse(globalRaw)) : null
+          return json(
+            {
+              template: globalDoc?.template ?? null,
+              rev: 0,
+              updatedAt: null,
+              weekStart,
+              inherited: true,
+              fallbackRev: globalDoc?.rev ?? 0,
+            },
+            200,
+            request,
+            env,
+            { 'Cache-Control': 'no-store' },
+          )
+        }
         const raw = await readTemplateRaw(env, restaurant)
-        const doc = raw ? normalizeTemplateDoc(JSON.parse(raw)) : null
+        const doc = raw ? normalizeTemplateDoc(safeParse(raw)) : null
         return json(
           { template: doc?.template ?? null, rev: doc?.rev ?? 0, updatedAt: doc?.updatedAt ?? null },
           200,
@@ -880,17 +962,12 @@ export default {
         }
         const valid = validateTemplateBody(body)
         if (!valid) return json({ error: 'invalid_body' }, 400, request, env)
-        const existingRaw = await readTemplateRaw(env, restaurant)
+        const targetKey = weekStart ? templateKeyForWeek(restaurant, weekStart) : templateKey(restaurant)
+        const existingRaw = weekStart ? await env.SCHEDULES.get(targetKey) : await readTemplateRaw(env, restaurant)
         let currentRev = 0
         let currentUpdatedAt: string | undefined
         if (existingRaw) {
-          let parsed: unknown
-          try {
-            parsed = JSON.parse(existingRaw)
-          } catch {
-            parsed = null
-          }
-          const current = normalizeTemplateDoc(parsed)
+          const current = normalizeTemplateDoc(safeParse(existingRaw))
           currentRev = current?.rev ?? 0
           currentUpdatedAt = current?.updatedAt
         }
@@ -903,7 +980,7 @@ export default {
           template: valid.template,
           updatedAt: new Date().toISOString(),
         }
-        await env.SCHEDULES.put(templateKey(restaurant), JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
+        await env.SCHEDULES.put(targetKey, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
         return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env)
       }
     }
