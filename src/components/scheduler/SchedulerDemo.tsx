@@ -2552,97 +2552,79 @@ function AvailabilityGridEditor({
         <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">PM</span>
         <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Hours</span>
       </div>
-      <div id={canCustomize ? customControlsId : undefined}>
-        {DAYS.map((day) => {
-          const { am, pm } = dayAvailabilityFromRanges(recurringAvailability[day])
-          const ranges = recurringAvailability[day] ?? []
-          const single = ranges.length === 1 ? ranges[0] : null
-          const custom = isCustomDayRanges(ranges)
-          const confirming = pendingReset?.day === day
-          const customLabel = ranges.length === 0 ? '' : ranges.map((range) => formatTimeRange(range)).join(' + ')
-          return (
-            <Fragment key={day}>
-              <div className="grid grid-cols-[2.5rem_2rem_2rem_1fr] items-center gap-x-3">
-                <span className="text-xs text-zinc-700">{day.slice(0, 3)}</span>
-                <label className="flex items-center justify-start">
-                  <input type="checkbox" checked={am} onChange={(event) => requestToggle(day, 'am', event.target.checked)} />
-                </label>
-                <label className="flex items-center justify-start">
-                  <input type="checkbox" checked={pm} onChange={(event) => requestToggle(day, 'pm', event.target.checked)} />
-                </label>
-                <div className="min-w-0 space-y-1">
-                  {!expanded && (
-                    <span className="text-xs text-zinc-700">
-                      {ranges.length === 0 ? <span className="text-zinc-400">Off</span> : customLabel}
-                      {custom && (
-                        <span className="ml-1 rounded border border-sky-200 bg-sky-50 px-1 py-px text-[10px] font-semibold text-sky-900">
-                          Custom
-                        </span>
-                      )}
+      {DAYS.map((day) => {
+        const { am, pm } = dayAvailabilityFromRanges(recurringAvailability[day])
+        const ranges = recurringAvailability[day] ?? []
+        const single = ranges.length === 1 ? ranges[0] : null
+        const custom = isCustomDayRanges(ranges)
+        return (
+          <Fragment key={day}>
+            <div className="grid grid-cols-[2.5rem_2rem_2rem_1fr] items-center gap-x-3">
+              <span className="text-xs text-zinc-700">{day.slice(0, 3)}</span>
+              <label className="flex items-center justify-start">
+                <input type="checkbox" checked={am} onChange={(event) => onToggle(day, 'am', event.target.checked)} />
+              </label>
+              <label className="flex items-center justify-start">
+                <input type="checkbox" checked={pm} onChange={(event) => onToggle(day, 'pm', event.target.checked)} />
+              </label>
+              <div className="min-w-0 space-y-1">
+                {ranges.length === 0 && <span className="text-xs text-zinc-400">Off</span>}
+                {ranges.map((range, index) => (
+                  <div key={index} className="flex min-w-0 flex-wrap items-center gap-1">
+                    <input
+                      type="time"
+                      aria-label={`${day} availability ${index + 1} start`}
+                      className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
+                      value={minutesToTimeValue(range.start)}
+                      disabled={!onChange}
+                      onChange={(event) => updateRangeTime(day, index, 'start', event.target.value)}
+                    />
+                    <span aria-hidden="true" className="text-xs text-zinc-500">
+                      to
                     </span>
-                  )}
-                  {expanded && (
-                    <>
-                      {ranges.length === 0 && <span className="text-xs text-zinc-400">Off</span>}
-                      {ranges.map((range, index) => (
-                        <div key={index} className="flex min-w-0 flex-wrap items-center gap-1">
-                          <input
-                            type="time"
-                            aria-label={`${day} availability ${index + 1} start`}
-                            className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
-                            value={minutesToTimeValue(range.start)}
-                            disabled={!onChange}
-                            onChange={(event) => updateRangeTime(day, index, 'start', event.target.value)}
-                          />
-                          <span aria-hidden="true" className="text-xs text-zinc-500">
-                            to
-                          </span>
-                          <input
-                            type="time"
-                            aria-label={`${day} availability ${index + 1} end`}
-                            className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
-                            value={minutesToTimeValue(range.end)}
-                            disabled={!onChange}
-                            onChange={(event) => updateRangeTime(day, index, 'end', event.target.value)}
-                          />
-                          {isSingleCustomRange(range) && (
-                            <span className="rounded border border-sky-200 bg-sky-50 px-1 py-px text-[10px] font-semibold text-sky-900">
-                              Custom
-                            </span>
-                          )}
-                          {onChange && ranges.length > 1 && (
-                            <button
-                              type="button"
-                              aria-label={`Remove ${day} hours ${index + 1}`}
-                              className="rounded border border-zinc-300 bg-white px-1 py-px text-[11px] font-semibold text-zinc-600 hover:bg-zinc-100"
-                              onClick={() => removeRange(day, index)}
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      {onChange && ranges.length >= 1 && ranges.length < 3 && (
-                        <button
-                          type="button"
-                          className="text-[11px] font-semibold text-sky-800 hover:text-sky-900"
-                          onClick={() => addRange(day)}
-                        >
-                          + Add hours
-                        </button>
-                      )}
-                      {onChange && ranges.length === 0 && (
-                        <button
-                          type="button"
-                          className="text-[11px] font-semibold text-sky-800 hover:text-sky-900"
-                          onClick={() => addRange(day)}
-                        >
-                          + Add hours
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
+                    <input
+                      type="time"
+                      aria-label={`${day} availability ${index + 1} end`}
+                      className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
+                      value={minutesToTimeValue(range.end)}
+                      disabled={!onChange}
+                      onChange={(event) => updateRangeTime(day, index, 'end', event.target.value)}
+                    />
+                    {isSingleCustomRange(range) && (
+                      <span className="rounded border border-sky-200 bg-sky-50 px-1 py-px text-[10px] font-semibold text-sky-900">
+                        Custom
+                      </span>
+                    )}
+                    {onChange && ranges.length > 1 && (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${day} hours ${index + 1}`}
+                        className="rounded border border-zinc-300 bg-white px-1 py-px text-[11px] font-semibold text-zinc-600 hover:bg-zinc-100"
+                        onClick={() => removeRange(day, index)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {onChange && ranges.length >= 1 && ranges.length < 3 && (
+                  <button
+                    type="button"
+                    className="text-[11px] font-semibold text-sky-800 hover:text-sky-900"
+                    onClick={() => addRange(day)}
+                  >
+                    + Add hours
+                  </button>
+                )}
+                {onChange && ranges.length === 0 && (
+                  <button
+                    type="button"
+                    className="text-[11px] font-semibold text-sky-800 hover:text-sky-900"
+                    onClick={() => addRange(day)}
+                  >
+                    + Add hours
+                  </button>
+                )}
               </div>
               {confirming && (
                 <div className="ml-10 mt-1 flex flex-wrap items-center gap-2 rounded border border-amber-300 bg-amber-50 px-2 py-1.5">
