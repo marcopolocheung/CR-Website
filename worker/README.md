@@ -4,22 +4,32 @@ Two stores in one Worker:
 
 - Legacy per-link blobs (`/api/weeks`): kept read/write compatible so old
   staff links keep working. New development should use the golden schedule.
-- Golden schedule (`/api/schedule`): one persistent codeless schedule keyed
-  by week start (`golden:YYYY-MM-DD`), edited by `/scheduler-demo` and read
-  by `/schedule`. Docs hold the plaintext week plus `visible` for the
-  manager's week on/off toggle and `rev` for optimistic concurrency.
+- Golden schedule (`/api/schedule`): one persistent codeless schedule per
+  station, keyed by week start (`r:{restaurant}:golden:YYYY-MM-DD`), edited by
+  `/scheduler-demo/{restaurant}` and read by `/schedule/{restaurant}`. Docs hold
+  the plaintext week plus `visible` for the manager's week on/off toggle and
+  `rev` for optimistic concurrency.
 
-Plus two more stores, keyed separately:
+Plus two more stores, keyed separately per station:
 
-- Employee roster (`/api/employees`): one persistent staff list (`roster:current`),
-  edited by `/scheduler-demo`. Public read, token-guarded write, same optimistic
-  concurrency (`rev`/`baseRev`) as the golden schedule.
-- Staffing template (`/api/template`): one persistent set of weekly shift rules
-  (`template:current`) — which roles are needed on each day/shift, and their hours.
-  Edited by `/scheduler-demo`, read by both `/scheduler-demo` and `/schedule` so
-  they always agree on shift layout. Same public-read, token-guarded-write,
-  optimistic-concurrency pattern. Falls back to the app's built-in default layout
-  when nothing has been saved yet (`rev: 0`).
+- Employee roster (`/api/employees?restaurant={id}`): one persistent staff list
+  per station (`r:{restaurant}:roster:current`), edited by `/scheduler-demo`.
+  Public read, token-guarded write, same optimistic concurrency (`rev`/`baseRev`)
+  as the golden schedule.
+- Staffing template (`/api/template?restaurant={id}`): one persistent set of
+  weekly shift rules per station (`r:{restaurant}:template:current`) — which roles
+  are needed on each day/shift, and their hours. Edited by `/scheduler-demo`,
+  read by both `/scheduler-demo` and `/schedule` so they always agree on shift
+  layout. Same public-read, token-guarded-write, optimistic-concurrency pattern.
+  Falls back to the app's built-in default layout when nothing has been saved
+  yet (`rev: 0`).
+
+Stations: `CR3-diningroom` (default, owns pre-partition legacy data),
+`CR3-kitchen`, `CR2-kitchen`, `CR2-diningroom`. Omit `?restaurant=` to read the
+default station. Unknown `?restaurant=` values answer `400 invalid_restaurant`.
+Pre-partition singleton keys (`golden:*`, `roster:current`, `template:current`)
+are served as a read fallback for the default station only — first save to the
+default station writes to the new `r:CR3-diningroom:*` keys.
 
 ## Write token (golden schedule)
 

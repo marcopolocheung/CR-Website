@@ -7,6 +7,21 @@ const MAX_CIPHER_CHARS = 16384;
 const MAX_BODY_CHARS = 20000;
 const DOC_TTL_SECONDS = 31536000;
 const WRITE_LIMIT_PER_HOUR = 60;
+export const RESTAURANTS = ['CR3-diningroom', 'CR3-kitchen', 'CR2-kitchen', 'CR2-diningroom'];
+export const DEFAULT_RESTAURANT = 'CR3-diningroom';
+const RESTAURANT_RE = /^[A-Za-z0-9-]{2,40}$/;
+export function isValidRestaurant(value) {
+    return typeof value === 'string' && RESTAURANTS.includes(value);
+}
+/** Query `?restaurant=` → validated id, default when omitted, null when invalid. */
+export function restaurantFromUrl(url) {
+    const raw = url.searchParams.get('restaurant');
+    if (raw === null || raw === '')
+        return DEFAULT_RESTAURANT;
+    if (!RESTAURANT_RE.test(raw) || !isValidRestaurant(raw))
+        return null;
+    return raw;
+}
 export function isValidId(id) {
     return ID_RE.test(id);
 }
@@ -94,10 +109,16 @@ const MAX_PEOPLE = 64;
 const MAX_NAME_CHARS = 80;
 const MAX_TITLE_CHARS = 120;
 const MAX_SLOTS = 200;
-export function goldenKey(weekStart) {
+export function goldenKey(weekStart, restaurant = DEFAULT_RESTAURANT) {
+    return `r:${restaurant}:golden:${weekStart}`;
+}
+export function legacyGoldenKey(weekStart) {
     return `golden:${weekStart}`;
 }
-export function goldenMonthRevKey(monthKey) {
+export function goldenMonthRevKey(monthKey, restaurant = DEFAULT_RESTAURANT) {
+    return `r:${restaurant}:golden:month-rev:${monthKey}`;
+}
+export function legacyGoldenMonthRevKey(monthKey) {
     return `golden:month-rev:${monthKey}`;
 }
 function shiftGoldenDate(isoDate, days) {
@@ -110,9 +131,9 @@ export function goldenMonthsForWeek(weekStart) {
         return [];
     return [...new Set([weekStart.slice(0, 7), shiftGoldenDate(weekStart, 6).slice(0, 7)])];
 }
-export async function readGoldenMonthRev(env, monthKey) {
+export async function readGoldenMonthRev(env, monthKey, restaurant = DEFAULT_RESTAURANT) {
     try {
-        const raw = await env.SCHEDULES.get(goldenMonthRevKey(monthKey));
+        const raw = await env.SCHEDULES.get(goldenMonthRevKey(monthKey, restaurant));
         const rev = raw ? Number.parseInt(raw, 10) : 0;
         return Number.isInteger(rev) && rev > 0 ? rev : 0;
     }
@@ -120,16 +141,26 @@ export async function readGoldenMonthRev(env, monthKey) {
         return 0;
     }
 }
-async function bumpGoldenMonthRevs(env, weekStart) {
+async function bumpGoldenMonthRevs(env, weekStart, restaurant = DEFAULT_RESTAURANT) {
     for (const month of goldenMonthsForWeek(weekStart)) {
-        const rev = await readGoldenMonthRev(env, month);
+        const rev = await readGoldenMonthRev(env, month, restaurant);
         try {
-            await env.SCHEDULES.put(goldenMonthRevKey(month), String(rev + 1), { expirationTtl: DOC_TTL_SECONDS });
+            await env.SCHEDULES.put(goldenMonthRevKey(month, restaurant), String(rev + 1), { expirationTtl: DOC_TTL_SECONDS });
         }
         catch {
             return;
         }
     }
+}
+async function readGoldenDoc(env, restaurant, weekStart) {
+    const raw = await env.SCHEDULES.get(goldenKey(weekStart, restaurant));
+    if (raw)
+        return raw;
+    // Migration fallback: pre-partition data lives under legacy keys and belongs to the default restaurant.
+    if (restaurant === DEFAULT_RESTAURANT) {
+        return await env.SCHEDULES.get(legacyGoldenKey(weekStart));
+    }
+    return null;
 }
 export function validateGoldenWeekBody(body) {
     if (!body || typeof body !== 'object')
@@ -219,7 +250,19 @@ export function goldenWeeksForMonth(monthKey) {
     return weeks;
 }
 // --- Employee roster (one persistent staff list, edited by scheduler-demo) ---
-const ROSTER_KEY = 'roster:current';
+const LEGACY_ROSTER_KEY = 'roster:current';
+function rosterKey(restaurant = DEFAULT_RESTAURANT) {
+    return `r:${restaurant}:roster:current`;
+}
+async function readRosterRaw(env, restaurant) {
+    const raw = await env.SCHEDULES.get(rosterKey(restaurant));
+    if (raw)
+        return raw;
+    if (restaurant === DEFAULT_RESTAURANT) {
+        return await env.SCHEDULES.get(LEGACY_ROSTER_KEY);
+    }
+    return null;
+}
 const ROSTER_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const ROSTER_ROLES = ['server', 'cashier', 'lead', 'manager'];
 const MAX_EMPLOYEES = 100;
@@ -320,7 +363,19 @@ export function normalizeRosterDoc(raw) {
     return { v: 1, rev: doc.rev, employees: valid.employees, updatedAt: doc.updatedAt };
 }
 // --- Staffing template (one persistent set of weekly shift rules, edited by scheduler-demo) ---
-const TEMPLATE_KEY = 'template:current';
+const LEGACY_TEMPLATE_KEY = 'template:current';
+function templateKey(restaurant = DEFAULT_RESTAURANT) {
+    return `r:${restaurant}:template:current`;
+}
+async function readTemplateRaw(env, restaurant) {
+    const raw = await env.SCHEDULES.get(templateKey(restaurant));
+    if (raw)
+        return raw;
+    if (restaurant === DEFAULT_RESTAURANT) {
+        return await env.SCHEDULES.get(LEGACY_TEMPLATE_KEY);
+    }
+    return null;
+}
 const MAX_SLOTS_PER_DAY = 20;
 const MAX_LABEL_CHARS = 60;
 function isValidStoredTemplateSlot(value) {
@@ -545,18 +600,21 @@ export default {
             return json({ weeks }, 200, request, env);
         }
         if (request.method === 'GET' && path === '/api/schedule') {
+            const restaurant = restaurantFromUrl(url);
+            if (!restaurant)
+                return json({ error: 'invalid_restaurant' }, 400, request, env);
             const month = url.searchParams.get('month') ?? '';
             if (!MONTH_RE.test(month))
                 return json({ error: 'invalid_month' }, 400, request, env);
             const knownRaw = url.searchParams.get('knownRev') ?? '';
             const knownRev = /^\d+$/.test(knownRaw) ? Number.parseInt(knownRaw, 10) : 0;
-            const rev = await readGoldenMonthRev(env, month);
+            const rev = await readGoldenMonthRev(env, month, restaurant);
             if (knownRev > 0 && rev > 0 && rev === knownRev) {
                 return json({ weeks: [], rev, notModified: true }, 200, request, env, { 'Cache-Control': 'no-store' });
             }
             const weeks = [];
             for (const weekStart of goldenWeeksForMonth(month)) {
-                const raw = await env.SCHEDULES.get(goldenKey(weekStart));
+                const raw = await readGoldenDoc(env, restaurant, weekStart);
                 if (!raw)
                     continue;
                 let parsed;
@@ -577,9 +635,12 @@ export default {
         const goldenMatch = path.match(/^\/api\/schedule\/(\d{4}-\d{2}-\d{2})$/);
         if (goldenMatch) {
             const weekStart = goldenMatch[1];
-            const key = goldenKey(weekStart);
+            const restaurant = restaurantFromUrl(url);
+            if (!restaurant)
+                return json({ error: 'invalid_restaurant' }, 400, request, env);
+            const key = goldenKey(weekStart, restaurant);
             if (request.method === 'GET') {
-                const raw = await env.SCHEDULES.get(key);
+                const raw = await readGoldenDoc(env, restaurant, weekStart);
                 if (!raw)
                     return json({ error: 'not_found' }, 404, request, env);
                 let parsed;
@@ -621,7 +682,7 @@ export default {
                 if (!valid || !templateHash || valid.week.weekStart !== weekStart) {
                     return json({ error: 'invalid_body' }, 400, request, env);
                 }
-                const existing = await env.SCHEDULES.get(key);
+                const existing = await readGoldenDoc(env, restaurant, weekStart);
                 if (!existing) {
                     if (valid.baseRev !== 0)
                         return json({ error: 'conflict', rev: 0 }, 409, request, env);
@@ -635,7 +696,7 @@ export default {
                         updatedAt: new Date().toISOString(),
                     };
                     await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
-                    await bumpGoldenMonthRevs(env, weekStart);
+                    await bumpGoldenMonthRevs(env, weekStart, restaurant);
                     return json({ rev: next.rev, updatedAt: next.updatedAt }, 201, request, env);
                 }
                 let parsed;
@@ -660,13 +721,16 @@ export default {
                     updatedAt: new Date().toISOString(),
                 };
                 await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
-                await bumpGoldenMonthRevs(env, weekStart);
+                await bumpGoldenMonthRevs(env, weekStart, restaurant);
                 return json({ rev: next.rev, updatedAt: next.updatedAt }, 200, request, env);
             }
         }
         if (path === '/api/employees') {
+            const restaurant = restaurantFromUrl(url);
+            if (!restaurant)
+                return json({ error: 'invalid_restaurant' }, 400, request, env);
             if (request.method === 'GET') {
-                const raw = await env.SCHEDULES.get(ROSTER_KEY);
+                const raw = await readRosterRaw(env, restaurant);
                 const doc = raw ? normalizeRosterDoc(JSON.parse(raw)) : null;
                 return json({ employees: doc?.employees ?? [], rev: doc?.rev ?? 0, updatedAt: doc?.updatedAt ?? null }, 200, request, env, { 'Cache-Control': 'no-store' });
             }
@@ -688,7 +752,7 @@ export default {
                 const valid = validateRosterBody(body);
                 if (!valid)
                     return json({ error: 'invalid_body' }, 400, request, env);
-                const existingRaw = await env.SCHEDULES.get(ROSTER_KEY);
+                const existingRaw = await readRosterRaw(env, restaurant);
                 let currentRev = 0;
                 let currentUpdatedAt;
                 if (existingRaw) {
@@ -712,13 +776,16 @@ export default {
                     employees: valid.employees,
                     updatedAt: new Date().toISOString(),
                 };
-                await env.SCHEDULES.put(ROSTER_KEY, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
+                await env.SCHEDULES.put(rosterKey(restaurant), JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
                 return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env);
             }
         }
         if (path === '/api/template') {
+            const restaurant = restaurantFromUrl(url);
+            if (!restaurant)
+                return json({ error: 'invalid_restaurant' }, 400, request, env);
             if (request.method === 'GET') {
-                const raw = await env.SCHEDULES.get(TEMPLATE_KEY);
+                const raw = await readTemplateRaw(env, restaurant);
                 const doc = raw ? normalizeTemplateDoc(JSON.parse(raw)) : null;
                 return json({ template: doc?.template ?? null, rev: doc?.rev ?? 0, updatedAt: doc?.updatedAt ?? null }, 200, request, env, { 'Cache-Control': 'no-store' });
             }
@@ -740,7 +807,7 @@ export default {
                 const valid = validateTemplateBody(body);
                 if (!valid)
                     return json({ error: 'invalid_body' }, 400, request, env);
-                const existingRaw = await env.SCHEDULES.get(TEMPLATE_KEY);
+                const existingRaw = await readTemplateRaw(env, restaurant);
                 let currentRev = 0;
                 let currentUpdatedAt;
                 if (existingRaw) {
@@ -764,7 +831,7 @@ export default {
                     template: valid.template,
                     updatedAt: new Date().toISOString(),
                 };
-                await env.SCHEDULES.put(TEMPLATE_KEY, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
+                await env.SCHEDULES.put(templateKey(restaurant), JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
                 return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env);
             }
         }

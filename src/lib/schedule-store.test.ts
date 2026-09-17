@@ -31,6 +31,7 @@ const goldenWeek = {
 test('fetchGoldenWeek returns null on 404 and the doc on 200', async () => {
   let restore = mockFetchOnce((url) => {
     assert.ok(url.endsWith('/api/schedule/2026-09-13'))
+    assert.ok(!url.includes('restaurant='))
     return { status: 404, payload: { error: 'not_found' } }
   })
   try {
@@ -47,6 +48,20 @@ test('fetchGoldenWeek returns null on 404 and the doc on 200', async () => {
     const doc = await fetchGoldenWeek('2026-09-13')
     assert.equal(doc?.rev, 2)
     assert.deepEqual(doc?.week.people, ['Mary'])
+  } finally {
+    restore()
+  }
+
+  restore = mockFetchOnce((url) => {
+    assert.ok(url.includes('/api/schedule/2026-09-13?restaurant=CR3-kitchen'))
+    return {
+      status: 200,
+      payload: { v: 3, weekStart: '2026-09-13', rev: 1, week: goldenWeek, visible: true, templateHash: 'a1b2', updatedAt: 'x' },
+    }
+  })
+  try {
+    const doc = await fetchGoldenWeek('2026-09-13', 'CR3-kitchen')
+    assert.equal(doc?.rev, 1)
   } finally {
     restore()
   }
@@ -102,6 +117,36 @@ test('fetchGoldenMonth sends knownRev and honors notModified', async () => {
   })
   try {
     assert.deepEqual(await fetchGoldenMonth('2026-09', 3), { weeks: [], rev: 3, notModified: true })
+  } finally {
+    restore()
+  }
+})
+
+test('golden reads and saves scope to the restaurant query param', async () => {
+  let restore = mockFetchOnce((url) => {
+    assert.ok(url.includes('/api/schedule?month=2026-09&restaurant=CR2-kitchen'))
+    return { status: 200, payload: { weeks: [], rev: 0, notModified: false } }
+  })
+  try {
+    assert.deepEqual(await fetchGoldenMonth('2026-09', 0, 'CR2-kitchen'), { weeks: [], rev: 0, notModified: false })
+  } finally {
+    restore()
+  }
+
+  restore = mockFetchOnce((url) => {
+    assert.ok(url.endsWith('/api/schedule/2026-09-13?restaurant=CR2-diningroom'))
+    return { status: 201, payload: { rev: 1 } }
+  })
+  try {
+    assert.deepEqual(
+      await saveGoldenWeek(
+        '2026-09-13',
+        { week: goldenWeek, templateHash: 'a1b2c3d4', visible: true, baseRev: 0 },
+        'manager-token',
+        'CR2-diningroom',
+      ),
+      { rev: 1 },
+    )
   } finally {
     restore()
   }

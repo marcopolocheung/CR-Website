@@ -40,6 +40,26 @@ const MAX_BODY_CHARS = 20000
 const DOC_TTL_SECONDS = 31536000
 const WRITE_LIMIT_PER_HOUR = 60
 
+export const RESTAURANTS = ['CR3-diningroom', 'CR3-kitchen', 'CR2-kitchen', 'CR2-diningroom'] as const
+
+export type RestaurantId = (typeof RESTAURANTS)[number]
+
+export const DEFAULT_RESTAURANT: RestaurantId = 'CR3-diningroom'
+
+const RESTAURANT_RE = /^[A-Za-z0-9-]{2,40}$/
+
+export function isValidRestaurant(value: unknown): value is RestaurantId {
+  return typeof value === 'string' && (RESTAURANTS as readonly string[]).includes(value)
+}
+
+/** Query `?restaurant=` → validated id, default when omitted, null when invalid. */
+export function restaurantFromUrl(url: URL): RestaurantId | null {
+  const raw = url.searchParams.get('restaurant')
+  if (raw === null || raw === '') return DEFAULT_RESTAURANT
+  if (!RESTAURANT_RE.test(raw) || !isValidRestaurant(raw)) return null
+  return raw
+}
+
 export function isValidId(id: string): boolean {
   return ID_RE.test(id)
 }
@@ -145,11 +165,19 @@ const MAX_NAME_CHARS = 80
 const MAX_TITLE_CHARS = 120
 const MAX_SLOTS = 200
 
-export function goldenKey(weekStart: string): string {
+export function goldenKey(weekStart: string, restaurant: string = DEFAULT_RESTAURANT): string {
+  return `r:${restaurant}:golden:${weekStart}`
+}
+
+export function legacyGoldenKey(weekStart: string): string {
   return `golden:${weekStart}`
 }
 
-export function goldenMonthRevKey(monthKey: string): string {
+export function goldenMonthRevKey(monthKey: string, restaurant: string = DEFAULT_RESTAURANT): string {
+  return `r:${restaurant}:golden:month-rev:${monthKey}`
+}
+
+export function legacyGoldenMonthRevKey(monthKey: string): string {
   return `golden:month-rev:${monthKey}`
 }
 
@@ -164,9 +192,9 @@ export function goldenMonthsForWeek(weekStart: string): string[] {
   return [...new Set([weekStart.slice(0, 7), shiftGoldenDate(weekStart, 6).slice(0, 7)])]
 }
 
-export async function readGoldenMonthRev(env: Env, monthKey: string): Promise<number> {
+export async function readGoldenMonthRev(env: Env, monthKey: string, restaurant: string = DEFAULT_RESTAURANT): Promise<number> {
   try {
-    const raw = await env.SCHEDULES.get(goldenMonthRevKey(monthKey))
+    const raw = await env.SCHEDULES.get(goldenMonthRevKey(monthKey, restaurant))
     const rev = raw ? Number.parseInt(raw, 10) : 0
     return Number.isInteger(rev) && rev > 0 ? rev : 0
   } catch {
@@ -174,15 +202,25 @@ export async function readGoldenMonthRev(env: Env, monthKey: string): Promise<nu
   }
 }
 
-async function bumpGoldenMonthRevs(env: Env, weekStart: string): Promise<void> {
+async function bumpGoldenMonthRevs(env: Env, weekStart: string, restaurant: string = DEFAULT_RESTAURANT): Promise<void> {
   for (const month of goldenMonthsForWeek(weekStart)) {
-    const rev = await readGoldenMonthRev(env, month)
+    const rev = await readGoldenMonthRev(env, month, restaurant)
     try {
-      await env.SCHEDULES.put(goldenMonthRevKey(month), String(rev + 1), { expirationTtl: DOC_TTL_SECONDS })
+      await env.SCHEDULES.put(goldenMonthRevKey(month, restaurant), String(rev + 1), { expirationTtl: DOC_TTL_SECONDS })
     } catch {
       return
     }
   }
+}
+
+async function readGoldenDoc(env: Env, restaurant: string, weekStart: string): Promise<string | null> {
+  const raw = await env.SCHEDULES.get(goldenKey(weekStart, restaurant))
+  if (raw) return raw
+  // Migration fallback: pre-partition data lives under legacy keys and belongs to the default restaurant.
+  if (restaurant === DEFAULT_RESTAURANT) {
+    return await env.SCHEDULES.get(legacyGoldenKey(weekStart))
+  }
+  return null
 }
 
 export function validateGoldenWeekBody(
@@ -271,7 +309,20 @@ export function goldenWeeksForMonth(monthKey: string): string[] {
 
 // --- Employee roster (one persistent staff list, edited by scheduler-demo) ---
 
-const ROSTER_KEY = 'roster:current'
+const LEGACY_ROSTER_KEY = 'roster:current'
+
+function rosterKey(restaurant: string = DEFAULT_RESTAURANT): string {
+  return `r:${restaurant}:roster:current`
+}
+
+async function readRosterRaw(env: Env, restaurant: string): Promise<string | null> {
+  const raw = await env.SCHEDULES.get(rosterKey(restaurant))
+  if (raw) return raw
+  if (restaurant === DEFAULT_RESTAURANT) {
+    return await env.SCHEDULES.get(LEGACY_ROSTER_KEY)
+  }
+  return null
+}
 const ROSTER_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const ROSTER_ROLES = ['server', 'cashier', 'lead', 'manager']
 const MAX_EMPLOYEES = 100
@@ -387,7 +438,20 @@ export function normalizeRosterDoc(raw: unknown): RosterDoc | null {
 
 // --- Staffing template (one persistent set of weekly shift rules, edited by scheduler-demo) ---
 
-const TEMPLATE_KEY = 'template:current'
+const LEGACY_TEMPLATE_KEY = 'template:current'
+
+function templateKey(restaurant: string = DEFAULT_RESTAURANT): string {
+  return `r:${restaurant}:template:current`
+}
+
+async function readTemplateRaw(env: Env, restaurant: string): Promise<string | null> {
+  const raw = await env.SCHEDULES.get(templateKey(restaurant))
+  if (raw) return raw
+  if (restaurant === DEFAULT_RESTAURANT) {
+    return await env.SCHEDULES.get(LEGACY_TEMPLATE_KEY)
+  }
+  return null
+}
 const MAX_SLOTS_PER_DAY = 20
 const MAX_LABEL_CHARS = 60
 
@@ -616,17 +680,19 @@ export default {
     }
 
     if (request.method === 'GET' && path === '/api/schedule') {
+      const restaurant = restaurantFromUrl(url)
+      if (!restaurant) return json({ error: 'invalid_restaurant' }, 400, request, env)
       const month = url.searchParams.get('month') ?? ''
       if (!MONTH_RE.test(month)) return json({ error: 'invalid_month' }, 400, request, env)
       const knownRaw = url.searchParams.get('knownRev') ?? ''
       const knownRev = /^\d+$/.test(knownRaw) ? Number.parseInt(knownRaw, 10) : 0
-      const rev = await readGoldenMonthRev(env, month)
+      const rev = await readGoldenMonthRev(env, month, restaurant)
       if (knownRev > 0 && rev > 0 && rev === knownRev) {
         return json({ weeks: [], rev, notModified: true }, 200, request, env, { 'Cache-Control': 'no-store' })
       }
       const weeks: GoldenWeekDoc[] = []
       for (const weekStart of goldenWeeksForMonth(month)) {
-        const raw = await env.SCHEDULES.get(goldenKey(weekStart))
+        const raw = await readGoldenDoc(env, restaurant, weekStart)
         if (!raw) continue
         let parsed: unknown
         try {
@@ -645,10 +711,12 @@ export default {
     const goldenMatch = path.match(/^\/api\/schedule\/(\d{4}-\d{2}-\d{2})$/)
     if (goldenMatch) {
       const weekStart = goldenMatch[1]
-      const key = goldenKey(weekStart)
+      const restaurant = restaurantFromUrl(url)
+      if (!restaurant) return json({ error: 'invalid_restaurant' }, 400, request, env)
+      const key = goldenKey(weekStart, restaurant)
 
       if (request.method === 'GET') {
-        const raw = await env.SCHEDULES.get(key)
+        const raw = await readGoldenDoc(env, restaurant, weekStart)
         if (!raw) return json({ error: 'not_found' }, 404, request, env)
         let parsed: unknown
         try {
@@ -685,7 +753,7 @@ export default {
         if (!valid || !templateHash || valid.week.weekStart !== weekStart) {
           return json({ error: 'invalid_body' }, 400, request, env)
         }
-        const existing = await env.SCHEDULES.get(key)
+        const existing = await readGoldenDoc(env, restaurant, weekStart)
         if (!existing) {
           if (valid.baseRev !== 0) return json({ error: 'conflict', rev: 0 }, 409, request, env)
           const next: GoldenWeekDoc = {
@@ -698,7 +766,7 @@ export default {
             updatedAt: new Date().toISOString(),
           }
           await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
-          await bumpGoldenMonthRevs(env, weekStart)
+          await bumpGoldenMonthRevs(env, weekStart, restaurant)
           return json({ rev: next.rev, updatedAt: next.updatedAt }, 201, request, env)
         }
         let parsed: unknown
@@ -721,14 +789,16 @@ export default {
           updatedAt: new Date().toISOString(),
         }
         await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
-        await bumpGoldenMonthRevs(env, weekStart)
+        await bumpGoldenMonthRevs(env, weekStart, restaurant)
         return json({ rev: next.rev, updatedAt: next.updatedAt }, 200, request, env)
       }
     }
 
     if (path === '/api/employees') {
+      const restaurant = restaurantFromUrl(url)
+      if (!restaurant) return json({ error: 'invalid_restaurant' }, 400, request, env)
       if (request.method === 'GET') {
-        const raw = await env.SCHEDULES.get(ROSTER_KEY)
+        const raw = await readRosterRaw(env, restaurant)
         const doc = raw ? normalizeRosterDoc(JSON.parse(raw)) : null
         return json(
           { employees: doc?.employees ?? [], rev: doc?.rev ?? 0, updatedAt: doc?.updatedAt ?? null },
@@ -753,7 +823,7 @@ export default {
         }
         const valid = validateRosterBody(body)
         if (!valid) return json({ error: 'invalid_body' }, 400, request, env)
-        const existingRaw = await env.SCHEDULES.get(ROSTER_KEY)
+        const existingRaw = await readRosterRaw(env, restaurant)
         let currentRev = 0
         let currentUpdatedAt: string | undefined
         if (existingRaw) {
@@ -776,14 +846,16 @@ export default {
           employees: valid.employees,
           updatedAt: new Date().toISOString(),
         }
-        await env.SCHEDULES.put(ROSTER_KEY, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
+        await env.SCHEDULES.put(rosterKey(restaurant), JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
         return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env)
       }
     }
 
     if (path === '/api/template') {
+      const restaurant = restaurantFromUrl(url)
+      if (!restaurant) return json({ error: 'invalid_restaurant' }, 400, request, env)
       if (request.method === 'GET') {
-        const raw = await env.SCHEDULES.get(TEMPLATE_KEY)
+        const raw = await readTemplateRaw(env, restaurant)
         const doc = raw ? normalizeTemplateDoc(JSON.parse(raw)) : null
         return json(
           { template: doc?.template ?? null, rev: doc?.rev ?? 0, updatedAt: doc?.updatedAt ?? null },
@@ -808,7 +880,7 @@ export default {
         }
         const valid = validateTemplateBody(body)
         if (!valid) return json({ error: 'invalid_body' }, 400, request, env)
-        const existingRaw = await env.SCHEDULES.get(TEMPLATE_KEY)
+        const existingRaw = await readTemplateRaw(env, restaurant)
         let currentRev = 0
         let currentUpdatedAt: string | undefined
         if (existingRaw) {
@@ -831,7 +903,7 @@ export default {
           template: valid.template,
           updatedAt: new Date().toISOString(),
         }
-        await env.SCHEDULES.put(TEMPLATE_KEY, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
+        await env.SCHEDULES.put(templateKey(restaurant), JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
         return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env)
       }
     }

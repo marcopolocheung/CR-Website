@@ -4,7 +4,9 @@ import handler, {
   goldenMonthsForWeek,
   goldenWeeksForMonth,
   isValidId,
+  isValidRestaurant,
   newShareId,
+  restaurantFromUrl,
   validateGoldenWeekBody,
   validatePublishBody,
   validateRosterBody,
@@ -455,4 +457,106 @@ test('visibility can toggle without re-encrypting', async () => {
   assert.equal(doc.ciphertext, 'payloadOne')
   assert.equal(doc.visible, false)
   assert.equal(doc.rev, 2)
+})
+
+test('restaurant ids validate and default when omitted', () => {
+  assert.equal(isValidRestaurant('CR3-diningroom'), true)
+  assert.equal(isValidRestaurant('CR3-kitchen'), true)
+  assert.equal(isValidRestaurant('CR2-kitchen'), true)
+  assert.equal(isValidRestaurant('CR2-diningroom'), true)
+  assert.equal(isValidRestaurant('nope'), false)
+  assert.equal(isValidRestaurant(''), false)
+  assert.equal(restaurantFromUrl(new URL('https://api.test/api/employees')), 'CR3-diningroom')
+  assert.equal(restaurantFromUrl(new URL('https://api.test/api/employees?restaurant=CR3-kitchen')), 'CR3-kitchen')
+  assert.equal(restaurantFromUrl(new URL('https://api.test/api/employees?restaurant=nope')), null)
+})
+
+test('invalid restaurant ids fail closed', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(new Request('https://api.test/api/employees?restaurant=nope'), env)).status, 400)
+  assert.equal((await handler.fetch(new Request('https://api.test/api/template?restaurant=nope'), env)).status, 400)
+  assert.equal((await handler.fetch(new Request('https://api.test/api/schedule?month=2026-09&restaurant=nope'), env)).status, 400)
+  assert.equal((await handler.fetch(new Request('https://api.test/api/schedule/2026-09-13?restaurant=nope'), env)).status, 400)
+})
+
+test('rosters are isolated per restaurant', async () => {
+  const env = mockEnv()
+  const dining = { employees: [rosterEmployee()], baseRev: 0 }
+  const created = await handler.fetch(rosterPut(dining), env)
+  assert.equal(created.status, 201)
+
+  const otherPut = new Request('https://api.test/api/employees?restaurant=CR3-kitchen', {
+    method: 'PUT',
+    headers: { Authorization: 'Bearer manager-token' },
+    body: JSON.stringify(dining),
+  })
+  const createdOther = await handler.fetch(otherPut, env)
+  assert.equal(createdOther.status, 201)
+
+  const fetchedDefault = await handler.fetch(new Request('https://api.test/api/employees'), env)
+  const defaultDoc = (await fetchedDefault.json()) as { rev: number }
+  assert.equal(defaultDoc.rev, 1)
+
+  const fetchedOther = await handler.fetch(new Request('https://api.test/api/employees?restaurant=CR3-kitchen'), env)
+  const otherDoc = (await fetchedOther.json()) as { rev: number }
+  assert.equal(otherDoc.rev, 1)
+
+  // Deleting in one station does not touch the other.
+  const deleted = await handler.fetch(rosterPut({ employees: [], baseRev: 1 }), env)
+  assert.equal(deleted.status, 200)
+  const afterOther = await handler.fetch(new Request('https://api.test/api/employees?restaurant=CR3-kitchen'), env)
+  const afterOtherDoc = (await afterOther.json()) as { employees: unknown[] }
+  assert.equal(afterOtherDoc.employees.length, 1)
+})
+
+test('golden weeks and month revs are isolated per restaurant', async () => {
+  const env = mockEnv()
+  await handler.fetch(
+    goldenPut('2026-09-13', { week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }),
+    env,
+  )
+  const otherGoldenPut = new Request('https://api.test/api/schedule/2026-09-13?restaurant=CR2-kitchen', {
+    method: 'PUT',
+    headers: { Authorization: 'Bearer manager-token' },
+    body: JSON.stringify({ week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }),
+  })
+  await handler.fetch(otherGoldenPut, env)
+
+  const listedDefault = await handler.fetch(new Request('https://api.test/api/schedule?month=2026-09'), env)
+  const defaultMonth = (await listedDefault.json()) as { rev: number; weeks: unknown[] }
+  assert.equal(defaultMonth.rev, 1)
+  assert.equal(defaultMonth.weeks.length, 1)
+
+  const listedOther = await handler.fetch(new Request('https://api.test/api/schedule?month=2026-09&restaurant=CR2-kitchen'), env)
+  const otherMonth = (await listedOther.json()) as { rev: number; weeks: unknown[] }
+  assert.equal(otherMonth.rev, 1)
+  assert.equal(otherMonth.weeks.length, 1)
+
+  const missing = await handler.fetch(new Request('https://api.test/api/schedule/2026-09-13?restaurant=CR2-diningroom'), env)
+  assert.equal(missing.status, 404)
+})
+
+test('legacy singleton docs fall back to the default restaurant only', async () => {
+  const data = new Map<string, string>()
+  data.set('roster:current', JSON.stringify({ v: 1, rev: 1, employees: [rosterEmployee()], updatedAt: 'x' }))
+  data.set('template:current', JSON.stringify({ v: 1, rev: 1, template: templatePayload(), updatedAt: 'x' }))
+  const env = {
+    SCHEDULES: {
+      async get(key: string) {
+        return data.get(key) ?? null
+      },
+      async put(key: string, value: string) {
+        data.set(key, value)
+      },
+    },
+    SCHEDULE_WRITE_TOKEN: 'manager-token',
+  }
+  const rosterDefault = await handler.fetch(new Request('https://api.test/api/employees'), env)
+  assert.equal(((await rosterDefault.json()) as { rev: number }).rev, 1)
+  const rosterOther = await handler.fetch(new Request('https://api.test/api/employees?restaurant=CR3-kitchen'), env)
+  assert.equal(((await rosterOther.json()) as { rev: number }).rev, 0)
+  const templateDefault = await handler.fetch(new Request('https://api.test/api/template'), env)
+  assert.equal(((await templateDefault.json()) as { rev: number }).rev, 1)
+  const templateOther = await handler.fetch(new Request('https://api.test/api/template?restaurant=CR2-kitchen'), env)
+  assert.equal(((await templateOther.json()) as { rev: number }).rev, 0)
 })

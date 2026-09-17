@@ -11,12 +11,14 @@ export default function RosterPanel({
   dirty,
   onSaved,
   onClose,
+  restaurantId,
 }: {
   employees: Employee[]
   rev: number
   dirty: boolean
   onSaved: (rev: number) => void
   onClose: () => void
+  restaurantId?: string
 }) {
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
@@ -30,7 +32,7 @@ export default function RosterPanel({
     setError('')
     setNotice('')
     try {
-      const result = await saveRoster(employees, rev, token)
+      const result = await saveRoster(employees, rev, token, restaurantId)
       setToken('')
       setNotice('Saved. This staff list is now what everyone editing the scheduler starts from.')
       onSaved(result.rev)

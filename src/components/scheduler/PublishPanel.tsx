@@ -18,10 +18,10 @@ function canonicalWeek(week: { weekStart: string; people: string[]; slotPeople: 
 
 const scheduleChannelName = 'chinarose-schedule'
 
-function broadcastSave(weekStart: string) {
+function broadcastSave(weekStart: string, restaurantId?: string) {
   try {
     const channel = new BroadcastChannel(scheduleChannelName)
-    channel.postMessage({ type: 'golden-saved', weekStart })
+    channel.postMessage({ type: 'golden-saved', weekStart, restaurantId })
     channel.close()
   } catch {
     return
@@ -37,6 +37,7 @@ export default function PublishPanel({
   visible,
   onVisibilityChange,
   onClose,
+  restaurantId,
 }: {
   weekStart: string
   weekLabel: string
@@ -46,6 +47,7 @@ export default function PublishPanel({
   visible: boolean
   onVisibilityChange: (status: WeekStatus) => void
   onClose: () => void
+  restaurantId?: string
 }) {
   const [name, setName] = useState(`Week of ${weekLabel}`)
   const [token, setToken] = useState('')
@@ -63,8 +65,10 @@ export default function PublishPanel({
 
   useEffect(() => {
     const base = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
-    setScheduleUrl(`${window.location.origin}${base}/schedule`)
-  }, [])
+    setScheduleUrl(
+      restaurantId ? `${window.location.origin}${base}/schedule/${restaurantId}` : `${window.location.origin}${base}/schedule`,
+    )
+  }, [restaurantId])
 
   const week = useMemo(
     () => buildPublishedWeek({ weekStart, name, slots, employees, assignments }),
@@ -85,7 +89,7 @@ export default function PublishPanel({
     tokenInputRef.current?.focus()
     let cancelled = false
     setLoading(true)
-    fetchGoldenWeek(weekStart)
+    fetchGoldenWeek(weekStart, restaurantId)
       .then((doc) => {
         if (cancelled || !doc) return
         setBaseRev(doc.rev)
@@ -104,7 +108,7 @@ export default function PublishPanel({
     return () => {
       cancelled = true
     }
-  }, [weekStart, weekLabel])
+  }, [weekStart, weekLabel, restaurantId])
 
   async function save() {
     if (filled === 0 || !token || busy) return
@@ -116,11 +120,12 @@ export default function PublishPanel({
         weekStart,
         { week, templateHash: templateHashForSlots(slots), visible, baseRev: baseRev ?? 0 },
         token,
+        restaurantId,
       )
       setBaseRev(result.rev)
       setServerFingerprint(fingerprint)
       setServerVisible(visible)
-      broadcastSave(weekStart)
+      broadcastSave(weekStart, restaurantId)
       setToken('')
       setNotice(
         visible

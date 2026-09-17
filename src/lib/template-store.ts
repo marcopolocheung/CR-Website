@@ -13,8 +13,9 @@ export type TemplateDoc = {
   updatedAt: string | null
 }
 
-export async function fetchTemplate(): Promise<TemplateDoc> {
-  const { status, body } = await requestJson('/api/template')
+export async function fetchTemplate(restaurantId?: string): Promise<TemplateDoc> {
+  const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
+  const { status, body } = await requestJson(`/api/template${suffix}`)
   if (status === 200 && body && typeof body === 'object' && 'template' in body) {
     const { template, rev, updatedAt } = body as { template: unknown; rev: unknown; updatedAt: unknown }
     if (template === null || isValidTemplate(template)) {
@@ -28,8 +29,14 @@ export async function fetchTemplate(): Promise<TemplateDoc> {
   throw new StoreUnavailableError()
 }
 
-export async function saveTemplate(template: WeeklyStaffingTemplate, baseRev: number, token: string): Promise<{ rev: number }> {
-  const { status, body } = await requestJson('/api/template', {
+export async function saveTemplate(
+  template: WeeklyStaffingTemplate,
+  baseRev: number,
+  token: string,
+  restaurantId?: string,
+): Promise<{ rev: number }> {
+  const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
+  const { status, body } = await requestJson(`/api/template${suffix}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ template, baseRev }),

@@ -666,7 +666,7 @@ function buildFixIssues(
   return issues
 }
 
-export default function SchedulerDemo() {
+export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
   const [employees, setEmployees] = useState<Employee[]>(cloneEmployees)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
@@ -824,8 +824,23 @@ export default function SchedulerDemo() {
   }, [])
 
   useEffect(() => {
+    setEmployees(cloneEmployees())
+    setTemplate(cloneTemplate())
+    setWeeks({})
+    setGeneratedWeeks({})
+    setWeekStatus({})
+    setDiagnostics([])
+    setIgnoredIssueIds([])
+    setGuidedChoosing(false)
+    setSharing(false)
+  }, [restaurantId])
+
+  useEffect(() => {
     let cancelled = false
-    fetchRoster()
+    setRosterLoadError('')
+    setRosterServerSnapshot(null)
+    setRosterRev(0)
+    fetchRoster(restaurantId)
       .then((doc) => {
         if (cancelled) return
         if (doc.rev > 0) {
@@ -842,11 +857,14 @@ export default function SchedulerDemo() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [restaurantId])
 
   useEffect(() => {
     let cancelled = false
-    fetchTemplate()
+    setTemplateLoadError('')
+    setTemplateServerSnapshot(null)
+    setTemplateRev(0)
+    fetchTemplate(restaurantId)
       .then((doc) => {
         if (cancelled) return
         if (doc.rev > 0 && doc.template) {
@@ -863,7 +881,7 @@ export default function SchedulerDemo() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [restaurantId])
 
   function dismissOnboarding() {
     setOnboardingDismissed(true)
@@ -1074,7 +1092,7 @@ export default function SchedulerDemo() {
     // similarWeek should anchor to the week before this one, not to whatever is on screen.
     const previousAssignments = variant === 'similarWeek' ? weeks[shiftWeek(weekStart, -1)] ?? assignments : assignments
     const result = generateSchedule(
-      { employees, template: seedTemplate },
+      { employees, template },
       {
         strategy: variant,
         referenceAssignments: previousAssignments,
@@ -1135,6 +1153,19 @@ export default function SchedulerDemo() {
     setGuidedChoosing(false)
     setDiagnostics(['Schedule rules restored to the built-in defaults. Save to keep them — Undo brings back your rules.'])
   }
+
+  function startBlankStation() {
+    remember('started blank station')
+    setEmployees([])
+    setWeeks({})
+    setGeneratedWeeks({})
+    setWeekStatus({})
+    setIgnoredIssueIds([])
+    setGuidedChoosing(false)
+    setDiagnostics(['Blank station ready. Add employees below, then save the staff list to keep it.'])
+  }
+
+  const isNewStation = rosterRev === 0 && templateRev === 0
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
     remember('changed one assignment')
@@ -1282,7 +1313,9 @@ export default function SchedulerDemo() {
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex w-full max-w-none flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Scheduler demo</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+              Scheduler demo{restaurantId ? ` · ${restaurantId}` : ''}
+            </p>
             <h1 className="text-2xl font-bold md:text-3xl">Weekly staff schedule</h1>
             {onWeeksCount > 0 && (
               <p className="mt-1 text-sm text-zinc-600">
@@ -1376,6 +1409,32 @@ export default function SchedulerDemo() {
             <OnboardingBanner activeEmployeeCount={activeEmployeeCount} onDismiss={dismissOnboarding} />
           )}
 
+          {isNewStation && (
+            <section className="rounded-lg border border-sky-300 bg-sky-50 p-4 shadow-sm print:hidden">
+              <h2 className="text-sm font-semibold text-sky-950">New station — start from the China Rose template or blank</h2>
+              <p className="mt-1 text-sm text-sky-900">
+                Nothing is saved for{restaurantId ? ` ${restaurantId}` : ' this station'} yet. The list below is the built-in
+                template so you have something to work from. Save to keep it, or start blank.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded border border-sky-700 bg-sky-700 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
+                  onClick={() => setDiagnostics(['Template ready — review the staff list, then save the staff list and rules to keep them.'])}
+                >
+                  Keep template
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={startBlankStation}
+                >
+                  Start blank
+                </button>
+              </div>
+            </section>
+          )}
+
           {sharing && weekStart && (
             <PublishPanel
               weekStart={weekStart}
@@ -1386,6 +1445,7 @@ export default function SchedulerDemo() {
               visible={weekVisibility === 'on'}
               onVisibilityChange={(status) => setWeekVisibility(weekStart, status)}
               onClose={() => setSharing(false)}
+              restaurantId={restaurantId}
             />
           )}
 
@@ -1565,6 +1625,7 @@ export default function SchedulerDemo() {
                 setTemplateServerSnapshot(templateFingerprint(template))
               }}
               onClosePanel={() => setTemplatePanelOpen(false)}
+              restaurantId={restaurantId}
             />
 
           <Disclosure summary="About this demo" tone="quiet">
@@ -1621,6 +1682,7 @@ export default function SchedulerDemo() {
                   setRosterServerSnapshot(rosterFingerprint(employees))
                 }}
                 onClose={() => setRosterPanelOpen(false)}
+                restaurantId={restaurantId}
               />
             )}
 
@@ -2432,6 +2494,7 @@ function TemplateEditor({
   onTogglePanel,
   onSaved,
   onClosePanel,
+  restaurantId,
 }: {
   template: WeeklyStaffingTemplate
   onChange: (template: WeeklyStaffingTemplate) => void
@@ -2444,6 +2507,7 @@ function TemplateEditor({
   onTogglePanel: () => void
   onSaved: (rev: number) => void
   onClosePanel: () => void
+  restaurantId?: string
 }) {
   function updateDay(day: DayOfWeek, daySlots: StaffingTemplateSlot[]) {
     onChange({ ...template, [day]: daySlots })
@@ -2491,7 +2555,7 @@ function TemplateEditor({
       {loadError && <p className="mt-2 text-xs font-medium text-amber-800">{loadError}</p>}
       {panelOpen && (
         <div className="mt-2">
-          <TemplatePanel template={template} rev={rev} dirty={dirty} onSaved={onSaved} onClose={onClosePanel} />
+          <TemplatePanel template={template} rev={rev} dirty={dirty} onSaved={onSaved} onClose={onClosePanel} restaurantId={restaurantId} />
         </div>
       )}
       <div className="mt-3 space-y-3">
