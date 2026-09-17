@@ -41,6 +41,7 @@ export default function PublishPanel({
   onVisibilityChange,
   onClose,
   restaurantId,
+  restaurantName,
   template,
   rosterRev,
   templateRev,
@@ -65,6 +66,7 @@ export default function PublishPanel({
   templateDirty?: boolean
   onRosterSaved?: (rev: number, updatedAt: string | null) => void
   onTemplateSaved?: (rev: number, updatedAt: string | null) => void
+  restaurantName?: string
 }) {
   const [name, setName] = useState(`Week of ${weekLabel}`)
   const [token, setToken] = useState('')
@@ -223,7 +225,7 @@ export default function PublishPanel({
     <section className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm print:hidden">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Publish {weekLabel} to /schedule</h2>
+          <h2 className="text-lg font-semibold">Publish {weekLabel}{restaurantName ? ` for ${restaurantName}` : ''} to /schedule</h2>
           <p className="mt-1 text-sm text-zinc-600">
             {filled} filled spot{filled === 1 ? '' : 's'} will be included. One schedule, no links or codes.
             Last published: {baseRev === null ? 'never' : formatUpdatedAt(serverUpdatedAt)}.
