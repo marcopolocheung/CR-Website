@@ -237,6 +237,21 @@ function availabilitySummary(employee: Employee) {
   const daysAvailable = DAYS.filter((day) => (employee.recurringAvailability[day]?.length ?? 0) > 0)
   if (daysAvailable.length === 0) return 'No availability set'
   const ranges = daysAvailable.flatMap((day) => employee.recurringAvailability[day] ?? [])
+  const uniqueRanges = new Set(ranges.map((range) => `${range.start}-${range.end}`))
+  // Uniform custom hours (e.g. 12-7 every day) read clearer as exact times than "mixed hours".
+  if (uniqueRanges.size === 1 && ranges.length > 0) {
+    const only = ranges[0]
+    const isStandard =
+      (only.start === amShift.start && only.end === amShift.end) ||
+      (only.start === pmShift.start && only.end === pmShift.end) ||
+      (only.start === fullDay.start && only.end === fullDay.end)
+    if (!isStandard) {
+      const timeHint = formatTimeRange(only)
+      if (daysAvailable.length === 7) return `Any day · ${timeHint}`
+      const short = daysAvailable.map((day) => day.slice(0, 3)).join(', ')
+      return `${short} · ${timeHint}`
+    }
+  }
   const morningsOnly = ranges.length > 0 && ranges.every((range) => range.end <= minutes(16))
   const dinnersOnly = ranges.length > 0 && ranges.every((range) => range.start >= minutes(16))
   const timeHint = morningsOnly ? 'mornings' : dinnersOnly ? 'dinners' : 'mixed hours'
@@ -269,6 +284,10 @@ function shiftStatus(statuses: SpotStatus[]): SpotStatus {
 const fullDay = { start: minutes(9, 30), end: minutes(23) }
 const amShift = { start: minutes(9, 30), end: minutes(16) }
 const pmShift = { start: minutes(16), end: minutes(23) }
+// Rogue / non-traditional shifts: extra coverage that spans or sits inside the standard halves.
+// Mid 12-7 spans AM+PM (needs allowDoubles when split across two slots); evening 4-7 sits inside PM.
+const midShift = { start: minutes(12), end: minutes(19) }
+const eveningShift = { start: minutes(16), end: minutes(19) }
 
 const scheduleVariants: { id: ScheduleVariant; label: string; description: string; icon: IconName }[] = [
   { id: 'balanced', label: 'Balanced', description: 'Spreads the work across everyone.', icon: 'spark' },
@@ -337,10 +356,32 @@ function rangesForDayToggle(am: boolean, pm: boolean): TimeRange[] {
   return []
 }
 
+function isCustomDayRanges(ranges: TimeRange[] | undefined) {
+  const list = ranges ?? []
+  if (list.length !== 1) return list.length > 1
+  const only = list[0]
+  const canonical =
+    (only.start === amShift.start && only.end === amShift.end) ||
+    (only.start === pmShift.start && only.end === pmShift.end) ||
+    (only.start === fullDay.start && only.end === fullDay.end)
+  return !canonical
+}
+
+function clampAvailabilityRange(start: number, end: number): TimeRange | null {
+  const dayStart = 0
+  const dayEnd = minutes(23, 59)
+  const safeStart = Math.min(dayEnd - 30, Math.max(dayStart, Math.trunc(start)))
+  const safeEnd = Math.min(dayEnd, Math.max(safeStart + 30, Math.trunc(end)))
+  if (!Number.isFinite(safeStart) || !Number.isFinite(safeEnd) || safeEnd <= safeStart) return null
+  return { start: safeStart, end: safeEnd }
+}
+
 const availabilityPresets: { label: string; build: () => Employee['recurringAvailability'] }[] = [
   { label: 'Any day, any shift', build: () => allDays([fullDay]) },
   { label: 'Morning shifts', build: () => allDays([amShift]) },
   { label: 'Dinner shifts', build: () => allDays([pmShift]) },
+  { label: 'Midday 12-7', build: () => allDays([{ ...midShift }]) },
+  { label: 'Evening 4-7', build: () => allDays([{ ...eveningShift }]) },
   { label: 'Weekday dinner shifts', build: () => onlyDays(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], [pmShift]) },
   { label: 'Saturday and Sunday', build: () => onlyDays(['Saturday', 'Sunday'], [fullDay]) },
 ]
@@ -2391,26 +2432,87 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 function AvailabilityGridEditor({
   recurringAvailability,
   onToggle,
+  onChange,
 }: {
   recurringAvailability: Employee['recurringAvailability']
   onToggle: (day: DayOfWeek, period: 'am' | 'pm', checked: boolean) => void
+  onChange?: (day: DayOfWeek, ranges: TimeRange[]) => void
 }) {
+  function updateDayTime(day: DayOfWeek, field: 'start' | 'end', value: string) {
+    if (!onChange) return
+    const current = recurringAvailability[day] ?? []
+    const base = current.length === 1 ? current[0] : field === 'start' ? { ...pmShift } : { ...pmShift }
+    const nextMinutes = timeValueToMinutes(value)
+    const next =
+      field === 'start'
+        ? clampAvailabilityRange(nextMinutes, base.end)
+        : clampAvailabilityRange(base.start, nextMinutes === 0 ? minutes(23, 59) : nextMinutes)
+    if (next) onChange(day, [next])
+  }
+
   return (
-    <div className="mt-2 grid grid-cols-[2.5rem_1fr_1fr] items-center gap-x-3 gap-y-1.5">
-      <span />
-      <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">AM</span>
-      <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">PM</span>
+    <div className="mt-2 space-y-1.5">
+      <div className="grid grid-cols-[2.5rem_2rem_2rem_1fr] items-center gap-x-3">
+        <span />
+        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">AM</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">PM</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Hours</span>
+      </div>
       {DAYS.map((day) => {
         const { am, pm } = dayAvailabilityFromRanges(recurringAvailability[day])
+        const ranges = recurringAvailability[day] ?? []
+        const single = ranges.length === 1 ? ranges[0] : null
+        const custom = isCustomDayRanges(ranges)
         return (
           <Fragment key={day}>
-            <span className="text-xs text-zinc-700">{day.slice(0, 3)}</span>
-            <label className="flex items-center justify-start">
-              <input type="checkbox" checked={am} onChange={(event) => onToggle(day, 'am', event.target.checked)} />
-            </label>
-            <label className="flex items-center justify-start">
-              <input type="checkbox" checked={pm} onChange={(event) => onToggle(day, 'pm', event.target.checked)} />
-            </label>
+            <div className="grid grid-cols-[2.5rem_2rem_2rem_1fr] items-center gap-x-3">
+              <span className="text-xs text-zinc-700">{day.slice(0, 3)}</span>
+              <label className="flex items-center justify-start">
+                <input type="checkbox" checked={am} onChange={(event) => onToggle(day, 'am', event.target.checked)} />
+              </label>
+              <label className="flex items-center justify-start">
+                <input type="checkbox" checked={pm} onChange={(event) => onToggle(day, 'pm', event.target.checked)} />
+              </label>
+              <div className="flex min-w-0 flex-wrap items-center gap-1">
+                {single ? (
+                  <>
+                    <input
+                      type="time"
+                      aria-label={`${day} availability start`}
+                      className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
+                      value={minutesToTimeValue(single.start)}
+                      disabled={!onChange}
+                      onChange={(event) => updateDayTime(day, 'start', event.target.value)}
+                    />
+                    <span aria-hidden="true" className="text-xs text-zinc-500">
+                      to
+                    </span>
+                    <input
+                      type="time"
+                      aria-label={`${day} availability end`}
+                      className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
+                      value={minutesToTimeValue(single.end)}
+                      disabled={!onChange}
+                      onChange={(event) => updateDayTime(day, 'end', event.target.value)}
+                    />
+                    {custom && (
+                      <span className="rounded border border-sky-200 bg-sky-50 px-1 py-px text-[10px] font-semibold text-sky-900">
+                        Custom
+                      </span>
+                    )}
+                  </>
+                ) : ranges.length > 1 ? (
+                  <span className="text-xs text-zinc-500">{ranges.length} ranges · edit via presets</span>
+                ) : (
+                  <span className="text-xs text-zinc-400">Off</span>
+                )}
+              </div>
+            </div>
+            {custom && single && (
+              <p className="ml-10 text-[11px] text-zinc-500">
+                Custom {formatTimeRange(single)} — AM/PM boxes only show overlap; changing them resets to standard halves.
+              </p>
+            )}
           </Fragment>
         )
       })}
@@ -2445,6 +2547,13 @@ function EmployeeForm({
     onDraftChange({
       ...draft,
       recurringAvailability: { ...draft.recurringAvailability, [day]: rangesForDayToggle(next.am, next.pm) },
+    })
+  }
+
+  function changeAvailabilityDay(day: DayOfWeek, ranges: TimeRange[]) {
+    onDraftChange({
+      ...draft,
+      recurringAvailability: { ...draft.recurringAvailability, [day]: ranges },
     })
   }
   return (
@@ -2482,6 +2591,10 @@ function EmployeeForm({
 
       <fieldset className="mt-3">
         <legend className="text-sm font-medium text-zinc-800">Availability</legend>
+        <p className="mt-1 text-xs text-zinc-500">
+          For 12-7 or 4-7 workers, use a preset then fine-tune per-day hours. 12-7 spans both halves: keep doubles on if
+          they can take one morning plus one dinner spot the same day.
+        </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {availabilityPresets.map((preset) => (
             <button
@@ -2503,7 +2616,11 @@ function EmployeeForm({
             </button>
           )}
         </div>
-        <AvailabilityGridEditor recurringAvailability={draft.recurringAvailability} onToggle={toggleAvailabilityDay} />
+        <AvailabilityGridEditor
+          recurringAvailability={draft.recurringAvailability}
+          onToggle={toggleAvailabilityDay}
+          onChange={changeAvailabilityDay}
+        />
       </fieldset>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
@@ -2693,6 +2810,11 @@ function EmployeeCard({
             const next = { ...current, [period]: checked }
             onUpdate(employee.id, {
               recurringAvailability: { ...employee.recurringAvailability, [day]: rangesForDayToggle(next.am, next.pm) },
+            })
+          }}
+          onChange={(day, ranges) => {
+            onUpdate(employee.id, {
+              recurringAvailability: { ...employee.recurringAvailability, [day]: ranges },
             })
           }}
         />
@@ -3204,6 +3326,10 @@ function TemplateEditor({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm text-zinc-600">Who the restaurant needs on each shift for this week. Add, remove, or change any spot.</p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            Extra 12-7 / 4-7 help goes here as an added spot with exact times (e.g. Mid 12:00-04:00 PM, Evening
+            04:00-07:00 PM) on top of the core AM/PM spots.
+          </p>
           <p className="mt-0.5 text-xs text-zinc-500">
             Last saved: {formatUpdatedAt(updatedAt)}{dirty ? ' · unsaved changes' : ''} · changes stay in this week only
           </p>
