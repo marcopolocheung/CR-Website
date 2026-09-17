@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DAYS,
   PERIODS,
@@ -85,6 +85,16 @@ type HistorySnapshot = {
 }
 
 type WeekAssignments = Record<string, ScheduleAssignment[]>
+
+type GenerationReport = {
+  id: number
+  at: string
+  variant: ScheduleVariant
+  weekStart: string
+  status: 'success' | 'unchanged' | 'failed'
+  filled: number
+  detail: string
+}
 
 type StaffSnapshot = {
   id: string
@@ -398,6 +408,17 @@ function cloneAssignmentList(assignments: ScheduleAssignment[]) {
 
 function uniqueMessages(messages: string[]) {
   return Array.from(new Set(messages))
+}
+
+function assignmentFingerprint(list: ScheduleAssignment[]) {
+  return list
+    .map((assignment) => `${assignment.slotId}:${assignment.employeeId}`)
+    .sort()
+    .join('|')
+}
+
+function formatReportTime(date = new Date()) {
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
 function overlapMinutes(a: StaffingSlot, b: StaffingSlot) {
@@ -772,6 +793,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [staffQuery, setStaffQuery] = useState('')
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generatingVariant, setGeneratingVariant] = useState<ScheduleVariant | null>(null)
+  const [lastReport, setLastReport] = useState<GenerationReport | null>(null)
+  const reportId = useRef(0)
   const [onboardingDismissed, setOnboardingDismissed] = useState(true)
   const [rosterRev, setRosterRev] = useState(0)
   const [rosterServerSnapshot, setRosterServerSnapshot] = useState<string | null>(null)
@@ -1093,6 +1118,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setWeekStart(nextWeekStart)
     setMonthKey(monthKeyForWeek(nextWeekStart))
     setDiagnostics([])
+    setLastReport(null)
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setSharing(false)
@@ -1256,38 +1282,70 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return `Balanced schedule made. ${hours}`
   }
 
-  function generate(variant: ScheduleVariant = selectedVariant) {
+  async function generate(variant: ScheduleVariant = selectedVariant) {
+    if (isGenerating) return
     remember('previous schedule')
     setSelectedVariant(variant)
+    setGeneratingVariant(variant)
+    setIsGenerating(true)
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
+    // Let the spinner paint before the synchronous solver blocks the main thread.
+    await new Promise((resolve) => setTimeout(resolve, 350))
     // similarWeek should anchor to the week before this one, not to whatever is on screen.
     const previousAssignments = variant === 'similarWeek' ? weeks[shiftWeek(weekStart, -1)] ?? assignments : assignments
-    const result = generateSchedule(
-      { employees, template },
-      {
-        strategy: variant,
-        referenceAssignments: previousAssignments,
-        existingAssignments: assignments.filter((assignment) => assignment.locked),
-      },
-    )
+    try {
+      const result = generateSchedule(
+        { employees, template },
+        {
+          strategy: variant,
+          referenceAssignments: previousAssignments,
+          existingAssignments: assignments.filter((assignment) => assignment.locked),
+        },
+      )
 
-    if (result.status === 'INFEASIBLE') {
+      if (result.status === 'INFEASIBLE') {
+        const messages = uniqueMessages(result.diagnostics.map((diagnostic) => diagnosticLabel(diagnostic, weekStart)))
+        setDiagnostics(['The schedule could not be made with these rules.', ...messages])
+        reportId.current += 1
+        setLastReport({
+          id: reportId.current,
+          at: formatReportTime(),
+          variant,
+          weekStart,
+          status: 'failed',
+          filled: 0,
+          detail: messages[0] ?? 'No spots could be filled with these rules.',
+        })
+        return
+      }
+
+      const summary = summarizeSchedule(employees, slots, result.assignments, previousAssignments)
+      const message = generationMessage(variant, summary, previousAssignments.length || result.assignments.length)
       setDiagnostics([
-        'The schedule could not be made with these rules.',
+        message,
         ...uniqueMessages(result.diagnostics.map((diagnostic) => diagnosticLabel(diagnostic, weekStart))),
       ])
-      return
+      const unchanged = assignmentFingerprint(result.assignments) === assignmentFingerprint(assignments)
+      setAssignments(result.assignments)
+      setGeneratedAssignments(cloneAssignmentList(result.assignments))
+      setWeekStatus((current) => ({ ...current, [weekStart]: 'on' }))
+      reportId.current += 1
+      setLastReport({
+        id: reportId.current,
+        at: formatReportTime(),
+        variant,
+        weekStart,
+        status: unchanged ? 'unchanged' : 'success',
+        filled: result.assignments.length,
+        detail: unchanged
+          ? `Same ${result.assignments.length} spots — nothing new to show.`
+          : message,
+      })
+    } finally {
+      setIsGenerating(false)
+      setGeneratingVariant(null)
     }
-
-    const summary = summarizeSchedule(employees, slots, result.assignments, previousAssignments)
-    setDiagnostics([
-      generationMessage(variant, summary, previousAssignments.length || result.assignments.length),
-      ...uniqueMessages(result.diagnostics.map((diagnostic) => diagnosticLabel(diagnostic, weekStart))),
-    ])
-    setAssignments(result.assignments)
-    setGeneratedAssignments(cloneAssignmentList(result.assignments))
-    setWeekStatus((current) => ({ ...current, [weekStart]: 'on' }))
   }
 
   function reset() {
@@ -1300,6 +1358,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setGeneratedWeeks({})
     setWeekStatus({})
     setDiagnostics([])
+    setLastReport(null)
     setDraft(blankDraft())
     setEmployeePanelOpen(false)
     setIgnoredIssueIds([])
@@ -1565,12 +1624,13 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Button
               tone="primary"
-              onClick={() => generate()}
+              onClick={() => void generate()}
               icon="spark"
-              disabled={activeEmployeeCount === 0}
+              loading={isGenerating}
+              disabled={activeEmployeeCount === 0 || isGenerating}
               title={activeEmployeeCount === 0 ? 'Add someone to the staff list first.' : 'Build the week from the staff list.'}
             >
-              Make schedule
+              {isGenerating ? 'Making schedule…' : 'Make schedule'}
             </Button>
             <Button onClick={fixNextIssue} icon="target" disabled={!nextIssue} badge={visibleFixIssues.length}>
               Fix next issue
@@ -1853,6 +1913,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 </Button>
               </div>
             )}
+            {lastReport && lastReport.weekStart === weekStart && (
+              <GenerationReportBanner report={lastReport} onDismiss={() => setLastReport(null)} />
+            )}
             <WeeklyScheduleBoard
               slots={slots}
               weekStart={weekStart}
@@ -1880,7 +1943,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               onActivateSlot={activateSlot}
             />
             <div className="print:hidden">
-              <VariantControls selectedVariant={selectedVariant} onGenerate={generate} />
+              <VariantControls selectedVariant={selectedVariant} pendingVariant={generatingVariant} disabled={isGenerating} onGenerate={(id) => void generate(id)} />
             </div>
           </section>
 
@@ -2795,33 +2858,81 @@ function FlipSwitch({
   )
 }
 
+function GenerationReportBanner({ report, onDismiss }: { report: GenerationReport; onDismiss: () => void }) {
+  const failed = report.status === 'failed'
+  return (
+    <div
+      key={report.id}
+      role={failed ? 'alert' : 'status'}
+      aria-live="polite"
+      className={`mt-3 flex flex-col gap-2 rounded border p-3 sm:flex-row sm:items-center sm:justify-between print:hidden ${
+        failed
+          ? 'border-red-300 bg-red-50'
+          : report.status === 'success'
+            ? 'border-green-300 bg-green-50'
+            : 'border-zinc-300 bg-zinc-50'
+      }`}
+    >
+      <p
+        className={`flex items-center gap-2 text-sm font-semibold ${
+          failed ? 'text-red-950' : report.status === 'success' ? 'text-green-950' : 'text-zinc-800'
+        }`}
+      >
+        <Icon name={failed ? 'warning' : report.status === 'success' ? 'check' : 'spark'} />
+        {failed ? `Couldn’t make the schedule (${report.at}). ` : `Schedule ${report.status === 'success' ? 'updated' : 'checked'} at ${report.at}. `}
+        <span className="font-normal">{report.detail}</span>
+      </p>
+      <button
+        type="button"
+        className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+        onClick={onDismiss}
+      >
+        Dismiss
+      </button>
+    </div>
+  )
+}
+
 function VariantControls({
   selectedVariant,
+  pendingVariant,
+  disabled = false,
   onGenerate,
 }: {
   selectedVariant: ScheduleVariant
+  pendingVariant: ScheduleVariant | null
+  disabled?: boolean
   onGenerate: (variant: ScheduleVariant) => void
 }) {
   return (
     <div className="mt-4 border-t border-zinc-100 pt-4">
       <p className="text-sm text-zinc-600">Other ways to build this week. Anyone marked Keep stays put.</p>
       <div className="mt-2 flex flex-wrap gap-2">
-      {scheduleVariants.map((variant) => (
-        <button
-          key={variant.id}
-          type="button"
-          className={`inline-flex items-center justify-center gap-2 rounded border px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${
-            selectedVariant === variant.id
-              ? 'border-red-800 bg-red-800 text-white'
-              : 'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100'
-          }`}
-          onClick={() => onGenerate(variant.id)}
-          title={variant.description}
-        >
-          <Icon name={variant.icon} />
-          {variant.label}
-        </button>
-      ))}
+      {scheduleVariants.map((variant) => {
+        const pending = pendingVariant === variant.id
+        return (
+          <button
+            key={variant.id}
+            type="button"
+            className={`inline-flex items-center justify-center gap-2 rounded border px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-not-allowed disabled:opacity-70 ${
+              selectedVariant === variant.id
+                ? 'border-red-800 bg-red-800 text-white'
+                : 'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100'
+            }`}
+            onClick={() => onGenerate(variant.id)}
+            disabled={disabled}
+            aria-busy={pending}
+            title={pending ? 'Building this schedule…' : variant.description}
+          >
+            {pending ? (
+              <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <Icon name={variant.icon} />
+            )}
+            {pending ? 'Making…' : variant.label}
+          </button>
+        )
+      })}
       </div>
     </div>
   )
@@ -3068,6 +3179,7 @@ function Button({
   badge,
   onClick,
   disabled = false,
+  loading = false,
   title,
 }: {
   children: React.ReactNode
@@ -3076,6 +3188,7 @@ function Button({
   badge?: number
   onClick: () => void
   disabled?: boolean
+  loading?: boolean
   title?: string
 }) {
   const className =
@@ -3084,8 +3197,12 @@ function Button({
       : 'inline-flex items-center justify-center gap-2 rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
 
   return (
-    <button type="button" className={className} onClick={onClick} disabled={disabled} title={title}>
-      <Icon name={icon} />
+    <button type="button" className={className} onClick={onClick} disabled={disabled || loading} aria-busy={loading} title={title}>
+      {loading ? (
+        <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      ) : (
+        <Icon name={icon} />
+      )}
       {children}
       {badge !== undefined && badge > 0 && (
         <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-200 px-1.5 text-xs font-bold text-amber-950">
