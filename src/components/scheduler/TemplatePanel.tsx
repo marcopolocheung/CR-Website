@@ -9,6 +9,7 @@ export default function TemplatePanel({
   template,
   rev,
   dirty,
+  loadPending = false,
   onSaved,
   onClose,
   restaurantId,
@@ -16,6 +17,7 @@ export default function TemplatePanel({
   template: WeeklyStaffingTemplate
   rev: number
   dirty: boolean
+  loadPending?: boolean
   onSaved: (rev: number, updatedAt: string | null) => void
   onClose: () => void
   restaurantId?: string
@@ -27,7 +29,7 @@ export default function TemplatePanel({
   const [notice, setNotice] = useState('')
 
   async function save() {
-    if (!token || busy) return
+    if (!token || busy || loadPending) return
     setBusy(true)
     setError('')
     setNotice('')
@@ -93,7 +95,8 @@ export default function TemplatePanel({
         type="button"
         className="mt-2 inline-flex items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
         onClick={save}
-        disabled={busy || !token || !dirty}
+        disabled={busy || !token || !dirty || loadPending}
+        title={loadPending ? 'Waiting for the schedule store.' : undefined}
       >
         {busy ? 'Saving...' : 'Save rules'}
       </button>

@@ -1998,6 +1998,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 employees={employees}
                 rev={rosterRev}
                 dirty={rosterDirty}
+                loadPending={storeLoading}
                 onSaved={(rev, updatedAt) => {
                   setRosterRev(rev)
                   setRosterServerSnapshot(rosterFingerprint(employees))
@@ -2964,6 +2965,8 @@ function TemplateEditor({
             type="button"
             className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             onClick={onTogglePanel}
+            disabled={loadPending}
+            title={loadPending ? 'Waiting for the schedule store.' : undefined}
           >
             {panelOpen ? 'Close save rules' : 'Save rules'}
           </button>
@@ -2972,7 +2975,7 @@ function TemplateEditor({
       {loadError && <p className="mt-2 text-xs font-medium text-amber-800">{loadError}</p>}
       {panelOpen && (
         <div className="mt-2">
-          <TemplatePanel template={template} rev={rev} dirty={dirty} onSaved={onSaved} onClose={onClosePanel} restaurantId={restaurantId} />
+          <TemplatePanel template={template} rev={rev} dirty={dirty} loadPending={loadPending} onSaved={onSaved} onClose={onClosePanel} restaurantId={restaurantId} />
         </div>
       )}
       <div className="mt-3 space-y-3">
