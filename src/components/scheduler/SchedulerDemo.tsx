@@ -41,9 +41,12 @@ import {
   type ValidationViolation,
   type WeeklyStaffingTemplate,
   type WeekStatus,
+  getEmployeeAvailability,
 } from '@/lib/scheduler'
 import { fetchRoster, rosterFingerprint } from '@/lib/employee-store'
 import { fetchTemplate, templateFingerprint } from '@/lib/template-store'
+import { fetchGoldenWeek, type GoldenWeekDoc } from '@/lib/schedule-store'
+import { assignmentsFromPublishedWeek, templateHashForSlots } from '@/lib/schedule-share'
 import PublishPanel from './PublishPanel'
 import RosterPanel from './RosterPanel'
 import TemplatePanel from './TemplatePanel'
@@ -365,25 +368,49 @@ function uniqueMessages(messages: string[]) {
   return Array.from(new Set(messages))
 }
 
+function overlapMinutes(a: StaffingSlot, b: StaffingSlot) {
+  return Math.max(0, Math.min(a.end, b.end) - Math.max(a.start, b.start))
+}
+
+function formatOverlapDuration(totalMinutes: number) {
+  if (totalMinutes <= 0) return 'moments'
+  const hours = Math.floor(totalMinutes / 60)
+  const mins = totalMinutes % 60
+  if (hours === 0) return `${mins} minute${mins === 1 ? '' : 's'}`
+  if (mins === 0) return `${hours} hour${hours === 1 ? '' : 's'}`
+  return `${hours} hour${hours === 1 ? '' : 's'} ${mins} minutes`
+}
+
+function availabilityText(employee: Employee, day: DayOfWeek) {
+  const ranges = getEmployeeAvailability(employee, day)
+  if (ranges.length === 0) return `has no ${day} availability at all`
+  return `${day} availability is ${ranges.map((range) => formatTimeRange(range)).join(', ')}`
+}
+
+function trainedRolesText(employee: Employee) {
+  if (employee.roles.length === 0) return 'nothing yet'
+  return employee.roles.map((role) => roleLabels[role]).join(', ')
+}
+
 function diagnosticLabel(diagnostic: Diagnostic, weekStart: string) {
   const day = diagnostic.day && weekStart ? formatDayLabel(weekStart, diagnostic.day) : diagnostic.day
   const where = day && diagnostic.period ? `${day} ${periodLabels[diagnostic.period]}` : null
   const role = diagnostic.role ? roleLabels[diagnostic.role] : null
 
   if (diagnostic.code === 'search_exhausted') {
-    return 'There is no way to fill every spot with the people and rules you have now.'
+    return 'There is no way to fill every spot with the people and rules you have now. Add availability, add staff, or loosen a limit, then make the schedule again.'
   }
   if (diagnostic.code === 'invalid_locked_assignment') {
-    return where ? `The person you kept on ${where} no longer fits the rules.` : 'A spot you marked Keep no longer fits the rules.'
+    return where ? `The person you kept on ${where} no longer fits the rules — availability, role, or limits changed.` : 'A spot you marked Keep no longer fits the rules.'
   }
   if (where && role && diagnostic.code.startsWith('no_')) {
-    return `${where} has nobody who can work as ${role}.`
+    return `${where} has nobody who can work as ${role}. Add someone with that role who is free then, or adjust the spot.`
   }
   if (where && role && diagnostic.code.startsWith('insufficient_')) {
-    return `${where} needs more ${role} cover than the staff list can give.`
+    return `${where} needs more ${role} cover than the staff list can give. Add staff or trim a spot.`
   }
   if (where && diagnostic.code === 'insufficient_shift_capacity') {
-    return `${where} does not have enough people available.`
+    return `${where} does not have enough people free. Add availability or staff, or remove a spot from the rules.`
   }
   if (where && role) {
     return `${where} needs ${role} cover.`
@@ -397,18 +424,17 @@ function dragErrorMessage(employee: Employee, slot: StaffingSlot, violations: Va
   const first = violations[0]
   if (!first) return `${employee.name} cannot work ${day} ${periodLabels[slot.period]}.`
 
-  if (first.code === 'unqualified_employee') return `${employee.name} is not set up for ${slot.label}.`
-  if (first.code === 'unavailable_employee') return `${employee.name} cannot work ${day} ${periodLabels[slot.period]}.`
-  if (first.code === 'inactive_employee') return `${employee.name} is inactive.`
+  if (first.code === 'unqualified_employee') return `${employee.name} is not trained for ${slot.label} — trained for ${trainedRolesText(employee)}.`
+  if (first.code === 'unavailable_employee') return `${employee.name} is not free ${day} ${periodLabels[slot.period]} (${formatTimeRange(slot)}). ${employee.name} ${availabilityText(employee, slot.day)}.`
+  if (first.code === 'inactive_employee') return `${employee.name} is off the list (inactive).`
   if (first.code === 'overlapping_assignment') {
     const conflict = slots.find((candidate) => candidate.id === first.relatedSlotId)
-    return conflict
-      ? `${employee.name} is already working ${day} ${periodLabels[conflict.period]} (${conflict.label}, ${formatTimeRange(conflict)}).`
-      : `${employee.name} is already working at that time.`
+    if (!conflict) return `${employee.name} is already working at that time.`
+    return `${employee.name} cannot take ${slot.label} (${formatTimeRange(slot)}) — it overlaps ${conflict.label} (${formatTimeRange(conflict)}) by ${formatOverlapDuration(overlapMinutes(slot, conflict))}. One person cannot be in two places at once, even with doubles allowed.`
   }
-  if (first.code === 'max_days_exceeded') return `${employee.name} would go over the weekly day limit.`
-  if (first.code === 'max_shifts_exceeded') return `${employee.name} would go over the weekly shift limit.`
-  if (first.code === 'prohibited_double') return `${employee.name} cannot work both shifts that day.`
+  if (first.code === 'max_days_exceeded') return `${employee.name} is limited to ${employee.maxDaysPerWeek ?? 'a set number of'} days a week.`
+  if (first.code === 'max_shifts_exceeded') return `${employee.name} is limited to ${employee.maxShiftsPerWeek ?? 'a set number of'} shifts a week.`
+  if (first.code === 'prohibited_double') return `${employee.name} does not allow doubles — both shifts that day is not an option.`
   if (first.code === 'incompatible_pair') return first.message
 
   return first.message
@@ -504,25 +530,40 @@ function buildMovePreview({
   }
 }
 
-function reviewLabel(violation: ValidationViolation, slot: StaffingSlot | undefined, employee: Employee | undefined, weekStart: string, slots: StaffingSlot[]) {
+function reviewLabel(
+  violation: ValidationViolation,
+  slot: StaffingSlot | undefined,
+  employee: Employee | undefined,
+  weekStart: string,
+  slots: StaffingSlot[],
+  stats?: ScheduleStats,
+) {
   const day = slot && weekStart ? formatDayLabel(weekStart, slot.day) : slot?.day
   const shift = slot ? `${day} ${periodLabels[slot.period]}` : 'This schedule'
   const position = slot?.label ?? 'this spot'
   const name = employee?.name ?? 'Someone'
 
-  if (violation.code === 'missing_assignment') return `${shift} needs ${position}.`
-  if (violation.code === 'unqualified_employee') return `${name} is not set up for ${position}.`
-  if (violation.code === 'unavailable_employee') return `${name} cannot work ${shift}.`
-  if (violation.code === 'inactive_employee') return `${name} is inactive.`
+  if (violation.code === 'missing_assignment') return `${shift} needs ${position}${slot ? ` (${formatTimeRange(slot)})` : ''}.`
+  if (violation.code === 'unqualified_employee') return `${name} is not trained for ${position} — trained for ${employee ? trainedRolesText(employee) : 'nothing listed'}.`
+  if (violation.code === 'unavailable_employee') {
+    if (!slot || !employee) return `${name} cannot work ${shift}.`
+    return `${name} is not free ${shift} (${formatTimeRange(slot)}). ${name} ${availabilityText(employee, slot.day)}.`
+  }
+  if (violation.code === 'inactive_employee') return `${name} is off the list (inactive).`
   if (violation.code === 'overlapping_assignment') {
     const conflict = slots.find((candidate) => candidate.id === violation.relatedSlotId)
-    return conflict
-      ? `${name} is already working ${day} ${periodLabels[conflict.period]} (${conflict.label}, ${formatTimeRange(conflict)}).`
-      : `${name} is already working at that time.`
+    if (!conflict || !slot) return `${name} is already working at that time.`
+    return `${name} cannot cover ${day} ${periodLabels[slot.period]} ${slot.label} (${formatTimeRange(slot)}) — it overlaps ${conflict.label} (${formatTimeRange(conflict)}) by ${formatOverlapDuration(overlapMinutes(slot, conflict))}. One person cannot be in two places at once, even with doubles allowed.`
   }
-  if (violation.code === 'max_days_exceeded') return `${name} has too many work days.`
-  if (violation.code === 'max_shifts_exceeded') return `${name} has too many shifts.`
-  if (violation.code === 'prohibited_double') return `${name} cannot work both shifts that day.`
+  if (violation.code === 'max_days_exceeded') {
+    if (stats && employee?.maxDaysPerWeek !== undefined) return `${name} would work ${stats.days} days — the limit is ${employee.maxDaysPerWeek} a week.`
+    return `${name} has too many work days.`
+  }
+  if (violation.code === 'max_shifts_exceeded') {
+    if (stats && employee?.maxShiftsPerWeek !== undefined) return `${name} would work ${stats.shifts} shifts — the limit is ${employee.maxShiftsPerWeek} a week.`
+    return `${name} has too many shifts.`
+  }
+  if (violation.code === 'prohibited_double') return `${name} does not allow doubles, but this covers ${day} ${periodLabels.AM} and ${periodLabels.PM}.`
   if (violation.code === 'incompatible_pair') return violation.message
   if (violation.code === 'locked_assignment_changed') return `A kept spot changed and needs review.`
 
@@ -560,16 +601,20 @@ function changesSince(
 }
 
 function fixAdvice(code: string) {
-  if (code === 'missing_assignment') return 'Pick someone for this spot, or add a new employee.'
-  if (code === 'unavailable_employee') return 'They are not free then. Pick someone else for this spot.'
-  if (code === 'unqualified_employee') return 'Pick someone trained for this position.'
-  if (code === 'inactive_employee') return 'They are off the list. Pick someone else, or turn them back on.'
-  if (code === 'overlapping_assignment') return 'They are in two places at once. Move one of the two.'
-  if (code === 'max_days_exceeded') return 'Give this shift to someone else, or raise their weekly day limit.'
-  if (code === 'max_shifts_exceeded') return 'Give this shift to someone else, or raise their weekly shift limit.'
-  if (code === 'prohibited_double') return 'Pick someone else for one of the two shifts that day.'
+  if (code === 'missing_assignment') return 'Pick someone for this spot, or add a new employee with the right role and availability.'
+  if (code === 'unavailable_employee') return 'Pick someone free then — check availability in the staff list.'
+  if (code === 'unqualified_employee') return 'Pick someone trained for this position, or add the role to them in the staff list.'
+  if (code === 'inactive_employee') return 'Turn them back on in the staff list, or pick someone else.'
+  if (code === 'overlapping_assignment') return 'Move one of the two shifts to someone else. If the overlap comes from shift times (like the Friday manager starting at 3pm while mornings end at 4pm), adjusting the times in the rules fixes it for everyone.'
+  if (code === 'max_days_exceeded') return 'Move a shift to someone else, or raise the weekly day limit in the staff list.'
+  if (code === 'max_shifts_exceeded') return 'Move a shift to someone else, or raise the weekly shift limit in the staff list.'
+  if (code === 'prohibited_double') return 'Give one of the two shifts to someone else, or allow doubles for them in the staff list.'
   if (code === 'incompatible_pair') return 'These two should not work the same shift. Move one of them.'
   if (code === 'locked_assignment_changed') return 'A spot you marked Keep changed. Confirm it still works.'
+  if (code === 'search_exhausted') return 'Add availability, add staff, or loosen a limit — then make the schedule again.'
+  if (code === 'invalid_locked_assignment') return 'Release the Keep mark, or fix that person’s availability, role, or limits.'
+  if (code.startsWith('no_')) return 'Add someone with that role and availability, or turn an inactive person back on.'
+  if (code.startsWith('insufficient_')) return 'Add staff or availability for that shift, or remove a spot from the rules.'
   return 'Nobody on the list can cover this. Add someone, or turn an inactive person back on.'
 }
 
@@ -623,7 +668,10 @@ function unassignableReason({
   const code = problems[0].code
   if (code === 'max_days_exceeded' || code === 'max_shifts_exceeded') return 'over limit'
   if (code === 'prohibited_double') return 'double that day'
-  if (code === 'overlapping_assignment') return 'already working then'
+  if (code === 'overlapping_assignment') {
+    const conflict = slots.find((candidate) => candidate.id === problems[0].relatedSlotId)
+    return conflict ? `busy then (${conflict.label} ${shortTimeRange(conflict)})` : 'already working then'
+  }
   if (code === 'incompatible_pair') return 'not with teammate'
   return 'breaks a rule'
 }
@@ -634,6 +682,7 @@ function buildFixIssues(
   slots: StaffingSlot[],
   employees: Employee[],
   weekStart: string,
+  assignments: ScheduleAssignment[] = [],
 ) {
   const issues: FixIssue[] = []
 
@@ -649,13 +698,15 @@ function buildFixIssues(
     })
   }
 
+  const statsById = new Map(calculateScheduleStats(employees, slots, assignments).map((stat) => [stat.employeeId, stat]))
+
   for (const violation of violations) {
     const slot = slots.find((candidate) => candidate.id === violation.slotId)
     const relatedSlot = slots.find((candidate) => candidate.id === violation.relatedSlotId)
     const employee = employees.find((candidate) => candidate.id === violation.employeeId)
     issues.push({
       id: `review:${violation.code}:${violation.slotId ?? ''}:${violation.employeeId ?? ''}:${violation.message}`,
-      title: reviewLabel(violation, slot, employee, weekStart, slots),
+      title: reviewLabel(violation, slot, employee, weekStart, slots, statsById.get(violation.employeeId ?? '')),
       detail: fixAdvice(violation.code),
       slot,
       relatedSlot,
@@ -692,12 +743,16 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [rosterRev, setRosterRev] = useState(0)
   const [rosterServerSnapshot, setRosterServerSnapshot] = useState<string | null>(null)
   const [rosterLoadError, setRosterLoadError] = useState('')
+  const [rosterLoaded, setRosterLoaded] = useState(false)
   const [rosterPanelOpen, setRosterPanelOpen] = useState(false)
   const rosterDirty = rosterServerSnapshot === null ? employees.length > 0 : rosterFingerprint(employees) !== rosterServerSnapshot
   const [template, setTemplate] = useState<WeeklyStaffingTemplate>(seedTemplate)
   const [templateRev, setTemplateRev] = useState(0)
   const [templateServerSnapshot, setTemplateServerSnapshot] = useState<string | null>(null)
   const [templateLoadError, setTemplateLoadError] = useState('')
+  const [templateLoaded, setTemplateLoaded] = useState(false)
+  const [publishedWeeks, setPublishedWeeks] = useState<Record<string, GoldenWeekDoc | null>>({})
+  const [hydratedWeeks, setHydratedWeeks] = useState<Record<string, boolean>>({})
   const [templatePanelOpen, setTemplatePanelOpen] = useState(false)
   const templateDirty =
     templateServerSnapshot === null
@@ -763,8 +818,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const movingEmployee = employees.find((employee) => employee.id === moveSource?.employeeId)
 
   const fixIssues = useMemo(
-    () => buildFixIssues(readinessProblems, violations, slots, employees, weekStart),
-    [employees, readinessProblems, slots, violations, weekStart],
+    () => buildFixIssues(readinessProblems, violations, slots, employees, weekStart, assignments),
+    [assignments, employees, readinessProblems, slots, violations, weekStart],
   )
   const visibleFixIssues = fixIssues.filter((issue) => !ignoredIssueIds.includes(issue.id))
   const nextIssue = visibleFixIssues[0]
@@ -833,6 +888,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setSharing(false)
+    setRosterLoaded(false)
+    setTemplateLoaded(false)
+    setPublishedWeeks({})
+    setHydratedWeeks({})
   }, [restaurantId])
 
   useEffect(() => {
@@ -840,6 +899,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setRosterLoadError('')
     setRosterServerSnapshot(null)
     setRosterRev(0)
+    setRosterLoaded(false)
     fetchRoster(restaurantId)
       .then((doc) => {
         if (cancelled) return
@@ -848,10 +908,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           setRosterServerSnapshot(rosterFingerprint(doc.employees))
         }
         setRosterRev(doc.rev)
+        setRosterLoaded(true)
       })
       .catch(() => {
         if (!cancelled) {
           setRosterLoadError('Could not reach the staff list store. Showing the built-in demo list — save once the connection works to keep changes.')
+          setRosterLoaded(true)
         }
       })
     return () => {
@@ -864,6 +926,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setTemplateLoadError('')
     setTemplateServerSnapshot(null)
     setTemplateRev(0)
+    setTemplateLoaded(false)
     fetchTemplate(restaurantId)
       .then((doc) => {
         if (cancelled) return
@@ -872,16 +935,67 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           setTemplateServerSnapshot(templateFingerprint(doc.template))
         }
         setTemplateRev(doc.rev)
+        setTemplateLoaded(true)
       })
       .catch(() => {
         if (!cancelled) {
           setTemplateLoadError('Could not reach the schedule-rules store. Showing the built-in default rules — save once the connection works to keep changes.')
+          setTemplateLoaded(true)
         }
       })
     return () => {
       cancelled = true
     }
   }, [restaurantId])
+
+  useEffect(() => {
+    if (!weekStart) return
+    let cancelled = false
+    fetchGoldenWeek(weekStart, restaurantId)
+      .then((doc) => {
+        if (cancelled) return
+        setPublishedWeeks((current) => ({ ...current, [weekStart]: doc }))
+        if (doc) {
+          setWeekStatus((current) =>
+            current[weekStart] ? current : { ...current, [weekStart]: doc.visible ? 'on' : 'off' },
+          )
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPublishedWeeks((current) => (current[weekStart] === undefined ? current : current))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [weekStart, restaurantId])
+
+  useEffect(() => {
+    if (!weekStart || !rosterLoaded || !templateLoaded || hydratedWeeks[weekStart]) return
+    const doc = publishedWeeks[weekStart]
+    if (doc === undefined || doc === null) return
+    if ((weeks[weekStart]?.length ?? 0) > 0) {
+      setHydratedWeeks((current) => ({ ...current, [weekStart]: true }))
+      return
+    }
+    if (templateHashForSlots(slots) !== doc.templateHash) {
+      setHydratedWeeks((current) => ({ ...current, [weekStart]: true }))
+      setDiagnostics((current) =>
+        current.length > 0
+          ? current
+          : ['The published week uses different shift rules, so it was not loaded into the editor. Review the rules before overwriting it.'],
+      )
+      return
+    }
+    const hydrated = assignmentsFromPublishedWeek({ slots, employees, published: doc.week })
+    setWeeks((current) => (current[weekStart] ? current : { ...current, [weekStart]: hydrated }))
+    setGeneratedWeeks((current) =>
+      current[weekStart] ? current : { ...current, [weekStart]: hydrated.map((assignment) => ({ ...assignment })) },
+    )
+    setHydratedWeeks((current) => ({ ...current, [weekStart]: true }))
+    if (hydrated.length > 0) {
+      setDiagnostics((current) => [...current, 'Loaded the published week from the server.'])
+    }
+  }, [weekStart, restaurantId, rosterLoaded, templateLoaded, publishedWeeks, hydratedWeeks, slots, employees, weeks])
 
   function dismissOnboarding() {
     setOnboardingDismissed(true)
@@ -1446,6 +1560,19 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               onVisibilityChange={(status) => setWeekVisibility(weekStart, status)}
               onClose={() => setSharing(false)}
               restaurantId={restaurantId}
+              template={template}
+              rosterRev={rosterRev}
+              templateRev={templateRev}
+              rosterDirty={rosterDirty}
+              templateDirty={templateDirty}
+              onRosterSaved={(rev) => {
+                setRosterRev(rev)
+                setRosterServerSnapshot(rosterFingerprint(employees))
+              }}
+              onTemplateSaved={(rev) => {
+                setTemplateRev(rev)
+                setTemplateServerSnapshot(templateFingerprint(template))
+              }}
             />
           )}
 
