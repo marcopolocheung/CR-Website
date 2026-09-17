@@ -4,4 +4,7 @@ compatibility_date = "2026-09-01"
 
 [[kv_namespaces]]
 binding = "SCHEDULES"
+# Fill in the real namespace id before any wrangler deploy. Deploying with a
+# placeholder or a fresh namespace makes every station look empty (rev 0) even
+# though the real data is untouched. GitHub Pages deploys never touch KV.
 id = "REPLACE_WITH_YOUR_NAMESPACE_ID"

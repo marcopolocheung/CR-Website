@@ -31,6 +31,19 @@ Pre-partition singleton keys (`golden:*`, `roster:current`, `template:current`)
 are served as a read fallback for the default station only — first save to the
 default station writes to the new `r:CR3-diningroom:*` keys.
 
+## Deploys do not reset data
+
+GitHub Pages builds (`deploy.yml`) only ship the static frontend — they never
+touch the Worker or its KV namespace, so a merge cannot wipe rosters, rules, or
+published weeks. If the scheduler looks default after a deploy, run
+`npm run scheduler:verify`: live revs mean the data survived and the page is
+showing built-in fallbacks (offline store, unsaved edits, or a week with
+nothing published yet).
+
+Dashboard paste deploys: keep the existing `SCHEDULES` binding attached. A
+deploy with a missing or fresh binding serves empty stations (`rev: 0`) while
+the real data sits untouched in the old namespace.
+
 ## Write token (golden schedule)
 
 Golden writes require a manager token. Set it as a Worker secret (never in

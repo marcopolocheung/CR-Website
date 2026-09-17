@@ -782,7 +782,14 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [staffSnapshots, setStaffSnapshots] = useState<StaffSnapshot[]>([])
   const [snapshotName, setSnapshotName] = useState('')
   const [rosterPanelOpen, setRosterPanelOpen] = useState(false)
-  const rosterDirty = rosterServerSnapshot === null ? employees.length > 0 : rosterFingerprint(employees) !== rosterServerSnapshot
+  // Before the first server response arrives the editor only holds the built-in
+  // seeds. Treat dirty as false until loaded so Publish never tries to save
+  // seeds over live data with a stale rev.
+  const rosterDirty = !rosterLoaded
+    ? false
+    : rosterServerSnapshot === null
+      ? employees.length > 0
+      : rosterFingerprint(employees) !== rosterServerSnapshot
   const [template, setTemplate] = useState<WeeklyStaffingTemplate>(seedTemplate)
   const [templateRev, setTemplateRev] = useState(0)
   const [templateServerSnapshot, setTemplateServerSnapshot] = useState<string | null>(null)
@@ -793,8 +800,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [publishedWeeks, setPublishedWeeks] = useState<Record<string, GoldenWeekDoc | null>>({})
   const [hydratedWeeks, setHydratedWeeks] = useState<Record<string, boolean>>({})
   const [templatePanelOpen, setTemplatePanelOpen] = useState(false)
-  const templateDirty =
-    templateServerSnapshot === null
+  const templateDirty = !templateLoaded
+    ? false
+    : templateServerSnapshot === null
       ? templateFingerprint(template) !== templateFingerprint(seedTemplate)
       : templateFingerprint(template) !== templateServerSnapshot
   const isDefaultRoster = useMemo(() => rosterFingerprint(employees) === rosterFingerprint(seedEmployees), [employees])
@@ -1391,7 +1399,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setStaffSnapshots((current) => current.filter((snapshot) => snapshot.id !== id))
   }
 
-  const isNewStation = rosterRev === 0 && templateRev === 0
+  // Both revs start at 0, so require the loads to finish before calling a
+  // station new — otherwise every deploy/reload flashes the new-station banner
+  // with seeds while the fetch is still in flight.
+  const storeLoading = !rosterLoaded || !templateLoaded
+  const storeOffline = Boolean(rosterLoadError || templateLoadError)
+  const isNewStation = !storeLoading && rosterRev === 0 && templateRev === 0
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
     remember('changed one assignment')
@@ -1565,8 +1578,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             <Button
               onClick={() => setSharing((open) => !open)}
               icon="share"
-              disabled={!weekStart}
-              title="Save this week to the /schedule golden schedule."
+              disabled={!weekStart || storeLoading}
+              title={
+                storeLoading
+                  ? 'Waiting for the schedule store — saving is paused until the saved data loads.'
+                  : 'Save this week to the /schedule golden schedule.'
+              }
             >
               Publish to staff
             </Button>
@@ -1631,6 +1648,28 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
       <div className="mx-auto grid w-full max-w-none min-w-0 gap-5 overflow-x-clip px-4 py-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
         <main className="order-1 min-w-0 space-y-4">
+          {storeLoading && (
+            <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">
+              <h2 className="text-sm font-semibold text-zinc-900">Connecting to the schedule store…</h2>
+              <p className="mt-1 text-sm text-zinc-600">
+                Showing the built-in defaults until the saved staff list, rules, and published week load. Saving is
+                paused so defaults cannot overwrite what is on the server — a deploy never deletes server data, it
+                just reloads this page.
+              </p>
+            </section>
+          )}
+
+          {!storeLoading && storeOffline && (
+            <section className="rounded-lg border border-amber-500 bg-amber-50 p-4 shadow-sm print:hidden" role="alert">
+              <h2 className="text-sm font-semibold text-amber-950">Could not reach the schedule store</h2>
+              <p className="mt-1 text-sm text-amber-900">
+                What you see below is the built-in demo list, not your saved data — your staff, rules, and published
+                weeks are still on the server. Do not save these defaults over them. Check your connection, then
+                reload to retry.
+              </p>
+            </section>
+          )}
+
           {!onboardingDismissed && assignments.length === 0 && (
             <OnboardingBanner activeEmployeeCount={activeEmployeeCount} onDismiss={dismissOnboarding} />
           )}
@@ -1893,6 +1932,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               rev={templateRev}
               dirty={templateDirty}
               loadError={templateLoadError}
+              loadPending={storeLoading}
               panelOpen={templatePanelOpen}
               onTogglePanel={() => setTemplatePanelOpen((open) => !open)}
               onSaved={(rev, updatedAt) => {
@@ -1938,8 +1978,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               <div className="flex shrink-0 items-center gap-1.5">
                 <IconButton
                   icon="check"
-                  label={rosterPanelOpen ? 'Close save staff list' : 'Save staff list'}
+                  label={storeLoading ? 'Waiting for the schedule store' : rosterPanelOpen ? 'Close save staff list' : 'Save staff list'}
                   onClick={() => setRosterPanelOpen((open) => !open)}
+                  disabled={storeLoading}
                 />
                 <IconButton
                   icon={employeePanelOpen ? 'close' : 'plus'}
@@ -1957,6 +1998,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 employees={employees}
                 rev={rosterRev}
                 dirty={rosterDirty}
+                loadPending={storeLoading}
                 onSaved={(rev, updatedAt) => {
                   setRosterRev(rev)
                   setRosterServerSnapshot(rosterFingerprint(employees))
@@ -2857,6 +2899,7 @@ function TemplateEditor({
   rev,
   dirty,
   loadError,
+  loadPending,
   panelOpen,
   onTogglePanel,
   onSaved,
@@ -2871,6 +2914,7 @@ function TemplateEditor({
   rev: number
   dirty: boolean
   loadError: string
+  loadPending: boolean
   panelOpen: boolean
   onTogglePanel: () => void
   onSaved: (rev: number, updatedAt: string | null) => void
@@ -2921,6 +2965,8 @@ function TemplateEditor({
             type="button"
             className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             onClick={onTogglePanel}
+            disabled={loadPending}
+            title={loadPending ? 'Waiting for the schedule store.' : undefined}
           >
             {panelOpen ? 'Close save rules' : 'Save rules'}
           </button>
@@ -2929,7 +2975,7 @@ function TemplateEditor({
       {loadError && <p className="mt-2 text-xs font-medium text-amber-800">{loadError}</p>}
       {panelOpen && (
         <div className="mt-2">
-          <TemplatePanel template={template} rev={rev} dirty={dirty} onSaved={onSaved} onClose={onClosePanel} restaurantId={restaurantId} />
+          <TemplatePanel template={template} rev={rev} dirty={dirty} loadPending={loadPending} onSaved={onSaved} onClose={onClosePanel} restaurantId={restaurantId} />
         </div>
       )}
       <div className="mt-3 space-y-3">
