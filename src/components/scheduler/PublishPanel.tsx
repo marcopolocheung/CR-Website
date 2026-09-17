@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildPublishedWeek, templateHashForSlots } from '@/lib/schedule-share'
+import { saveRoster } from '@/lib/employee-store'
+import { saveTemplate } from '@/lib/template-store'
 import {
   StoreAuthError,
   StoreConflictError,
@@ -10,7 +12,7 @@ import {
   fetchGoldenWeek,
   saveGoldenWeek,
 } from '@/lib/schedule-store'
-import type { Employee, ScheduleAssignment, StaffingSlot, WeekStatus } from '@/lib/scheduler'
+import type { Employee, ScheduleAssignment, StaffingSlot, WeekStatus, WeeklyStaffingTemplate } from '@/lib/scheduler'
 
 function canonicalWeek(week: { weekStart: string; people: string[]; slotPeople: number[] }) {
   return JSON.stringify({ w: week.weekStart, p: week.people, s: week.slotPeople })
@@ -38,6 +40,13 @@ export default function PublishPanel({
   onVisibilityChange,
   onClose,
   restaurantId,
+  template,
+  rosterRev,
+  templateRev,
+  rosterDirty,
+  templateDirty,
+  onRosterSaved,
+  onTemplateSaved,
 }: {
   weekStart: string
   weekLabel: string
@@ -48,6 +57,13 @@ export default function PublishPanel({
   onVisibilityChange: (status: WeekStatus) => void
   onClose: () => void
   restaurantId?: string
+  template?: WeeklyStaffingTemplate
+  rosterRev?: number
+  templateRev?: number
+  rosterDirty?: boolean
+  templateDirty?: boolean
+  onRosterSaved?: (rev: number) => void
+  onTemplateSaved?: (rev: number) => void
 }) {
   const [name, setName] = useState(`Week of ${weekLabel}`)
   const [token, setToken] = useState('')
@@ -110,12 +126,49 @@ export default function PublishPanel({
     }
   }, [weekStart, weekLabel, restaurantId])
 
+  const willSaveRoster = Boolean(rosterDirty && onRosterSaved && rosterRev !== undefined)
+  const willSaveTemplate = Boolean(templateDirty && template && onTemplateSaved && templateRev !== undefined)
+
   async function save() {
     if (filled === 0 || !token || busy) return
     setBusy(true)
     setError('')
     setNotice('')
     try {
+      if (willSaveRoster) {
+        try {
+          const rosterResult = await saveRoster(employees, rosterRev ?? 0, token, restaurantId)
+          onRosterSaved?.(rosterResult.rev)
+        } catch (caught) {
+          if (caught instanceof StoreConflictError) {
+            setError('The staff list changed on the server. Reload the page to see it, then publish again.')
+          } else if (caught instanceof StoreAuthError) {
+            setError('That token was not accepted. Check for typos and try again, or ask whoever runs the Worker for the current one.')
+          } else if (caught instanceof StoreUnavailableError) {
+            setError(`${caught.message} Your edits are safe on this screen — try again in a moment.`)
+          } else {
+            setError('Something went wrong saving the staff list.')
+          }
+          return
+        }
+      }
+      if (willSaveTemplate && template) {
+        try {
+          const templateResult = await saveTemplate(template, templateRev ?? 0, token, restaurantId)
+          onTemplateSaved?.(templateResult.rev)
+        } catch (caught) {
+          if (caught instanceof StoreConflictError) {
+            setError('The schedule rules changed on the server. Reload the page to see them, then publish again.')
+          } else if (caught instanceof StoreAuthError) {
+            setError('That token was not accepted. Check for typos and try again, or ask whoever runs the Worker for the current one.')
+          } else if (caught instanceof StoreUnavailableError) {
+            setError(`${caught.message} Your edits are safe on this screen — try again in a moment.`)
+          } else {
+            setError('Something went wrong saving the schedule rules.')
+          }
+          return
+        }
+      }
       const result = await saveGoldenWeek(
         weekStart,
         { week, templateHash: templateHashForSlots(slots), visible, baseRev: baseRev ?? 0 },
@@ -127,10 +180,15 @@ export default function PublishPanel({
       setServerVisible(visible)
       broadcastSave(weekStart, restaurantId)
       setToken('')
+      const savedExtras = [willSaveRoster && 'staff list', willSaveTemplate && 'rules'].filter(Boolean).join(' and ')
       setNotice(
         visible
-          ? 'Saved. Staff now see this week on /schedule.'
-          : 'Saved. This week stays hidden from staff until you turn it on.',
+          ? savedExtras
+            ? `Saved ${savedExtras} and week. Staff now see this week on /schedule.`
+            : 'Saved. Staff now see this week on /schedule.'
+          : savedExtras
+            ? `Saved ${savedExtras} and week. This week stays hidden from staff until you turn it on.`
+            : 'Saved. This week stays hidden from staff until you turn it on.',
       )
     } catch (caught) {
       if (caught instanceof StoreAuthError) {
@@ -163,6 +221,9 @@ export default function PublishPanel({
           <h2 className="text-lg font-semibold">Publish {weekLabel} to /schedule</h2>
           <p className="mt-1 text-sm text-zinc-600">
             {filled} filled spot{filled === 1 ? '' : 's'} will be included. One schedule, no links or codes.
+            {(willSaveRoster || willSaveTemplate) && (
+              <> Your unsaved {[willSaveRoster && 'staff list', willSaveTemplate && 'rules'].filter(Boolean).join(' and ')} will save first with the same token, so a reload brings back exactly this setup.</>
+            )}
           </p>
         </div>
         <button

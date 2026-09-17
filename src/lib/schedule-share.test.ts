@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   SHARE_VERSION,
+  assignmentsFromPublishedWeek,
   templateHashForSlots,
   type PublishedWeek,
   buildPublishedWeek,
@@ -80,6 +81,40 @@ test('unfilled spots travel as nobody rather than as a stray name', async () => 
 
   // Everyone active is listed even with nothing assigned, so the reader can show them as OFF.
   assert.deepEqual(published.people, seedEmployees.filter((employee) => employee.active).map((employee) => employee.name))
+})
+
+test('a published week round-trips back into editor assignments', () => {
+  const slots = expandTemplate(seedTemplate)
+  const generated = generateSchedule({ employees: seedEmployees, template: seedTemplate })
+  assert.equal(generated.status, 'FEASIBLE')
+
+  const published = buildPublishedWeek({
+    weekStart: '2026-03-01',
+    name: 'Round trip',
+    slots,
+    employees: seedEmployees,
+    assignments: generated.assignments,
+  })
+  const back = assignmentsFromPublishedWeek({ slots, employees: seedEmployees, published })
+  assert.equal(back.length, generated.assignments.length)
+  const bySlot = new Map(back.map((assignment) => [assignment.slotId, assignment.employeeId]))
+  for (const assignment of generated.assignments) {
+    assert.equal(bySlot.get(assignment.slotId), assignment.employeeId)
+  }
+})
+
+test('removed staff come back unassigned instead of misfiled', () => {
+  const slots = expandTemplate(seedTemplate)
+  const published = buildPublishedWeek({
+    weekStart: '2026-03-01',
+    name: 'Eleven left',
+    slots,
+    employees: seedEmployees,
+    assignments: [{ slotId: slots[0].id, employeeId: seedEmployees[0].id }],
+  })
+  const withoutFirst = seedEmployees.slice(1)
+  const back = assignmentsFromPublishedWeek({ slots, employees: withoutFirst, published })
+  assert.deepEqual(back, [])
 })
 
 test('the template hash is stable and changes with the shift layout', () => {

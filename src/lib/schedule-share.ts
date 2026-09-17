@@ -59,3 +59,31 @@ export function buildPublishedWeek({
 
   return { version: SHARE_VERSION, weekStart, name, people, slotPeople }
 }
+
+/**
+ * Rebuilds editor assignments from a published week. Slot order is canonical from
+ * the template, so index i of slotPeople always means slots[i]. Names that no
+ * longer match the roster (renamed/removed staff) come back unassigned rather
+ * than guessing. Callers must check the templateHash first — a layout drift
+ * silently misfiles every shift after the change.
+ */
+export function assignmentsFromPublishedWeek({
+  slots,
+  employees,
+  published,
+}: {
+  slots: StaffingSlot[]
+  employees: Employee[]
+  published: PublishedWeek
+}): ScheduleAssignment[] {
+  const idByName = new Map(employees.map((employee) => [employee.name, employee.id]))
+  const assignments: ScheduleAssignment[] = []
+  published.slotPeople.forEach((personIndex, index) => {
+    const slot = slots[index]
+    if (!slot || personIndex < 0) return
+    const name = published.people[personIndex]
+    const employeeId = name ? idByName.get(name) : undefined
+    if (employeeId) assignments.push({ slotId: slot.id, employeeId })
+  })
+  return assignments
+}

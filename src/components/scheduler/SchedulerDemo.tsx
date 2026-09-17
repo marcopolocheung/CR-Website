@@ -44,6 +44,8 @@ import {
 } from '@/lib/scheduler'
 import { fetchRoster, rosterFingerprint } from '@/lib/employee-store'
 import { fetchTemplate, templateFingerprint } from '@/lib/template-store'
+import { fetchGoldenWeek, type GoldenWeekDoc } from '@/lib/schedule-store'
+import { assignmentsFromPublishedWeek, templateHashForSlots } from '@/lib/schedule-share'
 import PublishPanel from './PublishPanel'
 import RosterPanel from './RosterPanel'
 import TemplatePanel from './TemplatePanel'
@@ -692,12 +694,16 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [rosterRev, setRosterRev] = useState(0)
   const [rosterServerSnapshot, setRosterServerSnapshot] = useState<string | null>(null)
   const [rosterLoadError, setRosterLoadError] = useState('')
+  const [rosterLoaded, setRosterLoaded] = useState(false)
   const [rosterPanelOpen, setRosterPanelOpen] = useState(false)
   const rosterDirty = rosterServerSnapshot === null ? employees.length > 0 : rosterFingerprint(employees) !== rosterServerSnapshot
   const [template, setTemplate] = useState<WeeklyStaffingTemplate>(seedTemplate)
   const [templateRev, setTemplateRev] = useState(0)
   const [templateServerSnapshot, setTemplateServerSnapshot] = useState<string | null>(null)
   const [templateLoadError, setTemplateLoadError] = useState('')
+  const [templateLoaded, setTemplateLoaded] = useState(false)
+  const [publishedWeeks, setPublishedWeeks] = useState<Record<string, GoldenWeekDoc | null>>({})
+  const [hydratedWeeks, setHydratedWeeks] = useState<Record<string, boolean>>({})
   const [templatePanelOpen, setTemplatePanelOpen] = useState(false)
   const templateDirty =
     templateServerSnapshot === null
@@ -833,6 +839,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setSharing(false)
+    setRosterLoaded(false)
+    setTemplateLoaded(false)
+    setPublishedWeeks({})
+    setHydratedWeeks({})
   }, [restaurantId])
 
   useEffect(() => {
@@ -840,6 +850,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setRosterLoadError('')
     setRosterServerSnapshot(null)
     setRosterRev(0)
+    setRosterLoaded(false)
     fetchRoster(restaurantId)
       .then((doc) => {
         if (cancelled) return
@@ -848,10 +859,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           setRosterServerSnapshot(rosterFingerprint(doc.employees))
         }
         setRosterRev(doc.rev)
+        setRosterLoaded(true)
       })
       .catch(() => {
         if (!cancelled) {
           setRosterLoadError('Could not reach the staff list store. Showing the built-in demo list — save once the connection works to keep changes.')
+          setRosterLoaded(true)
         }
       })
     return () => {
@@ -864,6 +877,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setTemplateLoadError('')
     setTemplateServerSnapshot(null)
     setTemplateRev(0)
+    setTemplateLoaded(false)
     fetchTemplate(restaurantId)
       .then((doc) => {
         if (cancelled) return
@@ -872,16 +886,67 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           setTemplateServerSnapshot(templateFingerprint(doc.template))
         }
         setTemplateRev(doc.rev)
+        setTemplateLoaded(true)
       })
       .catch(() => {
         if (!cancelled) {
           setTemplateLoadError('Could not reach the schedule-rules store. Showing the built-in default rules — save once the connection works to keep changes.')
+          setTemplateLoaded(true)
         }
       })
     return () => {
       cancelled = true
     }
   }, [restaurantId])
+
+  useEffect(() => {
+    if (!weekStart) return
+    let cancelled = false
+    fetchGoldenWeek(weekStart, restaurantId)
+      .then((doc) => {
+        if (cancelled) return
+        setPublishedWeeks((current) => ({ ...current, [weekStart]: doc }))
+        if (doc) {
+          setWeekStatus((current) =>
+            current[weekStart] ? current : { ...current, [weekStart]: doc.visible ? 'on' : 'off' },
+          )
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPublishedWeeks((current) => (current[weekStart] === undefined ? current : current))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [weekStart, restaurantId])
+
+  useEffect(() => {
+    if (!weekStart || !rosterLoaded || !templateLoaded || hydratedWeeks[weekStart]) return
+    const doc = publishedWeeks[weekStart]
+    if (doc === undefined || doc === null) return
+    if ((weeks[weekStart]?.length ?? 0) > 0) {
+      setHydratedWeeks((current) => ({ ...current, [weekStart]: true }))
+      return
+    }
+    if (templateHashForSlots(slots) !== doc.templateHash) {
+      setHydratedWeeks((current) => ({ ...current, [weekStart]: true }))
+      setDiagnostics((current) =>
+        current.length > 0
+          ? current
+          : ['The published week uses different shift rules, so it was not loaded into the editor. Review the rules before overwriting it.'],
+      )
+      return
+    }
+    const hydrated = assignmentsFromPublishedWeek({ slots, employees, published: doc.week })
+    setWeeks((current) => (current[weekStart] ? current : { ...current, [weekStart]: hydrated }))
+    setGeneratedWeeks((current) =>
+      current[weekStart] ? current : { ...current, [weekStart]: hydrated.map((assignment) => ({ ...assignment })) },
+    )
+    setHydratedWeeks((current) => ({ ...current, [weekStart]: true }))
+    if (hydrated.length > 0) {
+      setDiagnostics((current) => [...current, 'Loaded the published week from the server.'])
+    }
+  }, [weekStart, restaurantId, rosterLoaded, templateLoaded, publishedWeeks, hydratedWeeks, slots, employees, weeks])
 
   function dismissOnboarding() {
     setOnboardingDismissed(true)
@@ -1446,6 +1511,19 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               onVisibilityChange={(status) => setWeekVisibility(weekStart, status)}
               onClose={() => setSharing(false)}
               restaurantId={restaurantId}
+              template={template}
+              rosterRev={rosterRev}
+              templateRev={templateRev}
+              rosterDirty={rosterDirty}
+              templateDirty={templateDirty}
+              onRosterSaved={(rev) => {
+                setRosterRev(rev)
+                setRosterServerSnapshot(rosterFingerprint(employees))
+              }}
+              onTemplateSaved={(rev) => {
+                setTemplateRev(rev)
+                setTemplateServerSnapshot(templateFingerprint(template))
+              }}
             />
           )}
 
