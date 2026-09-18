@@ -276,6 +276,29 @@ test('golden writes fail closed without a configured token', async () => {
   assert.equal(response.status, 503)
 })
 
+function verifyGet(token?: string): Request {
+  return new Request('https://api.test/api/auth/verify', {
+    method: 'GET',
+    headers: token === undefined ? {} : { Authorization: `Bearer ${token}` },
+  })
+}
+
+test('auth verify accepts the manager token and nothing else', async () => {
+  const env = mockEnv()
+
+  assert.equal((await handler.fetch(verifyGet(), env)).status, 401)
+  assert.equal((await handler.fetch(verifyGet('wrong'), env)).status, 401)
+
+  const ok = await handler.fetch(verifyGet('manager-token'), env)
+  assert.equal(ok.status, 200)
+  assert.deepEqual(await ok.json(), { ok: true })
+})
+
+test('auth verify fails closed without a configured token', async () => {
+  const env = mockEnv('')
+  assert.equal((await handler.fetch(verifyGet('anything'), env)).status, 503)
+})
+
 test('employee roster bodies are strictly validated', () => {
   const good = { employees: [rosterEmployee()], baseRev: 0 }
   assert.equal(validateRosterBody(good)?.baseRev, 0)
