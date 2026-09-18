@@ -7,6 +7,7 @@ import {
   fetchGoldenMonth,
   fetchGoldenWeek,
   saveGoldenWeek,
+  verifyWriteToken,
 } from './schedule-store'
 
 function mockFetchOnce(handler: (url: string, init?: RequestInit) => { status: number; payload: unknown }) {
@@ -219,6 +220,40 @@ test('saveGoldenWeek maps 409 to a conflict carrying the server revision', async
     )
     assert.ok(caught instanceof StoreConflictError)
     assert.equal((caught as StoreConflictError).rev, 4)
+  } finally {
+    restore()
+  }
+})
+
+test('verifyWriteToken sends the bearer code and maps statuses', async () => {
+  let restore = mockFetchOnce((url, init) => {
+    assert.ok(url.endsWith('/api/auth/verify'))
+    assert.equal((init?.headers as Record<string, string>)?.Authorization, 'Bearer manager-token')
+    return { status: 200, payload: { ok: true } }
+  })
+  try {
+    await verifyWriteToken('manager-token')
+  } finally {
+    restore()
+  }
+
+  restore = mockFetchOnce(() => ({ status: 401, payload: { error: 'unauthorized' } }))
+  try {
+    await assert.rejects(() => verifyWriteToken('wrong'), StoreAuthError)
+  } finally {
+    restore()
+  }
+
+  restore = mockFetchOnce(() => ({ status: 429, payload: { error: 'rate_limited' } }))
+  try {
+    await assert.rejects(() => verifyWriteToken('wrong'), StoreUnavailableError)
+  } finally {
+    restore()
+  }
+
+  restore = mockFetchOnce(() => ({ status: 503, payload: { error: 'write_not_configured' } }))
+  try {
+    await assert.rejects(() => verifyWriteToken('manager-token'), StoreUnavailableError)
   } finally {
     restore()
   }

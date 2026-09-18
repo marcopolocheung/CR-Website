@@ -135,6 +135,24 @@ export async function saveGoldenWeek(
   throw new StoreUnavailableError()
 }
 
+/**
+ * Read-only gate check for the scheduler demo entry screen. Same manager
+ * token as the PUTs above — resolves when the code is accepted, throws
+ * StoreAuthError on a wrong code and StoreUnavailableError otherwise.
+ */
+export async function verifyWriteToken(token: string): Promise<void> {
+  const { status } = await requestJson('/api/auth/verify', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (status === 200) return
+  if (status === 401) throw new StoreAuthError()
+  if (status === 429) {
+    throw new StoreUnavailableError('Too many wrong codes. Wait a bit and try again.')
+  }
+  throw new StoreUnavailableError()
+}
+
 export class StoreUnavailableError extends Error {
   constructor(message = 'Could not reach the schedule store.') {
     super(message)

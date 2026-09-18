@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import DemoGate from '@/components/scheduler/DemoGate'
 import SchedulerDemo from '@/components/scheduler/SchedulerDemo'
 import { RESTAURANTS, RESTAURANT_IDS, isRestaurantId } from '@/data/restaurants'
 
@@ -39,5 +40,9 @@ export default async function SchedulerStationPage({ params }: { params: Promise
       </div>
     )
   }
-  return <SchedulerDemo restaurantId={restaurantId} />
+  return (
+    <DemoGate>
+      <SchedulerDemo restaurantId={restaurantId} />
+    </DemoGate>
+  )
 }

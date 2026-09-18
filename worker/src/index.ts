@@ -39,6 +39,8 @@ const MAX_CIPHER_CHARS = 16384
 const MAX_BODY_CHARS = 20000
 const DOC_TTL_SECONDS = 31536000
 const WRITE_LIMIT_PER_HOUR = 60
+/** Gate guesses get their own budget so they can never lock out legitimate saves. */
+const VERIFY_LIMIT_PER_HOUR = 30
 
 export const RESTAURANTS = ['CR3-diningroom', 'CR3-kitchen', 'CR2-kitchen', 'CR2-diningroom'] as const
 
@@ -578,6 +580,20 @@ async function checkWriteThrottle(env: Env, ip: string): Promise<boolean> {
   }
 }
 
+/** Separate throttle for gate guesses (`GET /api/auth/verify`) — see VERIFY_LIMIT_PER_HOUR. */
+async function checkVerifyThrottle(env: Env, ip: string): Promise<boolean> {
+  try {
+    const key = `rlv:${ip}:${new Date().toISOString().slice(0, 13)}`
+    const raw = await env.SCHEDULES.get(key)
+    const count = raw ? Number.parseInt(raw, 10) || 0 : 0
+    if (count >= VERIFY_LIMIT_PER_HOUR) return false
+    await env.SCHEDULES.put(key, String(count + 1), { expirationTtl: 3600 })
+    return true
+  } catch {
+    return true
+  }
+}
+
 async function readBody(request: Request): Promise<unknown> {
   const text = await request.text()
   if (text.length > MAX_BODY_CHARS) throw new Error('body_too_large')
@@ -641,6 +657,17 @@ export default {
     const path = url.pathname.replace(/\/+$/, '') || '/'
 
     if (request.method === 'GET' && (path === '/' || path === '/api/health')) {
+      return json({ ok: true }, 200, request, env)
+    }
+
+    // Gate check for the scheduler demo entry screen. Same manager token as
+    // the golden/roster/template PUTs — read-only, never writes anything.
+    if (request.method === 'GET' && path === '/api/auth/verify') {
+      if (goldenWriteError(env)) return json({ error: 'write_not_configured' }, 503, request, env)
+      if (!(await checkVerifyThrottle(env, clientIp(request)))) {
+        return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
+      }
+      if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
       return json({ ok: true }, 200, request, env)
     }
 

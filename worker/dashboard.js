@@ -7,6 +7,8 @@ const MAX_CIPHER_CHARS = 16384;
 const MAX_BODY_CHARS = 20000;
 const DOC_TTL_SECONDS = 31536000;
 const WRITE_LIMIT_PER_HOUR = 60;
+/** Gate guesses get their own budget so they can never lock out legitimate saves. */
+const VERIFY_LIMIT_PER_HOUR = 30;
 export const RESTAURANTS = ['CR3-diningroom', 'CR3-kitchen', 'CR2-kitchen', 'CR2-diningroom'];
 export const DEFAULT_RESTAURANT = 'CR3-diningroom';
 const RESTAURANT_RE = /^[A-Za-z0-9-]{2,40}$/;
@@ -249,10 +251,21 @@ export function goldenWeeksForMonth(monthKey) {
     }
     return weeks;
 }
-// --- Employee roster (one persistent staff list, edited by scheduler-demo) ---
+// --- Employee roster (staff lists are per-week, with the global doc as the seed) ---
 const LEGACY_ROSTER_KEY = 'roster:current';
 function rosterKey(restaurant = DEFAULT_RESTAURANT) {
     return `r:${restaurant}:roster:current`;
+}
+export function rosterKeyForWeek(restaurant, weekStart) {
+    return `r:${restaurant}:roster:${weekStart}`;
+}
+export function parseWeekStartParam(url) {
+    const raw = url.searchParams.get('weekStart');
+    if (raw === null || raw === '')
+        return { present: false };
+    if (!WEEK_RE.test(raw))
+        return { present: true, valid: false, value: raw };
+    return { present: true, valid: true, value: raw };
 }
 async function readRosterRaw(env, restaurant) {
     const raw = await env.SCHEDULES.get(rosterKey(restaurant));
@@ -362,10 +375,13 @@ export function normalizeRosterDoc(raw) {
         return null;
     return { v: 1, rev: doc.rev, employees: valid.employees, updatedAt: doc.updatedAt };
 }
-// --- Staffing template (one persistent set of weekly shift rules, edited by scheduler-demo) ---
+// --- Staffing template (rules are per-week, with the global doc as the seed) ---
 const LEGACY_TEMPLATE_KEY = 'template:current';
 function templateKey(restaurant = DEFAULT_RESTAURANT) {
     return `r:${restaurant}:template:current`;
+}
+export function templateKeyForWeek(restaurant, weekStart) {
+    return `r:${restaurant}:template:${weekStart}`;
 }
 async function readTemplateRaw(env, restaurant) {
     const raw = await env.SCHEDULES.get(templateKey(restaurant));
@@ -478,12 +494,35 @@ async function checkWriteThrottle(env, ip) {
         return true;
     }
 }
+/** Separate throttle for gate guesses (`GET /api/auth/verify`) — see VERIFY_LIMIT_PER_HOUR. */
+async function checkVerifyThrottle(env, ip) {
+    try {
+        const key = `rlv:${ip}:${new Date().toISOString().slice(0, 13)}`;
+        const raw = await env.SCHEDULES.get(key);
+        const count = raw ? Number.parseInt(raw, 10) || 0 : 0;
+        if (count >= VERIFY_LIMIT_PER_HOUR)
+            return false;
+        await env.SCHEDULES.put(key, String(count + 1), { expirationTtl: 3600 });
+        return true;
+    }
+    catch {
+        return true;
+    }
+}
 async function readBody(request) {
     const text = await request.text();
     if (text.length > MAX_BODY_CHARS)
         throw new Error('body_too_large');
     try {
         return JSON.parse(text);
+    }
+    catch {
+        return null;
+    }
+}
+function safeParse(raw) {
+    try {
+        return JSON.parse(raw);
     }
     catch {
         return null;
@@ -534,6 +573,18 @@ export default {
         const url = new URL(request.url);
         const path = url.pathname.replace(/\/+$/, '') || '/';
         if (request.method === 'GET' && (path === '/' || path === '/api/health')) {
+            return json({ ok: true }, 200, request, env);
+        }
+        // Gate check for the scheduler demo entry screen. Same manager token as
+        // the golden/roster/template PUTs — read-only, never writes anything.
+        if (request.method === 'GET' && path === '/api/auth/verify') {
+            if (goldenWriteError(env))
+                return json({ error: 'write_not_configured' }, 503, request, env);
+            if (!(await checkVerifyThrottle(env, clientIp(request)))) {
+                return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
+            }
+            if (!isGoldenWriteAuthorized(request, env))
+                return json({ error: 'unauthorized' }, 401, request, env);
             return json({ ok: true }, 200, request, env);
         }
         if (request.method === 'POST' && path === '/api/weeks') {
@@ -729,9 +780,30 @@ export default {
             const restaurant = restaurantFromUrl(url);
             if (!restaurant)
                 return json({ error: 'invalid_restaurant' }, 400, request, env);
+            const weekParam = parseWeekStartParam(url);
+            if (weekParam.present && !weekParam.valid)
+                return json({ error: 'invalid_weekStart' }, 400, request, env);
+            const weekStart = weekParam.present && weekParam.valid ? weekParam.value : undefined;
             if (request.method === 'GET') {
+                if (weekStart) {
+                    const weekRaw = await env.SCHEDULES.get(rosterKeyForWeek(restaurant, weekStart));
+                    const weekDoc = weekRaw ? normalizeRosterDoc(safeParse(weekRaw)) : null;
+                    if (weekDoc) {
+                        return json({ employees: weekDoc.employees, rev: weekDoc.rev, updatedAt: weekDoc.updatedAt, weekStart, inherited: false }, 200, request, env, { 'Cache-Control': 'no-store' });
+                    }
+                    const globalRaw = await readRosterRaw(env, restaurant);
+                    const globalDoc = globalRaw ? normalizeRosterDoc(safeParse(globalRaw)) : null;
+                    return json({
+                        employees: globalDoc?.employees ?? [],
+                        rev: 0,
+                        updatedAt: null,
+                        weekStart,
+                        inherited: true,
+                        fallbackRev: globalDoc?.rev ?? 0,
+                    }, 200, request, env, { 'Cache-Control': 'no-store' });
+                }
                 const raw = await readRosterRaw(env, restaurant);
-                const doc = raw ? normalizeRosterDoc(JSON.parse(raw)) : null;
+                const doc = raw ? normalizeRosterDoc(safeParse(raw)) : null;
                 return json({ employees: doc?.employees ?? [], rev: doc?.rev ?? 0, updatedAt: doc?.updatedAt ?? null }, 200, request, env, { 'Cache-Control': 'no-store' });
             }
             if (request.method === 'PUT') {
@@ -752,18 +824,12 @@ export default {
                 const valid = validateRosterBody(body);
                 if (!valid)
                     return json({ error: 'invalid_body' }, 400, request, env);
-                const existingRaw = await readRosterRaw(env, restaurant);
+                const targetKey = weekStart ? rosterKeyForWeek(restaurant, weekStart) : rosterKey(restaurant);
+                const existingRaw = weekStart ? await env.SCHEDULES.get(targetKey) : await readRosterRaw(env, restaurant);
                 let currentRev = 0;
                 let currentUpdatedAt;
                 if (existingRaw) {
-                    let parsed;
-                    try {
-                        parsed = JSON.parse(existingRaw);
-                    }
-                    catch {
-                        parsed = null;
-                    }
-                    const current = normalizeRosterDoc(parsed);
+                    const current = normalizeRosterDoc(safeParse(existingRaw));
                     currentRev = current?.rev ?? 0;
                     currentUpdatedAt = current?.updatedAt;
                 }
@@ -776,7 +842,7 @@ export default {
                     employees: valid.employees,
                     updatedAt: new Date().toISOString(),
                 };
-                await env.SCHEDULES.put(rosterKey(restaurant), JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
+                await env.SCHEDULES.put(targetKey, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
                 return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env);
             }
         }
@@ -784,9 +850,30 @@ export default {
             const restaurant = restaurantFromUrl(url);
             if (!restaurant)
                 return json({ error: 'invalid_restaurant' }, 400, request, env);
+            const weekParam = parseWeekStartParam(url);
+            if (weekParam.present && !weekParam.valid)
+                return json({ error: 'invalid_weekStart' }, 400, request, env);
+            const weekStart = weekParam.present && weekParam.valid ? weekParam.value : undefined;
             if (request.method === 'GET') {
+                if (weekStart) {
+                    const weekRaw = await env.SCHEDULES.get(templateKeyForWeek(restaurant, weekStart));
+                    const weekDoc = weekRaw ? normalizeTemplateDoc(safeParse(weekRaw)) : null;
+                    if (weekDoc) {
+                        return json({ template: weekDoc.template, rev: weekDoc.rev, updatedAt: weekDoc.updatedAt, weekStart, inherited: false }, 200, request, env, { 'Cache-Control': 'no-store' });
+                    }
+                    const globalRaw = await readTemplateRaw(env, restaurant);
+                    const globalDoc = globalRaw ? normalizeTemplateDoc(safeParse(globalRaw)) : null;
+                    return json({
+                        template: globalDoc?.template ?? null,
+                        rev: 0,
+                        updatedAt: null,
+                        weekStart,
+                        inherited: true,
+                        fallbackRev: globalDoc?.rev ?? 0,
+                    }, 200, request, env, { 'Cache-Control': 'no-store' });
+                }
                 const raw = await readTemplateRaw(env, restaurant);
-                const doc = raw ? normalizeTemplateDoc(JSON.parse(raw)) : null;
+                const doc = raw ? normalizeTemplateDoc(safeParse(raw)) : null;
                 return json({ template: doc?.template ?? null, rev: doc?.rev ?? 0, updatedAt: doc?.updatedAt ?? null }, 200, request, env, { 'Cache-Control': 'no-store' });
             }
             if (request.method === 'PUT') {
@@ -807,18 +894,12 @@ export default {
                 const valid = validateTemplateBody(body);
                 if (!valid)
                     return json({ error: 'invalid_body' }, 400, request, env);
-                const existingRaw = await readTemplateRaw(env, restaurant);
+                const targetKey = weekStart ? templateKeyForWeek(restaurant, weekStart) : templateKey(restaurant);
+                const existingRaw = weekStart ? await env.SCHEDULES.get(targetKey) : await readTemplateRaw(env, restaurant);
                 let currentRev = 0;
                 let currentUpdatedAt;
                 if (existingRaw) {
-                    let parsed;
-                    try {
-                        parsed = JSON.parse(existingRaw);
-                    }
-                    catch {
-                        parsed = null;
-                    }
-                    const current = normalizeTemplateDoc(parsed);
+                    const current = normalizeTemplateDoc(safeParse(existingRaw));
                     currentRev = current?.rev ?? 0;
                     currentUpdatedAt = current?.updatedAt;
                 }
@@ -831,7 +912,7 @@ export default {
                     template: valid.template,
                     updatedAt: new Date().toISOString(),
                 };
-                await env.SCHEDULES.put(templateKey(restaurant), JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
+                await env.SCHEDULES.put(targetKey, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
                 return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env);
             }
         }

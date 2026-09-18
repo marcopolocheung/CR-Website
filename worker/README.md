@@ -95,6 +95,8 @@ Legacy links:
 
 Golden schedule (public read, token-guarded write):
 
+- `GET /api/auth/verify` with `Authorization: Bearer <token>` → `200 { ok: true }`, `401 unauthorized`, `503 write_not_configured`. Read-only gate check for the scheduler demo entry screen — same manager token as the writes below, own throttle budget (30/hour per IP) so guesses can never lock out saves.
+
 - `GET /api/schedule?month=YYYY-MM` → `200 { weeks, rev, notModified }` (visible only, sorted). Pass `knownRev=<rev>` and the Worker answers `notModified: true` with no weeks when nothing changed — every golden save bumps the month rev (including the neighboring month when a week spans two), so readers revalidate with one tiny read instead of refetching.
 - `GET /api/schedule/:weekStart` → `200 GoldenWeekDoc` or `404`
 - `PUT /api/schedule/:weekStart { week, templateHash, visible, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`.

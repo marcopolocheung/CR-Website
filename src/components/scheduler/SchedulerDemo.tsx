@@ -2557,6 +2557,8 @@ function AvailabilityGridEditor({
         const ranges = recurringAvailability[day] ?? []
         const single = ranges.length === 1 ? ranges[0] : null
         const custom = isCustomDayRanges(ranges)
+        const confirming = pendingReset?.day === day
+        const customLabel = ranges.length === 0 ? '' : ranges.map((range) => formatTimeRange(range)).join(' + ')
         return (
           <Fragment key={day}>
             <div className="grid grid-cols-[2.5rem_2rem_2rem_1fr] items-center gap-x-3">
@@ -2656,10 +2658,10 @@ function AvailabilityGridEditor({
                   Custom {formatTimeRange(single)} — AM/PM boxes only show overlap; changing them resets to standard halves.
                 </p>
               )}
-            </Fragment>
+            </div>
+          </Fragment>
           )
         })}
-      </div>
       {canCustomize && onToggleCustomControls && (
         <button
           type="button"

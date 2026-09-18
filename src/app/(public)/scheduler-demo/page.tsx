@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import DemoGate from '@/components/scheduler/DemoGate'
 import { RESTAURANTS, RESTAURANT_IDS } from '@/data/restaurants'
 
 export const metadata: Metadata = {
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 
 export default function SchedulerDemoPage() {
   return (
+    <DemoGate>
     <div className="mx-auto max-w-2xl px-4 py-10">
       <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Scheduler demo</p>
       <h1 className="mt-1 text-2xl font-bold">Pick a station</h1>
@@ -30,5 +32,6 @@ export default function SchedulerDemoPage() {
         ))}
       </ul>
     </div>
+    </DemoGate>
   )
 }
