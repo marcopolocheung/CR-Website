@@ -337,7 +337,28 @@ async function readRosterRaw(env: Env, restaurant: string): Promise<string | nul
   return null
 }
 const ROSTER_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const ROSTER_ROLES = ['server', 'cashier', 'lead', 'manager']
+// Posts are extensible: dining defaults plus every kitchen post, plus any
+// manager-defined custom post slug (e.g. "sushi-chef"). Validation accepts any
+// well-formed slug so new posts never need a Worker redeploy to save.
+const KNOWN_ROLES = [
+  'server',
+  'cashier',
+  'lead',
+  'manager',
+  'cook',
+  'line-cook',
+  'fried-rice',
+  'dishwasher',
+  'meat-prep',
+  'veggie-prep',
+  'mv-prep',
+  'shadow',
+]
+const ROLE_SLUG_RE = /^[a-z0-9-]{1,40}$/
+
+export function isValidRole(value: unknown): value is string {
+  return typeof value === 'string' && ROLE_SLUG_RE.test(value)
+}
 const MAX_EMPLOYEES = 100
 const MAX_RANGES_PER_DAY = 6
 const MAX_MINUTES_PER_DAY = 24 * 60
@@ -392,7 +413,7 @@ function isValidStoredEmployee(value: unknown): value is StoredEmployee {
     return false
   }
   if (typeof employee.name !== 'string' || employee.name.length === 0 || employee.name.length > MAX_NAME_CHARS) return false
-  if (!Array.isArray(employee.roles) || !employee.roles.every((role) => typeof role === 'string' && ROSTER_ROLES.includes(role))) {
+  if (!Array.isArray(employee.roles) || !employee.roles.every(isValidRole)) {
     return false
   }
   if (!employee.recurringAvailability || typeof employee.recurringAvailability !== 'object') return false
@@ -494,7 +515,7 @@ function isValidStoredTemplateSlot(value: unknown): value is StoredTemplateSlot 
   if (!value || typeof value !== 'object') return false
   const slot = value as Record<string, unknown>
   if (slot.period !== 'AM' && slot.period !== 'PM') return false
-  if (typeof slot.role !== 'string' || !ROSTER_ROLES.includes(slot.role)) return false
+  if (!isValidRole(slot.role)) return false
   if (typeof slot.label !== 'string' || slot.label.length === 0 || slot.label.length > MAX_LABEL_CHARS) return false
   if (typeof slot.start !== 'number' || !Number.isInteger(slot.start) || slot.start < 0 || slot.start >= MAX_MINUTES_PER_DAY) return false
   if (typeof slot.end !== 'number' || !Number.isInteger(slot.end) || slot.end <= slot.start || slot.end > MAX_MINUTES_PER_DAY) return false

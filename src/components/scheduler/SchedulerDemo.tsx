@@ -4,24 +4,28 @@ import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   DAYS,
   PERIODS,
-  ROLES,
   calculateScheduleStats,
+  defaultEmployeesForRestaurant,
+  defaultRoleForRestaurant,
+  defaultTemplateForRestaurant,
   expandTemplate,
+  formatRoleLabel,
   formatTimeRange,
   generateSchedule,
   isEmployeeAvailableForSlot,
   isEmployeeQualified,
+  isValidRoleSlug,
   minutes,
+  normalizeRoleSlug,
   preflightDiagnostics,
   rangesOverlap,
+  rolesForRestaurant,
   schedulerAssumptions,
-  seedEmployees,
   currentWeekStart,
   formatDayLabel,
   formatWeekRange,
   monthKeyForWeek,
   monthLabel,
-  seedTemplate,
   shiftMonth,
   shiftWeek,
   summarizeSchedule,
@@ -30,7 +34,6 @@ import {
   type DayOfWeek,
   type Diagnostic,
   type Employee,
-  type Role,
   type ScheduleAssignment,
   type ScheduleStats,
   type ScheduleStrategy,
@@ -55,7 +58,7 @@ import TemplatePanel from './TemplatePanel'
 
 type EmployeeDraft = {
   name: string
-  roles: Record<Role, boolean>
+  roles: Record<string, boolean>
   recurringAvailability: Employee['recurringAvailability']
   maxDaysPerWeek: number
   allowDoubles: boolean
@@ -146,11 +149,8 @@ type MovePreview = {
   isEmptyTarget: boolean
 }
 
-const roleLabels: Record<Role, string> = {
-  server: 'Server',
-  cashier: 'Cashier',
-  lead: 'Shift lead',
-  manager: 'Manager',
+function roleLabel(role: string): string {
+  return formatRoleLabel(role)
 }
 
 const periodLabels: Record<ShiftPeriod, string> = {
@@ -158,11 +158,36 @@ const periodLabels: Record<ShiftPeriod, string> = {
   PM: 'Dinner',
 }
 
-const roleChipClasses: Record<Role, string> = {
+const KNOWN_ROLE_CHIP_CLASSES: Record<string, string> = {
   lead: 'border-red-200 bg-red-50 text-red-900',
   manager: 'border-violet-200 bg-violet-50 text-violet-900',
   server: 'border-sky-200 bg-sky-50 text-sky-900',
   cashier: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  cook: 'border-orange-200 bg-orange-50 text-orange-900',
+  'line-cook': 'border-amber-200 bg-amber-50 text-amber-900',
+  'fried-rice': 'border-yellow-200 bg-yellow-50 text-yellow-900',
+  dishwasher: 'border-cyan-200 bg-cyan-50 text-cyan-900',
+  'meat-prep': 'border-rose-200 bg-rose-50 text-rose-900',
+  'veggie-prep': 'border-lime-200 bg-lime-50 text-lime-900',
+  'mv-prep': 'border-teal-200 bg-teal-50 text-teal-900',
+  shadow: 'border-zinc-200 bg-zinc-50 text-zinc-700',
+}
+
+const FALLBACK_CHIP_CLASSES = [
+  'border-sky-200 bg-sky-50 text-sky-900',
+  'border-emerald-200 bg-emerald-50 text-emerald-900',
+  'border-violet-200 bg-violet-50 text-violet-900',
+  'border-orange-200 bg-orange-50 text-orange-900',
+  'border-teal-200 bg-teal-50 text-teal-900',
+  'border-rose-200 bg-rose-50 text-rose-900',
+]
+
+function roleChipClass(role: string): string {
+  const known = KNOWN_ROLE_CHIP_CLASSES[role]
+  if (known) return known
+  let hash = 0
+  for (let i = 0; i < role.length; i += 1) hash = (hash * 31 + role.charCodeAt(i)) >>> 0
+  return FALLBACK_CHIP_CLASSES[hash % FALLBACK_CHIP_CLASSES.length]
 }
 
 type SpotStatus = 'good' | 'review' | 'missing' | 'idle'
@@ -202,17 +227,37 @@ const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: stri
   },
 }
 
-const roleInitials: Record<Role, string> = {
+const KNOWN_ROLE_INITIALS: Record<string, string> = {
   server: 'S',
   cashier: 'C',
   lead: 'L',
   manager: 'M',
+  cook: 'K',
+  'line-cook': 'LC',
+  'fried-rice': 'FR',
+  dishwasher: 'D',
+  'meat-prep': 'MP',
+  'veggie-prep': 'VP',
+  'mv-prep': 'MV',
+  shadow: 'Sh',
+}
+
+function roleInitial(role: string): string {
+  const known = KNOWN_ROLE_INITIALS[role]
+  if (known) return known
+  const initials = role
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('')
+    .slice(0, 2)
+  return initials || '?'
 }
 
 /** "Cashier 2" becomes C2, so the position fits in a badge and the name gets the room. */
 function slotBadge(slot: StaffingSlot) {
   const position = slot.label.match(/(\d+)$/)?.[1] ?? ''
-  return `${roleInitials[slot.role]}${position}`
+  return `${roleInitial(slot.role)}${position}`
 }
 
 /** Compact shift time for chips: 9:30a-4p, 4-11p. Full range stays in the shift editor. */
@@ -296,8 +341,8 @@ const scheduleVariants: { id: ScheduleVariant; label: string; description: strin
   { id: 'fairHours', label: 'Similar hours for all', description: 'Evens out how many hours each person gets.', icon: 'undo' },
 ]
 
-function cloneEmployees() {
-  return seedEmployees.map((employee) => ({
+function cloneEmployees(restaurantId?: string) {
+  return defaultEmployeesForRestaurant(restaurantId).map((employee) => ({
     ...employee,
     roles: [...employee.roles],
     recurringAvailability: Object.fromEntries(
@@ -310,19 +355,40 @@ function cloneEmployees() {
   }))
 }
 
-function cloneTemplate(source: WeeklyStaffingTemplate = seedTemplate): WeeklyStaffingTemplate {
-  return Object.fromEntries(DAYS.map((day) => [day, source[day].map((slot) => ({ ...slot }))])) as WeeklyStaffingTemplate
+function cloneTemplate(source?: WeeklyStaffingTemplate, restaurantId?: string): WeeklyStaffingTemplate {
+  const base = source ?? defaultTemplateForRestaurant(restaurantId)
+  return Object.fromEntries(DAYS.map((day) => [day, base[day].map((slot) => ({ ...slot }))])) as WeeklyStaffingTemplate
 }
 
-function blankDraft(role: Role = 'server', recurringAvailability: Employee['recurringAvailability'] = allDays([fullDay])): EmployeeDraft {
+function blankDraft(
+  role: string = 'server',
+  recurringAvailability: Employee['recurringAvailability'] = allDays([fullDay]),
+  roles: string[] = rolesForRestaurant(),
+): EmployeeDraft {
   return {
     name: '',
-    roles: Object.fromEntries(ROLES.map((candidate) => [candidate, candidate === role])) as Record<Role, boolean>,
+    roles: Object.fromEntries(roles.map((candidate) => [candidate, candidate === role])) as Record<string, boolean>,
     recurringAvailability,
     maxDaysPerWeek: 5,
     allowDoubles: false,
     newHire: false,
   }
+}
+
+/** Every post in play: page defaults plus any custom post already used by staff or rules. */
+function rolesInUse(employees: Employee[], template: WeeklyStaffingTemplate, restaurantId?: string): string[] {
+  const seen = new Set<string>(rolesForRestaurant(restaurantId))
+  for (const employee of employees) {
+    for (const role of employee.roles) {
+      if (isValidRoleSlug(role)) seen.add(role)
+    }
+  }
+  for (const day of DAYS) {
+    for (const slot of template[day] ?? []) {
+      if (isValidRoleSlug(slot.role)) seen.add(slot.role)
+    }
+  }
+  return [...seen]
 }
 
 function allDays(ranges: TimeRange[]) {
@@ -484,13 +550,13 @@ function availabilityText(employee: Employee, day: DayOfWeek) {
 
 function trainedRolesText(employee: Employee) {
   if (employee.roles.length === 0) return 'nothing yet'
-  return employee.roles.map((role) => roleLabels[role]).join(', ')
+  return employee.roles.map((role) => roleLabel(role)).join(', ')
 }
 
 function diagnosticLabel(diagnostic: Diagnostic, weekStart: string) {
   const day = diagnostic.day && weekStart ? formatDayLabel(weekStart, diagnostic.day) : diagnostic.day
   const where = day && diagnostic.period ? `${day} ${periodLabels[diagnostic.period]}` : null
-  const role = diagnostic.role ? roleLabels[diagnostic.role] : null
+  const role = diagnostic.role ? roleLabel(diagnostic.role) : null
 
   if (diagnostic.code === 'search_exhausted') {
     return 'There is no way to fill every spot with the people and rules you have now. Add availability, add staff, or loosen a limit, then make the schedule again.'
@@ -826,7 +892,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [rosterSnapshots, setRosterSnapshots] = useState<Record<string, string | null>>({})
   const [rosterUpdatedAts, setRosterUpdatedAts] = useState<Record<string, string | null>>({})
   const [rosterLoadedWeeks, setRosterLoadedWeeks] = useState<Record<string, boolean>>({})
-  const [defaultRoster, setDefaultRoster] = useState<Employee[]>(cloneEmployees)
+  const [defaultRoster, setDefaultRoster] = useState<Employee[]>(() => cloneEmployees(restaurantId))
   const [defaultRosterLoaded, setDefaultRosterLoaded] = useState(false)
   const [defaultRosterRev, setDefaultRosterRev] = useState(0)
   const [templates, setTemplates] = useState<Record<string, WeeklyStaffingTemplate>>({})
@@ -834,7 +900,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [templateSnapshots, setTemplateSnapshots] = useState<Record<string, string | null>>({})
   const [templateUpdatedAts, setTemplateUpdatedAts] = useState<Record<string, string | null>>({})
   const [templateLoadedWeeks, setTemplateLoadedWeeks] = useState<Record<string, boolean>>({})
-  const [defaultTemplate, setDefaultTemplate] = useState<WeeklyStaffingTemplate>(() => cloneTemplate())
+  const [defaultTemplate, setDefaultTemplate] = useState<WeeklyStaffingTemplate>(() => cloneTemplate(undefined, restaurantId))
   const [defaultTemplateLoaded, setDefaultTemplateLoaded] = useState(false)
   const [defaultTemplateRev, setDefaultTemplateRev] = useState(0)
   const employees = weekStart ? (rosters[weekStart] ?? defaultRoster) : defaultRoster
@@ -881,7 +947,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
   const [monthKey, setMonthKey] = useState('')
   const [diagnostics, setDiagnostics] = useState<string[]>([])
-  const [draft, setDraft] = useState<EmployeeDraft>(() => blankDraft())
+  const [draft, setDraft] = useState<EmployeeDraft>(() => blankDraft(defaultRoleForRestaurant(restaurantId), allDays([fullDay]), rolesForRestaurant(restaurantId)))
   const [employeePanelOpen, setEmployeePanelOpen] = useState(false)
   const [openShiftKey, setOpenShiftKey] = useState<ShiftKey | null>(null)
   const [dragState, setDragState] = useState<DragState | null>(null)
@@ -921,10 +987,19 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const templateDirty = !templateLoaded
     ? false
     : templateServerSnapshot === null
-      ? templateFingerprint(template) !== templateFingerprint(seedTemplate)
+      ? templateFingerprint(template) !== templateFingerprint(defaultTemplateForRestaurant(restaurantId))
       : templateFingerprint(template) !== templateServerSnapshot
-  const isDefaultRoster = useMemo(() => rosterFingerprint(employees) === rosterFingerprint(seedEmployees), [employees])
-  const isDefaultTemplate = useMemo(() => templateFingerprint(template) === templateFingerprint(seedTemplate), [template])
+  const isDefaultRoster = useMemo(
+    () => rosterFingerprint(employees) === rosterFingerprint(defaultEmployeesForRestaurant(restaurantId)),
+    [employees, restaurantId],
+  )
+  const isDefaultTemplate = useMemo(
+    () => templateFingerprint(template) === templateFingerprint(defaultTemplateForRestaurant(restaurantId)),
+    [template, restaurantId],
+  )
+  // Posts offered on this page: kitchen pages show kitchen posts only, plus any
+  // custom post already used by this week's staff or rules so nothing disappears.
+  const availableRoles = useMemo(() => rolesInUse(employees, template, restaurantId), [employees, template, restaurantId])
   const assignments = weeks[weekStart] ?? emptyAssignments
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
   const weekVisibility = weekStart ? statusForWeek(weekStatus, weekStart, assignments) : 'off'
@@ -1030,8 +1105,14 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     assignments.length === 0 ? 'No schedule has been made yet.' : null,
     assignments.length > 0 && !schedulePassing ? 'Some spots still need fixing.' : null,
   ].filter((blocker): blocker is string => Boolean(blocker))
-  const selectedRoles = ROLES.filter((role) => draft.roles[role])
+  const selectedRoles = availableRoles.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && (selectedRoles.length > 0 || draft.newHire)
+
+  function addCustomRoleToDraft(raw: string) {
+    const slug = normalizeRoleSlug(raw)
+    if (!slug) return
+    setDraft((current) => ({ ...current, roles: { ...current.roles, [slug]: true } }))
+  }
 
   useEffect(() => {
     // The date has to wait for the browser: this page is prerendered,
@@ -1049,7 +1130,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setRosterSnapshots({})
     setRosterUpdatedAts({})
     setRosterLoadedWeeks({})
-    setDefaultRoster(cloneEmployees())
+    setDefaultRoster(cloneEmployees(restaurantId))
     setDefaultRosterLoaded(false)
     setDefaultRosterRev(0)
     setTemplates({})
@@ -1057,7 +1138,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setTemplateSnapshots({})
     setTemplateUpdatedAts({})
     setTemplateLoadedWeeks({})
-    setDefaultTemplate(cloneTemplate())
+    setDefaultTemplate(cloneTemplate(undefined, restaurantId))
+    setDraft(blankDraft(defaultRoleForRestaurant(restaurantId), allDays([fullDay]), rolesForRestaurant(restaurantId)))
     setDefaultTemplateLoaded(false)
     setDefaultTemplateRev(0)
     setWeeks({})
@@ -1273,7 +1355,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return employees.filter(
       (employee) =>
         employee.name.toLowerCase().includes(query) ||
-        employee.roles.some((role) => roleLabels[role].toLowerCase().includes(query)),
+        employee.roles.some((role) => roleLabel(role).toLowerCase().includes(query)),
     )
   }, [employees, staffQuery])
 
@@ -1420,12 +1502,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
   function addEmployeeForSlot(slot?: StaffingSlot) {
     if (slot) {
-      setDraft(blankDraft(slot.role, gapAvailability(slot)))
+      setDraft(blankDraft(slot.role, gapAvailability(slot), availableRoles))
       setOpenShiftKey(`${slot.day}-${slot.period}`)
     } else if (firstGap?.role && gapSlot) {
-      setDraft(blankDraft(firstGap.role, gapAvailability(gapSlot)))
+      setDraft(blankDraft(firstGap.role, gapAvailability(gapSlot), availableRoles))
     } else {
-      setDraft(blankDraft())
+      setDraft(blankDraft(defaultRoleForRestaurant(restaurantId), allDays([fullDay]), availableRoles))
     }
     setEmployeePanelOpen(true)
   }
@@ -1547,14 +1629,14 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     // Inline confirm in the header calls this only after an explicit second click.
     // remember() keeps the pre-reset state so Undo can bring it back.
     remember('reset demo')
-    setEmployees(cloneEmployees())
-    setTemplate(cloneTemplate())
+    setEmployees(cloneEmployees(restaurantId))
+    setTemplate(cloneTemplate(undefined, restaurantId))
     setWeeks({})
     setGeneratedWeeks({})
     setWeekStatus({})
     setDiagnostics([])
     setLastReport(null)
-    setDraft(blankDraft())
+    setDraft(blankDraft(defaultRoleForRestaurant(restaurantId), allDays([fullDay]), rolesForRestaurant(restaurantId)))
     setEmployeePanelOpen(false)
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
@@ -1565,7 +1647,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   function restoreDefaultRoster() {
     if (isDefaultRoster) return
     remember('restored default staff list')
-    setEmployees(cloneEmployees())
+    setEmployees(cloneEmployees(restaurantId))
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setDiagnostics(['Staff list for this week restored to the built-in defaults. Save to keep it — Undo brings back your list.'])
@@ -1574,7 +1656,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   function restoreDefaultTemplate() {
     if (isDefaultTemplate) return
     remember('restored default schedule rules')
-    setTemplate(cloneTemplate())
+    setTemplate(cloneTemplate(undefined, restaurantId))
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setDiagnostics(['Schedule rules for this week restored to the built-in defaults. Save to keep them — Undo brings back your rules.'])
@@ -1782,7 +1864,13 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     }
 
     setEmployees((current) => [...current, employee])
-    setDraft(blankDraft(firstGap?.role ?? selectedRoles[0], firstGap && gapSlot ? gapAvailability(gapSlot) : undefined))
+    setDraft(
+      blankDraft(
+        firstGap?.role ?? selectedRoles[0] ?? defaultRoleForRestaurant(restaurantId),
+        firstGap && gapSlot ? gapAvailability(gapSlot) : allDays([fullDay]),
+        availableRoles,
+      ),
+    )
     setEmployeePanelOpen(false)
     setIgnoredIssueIds([])
     setDiagnostics([`${employee.name} was added. Make the schedule again when the staff list looks right.`])
@@ -2132,6 +2220,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               onDragLeaveSlot={clearDropPreview}
               onDropAssignment={moveAssignmentTo}
               onActivateSlot={activateSlot}
+              roles={availableRoles}
             />
             <div className="print:hidden">
               <VariantControls selectedVariant={selectedVariant} pendingVariant={generatingVariant} disabled={isGenerating} onGenerate={(id) => void generate(id)} />
@@ -2177,6 +2266,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
             <TemplateEditor
               template={template}
+              roles={availableRoles}
               onChange={(next) => {
                 remember('changed schedule rules')
                 setTemplate(next)
@@ -2267,8 +2357,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 gapSlot={gapSlot}
                 weekStart={weekStart}
                 canAddEmployee={canAddEmployee}
+                roles={availableRoles}
                 onDraftChange={setDraft}
                 onAdd={addEmployee}
+                onAddCustomRole={addCustomRoleToDraft}
               />
             )}
 
@@ -2395,6 +2487,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                       key={employee.id}
                       employee={employee}
                       stat={staffStatsById.get(employee.id)}
+                      roles={availableRoles}
                       onUpdate={updateEmployee}
                       onRemove={removeEmployee}
                     />
@@ -2682,22 +2775,27 @@ function EmployeeForm({
   gapSlot,
   weekStart,
   canAddEmployee,
+  roles,
   onDraftChange,
   onAdd,
+  onAddCustomRole,
 }: {
   draft: EmployeeDraft
   gapSlot?: StaffingSlot
   weekStart: string
   canAddEmployee: boolean
+  roles: string[]
   onDraftChange: (draft: EmployeeDraft) => void
   onAdd: () => void
+  onAddCustomRole: (raw: string) => void
 }) {
   const saveHint = !draft.name.trim()
     ? 'Add a name to save.'
-    : ROLES.every((role) => !draft.roles[role]) && !draft.newHire
+    : roles.every((role) => !draft.roles[role]) && !draft.newHire
       ? 'Pick at least one position, or mark them a new hire, to save.'
       : null
   const [customizing, setCustomizing] = useState(false)
+  const [customRole, setCustomRole] = useState('')
 
   function toggleAvailabilityDay(day: DayOfWeek, period: 'am' | 'pm', checked: boolean) {
     const current = dayAvailabilityFromRanges(draft.recurringAvailability[day])
@@ -2729,11 +2827,11 @@ function EmployeeForm({
       <fieldset className="mt-3">
         <legend className="text-sm font-medium text-zinc-800">Positions</legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
-          {ROLES.map((role) => (
+          {roles.map((role) => (
             <label key={role} className="flex items-center gap-2 rounded border border-zinc-200 bg-white px-2 py-2 text-sm text-zinc-700">
               <input
                 type="checkbox"
-                checked={draft.roles[role]}
+                checked={Boolean(draft.roles[role])}
                 onChange={(event) =>
                   onDraftChange({
                     ...draft,
@@ -2741,9 +2839,37 @@ function EmployeeForm({
                   })
                 }
               />
-              {roleLabels[role]}
+              {roleLabel(role)}
             </label>
           ))}
+        </div>
+        <div className="mt-2 flex gap-2">
+          <input
+            className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            value={customRole}
+            onChange={(event) => setCustomRole(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                onAddCustomRole(customRole)
+                setCustomRole('')
+              }
+            }}
+            placeholder="New position (e.g. Sushi Chef)"
+            aria-label="Add a custom position"
+          />
+          <button
+            type="button"
+            className="shrink-0 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            disabled={!normalizeRoleSlug(customRole)}
+            onClick={() => {
+              onAddCustomRole(customRole)
+              setCustomRole('')
+            }}
+            title="Add any position you need — it becomes available everywhere on this page."
+          >
+            Add position
+          </button>
         </div>
       </fieldset>
 
@@ -2823,20 +2949,27 @@ function EmployeeForm({
 function EmployeeCard({
   employee,
   stat,
+  roles,
   onUpdate,
   onRemove,
 }: {
   employee: Employee
   stat?: ScheduleStats
+  roles: string[]
   onUpdate: (employeeId: string, update: Partial<Employee>) => void
   onRemove: (employeeId: string) => void
 }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [customizing, setCustomizing] = useState(false)
+  // Union so custom posts already on this person never disappear from their card.
+  const visibleRoles = [...roles]
+  for (const role of employee.roles) {
+    if (isValidRoleSlug(role) && !visibleRoles.includes(role)) visibleRoles.push(role)
+  }
 
-  function toggleRole(role: Role, enabled: boolean) {
-    const roles = enabled ? [...employee.roles, role] : employee.roles.filter((candidate) => candidate !== role)
-    onUpdate(employee.id, { roles: ROLES.filter((candidate) => roles.includes(candidate)) })
+  function toggleRole(role: string, enabled: boolean) {
+    const next = enabled ? [...employee.roles, role] : employee.roles.filter((candidate) => candidate !== role)
+    onUpdate(employee.id, { roles: [...new Set(next)] })
   }
 
   return (
@@ -2889,13 +3022,13 @@ function EmployeeCard({
       <fieldset className="mt-2">
         <legend className="sr-only">Positions {employee.name} can work</legend>
         <div className="flex flex-wrap gap-1.5">
-          {ROLES.map((role) => {
+          {visibleRoles.map((role) => {
             const checked = employee.roles.includes(role)
             return (
               <label
                 key={role}
                 className={`inline-flex cursor-pointer items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium ${
-                  checked ? roleChipClasses[role] : 'border-zinc-200 bg-white text-zinc-400'
+                  checked ? roleChipClass(role) : 'border-zinc-200 bg-white text-zinc-400'
                 }`}
               >
                 <input
@@ -2904,7 +3037,7 @@ function EmployeeCard({
                   checked={checked}
                   onChange={(event) => toggleRole(role, event.target.checked)}
                 />
-                {roleLabels[role]}
+                {roleLabel(role)}
               </label>
             )
           })}
@@ -3422,12 +3555,13 @@ function timeValueToMinutes(value: string) {
   return (hour || 0) * 60 + (minute || 0)
 }
 
-function blankTemplateSlot(): StaffingTemplateSlot {
-  return { period: 'AM', role: 'server', label: 'Server', start: minutes(9, 30), end: minutes(16), required: true }
+function blankTemplateSlot(role = 'server', label = 'Server'): StaffingTemplateSlot {
+  return { period: 'AM', role, label, start: minutes(9, 30), end: minutes(16), required: true }
 }
 
 function TemplateEditor({
   template,
+  roles,
   onChange,
   onUseDefault,
   isDefaultTemplate,
@@ -3444,6 +3578,7 @@ function TemplateEditor({
   weekStart,
 }: {
   template: WeeklyStaffingTemplate
+  roles: string[]
   onChange: (template: WeeklyStaffingTemplate) => void
   onUseDefault: () => void
   isDefaultTemplate: boolean
@@ -3472,7 +3607,8 @@ function TemplateEditor({
   }
 
   function addSlot(day: DayOfWeek) {
-    updateDay(day, [...template[day], blankTemplateSlot()])
+    const fallback = roles[0] ?? defaultRoleForRestaurant(restaurantId)
+    updateDay(day, [...template[day], blankTemplateSlot(fallback, roleLabel(fallback))])
   }
 
   return (
@@ -3519,6 +3655,13 @@ function TemplateEditor({
           <TemplatePanel template={template} rev={rev} dirty={dirty} loadPending={loadPending} onSaved={onSaved} onClose={onClosePanel} restaurantId={restaurantId} weekStart={weekStart} />
         </div>
       )}
+      <datalist id="scheduler-role-options">
+        {roles.map((role) => (
+          <option key={role} value={role}>
+            {roleLabel(role)}
+          </option>
+        ))}
+      </datalist>
       <div className="mt-3 space-y-3">
         {DAYS.map((day) => (
           <div key={day} className="rounded border border-zinc-200 p-2.5">
@@ -3547,17 +3690,19 @@ function TemplateEditor({
                       </option>
                     ))}
                   </select>
-                  <select
-                    className="rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs"
+                  <input
+                    className="w-28 rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs"
                     value={slot.role}
-                    onChange={(event) => updateSlot(day, index, { role: event.target.value as Role })}
-                  >
-                    {ROLES.map((role) => (
-                      <option key={role} value={role}>
-                        {roleLabels[role]}
-                      </option>
-                    ))}
-                  </select>
+                    list="scheduler-role-options"
+                    onChange={(event) => updateSlot(day, index, { role: event.target.value })}
+                    onBlur={(event) => {
+                      const slug = normalizeRoleSlug(event.target.value)
+                      updateSlot(day, index, { role: slug || slot.role })
+                    }}
+                    placeholder="Post"
+                    title="Pick a post or type any new one (e.g. Sushi Chef) — it is saved with the rules."
+                    aria-label="Post for this spot"
+                  />
                   <input
                     className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs"
                     value={slot.label}
@@ -3738,6 +3883,7 @@ function WeeklyScheduleBoard({
   onDragLeaveSlot,
   onDropAssignment,
   onActivateSlot,
+  roles,
 }: {
   slots: StaffingSlot[]
   weekStart: string
@@ -3763,6 +3909,7 @@ function WeeklyScheduleBoard({
   onDragLeaveSlot: (slotId: string) => void
   onDropAssignment: (targetSlotId: string) => void
   onActivateSlot: (slotId: string) => void
+  roles: string[]
 }) {
   return (
     <div className="mt-4 min-w-0">
@@ -3852,24 +3999,24 @@ function WeeklyScheduleBoard({
           onDropAssignment={onDropAssignment}
         />
       )}
-      <BoardLegend />
+      <BoardLegend roles={roles} />
     </div>
   )
 }
 
-function BoardLegend() {
+function BoardLegend({ roles }: { roles: string[] }) {
   const statusOrder: SpotStatus[] = ['good', 'review', 'missing', 'idle']
 
   return (
     <div className="space-y-2 border-t border-zinc-100 pt-3 text-xs">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-zinc-500">Position:</span>
-        {ROLES.map((role) => (
-          <span key={role} className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium ${roleChipClasses[role]}`}>
+        {roles.map((role) => (
+          <span key={role} className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium ${roleChipClass(role)}`}>
             <span aria-hidden="true" className="font-bold">
-              {roleInitials[role]}
+              {roleInitial(role)}
             </span>
-            {roleLabels[role]}
+            {roleLabel(role)}
           </span>
         ))}
       </div>
@@ -4229,7 +4376,7 @@ function AssignmentChip({
     >
       <span
         aria-hidden="true"
-        className={`inline-flex h-6 shrink-0 items-center justify-center rounded-sm border px-1 text-xs font-bold leading-none ${roleChipClasses[slot.role]}`}
+        className={`inline-flex h-6 shrink-0 items-center justify-center rounded-sm border px-1 text-xs font-bold leading-none ${roleChipClass(slot.role)}`}
       >
         {slotBadge(slot)}
       </span>
@@ -4351,11 +4498,11 @@ function SlotEditor({
           <div className="text-xs text-zinc-500">{formatTimeRange(slot)}</div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium ${roleChipClasses[slot.role]}`}>
+          <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium ${roleChipClass(slot.role)}`}>
             <span aria-hidden="true" className="font-bold">
-              {roleInitials[slot.role]}
+              {roleInitial(slot.role)}
             </span>
-            {roleLabels[slot.role]}
+            {roleLabel(slot.role)}
           </span>
           <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-medium ${statusMeta[status].badge}`}>
             <Icon name={statusMeta[status].icon} />
