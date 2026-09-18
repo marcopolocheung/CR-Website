@@ -1021,7 +1021,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   const slots = useMemo(() => expandTemplate(template), [template])
-  const readinessProblems = useMemo(() => preflightDiagnostics(employees, slots), [employees, slots])
+  // Readiness matches the solver: optional spots (not yet hired) never block the week.
+  const readinessProblems = useMemo(
+    () => preflightDiagnostics(employees, slots.filter((slot) => slot.required)),
+    [employees, slots],
+  )
   const firstGap = readinessProblems.find((problem) => problem.day && problem.period && problem.role)
   const gapSlot = useMemo(
     () =>
@@ -2008,8 +2012,15 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               <p className="mt-1 text-sm text-amber-900">
                 What you see below is the built-in demo list, not your saved data — your staff, rules, and published
                 weeks are still on the server. Do not save these defaults over them. Check your connection, then
-                reload to retry.
+                retry.
               </p>
+              <button
+                type="button"
+                className="mt-3 inline-flex items-center gap-2 rounded border border-amber-700 bg-white px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                onClick={() => window.location.reload()}
+              >
+                Retry connection
+              </button>
             </section>
           )}
 

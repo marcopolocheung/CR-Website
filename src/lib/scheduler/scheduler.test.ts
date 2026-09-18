@@ -10,7 +10,7 @@ import {
   seedTemplate,
   expandTemplate,
 } from './data'
-import { SCHEDULE_STRATEGIES, generateSchedule, summarizeSchedule } from './solver'
+import { SCHEDULE_STRATEGIES, generateSchedule, preflightDiagnostics, summarizeSchedule } from './solver'
 import { validateSchedule } from './validator'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeeklyStaffingTemplate } from './types'
 import { formatTime, formatTimeRange, minutes } from './time'
@@ -511,6 +511,20 @@ test('CR03 fixed crew covers every required kitchen slot', () => {
   assert.ok(tueEarly && bySlot.get(tueEarly.id) === 'jeffrey')
   const sundayLate = slots.filter((slot) => slot.day === 'Sunday' && slot.label === 'M/V Prep (late)')
   assert.equal(sundayLate.length, 0)
+})
+
+test('optional spots never block readiness — only required slots are checked', () => {
+  const employees = defaultEmployeesForRestaurant('CR3-kitchen')
+  const slots = expandTemplate(defaultTemplateForRestaurant('CR3-kitchen'))
+  assert.ok(slots.some((slot) => !slot.required), 'kitchen template has optional cover')
+  // The board checks readiness the way the solver does: required slots only.
+  assert.deepEqual(
+    preflightDiagnostics(
+      employees,
+      slots.filter((slot) => slot.required),
+    ),
+    [],
+  )
 })
 
 test('CR03 kitchens never inherit the dining crew and CR02 starts empty', () => {
