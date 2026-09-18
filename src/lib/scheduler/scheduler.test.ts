@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DAYS } from './types'
-import { seedEmployees, seedTemplate, expandTemplate } from './data'
+import { DAYS, formatRoleLabel, isValidRoleSlug, normalizeRoleSlug, rolesForRestaurant } from './types'
+import {
+  defaultEmployeesForRestaurant,
+  defaultTemplateForRestaurant,
+  seedEmployees,
+  seedKitchenEmployeesCR03,
+  seedKitchenTemplateCR03,
+  seedTemplate,
+  expandTemplate,
+} from './data'
 import { SCHEDULE_STRATEGIES, generateSchedule, summarizeSchedule } from './solver'
 import { validateSchedule } from './validator'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeeklyStaffingTemplate } from './types'
@@ -453,6 +461,82 @@ test('mid worker spanning AM and PM extra slots needs doubles allowed', () => {
     }),
     [],
   )
+})
+
+test('kitchen pages offer kitchen posts only — no dining posts', () => {
+  for (const restaurant of ['CR2-kitchen', 'CR3-kitchen']) {
+    const roles = rolesForRestaurant(restaurant)
+    assert.ok(!roles.includes('server') && !roles.includes('cashier') && !roles.includes('lead'))
+    assert.ok(roles.includes('cook') && roles.includes('dishwasher') && roles.includes('shadow'))
+  }
+  assert.ok(rolesForRestaurant('CR2-kitchen').includes('meat-prep'))
+  assert.ok(rolesForRestaurant('CR2-kitchen').includes('veggie-prep'))
+  assert.ok(rolesForRestaurant('CR2-kitchen').includes('manager'))
+  assert.ok(rolesForRestaurant('CR3-kitchen').includes('mv-prep'))
+  assert.ok(!rolesForRestaurant('CR3-kitchen').includes('meat-prep'))
+  assert.ok(!rolesForRestaurant('CR3-kitchen').includes('manager'))
+  assert.deepEqual(rolesForRestaurant('CR3-diningroom'), ['server', 'cashier', 'lead', 'manager'])
+})
+
+test('custom posts slugify, validate, and label for display', () => {
+  assert.equal(normalizeRoleSlug('M/V Prep'), 'mv-prep')
+  assert.equal(normalizeRoleSlug('  Sushi Chef '), 'sushi-chef')
+  assert.ok(isValidRoleSlug('sushi-chef'))
+  assert.ok(!isValidRoleSlug('Sushi Chef'))
+  assert.equal(formatRoleLabel('mv-prep'), 'M/V Prep')
+  assert.equal(formatRoleLabel('sushi-chef'), 'Sushi Chef')
+})
+
+test('CR03 fixed crew covers every required kitchen slot', () => {
+  const employees = defaultEmployeesForRestaurant('CR3-kitchen')
+  assert.deepEqual(
+    employees.map((employee) => employee.id).sort(),
+    ['carolina', 'jeffrey', 'muk'],
+  )
+  const requiredTemplate = Object.fromEntries(
+    DAYS.map((day) => [day, seedKitchenTemplateCR03[day].filter((slot) => slot.required)]),
+  ) as typeof seedKitchenTemplateCR03
+  const result = generateSchedule({ employees, template: requiredTemplate })
+  assert.equal(result.status, 'FEASIBLE')
+  if (result.status !== 'FEASIBLE') return
+
+  const slots = expandTemplate(requiredTemplate)
+  assert.deepEqual(validateSchedule({ employees, slots, assignments: result.assignments }), [])
+
+  const bySlot = new Map(result.assignments.map((assignment) => [assignment.slotId, assignment.employeeId]))
+  const cookSlots = slots.filter((slot) => slot.role === 'cook')
+  assert.ok(cookSlots.length === 7)
+  assert.ok(cookSlots.every((slot) => bySlot.get(slot.id) === 'muk'))
+  const tueEarly = slots.find((slot) => slot.day === 'Tuesday' && slot.label === 'M/V Prep (early)')
+  assert.ok(tueEarly && bySlot.get(tueEarly.id) === 'jeffrey')
+  const sundayLate = slots.filter((slot) => slot.day === 'Sunday' && slot.label === 'M/V Prep (late)')
+  assert.equal(sundayLate.length, 0)
+})
+
+test('CR03 kitchens never inherit the dining crew and CR02 starts empty', () => {
+  const cr03 = defaultEmployeesForRestaurant('CR3-kitchen')
+  assert.ok(cr03.every((employee) => !employee.roles.includes('server') && !employee.roles.includes('cashier')))
+  assert.deepEqual(defaultEmployeesForRestaurant('CR2-kitchen'), [])
+  const cr02Roles = new Set(defaultTemplateForRestaurant('CR2-kitchen').Sunday.map((slot) => slot.role))
+  assert.ok(cr02Roles.has('meat-prep') && cr02Roles.has('manager') && !cr02Roles.has('server'))
+  assert.ok(!seedKitchenEmployeesCR03.some((employee) => employee.id === 'mary'))
+})
+
+test('custom roles qualify and schedule like built-in ones', () => {
+  const chef: Employee = {
+    id: 'sushi',
+    name: 'Sushi',
+    roles: ['sushi-chef'],
+    recurringAvailability: Object.fromEntries(DAYS.map((day) => [day, [{ start: minutes(9), end: minutes(17) }]])),
+    maxDaysPerWeek: 7,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }
+  const template = emptyTemplate()
+  template.Monday = [{ period: 'AM', role: 'sushi-chef', label: 'Sushi Chef', start: minutes(9), end: minutes(17), required: true }]
+  const result = generateSchedule({ employees: [chef], template })
+  assert.equal(result.status, 'FEASIBLE')
 })
 
 test('extra mid and evening slots schedule on top of core AM/PM coverage', () => {

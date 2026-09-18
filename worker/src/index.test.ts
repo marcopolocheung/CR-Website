@@ -304,7 +304,10 @@ test('employee roster bodies are strictly validated', () => {
   assert.equal(validateRosterBody(good)?.baseRev, 0)
   assert.equal(validateRosterBody({ ...good, baseRev: -1 }), null)
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ id: 'Not Valid!' })], baseRev: 0 }), null)
-  assert.equal(validateRosterBody({ employees: [rosterEmployee({ roles: ['chef'] })], baseRev: 0 }), null)
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ roles: ['Chef!'] })], baseRev: 0 }), null, 'role slugs stay lowercase')
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ roles: ['line cook'] })], baseRev: 0 }), null, 'spaces rejected')
+  assert.ok(validateRosterBody({ employees: [rosterEmployee({ roles: ['cook', 'mv-prep'] })], baseRev: 0 }), 'kitchen posts accepted')
+  assert.ok(validateRosterBody({ employees: [rosterEmployee({ roles: ['sushi-chef'] })], baseRev: 0 }), 'custom posts accepted')
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ recurringAvailability: { Someday: [] } })], baseRev: 0 }), null)
   assert.equal(
     validateRosterBody({ employees: [rosterEmployee({ recurringAvailability: { Sunday: [{ start: 100, end: 50 }] } })], baseRev: 0 }),
@@ -367,10 +370,25 @@ test('staffing template bodies are strictly validated', () => {
   )
   assert.equal(
     validateTemplateBody({
-      template: templatePayload({ Monday: [{ period: 'AM', role: 'chef', label: 'Server', start: 570, end: 960, required: true }] }),
+      template: templatePayload({ Monday: [{ period: 'AM', role: 'Chef!', label: 'Server', start: 570, end: 960, required: true }] }),
       baseRev: 0,
     }),
     null,
+    'role slugs stay lowercase',
+  )
+  assert.ok(
+    validateTemplateBody({
+      template: templatePayload({ Monday: [{ period: 'AM', role: 'mv-prep', label: 'M/V Prep (early)', start: 360, end: 810, required: true }] }),
+      baseRev: 0,
+    }),
+    'kitchen post slots accepted',
+  )
+  assert.ok(
+    validateTemplateBody({
+      template: templatePayload({ Monday: [{ period: 'AM', role: 'sushi-chef', label: 'Sushi Chef', start: 570, end: 960, required: true }] }),
+      baseRev: 0,
+    }),
+    'custom post slots accepted',
   )
   assert.equal(
     validateTemplateBody({

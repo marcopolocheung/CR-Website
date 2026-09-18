@@ -277,7 +277,13 @@ async function readRosterRaw(env, restaurant) {
     return null;
 }
 const ROSTER_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const ROSTER_ROLES = ['server', 'cashier', 'lead', 'manager'];
+// Posts are extensible: dining defaults plus every kitchen post, plus any
+// manager-defined custom post slug (e.g. "sushi-chef"). Validation accepts any
+// well-formed slug so new posts never need a Worker redeploy to save.
+const ROLE_SLUG_RE = /^[a-z0-9-]{1,40}$/;
+function isValidRole(value) {
+    return typeof value === 'string' && ROLE_SLUG_RE.test(value);
+}
 const MAX_EMPLOYEES = 100;
 const MAX_RANGES_PER_DAY = 6;
 const MAX_MINUTES_PER_DAY = 24 * 60;
@@ -307,7 +313,7 @@ function isValidStoredEmployee(value) {
     }
     if (typeof employee.name !== 'string' || employee.name.length === 0 || employee.name.length > MAX_NAME_CHARS)
         return false;
-    if (!Array.isArray(employee.roles) || !employee.roles.every((role) => typeof role === 'string' && ROSTER_ROLES.includes(role))) {
+    if (!Array.isArray(employee.roles) || !employee.roles.every(isValidRole)) {
         return false;
     }
     if (!employee.recurringAvailability || typeof employee.recurringAvailability !== 'object')
@@ -400,7 +406,7 @@ function isValidStoredTemplateSlot(value) {
     const slot = value;
     if (slot.period !== 'AM' && slot.period !== 'PM')
         return false;
-    if (typeof slot.role !== 'string' || !ROSTER_ROLES.includes(slot.role))
+    if (!isValidRole(slot.role))
         return false;
     if (typeof slot.label !== 'string' || slot.label.length === 0 || slot.label.length > MAX_LABEL_CHARS)
         return false;
