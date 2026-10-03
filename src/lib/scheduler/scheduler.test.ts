@@ -523,9 +523,10 @@ test('CR03 fixed crew covers every required kitchen slot', () => {
   assert.deepEqual(validateSchedule({ employees, slots, assignments: result.assignments }), [])
 
   const bySlot = new Map(result.assignments.map((assignment) => [assignment.slotId, assignment.employeeId]))
-  // Every required spot is filled, one Cook per day, and no late prep on Sunday.
+  // Every required spot is filled, lunch + dinner cook each day, no Sunday late prep.
   assert.ok(slots.every((slot) => bySlot.get(slot.id)))
-  assert.equal(slots.filter((slot) => slot.role === 'cook').length, 7)
+  assert.equal(slots.filter((slot) => slot.role === 'cook').length, 14)
+  assert.equal(slots.filter((slot) => slot.period === 'PM' && slot.required).length, 28)
   assert.equal(slots.filter((slot) => slot.day === 'Sunday' && slot.label === 'M/V Prep (late)').length, 0)
 })
 

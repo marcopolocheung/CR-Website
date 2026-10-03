@@ -41,8 +41,8 @@ export const schedulerAssumptions = [
   'Desiree, Shorty, and Dolores have no confirmed weekly limits in the source text, so the demo config uses seven max days and makes that editable.',
   'Kitchen pages (CR02/CR03) use kitchen posts only — no dining-room posts. Managers can add custom posts from the UI.',
   'CR03 Kitchen is schedule-only: its 17-person crew, post qualifications, and hours are fixed in code from the CR03_K rules sheet. Users build the schedule and move people between spots; nobody edits the staff list or the rules from the app.',
-  'CR03 required cover is one Cook, one M/V Prep (early), and one M/V Prep (late) per day (no late slot Sunday). Line Cook, Fried Rice, Dishwasher, Shadow, and Meat Prep ship as optional AM/PM spots so the whole crew can be placed by hand without changing the required headcount.',
-  'CR03 AM optional spots start at 10:15am so both 9am-start and 10:15am-start workers (Alfredo) fit; PM spots use the 4-11pm window from the sheet.',
+  'CR03 runs the sheet’s two shifts: a lunch (AM) crew of Cook + M/V Prep (early/late) and a dinner (PM) crew of Cook + Line Cook + F.R. Cook + Dishwasher. Evening-only staff are scheduled into the Dinner column. Shadow, Meat Prep, and the extra lunch F.R. Cook / Dishwasher spots ship as optional cover.',
+  'CR03 lunch spots use the sheet’s AM window (10:15am-4pm Sunday, 9am-4pm otherwise) so both 9am-start and 10:15am-start workers fit; dinner spots use 4-11pm, except Dishwasher which starts at 5pm so the 5pm-start staff (Jayden, Cris) can take it.',
   'CR02 Kitchen template hours are placeholders (9am-8pm daily) until confirmed; its roster starts empty.',
 ]
 
@@ -260,7 +260,9 @@ function kitchenSlot(
   end: number,
   required = true,
 ): StaffingTemplateSlot {
-  return { period: 'AM', role, label, start, end, required }
+  // Lunch (AM) spots start before 4pm, dinner (PM) spots at/after 4pm — this is
+  // what puts evening-only staff in the Dinner column instead of Morning.
+  return { period: start >= minutes(16) ? 'PM' : 'AM', role, label, start, end, required }
 }
 
 // --- CR03 Kitchen crew (from 26-00919 CR SCHEDULER RULES, sheet CR03_K) ---
@@ -501,33 +503,36 @@ const CR03_EARLY_MV: Record<DayOfWeek, { start: number; end: number }> = {
 }
 
 /**
- * CR03 Kitchen rules. Required cover stays at the same headcount as before:
- * one Cook, one M/V Prep (early), and one M/V Prep (late) per day (no late slot
- * on Sunday). The other posts ship as optional AM/PM spots so the PM-only and
- * part-day crew can be placed by hand without changing the required headcount.
+ * CR03 Kitchen rules. The sheet runs a lunch (AM) and a dinner (PM) shift, so
+ * the board does too: the lunch crew is Cook + M/V Prep (early/late) and the
+ * dinner crew is Cook + Line Cook + F.R. Cook + Dishwasher. Evening-only staff
+ * therefore land in the Dinner column instead of Morning. Shadow, Meat Prep,
+ * and the extra lunch spots ship as optional cover for the rest of the crew.
  */
 export const seedKitchenTemplateCR03: WeeklyStaffingTemplate = Object.fromEntries(
   DAYS.map((day) => {
     const sunday = day === 'Sunday'
     const slots: StaffingTemplateSlot[] = [
-      sunday ? kitchenSlot('cook', 'Cook', minutes(10, 15), minutes(16)) : kitchenSlot('cook', 'Cook', minutes(9), minutes(20)),
+      // Lunch (AM) crew.
+      sunday
+        ? kitchenSlot('cook', 'Cook (AM)', minutes(10, 15), minutes(16))
+        : kitchenSlot('cook', 'Cook (AM)', minutes(9), minutes(16)),
       kitchenSlot('mv-prep', 'M/V Prep (early)', CR03_EARLY_MV[day].start, CR03_EARLY_MV[day].end),
     ]
     if (!sunday) {
-      slots.push(kitchenSlot('mv-prep', 'M/V Prep (late)', K_MV_LATE.start, K_MV_LATE.end))
+      slots.push(kitchenSlot('mv-prep', 'M/V Prep (late)', minutes(9), minutes(16)))
     }
-    // Optional cover for the rest of the crew. AM spots use 10:15-4pm so both
-    // 9am-start and 10:15am-start workers fit; PM spots use the 4-11pm window.
-    for (const [role, label] of [
-      ['line-cook', 'Line Cook'],
-      ['fried-rice', 'Fried Rice'],
-      ['dishwasher', 'Dishwasher'],
-    ] as const) {
-      slots.push(kitchenSlot(role, `${label} (AM)`, minutes(10, 15), minutes(16), false))
-      slots.push(kitchenSlot(role, `${label} (PM)`, minutes(16), minutes(23), false))
-    }
+    // Dinner (PM) crew.
+    slots.push(kitchenSlot('cook', 'Cook (PM)', minutes(16), minutes(23)))
+    slots.push(kitchenSlot('line-cook', 'Line Cook (PM)', minutes(16), minutes(23)))
+    slots.push(kitchenSlot('fried-rice', 'F.R. Cook (PM)', minutes(16), minutes(23)))
+    // Dishwashers who start at 5pm (Jayden, Cris) can take a 5-11 dinner spot.
+    slots.push(kitchenSlot('dishwasher', 'Dishwasher (PM)', minutes(17), minutes(23)))
+    // Optional cover: lunch F.R. Cook / Dishwasher, dinner Shadow / Meat Prep.
+    slots.push(kitchenSlot('fried-rice', 'F.R. Cook (AM)', minutes(10, 15), minutes(16), false))
+    slots.push(kitchenSlot('dishwasher', 'Dishwasher (AM)', sunday ? minutes(10, 15) : minutes(9), minutes(16), false))
     slots.push(kitchenSlot('shadow', 'Shadow (PM)', minutes(16), minutes(23), false))
-    slots.push(kitchenSlot('meat-prep', 'Meat Prep (PM)', minutes(16), minutes(23), false))
+    slots.push(kitchenSlot('meat-prep', 'Meat Prep (PM)', minutes(17), minutes(23), false))
     return [day, slots]
   }),
 ) as WeeklyStaffingTemplate

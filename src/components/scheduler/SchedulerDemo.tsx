@@ -10,6 +10,7 @@ import {
   defaultTemplateForRestaurant,
   expandTemplate,
   formatRoleLabel,
+  formatTime,
   formatTimeRange,
   generateSchedule,
   isEmployeeAvailableForSlot,
@@ -2724,24 +2725,20 @@ function AvailabilityGridEditor({
                 {ranges.length === 0 && <span className="text-xs text-zinc-400">Off</span>}
                 {ranges.map((range, index) => (
                   <div key={index} className="flex min-w-0 flex-wrap items-center gap-1">
-                    <input
-                      type="time"
-                      aria-label={`${day} availability ${index + 1} start`}
-                      className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
-                      value={minutesToTimeValue(range.start)}
+                    <TimeField
+                      ariaLabel={`${day} availability ${index + 1} start`}
+                      value={range.start}
                       disabled={!onChange}
-                      onChange={(event) => updateRangeTime(day, index, 'start', event.target.value)}
+                      onChange={(totalMinutes) => updateRangeTime(day, index, 'start', minutesToTimeValue(totalMinutes))}
                     />
                     <span aria-hidden="true" className="text-xs text-zinc-500">
                       to
                     </span>
-                    <input
-                      type="time"
-                      aria-label={`${day} availability ${index + 1} end`}
-                      className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
-                      value={minutesToTimeValue(range.end)}
+                    <TimeField
+                      ariaLabel={`${day} availability ${index + 1} end`}
+                      value={range.end}
                       disabled={!onChange}
-                      onChange={(event) => updateRangeTime(day, index, 'end', event.target.value)}
+                      onChange={(totalMinutes) => updateRangeTime(day, index, 'end', minutesToTimeValue(totalMinutes))}
                     />
                     {isSingleCustomRange(range) && (
                       <span className="rounded border border-sky-200 bg-sky-50 px-1 py-px text-[10px] font-semibold text-sky-900">
@@ -3652,6 +3649,78 @@ function timeValueToMinutes(value: string) {
   return (hour || 0) * 60 + (minute || 0)
 }
 
+const TIME_MINUTE_STEPS = [0, 15, 30, 45]
+
+/** 12-hour time picker (hour : minute AM/PM) so no screen ever shows a 24-hour clock. */
+function TimeField({
+  value,
+  onChange,
+  disabled,
+  ariaLabel,
+}: {
+  value: number
+  onChange: (totalMinutes: number) => void
+  disabled?: boolean
+  ariaLabel: string
+}) {
+  const hour24 = Math.floor(value / 60)
+  const minute = value % 60
+  const period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM'
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+  const minuteOptions = TIME_MINUTE_STEPS.includes(minute)
+    ? TIME_MINUTE_STEPS
+    : [...TIME_MINUTE_STEPS, minute].sort((a, b) => a - b)
+
+  function emit(nextHour12: number, nextMinute: number, nextPeriod: 'AM' | 'PM') {
+    const base = nextHour12 % 12
+    onChange((nextPeriod === 'PM' ? base + 12 : base) * 60 + nextMinute)
+  }
+
+  return (
+    <span className="inline-flex items-center gap-0.5" role="group" aria-label={ariaLabel}>
+      <select
+        className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
+        aria-label={`${ariaLabel} hour`}
+        value={hour12}
+        disabled={disabled}
+        onChange={(event) => emit(Number(event.target.value), minute, period)}
+      >
+        {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => (
+          <option key={hour} value={hour}>
+            {hour}
+          </option>
+        ))}
+      </select>
+      <span aria-hidden="true" className="text-xs text-zinc-500">
+        :
+      </span>
+      <select
+        className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
+        aria-label={`${ariaLabel} minute`}
+        value={minute}
+        disabled={disabled}
+        onChange={(event) => emit(hour12, Number(event.target.value), period)}
+      >
+        {minuteOptions.map((option) => (
+          <option key={option} value={option}>
+            {String(option).padStart(2, '0')}
+          </option>
+        ))}
+      </select>
+      <select
+        className="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs"
+        aria-label={`${ariaLabel} AM or PM`}
+        value={period}
+        disabled={disabled}
+        onChange={(event) => emit(hour12, minute, event.target.value as 'AM' | 'PM')}
+      >
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </span>
+  )
+}
+
 function blankTemplateSlot(role = 'server', label = 'Server'): StaffingTemplateSlot {
   return { period: 'AM', role, label, start: minutes(9, 30), end: minutes(16), required: true }
 }
@@ -3709,7 +3778,7 @@ function TemplateEditor({
                     <span className="font-medium">{slot.label}</span>
                     <span className="text-zinc-500">{roleLabel(slot.role)}</span>
                     <span>
-                      {minutesToTimeValue(slot.start)}–{minutesToTimeValue(slot.end)}
+                      {formatTime(slot.start)} – {formatTime(slot.end)}
                     </span>
                     {slot.required ? (
                       <span className="font-semibold text-zinc-900">required</span>
@@ -3749,8 +3818,8 @@ function TemplateEditor({
         <div>
           <p className="text-sm text-zinc-600">Who the restaurant needs on each shift for this week. Add, remove, or change any spot.</p>
           <p className="mt-0.5 text-xs text-zinc-500">
-            Extra 12-7 / 4-7 help goes here as an added spot with exact times (e.g. Mid 12:00-04:00 PM, Evening
-            04:00-07:00 PM) on top of the core AM/PM spots.
+            Extra 12-7 / 4-7 help goes here as an added spot with exact times (e.g. Mid 12:00 PM - 4:00 PM,
+            Evening 4:00 PM - 7:00 PM) on top of the core AM/PM spots.
           </p>
           <p className="mt-0.5 text-xs text-zinc-500">
             Last saved: {formatUpdatedAt(updatedAt)}{dirty ? ' · unsaved changes' : ''} · changes stay in this week only
@@ -3841,18 +3910,16 @@ function TemplateEditor({
                     onChange={(event) => updateSlot(day, index, { label: event.target.value })}
                     placeholder="Label"
                   />
-                  <input
-                    type="time"
-                    className="rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs"
-                    value={minutesToTimeValue(slot.start)}
-                    onChange={(event) => updateSlot(day, index, { start: timeValueToMinutes(event.target.value) })}
+                  <TimeField
+                    ariaLabel="Spot start time"
+                    value={slot.start}
+                    onChange={(totalMinutes) => updateSlot(day, index, { start: totalMinutes })}
                   />
                   <span aria-hidden="true" className="text-xs text-zinc-500">to</span>
-                  <input
-                    type="time"
-                    className="rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs"
-                    value={minutesToTimeValue(slot.end)}
-                    onChange={(event) => updateSlot(day, index, { end: timeValueToMinutes(event.target.value) })}
+                  <TimeField
+                    ariaLabel="Spot end time"
+                    value={slot.end}
+                    onChange={(totalMinutes) => updateSlot(day, index, { end: totalMinutes })}
                   />
                   <label className="flex items-center gap-1 text-xs text-zinc-700">
                     <input
