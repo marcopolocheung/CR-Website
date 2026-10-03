@@ -10,7 +10,7 @@ import {
   seedTemplate,
   expandTemplate,
 } from './data'
-import { SCHEDULE_STRATEGIES, generateSchedule, summarizeSchedule } from './solver'
+import { SCHEDULE_STRATEGIES, generateSchedule, preflightDiagnostics, summarizeSchedule } from './solver'
 import { validateSchedule } from './validator'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeeklyStaffingTemplate } from './types'
 import { formatTime, formatTimeRange, minutes } from './time'
@@ -473,7 +473,7 @@ test('kitchen pages offer kitchen posts only — no dining posts', () => {
   assert.ok(rolesForRestaurant('CR2-kitchen').includes('veggie-prep'))
   assert.ok(rolesForRestaurant('CR2-kitchen').includes('manager'))
   assert.ok(rolesForRestaurant('CR3-kitchen').includes('mv-prep'))
-  assert.ok(!rolesForRestaurant('CR3-kitchen').includes('meat-prep'))
+  assert.ok(rolesForRestaurant('CR3-kitchen').includes('meat-prep'))
   assert.ok(!rolesForRestaurant('CR3-kitchen').includes('manager'))
   assert.deepEqual(rolesForRestaurant('CR3-diningroom'), ['server', 'cashier', 'lead', 'manager'])
 })
@@ -489,9 +489,28 @@ test('custom posts slugify, validate, and label for display', () => {
 
 test('CR03 fixed crew covers every required kitchen slot', () => {
   const employees = defaultEmployeesForRestaurant('CR3-kitchen')
+  assert.equal(employees.length, 17)
   assert.deepEqual(
     employees.map((employee) => employee.id).sort(),
-    ['carolina', 'jeffrey', 'muk'],
+    [
+      'alex',
+      'alfredo',
+      'carolina',
+      'cris',
+      'daniel',
+      'eddie',
+      'isaiah',
+      'issac',
+      'jay',
+      'jayden',
+      'jeffery',
+      'jeremiah',
+      'jeremy',
+      'jorge',
+      'muk',
+      'robert',
+      'stef',
+    ],
   )
   const requiredTemplate = Object.fromEntries(
     DAYS.map((day) => [day, seedKitchenTemplateCR03[day].filter((slot) => slot.required)]),
@@ -504,13 +523,82 @@ test('CR03 fixed crew covers every required kitchen slot', () => {
   assert.deepEqual(validateSchedule({ employees, slots, assignments: result.assignments }), [])
 
   const bySlot = new Map(result.assignments.map((assignment) => [assignment.slotId, assignment.employeeId]))
-  const cookSlots = slots.filter((slot) => slot.role === 'cook')
-  assert.ok(cookSlots.length === 7)
-  assert.ok(cookSlots.every((slot) => bySlot.get(slot.id) === 'muk'))
-  const tueEarly = slots.find((slot) => slot.day === 'Tuesday' && slot.label === 'M/V Prep (early)')
-  assert.ok(tueEarly && bySlot.get(tueEarly.id) === 'jeffrey')
-  const sundayLate = slots.filter((slot) => slot.day === 'Sunday' && slot.label === 'M/V Prep (late)')
-  assert.equal(sundayLate.length, 0)
+  // Every required spot is filled, one Cook per day, and no late prep on Sunday.
+  assert.ok(slots.every((slot) => bySlot.get(slot.id)))
+  assert.equal(slots.filter((slot) => slot.role === 'cook').length, 7)
+  assert.equal(slots.filter((slot) => slot.day === 'Sunday' && slot.label === 'M/V Prep (late)').length, 0)
+})
+
+test('CR03 crew carries the sheet’s post qualifications and double limits', () => {
+  const employees = defaultEmployeesForRestaurant('CR3-kitchen')
+  const byId = new Map(employees.map((employee) => [employee.id, employee]))
+  assert.deepEqual(byId.get('muk')?.roles, ['cook'])
+  assert.deepEqual(byId.get('alfredo')?.roles, ['fried-rice'])
+  assert.ok(byId.get('stef')?.roles.includes('shadow'))
+  assert.ok(byId.get('cris')?.roles.includes('meat-prep'))
+  // Per-person double caps from the sheet.
+  assert.equal(byId.get('stef')?.maxDoublesPerWeek, 1)
+  assert.equal(byId.get('jay')?.maxDoublesPerWeek, 2)
+  assert.equal(byId.get('jorge')?.maxDoublesPerWeek, 1)
+  // PM-only and 4-day people.
+  assert.equal(byId.get('isaiah')?.maxDaysPerWeek, 4)
+  assert.equal(byId.get('isaiah')?.allowDoubles, false)
+  assert.equal(byId.get('jayden')?.allowDoubles, false)
+})
+
+test('max doubles per week is a hard constraint', () => {
+  const employee: Employee = {
+    id: 'doubler',
+    name: 'Doubler',
+    roles: ['server'],
+    recurringAvailability: Object.fromEntries(DAYS.map((day) => [day, [{ start: minutes(9), end: minutes(23) }]])),
+    maxDaysPerWeek: 7,
+    allowDoubles: true,
+    maxDoublesPerWeek: 1,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }
+  const slots = ['Monday', 'Tuesday'].flatMap((day) =>
+    (['AM', 'PM'] as const).map((period) => ({
+      id: `${day}-${period}`,
+      day: day as (typeof DAYS)[number],
+      period,
+      role: 'server',
+      label: 'Server',
+      start: period === 'AM' ? minutes(9) : minutes(16),
+      end: period === 'AM' ? minutes(16) : minutes(23),
+      required: true,
+    })),
+  )
+  // Two double days with a cap of one is rejected.
+  const twoDoubles = slots.map((slot) => ({ slotId: slot.id, employeeId: 'doubler' }))
+  assert.ok(
+    validateSchedule({ employees: [employee], slots, assignments: twoDoubles }).some(
+      (violation) => violation.code === 'max_doubles_exceeded',
+    ),
+  )
+  // One double day is fine.
+  const oneDouble = twoDoubles.filter((assignment) => assignment.slotId.startsWith('Monday'))
+  assert.deepEqual(
+    validateSchedule({ employees: [employee], slots, assignments: oneDouble }).filter(
+      (violation) => violation.code === 'max_doubles_exceeded',
+    ),
+    [],
+  )
+})
+
+test('optional spots never block readiness — only required slots are checked', () => {
+  const employees = defaultEmployeesForRestaurant('CR3-kitchen')
+  const slots = expandTemplate(defaultTemplateForRestaurant('CR3-kitchen'))
+  assert.ok(slots.some((slot) => !slot.required), 'kitchen template has optional cover')
+  // The board checks readiness the way the solver does: required slots only.
+  assert.deepEqual(
+    preflightDiagnostics(
+      employees,
+      slots.filter((slot) => slot.required),
+    ),
+    [],
+  )
 })
 
 test('CR03 kitchens never inherit the dining crew and CR02 starts empty', () => {

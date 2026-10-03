@@ -38,8 +38,20 @@ export const RESTAURANTS: Record<RestaurantId, Restaurant> = {
 
 export const DEFAULT_RESTAURANT: RestaurantId = 'CR3-diningroom'
 
+/**
+ * Stations whose staff list and shift rules are fixed in code. Users can still
+ * build a schedule and move people between the fixed spots, but nobody — not
+ * even a manager — edits the crew or the rules from the app. The Worker rejects
+ * roster/template writes for these stations too, so it cannot be bypassed.
+ */
+export const SCHEDULE_ONLY_RESTAURANTS: readonly RestaurantId[] = ['CR3-kitchen']
+
 export function isRestaurantId(value: unknown): value is RestaurantId {
   return typeof value === 'string' && (RESTAURANT_IDS as readonly string[]).includes(value)
+}
+
+export function isScheduleOnlyRestaurant(value: unknown): boolean {
+  return isRestaurantId(value) && SCHEDULE_ONLY_RESTAURANTS.includes(value)
 }
 
 export function assertRestaurantId(value: string): RestaurantId {

@@ -1,8 +1,9 @@
 // One-shot reset for the kitchen scheduler stations.
 //
-// Replaces the dining-room crew on CR3-kitchen with the fixed kitchen crew
-// (Muk / Jeffrey / Carolina) and pushes the kitchen schedule rules to both
-// CR3-kitchen and CR2-kitchen. Dining stations are untouched.
+// CR3-kitchen is schedule-only: its crew and rules are fixed in code and the
+// Worker refuses roster/template writes for it, so this script skips it. It
+// pushes the CR2-kitchen schedule rules and clears any stale dining staff there.
+// Dining stations are untouched.
 //
 // Usage:
 //   SCHEDULE_WRITE_TOKEN=... node --import jiti/register scripts/seed-kitchen-stations.mjs [--api BASE] [--dry-run]
@@ -13,8 +14,7 @@
 import { createJiti } from 'jiti'
 
 const jiti = createJiti(import.meta.url)
-const { seedKitchenEmployeesCR03, seedKitchenTemplateCR02, seedKitchenTemplateCR03 } = jiti('../src/lib/scheduler/data.ts')
-const { toRosterEmployee } = jiti('../src/lib/employee-store.ts')
+const { seedKitchenTemplateCR02 } = jiti('../src/lib/scheduler/data.ts')
 
 const args = new Set(process.argv.slice(2))
 const dryRun = args.has('--dry-run')
@@ -41,9 +41,11 @@ async function putJson(path, body) {
 
 const plans = [
   {
+    // CR3-kitchen is schedule-only: its crew and rules are fixed in code and the
+    // Worker refuses roster/template writes for it, so there is nothing to seed.
     restaurant: 'CR3-kitchen',
-    roster: seedKitchenEmployeesCR03.map(toRosterEmployee),
-    template: seedKitchenTemplateCR03,
+    roster: null,
+    template: null,
   },
   {
     restaurant: 'CR2-kitchen',
@@ -59,6 +61,11 @@ for (const plan of plans) {
   console.log(`\n== ${plan.restaurant} ==`)
   console.log(`roster: rev=${rosterDoc.rev} count=${rosterDoc.employees.length}`)
   console.log(`template: rev=${templateDoc.rev} present=${templateDoc.template !== null}`)
+
+  if (plan.roster === null && plan.template === null) {
+    console.log('schedule-only station — crew and rules are fixed in code; nothing to seed here.')
+    continue
+  }
 
   const rosterPayload = plan.roster ?? (rosterDoc.employees.length > 0 ? [] : null)
   if (dryRun) {

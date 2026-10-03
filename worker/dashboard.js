@@ -11,6 +11,11 @@ const WRITE_LIMIT_PER_HOUR = 60;
 const VERIFY_LIMIT_PER_HOUR = 30;
 export const RESTAURANTS = ['CR3-diningroom', 'CR3-kitchen', 'CR2-kitchen', 'CR2-diningroom'];
 export const DEFAULT_RESTAURANT = 'CR3-diningroom';
+/** Stations whose staff list and shift rules are fixed in code; roster/template PUTs are refused. */
+export const SCHEDULE_ONLY_RESTAURANTS = ['CR3-kitchen'];
+export function isScheduleOnlyRestaurant(restaurant) {
+    return SCHEDULE_ONLY_RESTAURANTS.includes(restaurant);
+}
 const RESTAURANT_RE = /^[A-Za-z0-9-]{2,40}$/;
 export function isValidRestaurant(value) {
     return typeof value === 'string' && RESTAURANTS.includes(value);
@@ -337,6 +342,14 @@ function isValidStoredEmployee(value) {
     }
     if (typeof employee.allowDoubles !== 'boolean')
         return false;
+    if (employee.maxDoublesPerWeek !== undefined) {
+        if (typeof employee.maxDoublesPerWeek !== 'number' ||
+            !Number.isInteger(employee.maxDoublesPerWeek) ||
+            employee.maxDoublesPerWeek < 0 ||
+            employee.maxDoublesPerWeek > 7) {
+            return false;
+        }
+    }
     if (!Array.isArray(employee.incompatibleEmployeeIds) ||
         employee.incompatibleEmployeeIds.length > MAX_INCOMPATIBLE_IDS ||
         !employee.incompatibleEmployeeIds.every((id) => typeof id === 'string')) {
@@ -817,6 +830,8 @@ export default {
                     return json({ error: 'write_not_configured' }, 503, request, env);
                 if (!isGoldenWriteAuthorized(request, env))
                     return json({ error: 'unauthorized' }, 401, request, env);
+                if (isScheduleOnlyRestaurant(restaurant))
+                    return json({ error: 'station_locked' }, 403, request, env);
                 if (!(await checkWriteThrottle(env, clientIp(request)))) {
                     return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
                 }
@@ -887,6 +902,8 @@ export default {
                     return json({ error: 'write_not_configured' }, 503, request, env);
                 if (!isGoldenWriteAuthorized(request, env))
                     return json({ error: 'unauthorized' }, 401, request, env);
+                if (isScheduleOnlyRestaurant(restaurant))
+                    return json({ error: 'station_locked' }, 403, request, env);
                 if (!(await checkWriteThrottle(env, clientIp(request)))) {
                     return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
                 }

@@ -48,6 +48,17 @@ export type RestaurantId = (typeof RESTAURANTS)[number]
 
 export const DEFAULT_RESTAURANT: RestaurantId = 'CR3-diningroom'
 
+/**
+ * Stations whose staff list and shift rules are fixed in code. The roster and
+ * template PUTs are refused here so a schedule-only user cannot change the crew
+ * by calling the API directly. The schedule itself stays writable.
+ */
+export const SCHEDULE_ONLY_RESTAURANTS: readonly RestaurantId[] = ['CR3-kitchen']
+
+export function isScheduleOnlyRestaurant(restaurant: string): boolean {
+  return (SCHEDULE_ONLY_RESTAURANTS as readonly string[]).includes(restaurant)
+}
+
 const RESTAURANT_RE = /^[A-Za-z0-9-]{2,40}$/
 
 export function isValidRestaurant(value: unknown): value is RestaurantId {
@@ -375,6 +386,7 @@ export type StoredEmployee = {
   maxDaysPerWeek?: number
   maxShiftsPerWeek?: number
   allowDoubles: boolean
+  maxDoublesPerWeek?: number
   incompatibleEmployeeIds: string[]
   active: boolean
   newHire: boolean
@@ -433,6 +445,16 @@ function isValidStoredEmployee(value: unknown): value is StoredEmployee {
     }
   }
   if (typeof employee.allowDoubles !== 'boolean') return false
+  if (employee.maxDoublesPerWeek !== undefined) {
+    if (
+      typeof employee.maxDoublesPerWeek !== 'number' ||
+      !Number.isInteger(employee.maxDoublesPerWeek) ||
+      employee.maxDoublesPerWeek < 0 ||
+      employee.maxDoublesPerWeek > 7
+    ) {
+      return false
+    }
+  }
   if (
     !Array.isArray(employee.incompatibleEmployeeIds) ||
     employee.incompatibleEmployeeIds.length > MAX_INCOMPATIBLE_IDS ||
@@ -915,6 +937,7 @@ export default {
       if (request.method === 'PUT') {
         if (goldenWriteError(env)) return json({ error: 'write_not_configured' }, 503, request, env)
         if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
+        if (isScheduleOnlyRestaurant(restaurant)) return json({ error: 'station_locked' }, 403, request, env)
         if (!(await checkWriteThrottle(env, clientIp(request)))) {
           return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
         }
@@ -999,6 +1022,7 @@ export default {
       if (request.method === 'PUT') {
         if (goldenWriteError(env)) return json({ error: 'write_not_configured' }, 503, request, env)
         if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
+        if (isScheduleOnlyRestaurant(restaurant)) return json({ error: 'station_locked' }, 403, request, env)
         if (!(await checkWriteThrottle(env, clientIp(request)))) {
           return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
         }

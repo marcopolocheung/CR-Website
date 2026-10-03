@@ -333,6 +333,21 @@ function basicCandidate(employee: Employee, slot: StaffingSlot) {
   return employee.active && isEmployeeQualified(employee, slot) && isEmployeeAvailableForSlot(employee, slot)
 }
 
+/** Days where a person already holds both an AM and a PM slot. */
+function countDoubleDays(slots: StaffingSlot[]) {
+  const periodsByDay = new Map<DayOfWeek, Set<ShiftPeriod>>()
+  for (const slot of slots) {
+    const periods = periodsByDay.get(slot.day) ?? new Set<ShiftPeriod>()
+    periods.add(slot.period)
+    periodsByDay.set(slot.day, periods)
+  }
+  let doubles = 0
+  for (const periods of periodsByDay.values()) {
+    if (periods.size > 1) doubles += 1
+  }
+  return doubles
+}
+
 function canAssign(allEmployees: Employee[], employee: Employee, slot: StaffingSlot, state: SolverState) {
   if (!basicCandidate(employee, slot)) return false
 
@@ -348,8 +363,13 @@ function canAssign(allEmployees: Employee[], employee: Employee, slot: StaffingS
   if (employee.maxShiftsPerWeek !== undefined && existingSlots.length + 1 > employee.maxShiftsPerWeek) return false
 
   const periodsForDay = new Set(existingSlots.filter((existingSlot) => existingSlot.day === slot.day).map((existingSlot) => existingSlot.period))
+  const alreadyDoubleToday = periodsForDay.size > 1
   periodsForDay.add(slot.period)
   if (!employee.allowDoubles && periodsForDay.size > 1) return false
+  if (employee.maxDoublesPerWeek !== undefined && periodsForDay.size > 1 && !alreadyDoubleToday) {
+    const doublesSoFar = countDoubleDays(existingSlots)
+    if (doublesSoFar + 1 > employee.maxDoublesPerWeek) return false
+  }
 
   const shiftEmployees = Array.from(state.assignments.values())
     .map((assignment) => ({
