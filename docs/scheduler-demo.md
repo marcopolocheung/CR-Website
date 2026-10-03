@@ -18,7 +18,8 @@ CR3 Kitchen is a **schedule-only** station: its 17-person crew, post qualificati
 - The list of locked stations lives in `src/data/restaurants.ts` (`SCHEDULE_ONLY_RESTAURANTS` / `isScheduleOnlyRestaurant`).
 - `SchedulerDemo` always renders the built-in crew and template for a locked station and skips the roster/template fetch, so no reachable edit path can change them. Staff/rules editing controls (add/remove staff, save staff list, restore/clear, snapshots, rules editor, "start blank", the gap-example button) are hidden, and the rules panel renders read-only.
 - The Worker mirrors the lock: `PUT /api/employees` and `PUT /api/template` return `403 { error: 'station_locked' }` for a locked station (`worker/src/index.ts`, mirrored in `worker/dashboard.js`). Schedule writes (`PUT /api/schedule/:week`) stay allowed.
-- Required cover stays the same headcount as before: one Cook, one M/V Prep (early), and one M/V Prep (late) per day (no late slot on Sunday). The other posts ship as optional AM/PM spots so the PM-only and part-day crew can be placed by hand without changing the required headcount.
+- The board runs the sheet's two shifts. The lunch (AM) crew is Cook + M/V Prep (early/late); the dinner (PM) crew is Cook + Line Cook + F.R. Cook + Dishwasher. Evening-only staff are therefore scheduled into the Dinner column. Shadow, Meat Prep, and the extra lunch F.R. Cook / Dishwasher spots ship as optional cover.
+- Times are shown on a 12-hour clock everywhere (the `TimeField` control and `formatTime`); no 24-hour clock is displayed.
 - Per-person double caps from the sheet ("max 2 double shift", etc.) are modeled with `Employee.maxDoublesPerWeek`, enforced in both `solver.ts` and `validator.ts`.
 
 ## Data Model
