@@ -43,6 +43,8 @@ export const schedulerAssumptions = [
   'CR03 Kitchen is schedule-only: its 17-person crew, post qualifications, and hours are fixed in code from the CR03_K rules sheet. Users build the schedule and move people between spots; nobody edits the staff list or the rules from the app.',
   'CR03 runs the sheet’s two shifts: a lunch (AM) crew of Cook + M/V Prep (early/late) and a dinner (PM) crew of Cook + Line Cook + F.R. Cook + Dishwasher. Evening-only staff are scheduled into the Dinner column. Shadow, Meat Prep, and the extra lunch F.R. Cook / Dishwasher spots ship as optional cover.',
   'CR03 lunch spots use the sheet’s AM window (10:15am-4pm Sunday, 9am-4pm otherwise) so both 9am-start and 10:15am-start workers fit; dinner spots use 4-11pm, except Dishwasher which starts at 5pm so the 5pm-start staff (Jayden, Cris) can take it.',
+  'CR03 optional spots are filled automatically when a valid candidate exists (e.g. Stef on Shadow, Cris on Meat Prep when he is not on Dishwasher). Unfilled optional spots show as open and never block the week.',
+  'A Meat / Veggie Prep qualification also covers Meat Prep, but not the other way around — a meat-prep-only worker (Cris) cannot cover M/V Prep.',
   'CR02 Kitchen template hours are placeholders (9am-8pm daily) until confirmed; its roster starts empty.',
 ]
 
@@ -279,6 +281,7 @@ const K_EARLY_MON_SAT = { start: minutes(6), end: minutes(13, 30) }
 const K_ALFREDO = { start: minutes(10, 15), end: minutes(16) }
 const K_STEF = { start: minutes(14), end: minutes(23) }
 const K_DANIEL = { start: minutes(15), end: minutes(23) }
+const K_AM = { start: minutes(9), end: minutes(16) }
 const K_MV_LATE = { start: minutes(9), end: minutes(17) }
 
 /** Fixed CR03 Kitchen crew: qualifications and hours mirror the CR03_K sheet. */
@@ -427,8 +430,8 @@ export const seedKitchenEmployeesCR03: Employee[] = [
     id: 'eddie',
     name: 'Eddie',
     roles: ['dishwasher', 'mv-prep'],
-    // Sheet: 6 days max, AM only.
-    recurringAvailability: allDays([K_MV_LATE]),
+    // Sheet: 6 days max, AM only (9am-4pm lunch shift).
+    recurringAvailability: allDays([K_AM]),
     maxDaysPerWeek: 6,
     allowDoubles: false,
     incompatibleEmployeeIds: [],

@@ -62,7 +62,9 @@ type GenerateOptions = {
 }
 
 export function generateSchedule(input: SchedulerInput, options: GenerateOptions = {}): GenerateScheduleResult {
-  const slots = expandTemplate(input.template).filter((slot) => slot.required)
+  const allSlots = expandTemplate(input.template)
+  const slots = allSlots.filter((slot) => slot.required)
+  const optionalSlots = allSlots.filter((slot) => !slot.required)
   const diagnostics = preflightDiagnostics(input.employees, slots)
   const blockingDiagnostics = diagnostics.filter((diagnostic) => diagnostic.code.startsWith('no_') || diagnostic.code.startsWith('insufficient_'))
 
@@ -148,12 +150,66 @@ export function generateSchedule(input: SchedulerInput, options: GenerateOptions
     }
   }
 
+  // Optional cover never blocks a week, so it is filled best-effort after the
+  // required assignments are fixed. A missing optional spot stays open.
+  const assignments = fillOptionalSlots(input.employees, allSlots, optionalSlots, bestAssignments)
+
   return {
     status: 'FEASIBLE',
-    assignments: bestAssignments,
+    assignments,
     diagnostics,
     objectiveScore: scoreSchedule(input.employees, slots, bestAssignments),
   }
+}
+
+/**
+ * Places a valid candidate into each optional slot where one exists (e.g. Stef
+ * on Shadow, Cris on Meat Prep when he is not on Dishwasher). Runs after the
+ * required week is fixed and never backtracks, so it cannot break required
+ * coverage. Candidates are ordered specialists-first, then by fewest hours.
+ */
+function fillOptionalSlots(
+  employees: Employee[],
+  allSlots: StaffingSlot[],
+  optionalSlots: StaffingSlot[],
+  requiredAssignments: ScheduleAssignment[],
+): ScheduleAssignment[] {
+  if (optionalSlots.length === 0) return requiredAssignments
+  const slotsById = new Map(allSlots.map((slot) => [slot.id, slot]))
+  const state: SolverState = { assignments: new Map(), employeeSlots: new Map() }
+  for (const assignment of requiredAssignments) {
+    const slot = slotsById.get(assignment.slotId)
+    const employee = employees.find((candidate) => candidate.id === assignment.employeeId)
+    if (slot && employee) applyAssignment(employee, slot, Boolean(assignment.locked), state)
+  }
+
+  const ordered = [...optionalSlots].sort(
+    (a, b) =>
+      DAYS.indexOf(a.day) - DAYS.indexOf(b.day) ||
+      (a.period === b.period ? 0 : a.period === 'AM' ? -1 : 1) ||
+      a.start - b.start ||
+      a.label.localeCompare(b.label),
+  )
+
+  const filled = [...requiredAssignments]
+  for (const slot of ordered) {
+    const pick = employees
+      .filter((employee) => basicCandidate(employee, slot) && canAssign(employees, employee, slot, state))
+      .sort(
+        (a, b) =>
+          a.roles.length - b.roles.length ||
+          hoursAssigned(a, state) - hoursAssigned(b, state) ||
+          a.name.localeCompare(b.name),
+      )[0]
+    if (!pick) continue
+    applyAssignment(pick, slot, false, state)
+    filled.push({ slotId: slot.id, employeeId: pick.id })
+  }
+  return filled
+}
+
+function hoursAssigned(employee: Employee, state: SolverState) {
+  return (state.employeeSlots.get(employee.id) ?? []).reduce((total, slot) => total + hoursFor(slot), 0)
 }
 
 type SearchResult = { assignments: ScheduleAssignment[] } | { diagnostic: Diagnostic }
