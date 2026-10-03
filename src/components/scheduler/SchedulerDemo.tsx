@@ -191,7 +191,7 @@ function roleChipClass(role: string): string {
   return FALLBACK_CHIP_CLASSES[hash % FALLBACK_CHIP_CLASSES.length]
 }
 
-type SpotStatus = 'good' | 'review' | 'missing' | 'idle'
+type SpotStatus = 'good' | 'review' | 'missing' | 'open' | 'idle'
 
 const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: string; row: string; shiftRow: string; shiftLabel: string }> = {
   good: {
@@ -217,6 +217,14 @@ const statusMeta: Record<SpotStatus, { icon: IconName; chip: string; badge: stri
     row: 'border-red-200 border-l-4 border-l-red-600',
     shiftRow: 'border-l-4 border-l-red-600 bg-red-50',
     shiftLabel: 'Nobody assigned',
+  },
+  open: {
+    icon: 'plus',
+    chip: 'border-dashed border-amber-300 bg-amber-50 text-amber-800',
+    badge: 'border-amber-200 bg-amber-50 text-amber-800',
+    row: 'border-amber-100 border-l-4 border-l-amber-300',
+    shiftRow: 'border-l-4 border-l-amber-300 bg-amber-50',
+    shiftLabel: 'Open (optional)',
   },
   idle: {
     icon: 'plus',
@@ -309,13 +317,15 @@ function availabilitySummary(employee: Employee) {
 function spotStatus({
   hasEmployee,
   hasSchedule,
+  optional,
   violations,
 }: {
   hasEmployee: boolean
   hasSchedule: boolean
+  optional?: boolean
   violations: ValidationViolation[]
 }): SpotStatus {
-  if (!hasEmployee) return hasSchedule ? 'missing' : 'idle'
+  if (!hasEmployee) return hasSchedule ? (optional ? 'open' : 'missing') : 'idle'
   if (violations.length > 0) return 'review'
   return 'good'
 }
@@ -323,7 +333,7 @@ function spotStatus({
 function shiftStatus(statuses: SpotStatus[]): SpotStatus {
   if (statuses.includes('missing')) return 'missing'
   if (statuses.includes('review')) return 'review'
-  if (statuses.length > 0 && statuses.every((status) => status === 'good')) return 'good'
+  if (statuses.includes('good')) return 'good'
   return 'idle'
 }
 
@@ -4204,7 +4214,7 @@ function WeeklyScheduleBoard({
 }
 
 function BoardLegend({ roles }: { roles: string[] }) {
-  const statusOrder: SpotStatus[] = ['good', 'review', 'missing', 'idle']
+  const statusOrder: SpotStatus[] = ['good', 'review', 'missing', 'open', 'idle']
 
   return (
     <div className="space-y-2 border-t border-zinc-100 pt-3 text-xs">
@@ -4300,6 +4310,7 @@ function ShiftRow({
     spotStatus({
       hasEmployee: Boolean(assignmentMap.get(slot.id)?.employeeId),
       hasSchedule,
+      optional: !slot.required,
       violations: violations.filter((violation) => violation.slotId === slot.id),
     }),
   )
@@ -4427,6 +4438,7 @@ function OpenShiftDetail({
             status={spotStatus({
               hasEmployee: Boolean(assignmentMap.get(slot.id)?.employeeId),
               hasSchedule: assignments.length > 0,
+              optional: !slot.required,
               violations: violations.filter((violation) => violation.slotId === slot.id),
             })}
             activeMove={activeMove}

@@ -11,7 +11,7 @@ import {
   expandTemplate,
 } from './data'
 import { SCHEDULE_STRATEGIES, generateSchedule, preflightDiagnostics, summarizeSchedule } from './solver'
-import { validateSchedule } from './validator'
+import { isEmployeeQualified, validateSchedule } from './validator'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeeklyStaffingTemplate } from './types'
 import { formatTime, formatTimeRange, minutes } from './time'
 import { dateForDay, dayOfMonth, formatDayLabel, formatWeekRange, shiftWeek, weekStartFor, weeksBetween } from './week'
@@ -545,6 +545,58 @@ test('CR03 crew carries the sheet’s post qualifications and double limits', ()
   assert.equal(byId.get('isaiah')?.maxDaysPerWeek, 4)
   assert.equal(byId.get('isaiah')?.allowDoubles, false)
   assert.equal(byId.get('jayden')?.allowDoubles, false)
+})
+
+test('M/V prep qualification implies meat prep, but not the reverse', () => {
+  const mv: Employee = { id: 'mv', name: 'MV', roles: ['mv-prep'], recurringAvailability: {}, allowDoubles: false, active: true }
+  const mp: Employee = { id: 'mp', name: 'MP', roles: ['meat-prep'], recurringAvailability: {}, allowDoubles: false, active: true }
+  const meatSlot: StaffingSlot = {
+    id: 'meat',
+    day: 'Monday',
+    period: 'AM',
+    role: 'meat-prep',
+    label: 'Meat Prep',
+    start: minutes(9),
+    end: minutes(16),
+    required: true,
+  }
+  const mvSlot: StaffingSlot = { ...meatSlot, id: 'mv', role: 'mv-prep', label: 'M/V Prep' }
+  // An M/V prep worker can cover meat prep...
+  assert.equal(isEmployeeQualified(mv, meatSlot), true)
+  // ...but a meat-prep-only worker (Cris) cannot cover M/V prep.
+  assert.equal(isEmployeeQualified(mp, mvSlot), false)
+})
+
+test('optional spots are filled when a candidate exists, and left open when not', () => {
+  const solo: Employee = {
+    id: 'solo',
+    name: 'Solo',
+    roles: ['server'],
+    recurringAvailability: Object.fromEntries(DAYS.map((day) => [day, [{ start: minutes(9), end: minutes(23) }]])),
+    maxDaysPerWeek: 7,
+    allowDoubles: true,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }
+  const template = Object.fromEntries(DAYS.map((day) => [day, []])) as unknown as WeeklyStaffingTemplate
+  template.Monday = [
+    { period: 'AM', role: 'server', label: 'Server (AM)', start: minutes(9), end: minutes(16), required: true },
+    { period: 'PM', role: 'server', label: 'Server (PM)', start: minutes(16), end: minutes(23), required: false },
+    { period: 'PM', role: 'cook', label: 'Cook (PM)', start: minutes(16), end: minutes(23), required: false },
+  ]
+  const result = generateSchedule({ employees: [solo], template })
+  assert.equal(result.status, 'FEASIBLE')
+  if (result.status !== 'FEASIBLE') return
+  const slots = expandTemplate(template)
+  const bySlot = new Map(result.assignments.map((assignment) => [assignment.slotId, assignment.employeeId]))
+  const required = slots.find((slot) => slot.label === 'Server (AM)')
+  const optionalServer = slots.find((slot) => slot.label === 'Server (PM)')
+  const optionalCook = slots.find((slot) => slot.label === 'Cook (PM)')
+  assert.ok(required && bySlot.get(required.id) === 'solo')
+  // Optional spot with a qualified candidate is filled even though it is not required.
+  assert.ok(optionalServer && bySlot.get(optionalServer.id) === 'solo')
+  // Optional spot nobody is qualified for stays open.
+  assert.ok(optionalCook && bySlot.get(optionalCook.id) === undefined)
 })
 
 test('max doubles per week is a hard constraint', () => {

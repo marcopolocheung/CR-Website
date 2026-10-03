@@ -32,8 +32,20 @@ export function isEmployeeAvailableForSlot(employee: Employee, slot: StaffingSlo
   )
 }
 
+/**
+ * Role implications: a "Meat / Veggie Prep" worker can also cover "Meat Prep",
+ * but not the other way around — a meat-prep-only worker (Cris) cannot do M/V
+ * prep. Keep this shared by the solver and validator so both agree.
+ */
+const IMPLIED_ROLES: Record<string, string> = {
+  'meat-prep': 'mv-prep',
+}
+
 export function isEmployeeQualified(employee: Employee, slot: StaffingSlot) {
-  return Boolean(employee.newHire) || employee.roles.includes(slot.role)
+  if (employee.newHire) return true
+  if (employee.roles.includes(slot.role)) return true
+  const impliedBy = IMPLIED_ROLES[slot.role]
+  return impliedBy !== undefined && employee.roles.includes(impliedBy)
 }
 
 export function areEmployeesIncompatible(a: Employee, b: Employee) {
