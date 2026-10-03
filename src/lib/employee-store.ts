@@ -3,7 +3,16 @@ import type { Employee } from './scheduler'
 
 export type RosterEmployee = Pick<
   Employee,
-  'id' | 'name' | 'roles' | 'recurringAvailability' | 'maxDaysPerWeek' | 'maxShiftsPerWeek' | 'allowDoubles' | 'incompatibleEmployeeIds' | 'active'
+  | 'id'
+  | 'name'
+  | 'roles'
+  | 'recurringAvailability'
+  | 'maxDaysPerWeek'
+  | 'maxShiftsPerWeek'
+  | 'allowDoubles'
+  | 'maxDoublesPerWeek'
+  | 'incompatibleEmployeeIds'
+  | 'active'
 >
 
 export function toRosterEmployee(employee: Employee): RosterEmployee {
@@ -15,6 +24,7 @@ export function toRosterEmployee(employee: Employee): RosterEmployee {
     maxDaysPerWeek: employee.maxDaysPerWeek,
     maxShiftsPerWeek: employee.maxShiftsPerWeek,
     allowDoubles: employee.allowDoubles,
+    maxDoublesPerWeek: employee.maxDoublesPerWeek,
     incompatibleEmployeeIds: employee.incompatibleEmployeeIds ?? [],
     active: employee.active,
   }

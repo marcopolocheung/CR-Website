@@ -40,8 +40,9 @@ export const schedulerAssumptions = [
   'The Sunday noon third-person and Thursday/Friday noon fourth-person notes are listed as unresolved ambiguities instead of encoded as separate slots.',
   'Desiree, Shorty, and Dolores have no confirmed weekly limits in the source text, so the demo config uses seven max days and makes that editable.',
   'Kitchen pages (CR02/CR03) use kitchen posts only — no dining-room posts. Managers can add custom posts from the UI.',
-  'CR03 Kitchen fixed cover: Muk (Cook) Mon-Sat 9am-8pm + Sun 9-11am; Jeffrey (M/V Prep) Sun 8am-1:30pm, Mon & Wed-Sat 6am-1:30pm, Tue 9-11am; Carolina (M/V Prep) Mon-Sat 9am-5pm, Sun off.',
-  'CR03 non-fixed posts (Line Cook, Fried Rice, Dishwasher, Shadow) ship as optional 9am-8pm spots — flip them to required once hired so the solver stays feasible meanwhile.',
+  'CR03 Kitchen is schedule-only: its 17-person crew, post qualifications, and hours are fixed in code from the CR03_K rules sheet. Users build the schedule and move people between spots; nobody edits the staff list or the rules from the app.',
+  'CR03 required cover is one Cook, one M/V Prep (early), and one M/V Prep (late) per day (no late slot Sunday). Line Cook, Fried Rice, Dishwasher, Shadow, and Meat Prep ship as optional AM/PM spots so the whole crew can be placed by hand without changing the required headcount.',
+  'CR03 AM optional spots start at 10:15am so both 9am-start and 10:15am-start workers (Alfredo) fit; PM spots use the 4-11pm window from the sheet.',
   'CR02 Kitchen template hours are placeholders (9am-8pm daily) until confirmed; its roster starts empty.',
 ]
 
@@ -245,8 +246,9 @@ export function expandTemplate(template: WeeklyStaffingTemplate): StaffingSlot[]
 }
 
 // --- Kitchen stations (CR02 / CR03) ---
-// Kitchen pages use kitchen posts only. Long day-cover slots are single slots
-// (period AM) so fixed staff like Muk (9am-8pm) need no doubles to cover them.
+// Kitchen pages use kitchen posts only. The required Cook/prep slots are single
+// long (period AM) slots so a worker like Muk (9am-8pm) covers one slot with no
+// double; the optional AM/PM spots are where the rest of the crew gets placed.
 
 const KITCHEN_COVER_START = minutes(9)
 const KITCHEN_COVER_END = minutes(20)
@@ -261,40 +263,171 @@ function kitchenSlot(
   return { period: 'AM', role, label, start, end, required }
 }
 
-/** Fixed CR03 Kitchen crew: availability mirrors the template slots below exactly. */
+// --- CR03 Kitchen crew (from 26-00919 CR SCHEDULER RULES, sheet CR03_K) ---
+// 17 fixed staff. Post qualifications come from the sheet's Y matrix; the
+// availability windows, day limits, and double limits come from its per-person
+// work-hour rules. Windows that "any shift" people can cover span the whole day.
+
+const K_MUK = { start: minutes(9), end: minutes(20) }
+const K_FULL = { start: minutes(9), end: minutes(23) }
+const K_PM = { start: minutes(16), end: minutes(23) }
+const K_EVENING = { start: minutes(17), end: minutes(23) }
+const K_EARLY_SUN = { start: minutes(8), end: minutes(13, 30) }
+const K_EARLY_MON_SAT = { start: minutes(6), end: minutes(13, 30) }
+const K_ALFREDO = { start: minutes(10, 15), end: minutes(16) }
+const K_STEF = { start: minutes(14), end: minutes(23) }
+const K_DANIEL = { start: minutes(15), end: minutes(23) }
+const K_MV_LATE = { start: minutes(9), end: minutes(17) }
+
+/** Fixed CR03 Kitchen crew: qualifications and hours mirror the CR03_K sheet. */
 export const seedKitchenEmployeesCR03: Employee[] = [
   employee({
     id: 'muk',
     name: 'Muk',
     roles: ['cook'],
-    recurringAvailability: {
-      Sunday: [{ start: minutes(9), end: minutes(11) }],
-      Monday: [{ start: minutes(9), end: minutes(20) }],
-      Tuesday: [{ start: minutes(9), end: minutes(20) }],
-      Wednesday: [{ start: minutes(9), end: minutes(20) }],
-      Thursday: [{ start: minutes(9), end: minutes(20) }],
-      Friday: [{ start: minutes(9), end: minutes(20) }],
-      Saturday: [{ start: minutes(9), end: minutes(20) }],
-    },
-    maxDaysPerWeek: 7,
+    // Sheet: Sun off, Mon-Sat 9am-8pm.
+    recurringAvailability: only(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], [K_MUK]),
+    maxDaysPerWeek: 6,
     allowDoubles: false,
     incompatibleEmployeeIds: [],
     active: true,
   }),
   employee({
-    id: 'jeffrey',
-    name: 'Jeffrey',
+    id: 'jeffery',
+    name: 'Jeffery',
     roles: ['mv-prep'],
+    // Sheet: Tue off; Sun 8am-1:30pm; Mon & Wed-Sat 6am-1:30pm.
     recurringAvailability: {
-      Sunday: [{ start: minutes(8), end: minutes(13, 30) }],
-      Monday: [{ start: minutes(6), end: minutes(13, 30) }],
-      Tuesday: [{ start: minutes(9), end: minutes(11) }],
-      Wednesday: [{ start: minutes(6), end: minutes(13, 30) }],
-      Thursday: [{ start: minutes(6), end: minutes(13, 30) }],
-      Friday: [{ start: minutes(6), end: minutes(13, 30) }],
-      Saturday: [{ start: minutes(6), end: minutes(13, 30) }],
+      Sunday: [K_EARLY_SUN],
+      Monday: [K_EARLY_MON_SAT],
+      Wednesday: [K_EARLY_MON_SAT],
+      Thursday: [K_EARLY_MON_SAT],
+      Friday: [K_EARLY_MON_SAT],
+      Saturday: [K_EARLY_MON_SAT],
     },
-    maxDaysPerWeek: 7,
+    maxDaysPerWeek: 6,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'alfredo',
+    name: 'Alfredo',
+    roles: ['fried-rice'],
+    // Sheet: Mon-Fri 10:15am-4pm.
+    recurringAvailability: only(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], [K_ALFREDO]),
+    maxDaysPerWeek: 5,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'stef',
+    name: 'Stef',
+    roles: ['line-cook', 'shadow'],
+    // Sheet: one day off, any 6 days, 2pm-11pm; main post shadow; one double only.
+    recurringAvailability: allDays([K_STEF]),
+    maxDaysPerWeek: 6,
+    allowDoubles: true,
+    maxDoublesPerWeek: 1,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'jay',
+    name: 'Jay',
+    roles: ['cook', 'line-cook', 'fried-rice'],
+    // Sheet: Tue off, 6 days max, any shift, max 2 doubles.
+    recurringAvailability: except(['Tuesday'], [K_FULL]),
+    maxDaysPerWeek: 6,
+    allowDoubles: true,
+    maxDoublesPerWeek: 2,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'jeremy',
+    name: 'Jeremy',
+    roles: ['cook', 'line-cook', 'fried-rice', 'shadow'],
+    // Sheet: Mon off, 6 days max, any shift, max 2 doubles; shadow when Stef is off.
+    recurringAvailability: except(['Monday'], [K_FULL]),
+    maxDaysPerWeek: 6,
+    allowDoubles: true,
+    maxDoublesPerWeek: 2,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'robert',
+    name: 'Robert',
+    roles: ['cook', 'line-cook', 'fried-rice'],
+    // Sheet: Thu off, 6 days max, max 2 doubles.
+    recurringAvailability: except(['Thursday'], [K_FULL]),
+    maxDaysPerWeek: 6,
+    allowDoubles: true,
+    maxDoublesPerWeek: 2,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'daniel',
+    name: 'Daniel',
+    roles: ['cook', 'line-cook', 'fried-rice'],
+    // Sheet: Tue, Wed, Sat off; 3pm-11pm the other days.
+    recurringAvailability: only(['Sunday', 'Monday', 'Thursday', 'Friday'], [K_DANIEL]),
+    maxDaysPerWeek: 4,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'jorge',
+    name: 'Jorge',
+    roles: ['fried-rice'],
+    // Sheet: Sun, Thu, Sat only; any shift; max 1 double.
+    recurringAvailability: only(['Sunday', 'Thursday', 'Saturday'], [K_FULL]),
+    maxDaysPerWeek: 3,
+    allowDoubles: true,
+    maxDoublesPerWeek: 1,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'isaiah',
+    name: 'Isaiah',
+    roles: ['line-cook'],
+    // Sheet: PM only, max 4 days.
+    recurringAvailability: allDays([K_PM]),
+    maxDaysPerWeek: 4,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'jayden',
+    name: 'Jayden',
+    roles: ['fried-rice', 'dishwasher'],
+    // Sheet: Sun off; Mon-Fri 5pm-11pm; Sat any shift; no doubles.
+    recurringAvailability: {
+      Monday: [K_EVENING],
+      Tuesday: [K_EVENING],
+      Wednesday: [K_EVENING],
+      Thursday: [K_EVENING],
+      Friday: [K_EVENING],
+      Saturday: [K_FULL],
+    },
+    maxDaysPerWeek: 6,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'eddie',
+    name: 'Eddie',
+    roles: ['dishwasher', 'mv-prep'],
+    // Sheet: 6 days max, AM only.
+    recurringAvailability: allDays([K_MV_LATE]),
+    maxDaysPerWeek: 6,
     allowDoubles: false,
     incompatibleEmployeeIds: [],
     active: true,
@@ -303,15 +436,53 @@ export const seedKitchenEmployeesCR03: Employee[] = [
     id: 'carolina',
     name: 'Carolina',
     roles: ['mv-prep'],
-    recurringAvailability: {
-      Monday: [{ start: minutes(9), end: minutes(17) }],
-      Tuesday: [{ start: minutes(9), end: minutes(17) }],
-      Wednesday: [{ start: minutes(9), end: minutes(17) }],
-      Thursday: [{ start: minutes(9), end: minutes(17) }],
-      Friday: [{ start: minutes(9), end: minutes(17) }],
-      Saturday: [{ start: minutes(9), end: minutes(17) }],
-    },
+    // Sheet: Sun off, Mon-Sat 9am-5pm.
+    recurringAvailability: except(['Sunday'], [K_MV_LATE]),
     maxDaysPerWeek: 6,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'issac',
+    name: 'Issac',
+    roles: ['dishwasher'],
+    // Sheet: any day, PM only, max 4 days.
+    recurringAvailability: allDays([K_PM]),
+    maxDaysPerWeek: 4,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'jeremiah',
+    name: 'Jeremiah',
+    roles: ['fried-rice', 'dishwasher'],
+    // Sheet: any shift, max 4 days.
+    recurringAvailability: allDays([K_FULL]),
+    maxDaysPerWeek: 4,
+    allowDoubles: true,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'cris',
+    name: 'Cris',
+    roles: ['dishwasher', 'meat-prep'],
+    // Sheet: Mon, Tue, Wed, Fri, Sat 5pm-11pm; Sun & Thu off.
+    recurringAvailability: only(['Monday', 'Tuesday', 'Wednesday', 'Friday', 'Saturday'], [K_EVENING]),
+    maxDaysPerWeek: 5,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }),
+  employee({
+    id: 'alex',
+    name: 'Alex',
+    roles: ['fried-rice'],
+    // Sheet: PM only, max 4 days.
+    recurringAvailability: allDays([K_PM]),
+    maxDaysPerWeek: 4,
     allowDoubles: false,
     incompatibleEmployeeIds: [],
     active: true,
@@ -319,36 +490,44 @@ export const seedKitchenEmployeesCR03: Employee[] = [
 ]
 
 const CR03_EARLY_MV: Record<DayOfWeek, { start: number; end: number }> = {
-  Sunday: { start: minutes(8), end: minutes(13, 30) },
-  Monday: { start: minutes(6), end: minutes(13, 30) },
-  Tuesday: { start: minutes(9), end: minutes(11) },
-  Wednesday: { start: minutes(6), end: minutes(13, 30) },
-  Thursday: { start: minutes(6), end: minutes(13, 30) },
-  Friday: { start: minutes(6), end: minutes(13, 30) },
-  Saturday: { start: minutes(6), end: minutes(13, 30) },
+  Sunday: K_EARLY_SUN,
+  Monday: K_EARLY_MON_SAT,
+  // Jeffery is off Tuesday; Eddie or Carolina covers the early prep slot at 9.
+  Tuesday: { start: minutes(9), end: minutes(13, 30) },
+  Wednesday: K_EARLY_MON_SAT,
+  Thursday: K_EARLY_MON_SAT,
+  Friday: K_EARLY_MON_SAT,
+  Saturday: K_EARLY_MON_SAT,
 }
 
-/** CR03 Kitchen rules: Cook + two M/V Prep slots/day (early/late) are required; other posts are optional until hired. */
+/**
+ * CR03 Kitchen rules. Required cover stays at the same headcount as before:
+ * one Cook, one M/V Prep (early), and one M/V Prep (late) per day (no late slot
+ * on Sunday). The other posts ship as optional AM/PM spots so the PM-only and
+ * part-day crew can be placed by hand without changing the required headcount.
+ */
 export const seedKitchenTemplateCR03: WeeklyStaffingTemplate = Object.fromEntries(
   DAYS.map((day) => {
+    const sunday = day === 'Sunday'
     const slots: StaffingTemplateSlot[] = [
-      day === 'Sunday'
-        ? kitchenSlot('cook', 'Cook', minutes(9), minutes(11))
-        : kitchenSlot('cook', 'Cook', minutes(9), minutes(20)),
+      sunday ? kitchenSlot('cook', 'Cook', minutes(10, 15), minutes(16)) : kitchenSlot('cook', 'Cook', minutes(9), minutes(20)),
       kitchenSlot('mv-prep', 'M/V Prep (early)', CR03_EARLY_MV[day].start, CR03_EARLY_MV[day].end),
     ]
-    if (day !== 'Sunday') {
-      slots.push(kitchenSlot('mv-prep', 'M/V Prep (late)', minutes(9), minutes(17)))
+    if (!sunday) {
+      slots.push(kitchenSlot('mv-prep', 'M/V Prep (late)', K_MV_LATE.start, K_MV_LATE.end))
     }
-    // Optional cover: flip to required once these posts are hired.
+    // Optional cover for the rest of the crew. AM spots use 10:15-4pm so both
+    // 9am-start and 10:15am-start workers fit; PM spots use the 4-11pm window.
     for (const [role, label] of [
       ['line-cook', 'Line Cook'],
       ['fried-rice', 'Fried Rice'],
       ['dishwasher', 'Dishwasher'],
-      ['shadow', 'Shadow'],
     ] as const) {
-      slots.push(kitchenSlot(role, label, KITCHEN_COVER_START, KITCHEN_COVER_END, false))
+      slots.push(kitchenSlot(role, `${label} (AM)`, minutes(10, 15), minutes(16), false))
+      slots.push(kitchenSlot(role, `${label} (PM)`, minutes(16), minutes(23), false))
     }
+    slots.push(kitchenSlot('shadow', 'Shadow (PM)', minutes(16), minutes(23), false))
+    slots.push(kitchenSlot('meat-prep', 'Meat Prep (PM)', minutes(16), minutes(23), false))
     return [day, slots]
   }),
 ) as WeeklyStaffingTemplate

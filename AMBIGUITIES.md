@@ -32,4 +32,19 @@ The `/scheduler-demo` route uses explicit seed assumptions so it can produce a r
 scheduler-demo > updates schedule page
 cr2dr
 
-monday to wednesday, hire new person, so that person can only works morning 
+monday to wednesday, hire new person, so that person can only works morning
+
+## CR03 Kitchen (sheet `CR03_K`) Assumptions
+
+The CR03 Kitchen crew and rules are now fixed in code (`seedKitchenEmployeesCR03` / `seedKitchenTemplateCR03`). The sheet lists post qualifications and per-person hours but not required headcount, so these points still need manager confirmation:
+
+- **Required headcount is unchanged from the previous CR03 template** — one Cook, one M/V Prep (early), and one M/V Prep (late) per day (no late slot Sunday). The sheet does not say how many of each post a shift needs. If the kitchen actually needs PM cover (Cook/Prep 4-11pm) as *required*, those spots should be flipped from optional to required.
+- **"Any shift"** people (Jay, Jeremy, Robert, Jorge, Jeremiah) are modeled as available the whole day (9:00-23:00).
+- **Jeffery starts at 6:00am**, before the sheet's 9:00am AM window; his hours are encoded as written (Sun 8:00-1:30, Mon & Wed-Sat 6:00-1:30, Tue off).
+- **Alfredo** works Mon-Fri 10:15am-4pm only; he can fill AM optional spots (which start at 10:15am) but not the 9:00am required spots.
+- **Stef** "one day off only, any 6 days" → max 6 days; "one day double shift only" → `maxDoublesPerWeek: 1`. His "main post: shadow" is not modeled — the model has no per-person role preference, so shadow is just an optional PM spot.
+- **Jeremy** "when Stef is off, he is the shadow" is conditional and is not encoded as a rule; shadow ships as an optional PM spot either of them can take.
+- The sheet's AM (9-4) and PM (4-11) windows are represented as optional AM/PM spots; the required Cook slot still spans 9am-8pm (Muk's hours) as before.
+- Sheet typo: "Monday to Saturday PM : 4 am to 11 pm" is read as 4pm-11pm.
+- No employee incompatibilities are stated for the CR03 crew.
+- **Publishing still needs the manager write token.** If CR3 users should publish without it, that needs a separate station-scoped token. 

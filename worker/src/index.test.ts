@@ -529,7 +529,7 @@ test('rosters are isolated per restaurant', async () => {
   const created = await handler.fetch(rosterPut(dining), env)
   assert.equal(created.status, 201)
 
-  const otherPut = new Request('https://api.test/api/employees?restaurant=CR3-kitchen', {
+  const otherPut = new Request('https://api.test/api/employees?restaurant=CR2-kitchen', {
     method: 'PUT',
     headers: { Authorization: 'Bearer manager-token' },
     body: JSON.stringify(dining),
@@ -541,14 +541,14 @@ test('rosters are isolated per restaurant', async () => {
   const defaultDoc = (await fetchedDefault.json()) as { rev: number }
   assert.equal(defaultDoc.rev, 1)
 
-  const fetchedOther = await handler.fetch(new Request('https://api.test/api/employees?restaurant=CR3-kitchen'), env)
+  const fetchedOther = await handler.fetch(new Request('https://api.test/api/employees?restaurant=CR2-kitchen'), env)
   const otherDoc = (await fetchedOther.json()) as { rev: number }
   assert.equal(otherDoc.rev, 1)
 
   // Deleting in one station does not touch the other.
   const deleted = await handler.fetch(rosterPut({ employees: [], baseRev: 1 }), env)
   assert.equal(deleted.status, 200)
-  const afterOther = await handler.fetch(new Request('https://api.test/api/employees?restaurant=CR3-kitchen'), env)
+  const afterOther = await handler.fetch(new Request('https://api.test/api/employees?restaurant=CR2-kitchen'), env)
   const afterOtherDoc = (await afterOther.json()) as { employees: unknown[] }
   assert.equal(afterOtherDoc.employees.length, 1)
 })
@@ -714,4 +714,53 @@ test('templates are isolated per week and fall back to the global seed', async (
 
   const bad = await handler.fetch(new Request('https://api.test/api/template?weekStart=bad'), env)
   assert.equal(bad.status, 400)
+})
+
+test('schedule-only stations refuse roster and template writes', async () => {
+  const env = mockEnv()
+  const lockedRoster = await handler.fetch(
+    new Request('https://api.test/api/employees?restaurant=CR3-kitchen', {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer manager-token' },
+      body: JSON.stringify({ employees: [rosterEmployee()], baseRev: 0 }),
+    }),
+    env,
+  )
+  assert.equal(lockedRoster.status, 403)
+  assert.deepEqual(await lockedRoster.json(), { error: 'station_locked' })
+
+  const lockedTemplate = await handler.fetch(
+    new Request('https://api.test/api/template?restaurant=CR3-kitchen', {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer manager-token' },
+      body: JSON.stringify({ template: templatePayload(), baseRev: 0 }),
+    }),
+    env,
+  )
+  assert.equal(lockedTemplate.status, 403)
+  assert.deepEqual(await lockedTemplate.json(), { error: 'station_locked' })
+
+  // An unlocked station still accepts the same writes.
+  const openRoster = await handler.fetch(
+    new Request('https://api.test/api/employees?restaurant=CR2-kitchen', {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer manager-token' },
+      body: JSON.stringify({ employees: [rosterEmployee()], baseRev: 0 }),
+    }),
+    env,
+  )
+  assert.equal(openRoster.status, 201)
+})
+
+test('schedule-only stations still accept schedule writes', async () => {
+  const env = mockEnv()
+  const saved = await handler.fetch(
+    new Request('https://api.test/api/schedule/2026-09-13?restaurant=CR3-kitchen', {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer manager-token' },
+      body: JSON.stringify({ week: goldenPayload(), templateHash: 'a1b2c3d4', visible: true, baseRev: 0 }),
+    }),
+    env,
+  )
+  assert.equal(saved.status, 201)
 })

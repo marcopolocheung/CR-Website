@@ -177,14 +177,18 @@ export function validateSchedule({
       byDay.set(slot.day, slotsForDay)
     }
 
+    let doubleDays = 0
     for (const [day, slotsForDay] of byDay.entries()) {
       const periods = new Set(slotsForDay.map((slot) => slot.period))
-      if (!employee.allowDoubles && periods.size > 1) {
-        violations.push({
-          code: 'prohibited_double',
-          employeeId,
-          message: `${employee.name} is assigned both AM and PM on ${day}, but doubles are prohibited.`,
-        })
+      if (periods.size > 1) {
+        doubleDays += 1
+        if (!employee.allowDoubles) {
+          violations.push({
+            code: 'prohibited_double',
+            employeeId,
+            message: `${employee.name} is assigned both AM and PM on ${day}, but doubles are prohibited.`,
+          })
+        }
       }
 
       for (let i = 0; i < slotsForDay.length; i += 1) {
@@ -202,6 +206,14 @@ export function validateSchedule({
           }
         }
       }
+    }
+
+    if (employee.maxDoublesPerWeek !== undefined && doubleDays > employee.maxDoublesPerWeek) {
+      violations.push({
+        code: 'max_doubles_exceeded',
+        employeeId,
+        message: `${employee.name} is assigned ${doubleDays} double shifts, exceeding the max of ${employee.maxDoublesPerWeek}.`,
+      })
     }
   }
 

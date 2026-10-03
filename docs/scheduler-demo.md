@@ -11,9 +11,19 @@ The demo at `/scheduler-demo` is a static Next.js App Router page with the corre
 - `src/lib/scheduler/week-visibility.ts`: per-week on/off status, month strip helpers (`weeksForMonth`, `shiftMonth`), and v1→v2 draft migration. Off weeks are hidden from staff; they are never deleted.
 - `src/components/scheduler/SchedulerDemo.tsx`: manager-facing demo UI for generating, locking, manually reassigning, validating, printing, editing basic employee constraints, and adding new employees. The week board is a 7-column fluid grid (`lg:grid-cols-7`, no `min-w`, full-width containers) with a month strip, per-week on/off toggles, and copy-prior-week.
 
+## Schedule-only stations
+
+CR3 Kitchen is a **schedule-only** station: its 17-person crew, post qualifications, and hours are fixed in code from `26-00919 CR SCHEDULER RULES` (sheet `CR03_K`), and nobody — not even a manager — edits the staff list or the shift rules from the app. Users build the week and move people between the fixed spots.
+
+- The list of locked stations lives in `src/data/restaurants.ts` (`SCHEDULE_ONLY_RESTAURANTS` / `isScheduleOnlyRestaurant`).
+- `SchedulerDemo` always renders the built-in crew and template for a locked station and skips the roster/template fetch, so no reachable edit path can change them. Staff/rules editing controls (add/remove staff, save staff list, restore/clear, snapshots, rules editor, "start blank", the gap-example button) are hidden, and the rules panel renders read-only.
+- The Worker mirrors the lock: `PUT /api/employees` and `PUT /api/template` return `403 { error: 'station_locked' }` for a locked station (`worker/src/index.ts`, mirrored in `worker/dashboard.js`). Schedule writes (`PUT /api/schedule/:week`) stay allowed.
+- Required cover stays the same headcount as before: one Cook, one M/V Prep (early), and one M/V Prep (late) per day (no late slot on Sunday). The other posts ship as optional AM/PM spots so the PM-only and part-day crew can be placed by hand without changing the required headcount.
+- Per-person double caps from the sheet ("max 2 double shift", etc.) are modeled with `Employee.maxDoublesPerWeek`, enforced in both `solver.ts` and `validator.ts`.
+
 ## Data Model
 
-Employees are independent from staffing slots. Each employee has roles, recurring weekly availability, optional overrides, max day/shift limits, double-shift policy, preferences, incompatibilities, and active state.
+Employees are independent from staffing slots. Each employee has roles, recurring weekly availability, optional overrides, max day/shift limits, double-shift policy (including an optional per-week double cap), preferences, incompatibilities, and active state.
 
 Staffing slots are concrete required positions expanded from a weekly template. A slot has day, AM/PM period, role, label, start time, end time, and required status. Cashier 1 and Cashier 2 are labels over the same `cashier` role in the demo seed data. Weekday PM server slots start at 5:00 PM in this demo so Javier and Serenity's stated weekday availability can be represented without relaxing the validator.
 

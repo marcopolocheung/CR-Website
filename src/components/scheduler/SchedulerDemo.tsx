@@ -51,7 +51,7 @@ import { fetchRoster, rosterFingerprint } from '@/lib/employee-store'
 import { fetchTemplate, templateFingerprint } from '@/lib/template-store'
 import { fetchGoldenWeek, type GoldenWeekDoc } from '@/lib/schedule-store'
 import { assignmentsFromPublishedWeek, templateHashForSlots } from '@/lib/schedule-share'
-import { RESTAURANTS, isRestaurantId } from '@/data/restaurants'
+import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
 import PublishPanel from './PublishPanel'
 import RosterPanel from './RosterPanel'
 import TemplatePanel from './TemplatePanel'
@@ -770,6 +770,7 @@ function fixAdvice(code: string) {
   if (code === 'max_days_exceeded') return 'Move a shift to someone else, or raise the weekly day limit in the staff list.'
   if (code === 'max_shifts_exceeded') return 'Move a shift to someone else, or raise the weekly shift limit in the staff list.'
   if (code === 'prohibited_double') return 'Give one of the two shifts to someone else, or allow doubles for them in the staff list.'
+  if (code === 'max_doubles_exceeded') return 'Give one of their double shifts to someone else, or raise their double limit in the staff list.'
   if (code === 'incompatible_pair') return 'These two should not work the same shift. Move one of them.'
   if (code === 'locked_assignment_changed') return 'A spot you marked Keep changed. Confirm it still works.'
   if (code === 'search_exhausted') return 'Add availability, add staff, or loosen a limit — then make the schedule again.'
@@ -880,6 +881,11 @@ function buildFixIssues(
 
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
   const restaurantName = restaurantId && isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
+  // Schedule-only stations (CR3 Kitchen) ship a fixed crew and fixed rules.
+  // The app always renders the built-in crew/template for them, so no edit path
+  // can change the staff list even if one is left reachable, and the Worker
+  // refuses roster/template writes for the same station.
+  const scheduleOnly = isScheduleOnlyRestaurant(restaurantId)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
   const [generatedWeeks, setGeneratedWeeks] = useState<WeekAssignments>({})
@@ -903,8 +909,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [defaultTemplate, setDefaultTemplate] = useState<WeeklyStaffingTemplate>(() => cloneTemplate(undefined, restaurantId))
   const [defaultTemplateLoaded, setDefaultTemplateLoaded] = useState(false)
   const [defaultTemplateRev, setDefaultTemplateRev] = useState(0)
-  const employees = weekStart ? (rosters[weekStart] ?? defaultRoster) : defaultRoster
-  const template = weekStart ? (templates[weekStart] ?? defaultTemplate) : defaultTemplate
+  const employees = scheduleOnly ? defaultRoster : weekStart ? (rosters[weekStart] ?? defaultRoster) : defaultRoster
+  const template = scheduleOnly ? defaultTemplate : weekStart ? (templates[weekStart] ?? defaultTemplate) : defaultTemplate
   const rosterRev = weekStart ? (rosterRevs[weekStart] ?? 0) : 0
   const rosterServerSnapshot = weekStart ? (rosterSnapshots[weekStart] ?? null) : null
   const rosterUpdatedAt = weekStart ? (rosterUpdatedAts[weekStart] ?? null) : null
@@ -974,21 +980,25 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // Before the first server response arrives the editor only holds the built-in
   // seeds. Treat dirty as false until loaded so Publish never tries to save
   // seeds over live data with a stale rev.
-  const rosterDirty = !rosterLoaded
+  const rosterDirty = scheduleOnly
     ? false
-    : rosterServerSnapshot === null
-      ? employees.length > 0
-      : rosterFingerprint(employees) !== rosterServerSnapshot
+    : !rosterLoaded
+      ? false
+      : rosterServerSnapshot === null
+        ? employees.length > 0
+        : rosterFingerprint(employees) !== rosterServerSnapshot
   const [templateLoadError, setTemplateLoadError] = useState('')
   const [confirmingClearWeek, setConfirmingClearWeek] = useState(false)
   const [publishedWeeks, setPublishedWeeks] = useState<Record<string, GoldenWeekDoc | null>>({})
   const [hydratedWeeks, setHydratedWeeks] = useState<Record<string, boolean>>({})
   const [templatePanelOpen, setTemplatePanelOpen] = useState(false)
-  const templateDirty = !templateLoaded
+  const templateDirty = scheduleOnly
     ? false
-    : templateServerSnapshot === null
-      ? templateFingerprint(template) !== templateFingerprint(defaultTemplateForRestaurant(restaurantId))
-      : templateFingerprint(template) !== templateServerSnapshot
+    : !templateLoaded
+      ? false
+      : templateServerSnapshot === null
+        ? templateFingerprint(template) !== templateFingerprint(defaultTemplateForRestaurant(restaurantId))
+        : templateFingerprint(template) !== templateServerSnapshot
   const isDefaultRoster = useMemo(
     () => rosterFingerprint(employees) === rosterFingerprint(defaultEmployeesForRestaurant(restaurantId)),
     [employees, restaurantId],
@@ -1165,6 +1175,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     let cancelled = false
     setRosterLoadError('')
     setDefaultRosterLoaded(false)
+    if (scheduleOnly) {
+      setDefaultRosterRev(0)
+      setDefaultRosterLoaded(true)
+      return
+    }
     fetchRoster(restaurantId)
       .then((doc) => {
         if (cancelled) return
@@ -1183,12 +1198,17 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [restaurantId])
+  }, [restaurantId, scheduleOnly])
 
   useEffect(() => {
     let cancelled = false
     setTemplateLoadError('')
     setDefaultTemplateLoaded(false)
+    if (scheduleOnly) {
+      setDefaultTemplateRev(0)
+      setDefaultTemplateLoaded(true)
+      return
+    }
     fetchTemplate(restaurantId)
       .then((doc) => {
         if (cancelled) return
@@ -1207,11 +1227,15 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [restaurantId])
+  }, [restaurantId, scheduleOnly])
 
   useEffect(() => {
     if (!weekStart || !defaultRosterLoaded || rosterLoadedWeeks[weekStart]) return
     let cancelled = false
+    if (scheduleOnly) {
+      setRosterLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
+      return
+    }
     fetchRoster(restaurantId, weekStart)
       .then((doc) => {
         if (cancelled) return
@@ -1243,11 +1267,15 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [weekStart, restaurantId, defaultRosterLoaded, defaultRoster, rosterLoadedWeeks])
+  }, [weekStart, restaurantId, defaultRosterLoaded, defaultRoster, rosterLoadedWeeks, scheduleOnly])
 
   useEffect(() => {
     if (!weekStart || !defaultTemplateLoaded || templateLoadedWeeks[weekStart]) return
     let cancelled = false
+    if (scheduleOnly) {
+      setTemplateLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
+      return
+    }
     fetchTemplate(restaurantId, weekStart)
       .then((doc) => {
         if (cancelled) return
@@ -1279,7 +1307,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [weekStart, restaurantId, defaultTemplateLoaded, defaultTemplate, templateLoadedWeeks])
+  }, [weekStart, restaurantId, defaultTemplateLoaded, defaultTemplate, templateLoadedWeeks, scheduleOnly])
 
   useEffect(() => {
     if (!weekStart) return
@@ -1429,15 +1457,21 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     remember('copied the prior week')
     setWeeks((current) => ({ ...current, [weekStart]: cloneAssignmentList(source) }))
     setWeekStatus((current) => ({ ...current, [weekStart]: 'on' }))
-    const priorRoster = rosters[prior]
-    if (priorRoster) {
-      setRosters((current) => ({ ...current, [weekStart]: cloneEmployeeList(priorRoster) }))
+    if (!scheduleOnly) {
+      const priorRoster = rosters[prior]
+      if (priorRoster) {
+        setRosters((current) => ({ ...current, [weekStart]: cloneEmployeeList(priorRoster) }))
+      }
+      const priorTemplate = templates[prior]
+      if (priorTemplate) {
+        setTemplates((current) => ({ ...current, [weekStart]: cloneTemplate(priorTemplate) }))
+      }
     }
-    const priorTemplate = templates[prior]
-    if (priorTemplate) {
-      setTemplates((current) => ({ ...current, [weekStart]: cloneTemplate(priorTemplate) }))
-    }
-    setDiagnostics(['Prior week copied here — schedule, staff list, and rules. Review it, then publish when it looks right.'])
+    setDiagnostics([
+      scheduleOnly
+        ? 'Prior week copied here — schedule only. The fixed crew and rules stay as they are. Publish when it looks right.'
+        : 'Prior week copied here — schedule, staff list, and rules. Review it, then publish when it looks right.',
+    ])
   }
 
   function remember(label: string) {
@@ -1744,7 +1778,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // with seeds while the fetch is still in flight.
   const storeLoading = !rosterLoaded || !templateLoaded
   const storeOffline = Boolean(rosterLoadError || templateLoadError)
-  const isNewStation = !storeLoading && defaultRosterRev === 0 && defaultTemplateRev === 0 && rosterRev === 0 && templateRev === 0
+  const isNewStation = !scheduleOnly && !storeLoading && defaultRosterRev === 0 && defaultTemplateRev === 0 && rosterRev === 0 && templateRev === 0
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
     remember('changed one assignment')
@@ -2024,7 +2058,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             </section>
           )}
 
-          {!onboardingDismissed && assignments.length === 0 && (
+          {!scheduleOnly && !onboardingDismissed && assignments.length === 0 && (
             <OnboardingBanner activeEmployeeCount={activeEmployeeCount} onDismiss={dismissOnboarding} />
           )}
 
@@ -2095,6 +2129,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             onAddEmployee={() => addEmployeeForSlot(nextIssue?.slot)}
             onIgnore={ignoreNextIssue}
             onShowIgnored={showIgnoredIssues}
+            canAddEmployee={!scheduleOnly}
           />
 
           <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
@@ -2278,6 +2313,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             <TemplateEditor
               template={template}
               roles={availableRoles}
+              readOnly={scheduleOnly}
               onChange={(next) => {
                 remember('changed schedule rules')
                 setTemplate(next)
@@ -2305,14 +2341,16 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 <li key={assumption}>{assumption}</li>
               ))}
             </ul>
-            <button
-              type="button"
-              className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-              onClick={makeInfeasible}
-            >
-              <Icon name="warning" />
-              Show what a missing-coverage week looks like
-            </button>
+            {!scheduleOnly && (
+              <button
+                type="button"
+                className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                onClick={makeInfeasible}
+              >
+                <Icon name="warning" />
+                Show what a missing-coverage week looks like
+              </button>
+            )}
             </Disclosure>
           </div>
         </main>
@@ -2326,28 +2364,32 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                   {activeEmployeeCount} working, {employees.length - activeEmployeeCount} off the list
                 </p>
                 <p className="mt-0.5 text-xs text-zinc-500">
-                  Last saved: {formatUpdatedAt(rosterUpdatedAt)}{rosterDirty ? ' · unsaved changes' : ''} · changes stay in this week only
+                  {scheduleOnly
+                    ? 'Fixed crew for this station — you build the schedule and move people between the spots.'
+                    : `Last saved: ${formatUpdatedAt(rosterUpdatedAt)}${rosterDirty ? ' · unsaved changes' : ''} · changes stay in this week only`}
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <IconButton
-                  icon="check"
-                  label={storeLoading ? 'Waiting for the schedule store' : rosterPanelOpen ? 'Close save staff list' : 'Save staff list'}
-                  onClick={() => setRosterPanelOpen((open) => !open)}
-                  disabled={storeLoading}
-                />
-                <IconButton
-                  icon={employeePanelOpen ? 'close' : 'plus'}
-                  label={employeePanelOpen ? 'Close employee form' : 'Add employee'}
-                  tone="accent"
-                  onClick={() => setEmployeePanelOpen((open) => !open)}
-                />
-              </div>
+              {!scheduleOnly && (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <IconButton
+                    icon="check"
+                    label={storeLoading ? 'Waiting for the schedule store' : rosterPanelOpen ? 'Close save staff list' : 'Save staff list'}
+                    onClick={() => setRosterPanelOpen((open) => !open)}
+                    disabled={storeLoading}
+                  />
+                  <IconButton
+                    icon={employeePanelOpen ? 'close' : 'plus'}
+                    label={employeePanelOpen ? 'Close employee form' : 'Add employee'}
+                    tone="accent"
+                    onClick={() => setEmployeePanelOpen((open) => !open)}
+                  />
+                </div>
+              )}
             </div>
 
             {rosterLoadError && <p className="mt-2 text-xs font-medium text-amber-800">{rosterLoadError}</p>}
 
-            {rosterPanelOpen && (
+            {rosterPanelOpen && !scheduleOnly && (
               <RosterPanel
                 employees={employees}
                 rev={rosterRev}
@@ -2362,7 +2404,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               />
             )}
 
-            {employeePanelOpen && (
+            {employeePanelOpen && !scheduleOnly && (
               <EmployeeForm
                 draft={draft}
                 gapSlot={gapSlot}
@@ -2375,6 +2417,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               />
             )}
 
+            {!scheduleOnly && (
+            <>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-zinc-600">Mistake? Bring back the built-in demo list.</p>
               <button
@@ -2477,6 +2521,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 )}
               </Disclosure>
             </div>
+            </>
+            )}
 
             <div className="mt-3 border-t border-zinc-100 pt-3">
               <label className="block text-sm font-medium text-zinc-800">
@@ -2501,6 +2547,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                       roles={availableRoles}
                       onUpdate={updateEmployee}
                       onRemove={removeEmployee}
+                      readOnly={scheduleOnly}
                     />
                   ))}
                   {filteredEmployees.length === 0 && (
@@ -2963,12 +3010,14 @@ function EmployeeCard({
   roles,
   onUpdate,
   onRemove,
+  readOnly = false,
 }: {
   employee: Employee
   stat?: ScheduleStats
   roles: string[]
   onUpdate: (employeeId: string, update: Partial<Employee>) => void
   onRemove: (employeeId: string) => void
+  readOnly?: boolean
 }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [customizing, setCustomizing] = useState(false)
@@ -2981,6 +3030,37 @@ function EmployeeCard({
   function toggleRole(role: string, enabled: boolean) {
     const next = enabled ? [...employee.roles, role] : employee.roles.filter((candidate) => candidate !== role)
     onUpdate(employee.id, { roles: [...new Set(next)] })
+  }
+
+  if (readOnly) {
+    return (
+      <div className="rounded border border-zinc-200 bg-white p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-zinc-950">{employee.name}</div>
+            <p className="mt-0.5 text-xs text-zinc-600">
+              {availabilitySummary(employee)} · {stat && stat.shifts > 0 ? `${stat.hours.toFixed(1)}h · ${stat.days}d this week` : 'off this week'}
+            </p>
+          </div>
+          {!employee.active && <span className="shrink-0 text-xs font-semibold text-zinc-500">Off the list</span>}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {visibleRoles
+            .filter((role) => employee.roles.includes(role))
+            .map((role) => (
+              <span key={role} className={`inline-flex items-center rounded border px-2 py-1 text-xs font-medium ${roleChipClass(role)}`}>
+                {roleLabel(role)}
+              </span>
+            ))}
+          {employee.newHire && (
+            <span className="inline-flex items-center rounded border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-900">New hire</span>
+          )}
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">
+          Max {employee.maxDaysPerWeek ?? 7} days · {employee.allowDoubles ? `doubles${employee.maxDoublesPerWeek !== undefined ? ` (max ${employee.maxDoublesPerWeek})` : ''}` : 'no doubles'}
+        </p>
+      </div>
+    )
   }
 
   return (
@@ -3162,6 +3242,7 @@ function GuidedFixPanel({
   onAddEmployee,
   onIgnore,
   onShowIgnored,
+  canAddEmployee = true,
 }: {
   nextIssue?: FixIssue
   weekStart: string
@@ -3177,6 +3258,7 @@ function GuidedFixPanel({
   onAddEmployee: () => void
   onIgnore: () => void
   onShowIgnored: () => void
+  canAddEmployee?: boolean
 }) {
   if (!nextIssue) {
     return (
@@ -3235,9 +3317,11 @@ function GuidedFixPanel({
           <Button tone="primary" onClick={onChooseEmployee} icon="target" disabled={!nextIssue.slot}>
             Choose employee
           </Button>
-          <Button onClick={onAddEmployee} icon="plus">
-            Add employee
-          </Button>
+          {canAddEmployee && (
+            <Button onClick={onAddEmployee} icon="plus">
+              Add employee
+            </Button>
+          )}
           <Button onClick={onIgnore} icon="close" disabled={isBlocker} title={isBlocker ? 'An empty spot must be filled — skipping would hide missing cover.' : 'Skip this for now.'}>
             Ignore for now
           </Button>
@@ -3288,7 +3372,9 @@ function GuidedFixPanel({
           ) : (
             <>
               <p className="text-sm text-zinc-700">
-                Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.
+                {canAddEmployee
+                  ? 'Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.'
+                  : 'Nobody on the fixed crew is free and trained for this spot. Open the shift below to move someone else in.'}
               </p>
               {excluded.length > 0 && (
                 <ul className="mt-2 space-y-1 text-xs text-zinc-600">
@@ -3587,6 +3673,7 @@ function TemplateEditor({
   restaurantId,
   updatedAt,
   weekStart,
+  readOnly = false,
 }: {
   template: WeeklyStaffingTemplate
   roles: string[]
@@ -3604,7 +3691,41 @@ function TemplateEditor({
   restaurantId?: string
   updatedAt: string | null
   weekStart?: string
+  readOnly?: boolean
 }) {
+  if (readOnly) {
+    return (
+      <Disclosure summary="Schedule rules (fixed)" tone="quiet">
+        <p className="text-sm text-zinc-600">
+          The spots below are fixed for this station. You build the week by putting the crew into them and moving people around.
+        </p>
+        <div className="mt-3 space-y-3">
+          {DAYS.map((day) => (
+            <div key={day} className="rounded border border-zinc-200 p-2.5">
+              <h4 className="text-sm font-semibold text-zinc-900">{day}</h4>
+              <ul className="mt-1 space-y-1 text-xs text-zinc-700">
+                {template[day].map((slot, index) => (
+                  <li key={index} className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{slot.label}</span>
+                    <span className="text-zinc-500">{roleLabel(slot.role)}</span>
+                    <span>
+                      {minutesToTimeValue(slot.start)}–{minutesToTimeValue(slot.end)}
+                    </span>
+                    {slot.required ? (
+                      <span className="font-semibold text-zinc-900">required</span>
+                    ) : (
+                      <span className="text-zinc-400">optional</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </Disclosure>
+    )
+  }
+
   function updateDay(day: DayOfWeek, daySlots: StaffingTemplateSlot[]) {
     onChange({ ...template, [day]: daySlots })
   }

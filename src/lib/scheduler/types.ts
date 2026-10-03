@@ -25,8 +25,8 @@ export const KITCHEN_ROLES_CR02 = [
   'shadow',
   'manager',
 ] as const
-/** Kitchen posts for CR03 Kitchen (combined m/v prep, no manager post). */
-export const KITCHEN_ROLES_CR03 = ['cook', 'line-cook', 'fried-rice', 'dishwasher', 'mv-prep', 'shadow'] as const
+/** Kitchen posts for CR03 Kitchen (combined m/v prep + a dedicated meat prep, no manager post). */
+export const KITCHEN_ROLES_CR03 = ['cook', 'line-cook', 'fried-rice', 'dishwasher', 'mv-prep', 'meat-prep', 'shadow'] as const
 /**
  * All built-in posts. Roles are extensible: managers can add custom posts
  * (slugified, e.g. "sushi-chef") from the scheduler UI, so `Role` is a string
@@ -124,6 +124,8 @@ export type Employee = {
   maxDaysPerWeek?: number
   maxShiftsPerWeek?: number
   allowDoubles: boolean
+  /** Cap on how many days this person may work both an AM and a PM shift. Ignored when `allowDoubles` is false. */
+  maxDoublesPerWeek?: number
   preferredDaysPerWeek?: number
   preferredHoursPerWeek?: number
   preferences?: ShiftPreference[]
@@ -169,6 +171,7 @@ export type ValidationCode =
   | 'max_days_exceeded'
   | 'max_shifts_exceeded'
   | 'prohibited_double'
+  | 'max_doubles_exceeded'
   | 'incompatible_pair'
   | 'locked_assignment_changed'
 
