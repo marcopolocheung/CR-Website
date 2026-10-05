@@ -562,13 +562,17 @@ export function isGoldenWriteAuthorized(request, env) {
         return false;
     return request.headers.get('Authorization') === `Bearer ${token}`;
 }
-export function staffEditError(env) {
-    return env.STAFF_EDIT_PASSWORD || env.SCHEDULE_WRITE_TOKEN ? null : 'write_not_configured';
+/**
+ * Demo staff password. Hardcoded for now so crew editing works with no Worker
+ * setup; set the STAFF_EDIT_PASSWORD secret to override it in production.
+ */
+export const DEFAULT_STAFF_EDIT_PASSWORD = 'test';
+function staffPassword(env) {
+    return env.STAFF_EDIT_PASSWORD || DEFAULT_STAFF_EDIT_PASSWORD;
 }
 /** Crew edits accept the staff password or the manager token. The password unlocks nothing else. */
 export function isStaffEditAuthorized(request, env) {
-    const password = env.STAFF_EDIT_PASSWORD ?? '';
-    if (password && request.headers.get('Authorization') === `Bearer ${password}`)
+    if (request.headers.get('Authorization') === `Bearer ${staffPassword(env)}`)
         return true;
     return isGoldenWriteAuthorized(request, env);
 }
@@ -975,8 +979,6 @@ export default {
             }
             // Unlock check for the staff editor — read-only, throttled like the demo gate.
             if (request.method === 'GET' && path === '/api/staff/verify') {
-                if (staffEditError(env))
-                    return json({ error: 'write_not_configured' }, 503, request, env);
                 if (!(await checkVerifyThrottle(env, clientIp(request)))) {
                     return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
                 }
@@ -987,8 +989,6 @@ export default {
             const isSave = request.method === 'PUT' && path === '/api/staff';
             const isUndo = request.method === 'POST' && path === '/api/staff/undo';
             if (isSave || isUndo) {
-                if (staffEditError(env))
-                    return json({ error: 'write_not_configured' }, 503, request, env);
                 if (!isStaffEditAuthorized(request, env))
                     return json({ error: 'unauthorized' }, 401, request, env);
                 if (!(await checkWriteThrottle(env, clientIp(request)))) {
