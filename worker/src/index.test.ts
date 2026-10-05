@@ -17,7 +17,7 @@ import handler, {
   validateUpdateBody,
 } from './index'
 
-function mockEnv(token = 'manager-token') {
+function mockEnv(token = 'manager-token', staffPassword?: string) {
   const data = new Map<string, string>()
   return {
     SCHEDULES: {
@@ -29,6 +29,7 @@ function mockEnv(token = 'manager-token') {
       },
     },
     SCHEDULE_WRITE_TOKEN: token,
+    STAFF_EDIT_PASSWORD: staffPassword,
   }
 }
 
@@ -763,4 +764,125 @@ test('schedule-only stations still accept schedule writes', async () => {
     env,
   )
   assert.equal(saved.status, 201)
+})
+
+function staffGet(restaurant = 'CR3-kitchen'): Request {
+  return new Request(`https://api.test/api/staff?restaurant=${restaurant}`)
+}
+
+function staffVerify(password: string | undefined, restaurant = 'CR3-kitchen'): Request {
+  return new Request(`https://api.test/api/staff/verify?restaurant=${restaurant}`, {
+    headers: password === undefined ? {} : { Authorization: `Bearer ${password}` },
+  })
+}
+
+function staffPut(body: unknown, password: string | undefined, restaurant = 'CR3-kitchen'): Request {
+  return new Request(`https://api.test/api/staff?restaurant=${restaurant}`, {
+    method: 'PUT',
+    headers: password === undefined ? {} : { Authorization: `Bearer ${password}` },
+    body: JSON.stringify(body),
+  })
+}
+
+function staffUndo(body: unknown, password: string | undefined, restaurant = 'CR3-kitchen'): Request {
+  return new Request(`https://api.test/api/staff/undo?restaurant=${restaurant}`, {
+    method: 'POST',
+    headers: password === undefined ? {} : { Authorization: `Bearer ${password}` },
+    body: JSON.stringify(body),
+  })
+}
+
+test('staff editing is password-gated and starts empty', async () => {
+  const env = mockEnv('manager-token', 'test')
+
+  const empty = await handler.fetch(staffGet(), env)
+  assert.equal(empty.status, 200)
+  assert.deepEqual(await empty.json(), { employees: null, rev: 0, updatedAt: null, canUndo: false })
+
+  assert.equal((await handler.fetch(staffVerify('wrong'), env)).status, 401)
+  assert.equal((await handler.fetch(staffVerify(undefined), env)).status, 401)
+  assert.equal((await handler.fetch(staffVerify('test'), env)).status, 200)
+
+  // The manager token still works for crew writes.
+  assert.equal((await handler.fetch(staffVerify('manager-token'), env)).status, 200)
+})
+
+test('crew saves persist for every week and undo steps back through history', async () => {
+  const env = mockEnv('manager-token', 'test')
+
+  const first = await handler.fetch(staffPut({ employees: [rosterEmployee()], baseRev: 0 }, 'test'), env)
+  assert.equal(first.status, 201)
+  const firstDoc = (await first.json()) as { employees: { id: string }[]; rev: number; canUndo: boolean }
+  assert.equal(firstDoc.rev, 1)
+  assert.equal(firstDoc.employees.length, 1)
+  // The first save is undoable back to "no saved crew" (the built-in seed).
+  assert.equal(firstDoc.canUndo, true)
+
+  const two = [rosterEmployee(), rosterEmployee({ id: 'levelle', name: 'Levelle', roles: ['fried-rice'] })]
+  const second = await handler.fetch(staffPut({ employees: two, baseRev: 1 }, 'test'), env)
+  assert.equal(second.status, 200)
+  const secondDoc = (await second.json()) as { rev: number; canUndo: boolean }
+  assert.equal(secondDoc.rev, 2)
+  assert.equal(secondDoc.canUndo, true)
+
+  // The crew is station-wide: any week reads the same saved crew.
+  const read = await handler.fetch(staffGet(), env)
+  const readDoc = (await read.json()) as { employees: unknown[]; rev: number; canUndo: boolean }
+  assert.equal(readDoc.employees.length, 2)
+  assert.equal(readDoc.rev, 2)
+  assert.equal(readDoc.canUndo, true)
+
+  // Undo returns the previously saved crew and keeps one older step.
+  const undone = await handler.fetch(staffUndo({ baseRev: 2 }, 'test'), env)
+  assert.equal(undone.status, 200)
+  const undoneDoc = (await undone.json()) as { employees: { id: string }[]; rev: number; canUndo: boolean }
+  assert.equal(undoneDoc.rev, 3)
+  assert.equal(undoneDoc.employees.length, 1)
+  assert.equal(undoneDoc.employees[0].id, 'mary')
+  assert.equal(undoneDoc.canUndo, true)
+
+  // Undoing the first save restores "no saved crew" (built-in seed on the client).
+  const undoneAgain = await handler.fetch(staffUndo({ baseRev: 3 }, 'test'), env)
+  assert.equal(undoneAgain.status, 200)
+  const finalDoc = (await undoneAgain.json()) as { employees: unknown; rev: number; canUndo: boolean }
+  assert.equal(finalDoc.employees, null)
+  assert.equal(finalDoc.rev, 4)
+  assert.equal(finalDoc.canUndo, false)
+
+  const nothingLeft = await handler.fetch(staffUndo({ baseRev: 4 }, 'test'), env)
+  assert.equal(nothingLeft.status, 409)
+  assert.equal(((await nothingLeft.json()) as { error: string }).error, 'nothing_to_undo')
+})
+
+test('staff writes reject stale revisions and unauthorized callers', async () => {
+  const env = mockEnv('manager-token', 'test')
+  assert.equal((await handler.fetch(staffPut({ employees: [rosterEmployee()], baseRev: 0 }, 'wrong'), env)).status, 401)
+  assert.equal((await handler.fetch(staffPut({ employees: [rosterEmployee()], baseRev: 0 }, undefined), env)).status, 401)
+
+  const created = await handler.fetch(staffPut({ employees: [rosterEmployee()], baseRev: 0 }, 'test'), env)
+  assert.equal(created.status, 201)
+
+  const stale = await handler.fetch(staffPut({ employees: [], baseRev: 0 }, 'test'), env)
+  assert.equal(stale.status, 409)
+  assert.equal(((await stale.json()) as { rev: number }).rev, 1)
+
+  const badBody = await handler.fetch(staffPut({ employees: [{ id: 'Bad Id!' }], baseRev: 1 }, 'test'), env)
+  assert.equal(badBody.status, 400)
+})
+
+test('staff editing is refused without a configured password or on locked stations', async () => {
+  const noPassword = mockEnv('manager-token')
+  // The manager token still authorizes when no separate staff password is set.
+  const saved = await handler.fetch(staffPut({ employees: [rosterEmployee()], baseRev: 0 }, 'manager-token'), noPassword)
+  assert.equal(saved.status, 201)
+
+  const env = mockEnv('manager-token', 'test')
+  assert.equal((await handler.fetch(staffGet('CR2-kitchen'), env)).status, 403)
+  const locked = await handler.fetch(staffPut({ employees: [rosterEmployee()], baseRev: 0 }, 'test', 'CR2-kitchen'), env)
+  assert.equal(locked.status, 403)
+  assert.equal(((await locked.json()) as { error: string }).error, 'staff_editing_not_enabled')
+
+  const unconfigured = mockEnv('', '')
+  const notConfigured = await handler.fetch(staffVerify('anything'), unconfigured)
+  assert.equal(notConfigured.status, 503)
 })

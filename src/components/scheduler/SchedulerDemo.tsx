@@ -49,12 +49,14 @@ import {
   getEmployeeAvailability,
 } from '@/lib/scheduler'
 import { fetchRoster, rosterFingerprint } from '@/lib/employee-store'
+import { fetchStaff, staffFingerprint, type StaffWriteResult } from '@/lib/staff-store'
 import { fetchTemplate, templateFingerprint } from '@/lib/template-store'
 import { fetchGoldenWeek, type GoldenWeekDoc } from '@/lib/schedule-store'
 import { assignmentsFromPublishedWeek, templateHashForSlots } from '@/lib/schedule-share'
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
 import PublishPanel from './PublishPanel'
 import RosterPanel from './RosterPanel'
+import StaffPanel from './StaffPanel'
 import TemplatePanel from './TemplatePanel'
 
 type EmployeeDraft = {
@@ -892,10 +894,10 @@ function buildFixIssues(
 
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
   const restaurantName = restaurantId && isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
-  // Schedule-only stations (CR3 Kitchen) ship a fixed crew and fixed rules.
-  // The app always renders the built-in crew/template for them, so no edit path
-  // can change the staff list even if one is left reachable, and the Worker
-  // refuses roster/template writes for the same station.
+  // Schedule-only stations (CR3 Kitchen) ship a built-in crew and fixed rules.
+  // The rules stay fixed, but the crew can be edited after unlocking with the
+  // staff password (`/api/staff`): one crew per station, shared by every week,
+  // with the last saved change undoable. Until unlocked the crew is read-only.
   const scheduleOnly = isScheduleOnlyRestaurant(restaurantId)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
@@ -920,7 +922,21 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [defaultTemplate, setDefaultTemplate] = useState<WeeklyStaffingTemplate>(() => cloneTemplate(undefined, restaurantId))
   const [defaultTemplateLoaded, setDefaultTemplateLoaded] = useState(false)
   const [defaultTemplateRev, setDefaultTemplateRev] = useState(0)
-  const employees = scheduleOnly ? defaultRoster : weekStart ? (rosters[weekStart] ?? defaultRoster) : defaultRoster
+  // Editable crew for schedule-only stations. `staffDraft` is null until the
+  // saved crew loads; until then the built-in crew shows.
+  const [staffDraft, setStaffDraft] = useState<Employee[] | null>(null)
+  const [staffLoaded, setStaffLoaded] = useState(false)
+  const [staffRev, setStaffRev] = useState(0)
+  const [staffCanUndo, setStaffCanUndo] = useState(false)
+  const [staffUpdatedAt, setStaffUpdatedAt] = useState<string | null>(null)
+  const [staffBaseline, setStaffBaseline] = useState<string | null>(null)
+  const [staffUnlocked, setStaffUnlocked] = useState(false)
+  const [staffLoadError, setStaffLoadError] = useState('')
+  const employees = scheduleOnly
+    ? staffDraft ?? defaultRoster
+    : weekStart
+      ? rosters[weekStart] ?? defaultRoster
+      : defaultRoster
   const template = scheduleOnly ? defaultTemplate : weekStart ? (templates[weekStart] ?? defaultTemplate) : defaultTemplate
   const rosterRev = weekStart ? (rosterRevs[weekStart] ?? 0) : 0
   const rosterServerSnapshot = weekStart ? (rosterSnapshots[weekStart] ?? null) : null
@@ -932,6 +948,13 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const templateLoaded = Boolean(weekStart && defaultTemplateLoaded && templateLoadedWeeks[weekStart])
 
   function setEmployees(next: Employee[] | ((current: Employee[]) => Employee[])) {
+    if (scheduleOnly) {
+      setStaffDraft((current) => {
+        const base = current ?? defaultRoster
+        return typeof next === 'function' ? (next as (c: Employee[]) => Employee[])(base) : next
+      })
+      return
+    }
     const target = weekStart
     if (!target) return
     setRosters((current) => {
@@ -998,6 +1021,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       : rosterServerSnapshot === null
         ? employees.length > 0
         : rosterFingerprint(employees) !== rosterServerSnapshot
+  // Crew edits for schedule-only stations compare against the last saved crew.
+  const staffDirty =
+    scheduleOnly && staffLoaded && staffDraft !== null && staffBaseline !== null
+      ? staffFingerprint(staffDraft) !== staffBaseline
+      : false
   const [templateLoadError, setTemplateLoadError] = useState('')
   const [confirmingClearWeek, setConfirmingClearWeek] = useState(false)
   const [publishedWeeks, setPublishedWeeks] = useState<Record<string, GoldenWeekDoc | null>>({})
@@ -1180,6 +1208,14 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setConfirmingClearWeek(false)
     setSnapshotName('')
     setStaffSnapshots(readStaffSnapshots(restaurantId))
+    setStaffDraft(null)
+    setStaffLoaded(false)
+    setStaffRev(0)
+    setStaffCanUndo(false)
+    setStaffUpdatedAt(null)
+    setStaffBaseline(null)
+    setStaffUnlocked(false)
+    setStaffLoadError('')
   }, [restaurantId])
 
   useEffect(() => {
@@ -1205,6 +1241,38 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           setRosterLoadError('Could not reach the staff list store. Showing the built-in demo list — save once the connection works to keep changes.')
           setDefaultRosterLoaded(true)
         }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [restaurantId, scheduleOnly])
+
+  // Schedule-only crew: load the saved crew (one per station, shared by every
+  // week). No saved crew yet means the built-in seed, which stays editable.
+  useEffect(() => {
+    if (!scheduleOnly) return
+    let cancelled = false
+    setStaffLoadError('')
+    setStaffLoaded(false)
+    fetchStaff(restaurantId)
+      .then((doc) => {
+        if (cancelled) return
+        // `null` means no crew saved yet; an empty array is a deliberately empty crew.
+        const seed = doc.employees === null ? cloneEmployees(restaurantId) : (doc.employees as Employee[])
+        setStaffDraft(cloneEmployeeList(seed))
+        setStaffBaseline(staffFingerprint(seed))
+        setStaffRev(doc.rev)
+        setStaffCanUndo(doc.canUndo)
+        setStaffUpdatedAt(doc.updatedAt)
+        setStaffLoaded(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        const seed = cloneEmployees(restaurantId)
+        setStaffDraft(seed)
+        setStaffBaseline(staffFingerprint(seed))
+        setStaffLoadError('Could not reach the crew store. Showing the built-in crew — saving is paused until the connection works.')
+        setStaffLoaded(true)
       })
     return () => {
       cancelled = true
@@ -1480,7 +1548,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     }
     setDiagnostics([
       scheduleOnly
-        ? 'Prior week copied here — schedule only. The fixed crew and rules stay as they are. Publish when it looks right.'
+        ? 'Prior week copied here — schedule only. The saved crew and rules stay as they are. Publish when it looks right.'
         : 'Prior week copied here — schedule, staff list, and rules. Review it, then publish when it looks right.',
     ])
   }
@@ -1505,7 +1573,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     const [snapshot, ...rest] = history
     if (!snapshot) return
     const target = snapshot.weekStart || weekStart
-    if (target) {
+    if (scheduleOnly) {
+      // One crew per station — bring back the crew as it was before the last edit.
+      setStaffDraft(cloneEmployeeList(snapshot.employees))
+    } else if (target) {
       setRosters((current) => ({ ...current, [target]: cloneEmployeeList(snapshot.employees) }))
       setTemplates((current) => ({ ...current, [target]: cloneTemplate(snapshot.template) }))
     }
@@ -1925,6 +1996,31 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setDiagnostics([`${employee.name} was added. Make the schedule again when the staff list looks right.`])
   }
 
+  // The saved crew echoes back from the Worker after a save/undo. `employees: null`
+  // means "no saved crew", so fall back to the built-in seed.
+  function applyStaffResult(result: StaffWriteResult) {
+    const next = result.employees === null ? cloneEmployees(restaurantId) : result.employees
+    setStaffDraft(cloneEmployeeList(next))
+    setStaffBaseline(staffFingerprint(next))
+    setStaffRev(result.rev)
+    setStaffCanUndo(result.canUndo)
+    setStaffUpdatedAt(result.updatedAt)
+  }
+
+  function handleStaffSaved(result: StaffWriteResult) {
+    applyStaffResult(result)
+    setIgnoredIssueIds([])
+    setGuidedChoosing(false)
+    setDiagnostics(['Crew saved. It now applies to every week — make the schedule again to use it.'])
+  }
+
+  function handleStaffUndone(result: StaffWriteResult) {
+    applyStaffResult(result)
+    setIgnoredIssueIds([])
+    setGuidedChoosing(false)
+    setDiagnostics(['Undid the last saved crew change.'])
+  }
+
   function makeInfeasible() {
     remember('gap example')
     setEmployees((current) =>
@@ -2140,7 +2236,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             onAddEmployee={() => addEmployeeForSlot(nextIssue?.slot)}
             onIgnore={ignoreNextIssue}
             onShowIgnored={showIgnoredIssues}
-            canAddEmployee={!scheduleOnly}
+            canAddEmployee={!scheduleOnly || staffUnlocked}
           />
 
           <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
@@ -2376,18 +2472,22 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 </p>
                 <p className="mt-0.5 text-xs text-zinc-500">
                   {scheduleOnly
-                    ? 'Fixed crew for this station — you build the schedule and move people between the spots.'
+                    ? staffUnlocked
+                      ? `Editable crew for this station — saves apply to every week${staffDirty ? ' · unsaved changes' : ''}`
+                      : 'Crew for this station. Roles, availability, and the people on it are locked — unlock with the staff password to edit.'
                     : `Last saved: ${formatUpdatedAt(rosterUpdatedAt)}${rosterDirty ? ' · unsaved changes' : ''} · changes stay in this week only`}
                 </p>
               </div>
-              {!scheduleOnly && (
+              {(!scheduleOnly || staffUnlocked) && (
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <IconButton
-                    icon="check"
-                    label={storeLoading ? 'Waiting for the schedule store' : rosterPanelOpen ? 'Close save staff list' : 'Save staff list'}
-                    onClick={() => setRosterPanelOpen((open) => !open)}
-                    disabled={storeLoading}
-                  />
+                  {!scheduleOnly && (
+                    <IconButton
+                      icon="check"
+                      label={storeLoading ? 'Waiting for the schedule store' : rosterPanelOpen ? 'Close save staff list' : 'Save staff list'}
+                      onClick={() => setRosterPanelOpen((open) => !open)}
+                      disabled={storeLoading}
+                    />
+                  )}
                   <IconButton
                     icon={employeePanelOpen ? 'close' : 'plus'}
                     label={employeePanelOpen ? 'Close employee form' : 'Add employee'}
@@ -2399,6 +2499,24 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             </div>
 
             {rosterLoadError && <p className="mt-2 text-xs font-medium text-amber-800">{rosterLoadError}</p>}
+            {scheduleOnly && staffLoadError && <p className="mt-2 text-xs font-medium text-amber-800">{staffLoadError}</p>}
+
+            {scheduleOnly && (
+              <StaffPanel
+                employees={employees}
+                rev={staffRev}
+                canUndo={staffCanUndo}
+                updatedAt={staffUpdatedAt}
+                dirty={staffDirty}
+                loadPending={!staffLoaded}
+                unlocked={staffUnlocked}
+                restaurantId={restaurantId}
+                onUnlock={() => setStaffUnlocked(true)}
+                onLock={() => setStaffUnlocked(false)}
+                onSaved={handleStaffSaved}
+                onUndone={handleStaffUndone}
+              />
+            )}
 
             {rosterPanelOpen && !scheduleOnly && (
               <RosterPanel
@@ -2415,7 +2533,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               />
             )}
 
-            {employeePanelOpen && !scheduleOnly && (
+            {employeePanelOpen && (!scheduleOnly || staffUnlocked) && (
               <EmployeeForm
                 draft={draft}
                 gapSlot={gapSlot}
@@ -2558,7 +2676,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                       roles={availableRoles}
                       onUpdate={updateEmployee}
                       onRemove={removeEmployee}
-                      readOnly={scheduleOnly}
+                      readOnly={scheduleOnly && !staffUnlocked}
                     />
                   ))}
                   {filteredEmployees.length === 0 && (
@@ -3381,7 +3499,7 @@ function GuidedFixPanel({
               <p className="text-sm text-zinc-700">
                 {canAddEmployee
                   ? 'Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.'
-                  : 'Nobody on the fixed crew is free and trained for this spot. Open the shift below to move someone else in.'}
+                  : 'Nobody on the crew is free and trained for this spot. Open the shift below to move someone else in.'}
               </p>
               {excluded.length > 0 && (
                 <ul className="mt-2 space-y-1 text-xs text-zinc-600">

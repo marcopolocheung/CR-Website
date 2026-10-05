@@ -487,13 +487,12 @@ test('custom posts slugify, validate, and label for display', () => {
   assert.equal(formatRoleLabel('sushi-chef'), 'Sushi Chef')
 })
 
-test('CR03 fixed crew covers every required kitchen slot', () => {
+test('CR03 built-in crew covers every required kitchen slot', () => {
   const employees = defaultEmployeesForRestaurant('CR3-kitchen')
-  assert.equal(employees.length, 17)
+  assert.equal(employees.length, 19)
   assert.deepEqual(
     employees.map((employee) => employee.id).sort(),
     [
-      'alex',
       'alfredo',
       'carolina',
       'cris',
@@ -506,7 +505,10 @@ test('CR03 fixed crew covers every required kitchen slot', () => {
       'jeffery',
       'jeremiah',
       'jeremy',
+      'jerry',
       'jorge',
+      'levelle',
+      'michaela',
       'muk',
       'robert',
       'stef',
@@ -545,6 +547,70 @@ test('CR03 crew carries the sheet’s post qualifications and double limits', ()
   assert.equal(byId.get('isaiah')?.maxDaysPerWeek, 4)
   assert.equal(byId.get('isaiah')?.allowDoubles, false)
   assert.equal(byId.get('jayden')?.allowDoubles, false)
+  // Morning-and-night hires: no doubles, max 5 days.
+  assert.equal(byId.has('alex'), false)
+  assert.deepEqual(byId.get('levelle')?.roles, ['fried-rice'])
+  assert.deepEqual(byId.get('michaela')?.roles, ['line-cook'])
+  assert.deepEqual(byId.get('jerry')?.roles, ['line-cook'])
+  for (const id of ['levelle', 'michaela', 'jerry']) {
+    const hire = byId.get(id)
+    assert.equal(hire?.maxDaysPerWeek, 5)
+    assert.equal(hire?.allowDoubles, false)
+    assert.equal(Object.keys(hire?.recurringAvailability ?? {}).length, 7)
+    assert.deepEqual(hire?.recurringAvailability.Monday, [{ start: minutes(9), end: minutes(23) }])
+  }
+})
+
+test('M/V prep qualification implies meat prep, but not the reverse', () => {
+  const mv: Employee = { id: 'mv', name: 'MV', roles: ['mv-prep'], recurringAvailability: {}, allowDoubles: false, active: true }
+  const mp: Employee = { id: 'mp', name: 'MP', roles: ['meat-prep'], recurringAvailability: {}, allowDoubles: false, active: true }
+  const meatSlot: StaffingSlot = {
+    id: 'meat',
+    day: 'Monday',
+    period: 'AM',
+    role: 'meat-prep',
+    label: 'Meat Prep',
+    start: minutes(9),
+    end: minutes(16),
+    required: true,
+  }
+  const mvSlot: StaffingSlot = { ...meatSlot, id: 'mv', role: 'mv-prep', label: 'M/V Prep' }
+  // An M/V prep worker can cover meat prep...
+  assert.equal(isEmployeeQualified(mv, meatSlot), true)
+  // ...but a meat-prep-only worker (Cris) cannot cover M/V prep.
+  assert.equal(isEmployeeQualified(mp, mvSlot), false)
+})
+
+test('optional spots are filled when a candidate exists, and left open when not', () => {
+  const solo: Employee = {
+    id: 'solo',
+    name: 'Solo',
+    roles: ['server'],
+    recurringAvailability: Object.fromEntries(DAYS.map((day) => [day, [{ start: minutes(9), end: minutes(23) }]])),
+    maxDaysPerWeek: 7,
+    allowDoubles: true,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }
+  const template = Object.fromEntries(DAYS.map((day) => [day, []])) as unknown as WeeklyStaffingTemplate
+  template.Monday = [
+    { period: 'AM', role: 'server', label: 'Server (AM)', start: minutes(9), end: minutes(16), required: true },
+    { period: 'PM', role: 'server', label: 'Server (PM)', start: minutes(16), end: minutes(23), required: false },
+    { period: 'PM', role: 'cook', label: 'Cook (PM)', start: minutes(16), end: minutes(23), required: false },
+  ]
+  const result = generateSchedule({ employees: [solo], template })
+  assert.equal(result.status, 'FEASIBLE')
+  if (result.status !== 'FEASIBLE') return
+  const slots = expandTemplate(template)
+  const bySlot = new Map(result.assignments.map((assignment) => [assignment.slotId, assignment.employeeId]))
+  const required = slots.find((slot) => slot.label === 'Server (AM)')
+  const optionalServer = slots.find((slot) => slot.label === 'Server (PM)')
+  const optionalCook = slots.find((slot) => slot.label === 'Cook (PM)')
+  assert.ok(required && bySlot.get(required.id) === 'solo')
+  // Optional spot with a qualified candidate is filled even though it is not required.
+  assert.ok(optionalServer && bySlot.get(optionalServer.id) === 'solo')
+  // Optional spot nobody is qualified for stays open.
+  assert.ok(optionalCook && bySlot.get(optionalCook.id) === undefined)
 })
 
 test('M/V prep qualification implies meat prep, but not the reverse', () => {

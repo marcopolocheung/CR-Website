@@ -36,7 +36,7 @@ monday to wednesday, hire new person, so that person can only works morning
 
 ## CR03 Kitchen (sheet `CR03_K`) Assumptions
 
-The CR03 Kitchen crew and rules are now fixed in code (`seedKitchenEmployeesCR03` / `seedKitchenTemplateCR03`). The sheet lists post qualifications and per-person hours but not required headcount, so these points still need manager confirmation:
+The CR03 Kitchen shift rules are fixed in code (`seedKitchenTemplateCR03`) and its crew ships as a built-in seed (`seedKitchenEmployeesCR03`). The crew can be edited from the scheduler behind the staff password (`/api/staff`) — roles, availability, add and remove — and saved for every week, with the last save undoable. The sheet lists post qualifications and per-person hours but not required headcount, so these points still need manager confirmation:
 
 - **Required cover per shift** is now: lunch (AM) = Cook + M/V Prep (early/late); dinner (PM) = Cook + Line Cook + F.R. Cook + Dishwasher. The sheet lists who can work each post but not how many of each a shift needs, so this is a chosen default. Shadow, Meat Prep, and the extra lunch F.R. Cook / Dishwasher spots are optional. Adjust the counts if the kitchen needs different coverage.
 - **Dishwasher (PM) starts at 5pm**, not 4pm, so Jayden and Cris (whose sheet hours start at 5pm) can take it. Confirm if dinner dishwasher should start at 4pm.

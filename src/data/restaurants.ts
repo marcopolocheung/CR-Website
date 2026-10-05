@@ -39,10 +39,12 @@ export const RESTAURANTS: Record<RestaurantId, Restaurant> = {
 export const DEFAULT_RESTAURANT: RestaurantId = 'CR3-diningroom'
 
 /**
- * Stations whose staff list and shift rules are fixed in code. Users can still
- * build a schedule and move people between the fixed spots, but nobody — not
- * even a manager — edits the crew or the rules from the app. The Worker rejects
- * roster/template writes for these stations too, so it cannot be bypassed.
+ * Stations whose shift rules are fixed in code. The crew starts from the
+ * built-in sheet and can be edited only after unlocking with the staff
+ * password (`/api/staff`) — one crew per station, shared by every week, with the
+ * last saved change undoable. The Worker still rejects the per-week
+ * roster/template writes for these stations, so the fixed rules cannot be
+ * bypassed and the crew cannot drift week to week.
  */
 export const SCHEDULE_ONLY_RESTAURANTS: readonly RestaurantId[] = ['CR3-kitchen']
 
