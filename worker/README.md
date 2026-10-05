@@ -69,18 +69,19 @@ in `sessionStorage` or `localStorage`, by design.
 ## Staff password (crew editor)
 
 Crew editing on schedule-only stations (CR3 Kitchen) is hidden behind a
-separate staff password, `STAFF_EDIT_PASSWORD`. `worker/wrangler.toml` ships the
-demo value `test` as a `[vars]` entry; override it for anything beyond the demo:
+separate staff password. It is **hardcoded for now** to `test` in
+`worker/src/index.ts` (`DEFAULT_STAFF_EDIT_PASSWORD`) so it works with no Worker
+setup. Override it for anything beyond the demo:
 
 ```sh
 wrangler secret put STAFF_EDIT_PASSWORD --config worker/wrangler.toml
 ```
 
-Dashboard deploys: Worker → Settings → Variables → Add variable/secret
-`STAFF_EDIT_PASSWORD`. Without either `STAFF_EDIT_PASSWORD` or
-`SCHEDULE_WRITE_TOKEN` set, `/api/staff` writes answer `503 write_not_configured`.
-The password is typed into the crew editor, checked against
-`GET /api/staff/verify`, and kept only in memory for that page view.
+Dashboard deploys: Worker → Settings → Variables → Add a variable/secret
+`STAFF_EDIT_PASSWORD`. When set, it takes the place of the hardcoded default;
+the manager token also still authorizes crew writes. The password is typed into
+the crew editor, checked against `GET /api/staff/verify`, and kept only in
+memory for that page view.
 
 ## Deploy option A: dashboard paste (what you already did)
 
@@ -137,7 +138,7 @@ Staffing template (public read, token-guarded write, same token as the golden sc
 Station crew (public read, password-guarded write, schedule-only stations only):
 
 - `GET /api/staff?restaurant=CR3-kitchen` → `200 { employees, rev, updatedAt, canUndo }` (`employees: null` means no crew saved yet — fall back to the built-in crew). `403 staff_editing_not_enabled` for stations whose crew is not editable.
-- `GET /api/staff/verify` with `Authorization: Bearer <staff password>` → `200 { ok: true }`, `401 unauthorized`, `503 write_not_configured`. Read-only gate check for the crew editor — own throttle budget (30/hour per IP).
+- `GET /api/staff/verify` with `Authorization: Bearer <staff password>` → `200 { ok: true }`, `401 unauthorized`. Read-only gate check for the crew editor — own throttle budget (30/hour per IP). The password defaults to the hardcoded `test` when `STAFF_EDIT_PASSWORD` is unset.
 - `PUT /api/staff?restaurant=CR3-kitchen { employees, baseRev }` with `Authorization: Bearer <staff password>` → `200|201 { employees, rev, updatedAt, canUndo }`, `401 unauthorized`, `403 staff_editing_not_enabled`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`. Removing someone from `employees` and saving is a real, persisted delete.
 - `POST /api/staff/undo?restaurant=CR3-kitchen { baseRev }` with `Authorization: Bearer <staff password>` → `200 { employees, rev, updatedAt, canUndo }` restoring the crew replaced by the last save, `409 { error: "nothing_to_undo", rev }` when there is nothing left. The first save is undoable back to `employees: null` (the built-in crew).
 

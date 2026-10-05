@@ -870,11 +870,15 @@ test('staff writes reject stale revisions and unauthorized callers', async () =>
   assert.equal(badBody.status, 400)
 })
 
-test('staff editing is refused without a configured password or on locked stations', async () => {
+test('staff password falls back to the hardcoded demo value and locked stations are refused', async () => {
   const noPassword = mockEnv('manager-token')
-  // The manager token still authorizes when no separate staff password is set.
+  // The manager token still authorizes.
   const saved = await handler.fetch(staffPut({ employees: [rosterEmployee()], baseRev: 0 }, 'manager-token'), noPassword)
   assert.equal(saved.status, 201)
+  // With no env password, the hardcoded default "test" unlocks and writes.
+  assert.equal((await handler.fetch(staffVerify('test'), noPassword)).status, 200)
+  assert.equal((await handler.fetch(staffPut({ employees: [rosterEmployee()], baseRev: 1 }, 'test'), noPassword)).status, 200)
+  assert.equal((await handler.fetch(staffVerify('anything'), noPassword)).status, 401)
 
   const env = mockEnv('manager-token', 'test')
   assert.equal((await handler.fetch(staffGet('CR2-kitchen'), env)).status, 403)
@@ -882,7 +886,8 @@ test('staff editing is refused without a configured password or on locked statio
   assert.equal(locked.status, 403)
   assert.equal(((await locked.json()) as { error: string }).error, 'staff_editing_not_enabled')
 
-  const unconfigured = mockEnv('', '')
-  const notConfigured = await handler.fetch(staffVerify('anything'), unconfigured)
-  assert.equal(notConfigured.status, 503)
+  // An explicit env password overrides the hardcoded default.
+  const custom = mockEnv('manager-token', 'hunter2')
+  assert.equal((await handler.fetch(staffVerify('hunter2'), custom)).status, 200)
+  assert.equal((await handler.fetch(staffVerify('test'), custom)).status, 401)
 })

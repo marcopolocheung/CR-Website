@@ -10,9 +10,7 @@ binding = "SCHEDULES"
 id = "REPLACE_WITH_YOUR_NAMESPACE_ID"
 
 # Password that unlocks crew editing on schedule-only stations (`/api/staff`).
-# It grants no other write — publishing still needs SCHEDULE_WRITE_TOKEN. This
-# is the demo password requested for the CR3 Kitchen crew editor; override it
+# It grants no other write — publishing still needs SCHEDULE_WRITE_TOKEN.
+# Hardcoded for now to the demo value "test" in worker/src/index.ts; override it
 # with a Worker secret (wrangler secret put STAFF_EDIT_PASSWORD) for anything
-# beyond the demo. Dashboard deploys must set it under Settings → Variables.
-[vars]
-STAFF_EDIT_PASSWORD = "test"
+# beyond the demo.
