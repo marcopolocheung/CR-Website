@@ -30,7 +30,7 @@ export function toRosterEmployee(employee: Employee): RosterEmployee {
   }
 }
 
-function isRosterEmployee(value: unknown): value is RosterEmployee {
+export function isRosterEmployee(value: unknown): value is RosterEmployee {
   if (!value || typeof value !== 'object') return false
   const employee = value as Record<string, unknown>
   return (

@@ -487,13 +487,12 @@ test('custom posts slugify, validate, and label for display', () => {
   assert.equal(formatRoleLabel('sushi-chef'), 'Sushi Chef')
 })
 
-test('CR03 fixed crew covers every required kitchen slot', () => {
+test('CR03 built-in crew covers every required kitchen slot', () => {
   const employees = defaultEmployeesForRestaurant('CR3-kitchen')
-  assert.equal(employees.length, 17)
+  assert.equal(employees.length, 19)
   assert.deepEqual(
     employees.map((employee) => employee.id).sort(),
     [
-      'alex',
       'alfredo',
       'carolina',
       'cris',
@@ -506,7 +505,10 @@ test('CR03 fixed crew covers every required kitchen slot', () => {
       'jeffery',
       'jeremiah',
       'jeremy',
+      'jerry',
       'jorge',
+      'levelle',
+      'michaela',
       'muk',
       'robert',
       'stef',
@@ -545,6 +547,18 @@ test('CR03 crew carries the sheet’s post qualifications and double limits', ()
   assert.equal(byId.get('isaiah')?.maxDaysPerWeek, 4)
   assert.equal(byId.get('isaiah')?.allowDoubles, false)
   assert.equal(byId.get('jayden')?.allowDoubles, false)
+  // Morning-and-night hires: no doubles, max 5 days.
+  assert.equal(byId.has('alex'), false)
+  assert.deepEqual(byId.get('levelle')?.roles, ['fried-rice'])
+  assert.deepEqual(byId.get('michaela')?.roles, ['line-cook'])
+  assert.deepEqual(byId.get('jerry')?.roles, ['line-cook'])
+  for (const id of ['levelle', 'michaela', 'jerry']) {
+    const hire = byId.get(id)
+    assert.equal(hire?.maxDaysPerWeek, 5)
+    assert.equal(hire?.allowDoubles, false)
+    assert.equal(Object.keys(hire?.recurringAvailability ?? {}).length, 7)
+    assert.deepEqual(hire?.recurringAvailability.Monday, [{ start: minutes(9), end: minutes(23) }])
+  }
 })
 
 test('M/V prep qualification implies meat prep, but not the reverse', () => {

@@ -8,6 +8,8 @@ interface Env {
   ALLOWED_ORIGIN?: string
   /** Manager write token for the golden schedule. Never shipped to browsers; the manager types it per save. */
   SCHEDULE_WRITE_TOKEN?: string
+  /** Password that unlocks crew editing on schedule-only stations. Grants no other write. */
+  STAFF_EDIT_PASSWORD?: string
 }
 
 export type StoredWeek = {
@@ -49,14 +51,21 @@ export type RestaurantId = (typeof RESTAURANTS)[number]
 export const DEFAULT_RESTAURANT: RestaurantId = 'CR3-diningroom'
 
 /**
- * Stations whose staff list and shift rules are fixed in code. The roster and
- * template PUTs are refused here so a schedule-only user cannot change the crew
- * by calling the API directly. The schedule itself stays writable.
+ * Stations whose shift rules are fixed in code. The per-week roster and
+ * template PUTs are refused here so a schedule-only user cannot change the
+ * rules (or fork the crew week to week) by calling the API directly. The crew
+ * is editable through the password-gated `/api/staff` route instead, and the
+ * schedule itself stays writable.
  */
 export const SCHEDULE_ONLY_RESTAURANTS: readonly RestaurantId[] = ['CR3-kitchen']
 
 export function isScheduleOnlyRestaurant(restaurant: string): boolean {
   return (SCHEDULE_ONLY_RESTAURANTS as readonly string[]).includes(restaurant)
+}
+
+/** Schedule-only stations whose crew can still be edited behind the staff password (`/api/staff`). */
+export function isStaffEditableRestaurant(restaurant: string): boolean {
+  return isScheduleOnlyRestaurant(restaurant)
 }
 
 const RESTAURANT_RE = /^[A-Za-z0-9-]{2,40}$/
@@ -492,6 +501,75 @@ export function normalizeRosterDoc(raw: unknown): RosterDoc | null {
   return { v: 1, rev: doc.rev, employees: valid.employees, updatedAt: doc.updatedAt }
 }
 
+// --- Station crew (password-gated staff editing for schedule-only stations) ---
+// One crew per station, shared by every week. `employees: null` means the
+// built-in crew from code. Each save pushes the replaced crew onto `history`
+// so `POST /api/staff/undo` can step back through recent saves.
+
+const STAFF_HISTORY_LIMIT = 10
+
+export type StaffHistoryEntry = { employees: StoredEmployee[] | null; updatedAt: string | null }
+
+export type StaffDoc = {
+  v: 1
+  rev: number
+  employees: StoredEmployee[] | null
+  updatedAt: string
+  history: StaffHistoryEntry[]
+}
+
+export function staffKey(restaurant: string): string {
+  return `r:${restaurant}:staff:current`
+}
+
+function normalizeStaffEmployees(value: unknown): StoredEmployee[] | null | undefined {
+  if (value === null) return null
+  const valid = validateRosterBody({ employees: value, baseRev: 0 })
+  return valid ? valid.employees : undefined
+}
+
+export function normalizeStaffDoc(raw: unknown): StaffDoc | null {
+  if (!raw || typeof raw !== 'object') return null
+  const doc = raw as Record<string, unknown>
+  if (doc.v !== 1) return null
+  if (typeof doc.rev !== 'number' || !Number.isInteger(doc.rev) || doc.rev < 1) return null
+  if (typeof doc.updatedAt !== 'string') return null
+  const employees = normalizeStaffEmployees(doc.employees)
+  if (employees === undefined) return null
+  if (!Array.isArray(doc.history)) return null
+  const history: StaffHistoryEntry[] = []
+  for (const entry of doc.history.slice(0, STAFF_HISTORY_LIMIT)) {
+    if (!entry || typeof entry !== 'object') return null
+    const { employees: entryEmployees, updatedAt } = entry as Record<string, unknown>
+    const normalized = normalizeStaffEmployees(entryEmployees)
+    if (normalized === undefined) return null
+    if (updatedAt !== null && typeof updatedAt !== 'string') return null
+    history.push({ employees: normalized, updatedAt: (updatedAt as string | null) ?? null })
+  }
+  return { v: 1, rev: doc.rev, employees, updatedAt: doc.updatedAt, history }
+}
+
+export function validateStaffUndoBody(body: unknown): { baseRev: number } | null {
+  if (!body || typeof body !== 'object') return null
+  const { baseRev } = body as Record<string, unknown>
+  if (typeof baseRev !== 'number' || !Number.isInteger(baseRev) || baseRev < 1) return null
+  return { baseRev }
+}
+
+async function readStaffDoc(env: Env, restaurant: string): Promise<StaffDoc | null> {
+  const raw = await env.SCHEDULES.get(staffKey(restaurant))
+  return raw ? normalizeStaffDoc(safeParse(raw)) : null
+}
+
+function staffResponse(doc: StaffDoc | null) {
+  return {
+    employees: doc?.employees ?? null,
+    rev: doc?.rev ?? 0,
+    updatedAt: doc?.updatedAt ?? null,
+    canUndo: (doc?.history.length ?? 0) > 0,
+  }
+}
+
 // --- Staffing template (rules are per-week, with the global doc as the seed) ---
 
 const LEGACY_TEMPLATE_KEY = 'template:current'
@@ -580,6 +658,17 @@ export function isGoldenWriteAuthorized(request: Request, env: Env): boolean {
   const token = env.SCHEDULE_WRITE_TOKEN ?? ''
   if (!token) return false
   return request.headers.get('Authorization') === `Bearer ${token}`
+}
+
+export function staffEditError(env: Env): 'write_not_configured' | null {
+  return env.STAFF_EDIT_PASSWORD || env.SCHEDULE_WRITE_TOKEN ? null : 'write_not_configured'
+}
+
+/** Crew edits accept the staff password or the manager token. The password unlocks nothing else. */
+export function isStaffEditAuthorized(request: Request, env: Env): boolean {
+  const password = env.STAFF_EDIT_PASSWORD ?? ''
+  if (password && request.headers.get('Authorization') === `Bearer ${password}`) return true
+  return isGoldenWriteAuthorized(request, env)
 }
 
 function clientIp(request: Request): string {
@@ -969,6 +1058,72 @@ export default {
         }
         await env.SCHEDULES.put(targetKey, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
         return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env)
+      }
+    }
+
+    if (path === '/api/staff' || path === '/api/staff/undo' || path === '/api/staff/verify') {
+      const restaurant = restaurantFromUrl(url)
+      if (!restaurant) return json({ error: 'invalid_restaurant' }, 400, request, env)
+      if (!isStaffEditableRestaurant(restaurant)) return json({ error: 'staff_editing_not_enabled' }, 403, request, env)
+
+      if (request.method === 'GET' && path === '/api/staff') {
+        return json(staffResponse(await readStaffDoc(env, restaurant)), 200, request, env, { 'Cache-Control': 'no-store' })
+      }
+
+      // Unlock check for the staff editor — read-only, throttled like the demo gate.
+      if (request.method === 'GET' && path === '/api/staff/verify') {
+        if (staffEditError(env)) return json({ error: 'write_not_configured' }, 503, request, env)
+        if (!(await checkVerifyThrottle(env, clientIp(request)))) {
+          return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
+        }
+        if (!isStaffEditAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
+        return json({ ok: true }, 200, request, env)
+      }
+
+      const isSave = request.method === 'PUT' && path === '/api/staff'
+      const isUndo = request.method === 'POST' && path === '/api/staff/undo'
+      if (isSave || isUndo) {
+        if (staffEditError(env)) return json({ error: 'write_not_configured' }, 503, request, env)
+        if (!isStaffEditAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
+        if (!(await checkWriteThrottle(env, clientIp(request)))) {
+          return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
+        }
+        let body: unknown
+        try {
+          body = await readBody(request)
+        } catch {
+          return json({ error: 'body_too_large' }, 413, request, env)
+        }
+        const current = await readStaffDoc(env, restaurant)
+        const currentRev = current?.rev ?? 0
+        const updatedAt = new Date().toISOString()
+        let next: StaffDoc
+        if (isSave) {
+          const valid = validateRosterBody(body)
+          if (!valid) return json({ error: 'invalid_body' }, 400, request, env)
+          if (valid.baseRev !== currentRev) {
+            return json({ error: 'conflict', rev: currentRev, updatedAt: current?.updatedAt }, 409, request, env)
+          }
+          const replaced: StaffHistoryEntry = { employees: current?.employees ?? null, updatedAt: current?.updatedAt ?? null }
+          next = {
+            v: 1,
+            rev: currentRev + 1,
+            employees: valid.employees,
+            updatedAt,
+            history: [replaced, ...(current?.history ?? [])].slice(0, STAFF_HISTORY_LIMIT),
+          }
+        } else {
+          const valid = validateStaffUndoBody(body)
+          if (!valid) return json({ error: 'invalid_body' }, 400, request, env)
+          if (valid.baseRev !== currentRev) {
+            return json({ error: 'conflict', rev: currentRev, updatedAt: current?.updatedAt }, 409, request, env)
+          }
+          const [previous, ...older] = current?.history ?? []
+          if (!current || !previous) return json({ error: 'nothing_to_undo', rev: currentRev }, 409, request, env)
+          next = { v: 1, rev: currentRev + 1, employees: previous.employees, updatedAt, history: older }
+        }
+        await env.SCHEDULES.put(staffKey(restaurant), JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
+        return json(staffResponse(next), currentRev === 0 ? 201 : 200, request, env)
       }
     }
 
