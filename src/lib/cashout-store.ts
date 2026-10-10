@@ -46,7 +46,13 @@ function errorFor(status: number): Error {
   return new StoreUnavailableError('Could not reach the cash-out store.')
 }
 
-async function requestJson(path: string, token: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
+/** Manager-token request to the Worker. Shared with the write-up store. */
+export async function requestJson(
+  path: string,
+  token: string,
+  init?: RequestInit,
+  unreachable = 'Could not reach the cash-out store.',
+): Promise<{ status: number; body: unknown }> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 10000)
   try {
@@ -64,7 +70,7 @@ async function requestJson(path: string, token: string, init?: RequestInit): Pro
     }
     return { status: response.status, body }
   } catch {
-    throw new StoreUnavailableError('Could not reach the cash-out store.')
+    throw new StoreUnavailableError(unreachable)
   } finally {
     clearTimeout(timer)
   }

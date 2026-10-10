@@ -609,6 +609,64 @@ export function cashoutHistoryDates(to) {
     const end = Date.parse(`${to}T00:00:00Z`);
     return Array.from({ length: CASHOUT_HISTORY_DAYS }, (_, i) => new Date(end - i * 86400000).toISOString().slice(0, 10));
 }
+// --- Employee write-ups (record of corrective action) ---
+export const WRITEUP_VIOLATIONS = ['attendance', 'job-performance', 'conduct', 'company-policy', 'others'];
+export const WRITEUP_ACTIONS = ['verbal', 'written', 'suspension', 'termination'];
+const WRITEUP_SHORT_CHARS = 60;
+const WRITEUP_LONG_CHARS = 3000;
+/** Kept short so the list summary fits KV's 1024-byte metadata limit. */
+const WRITEUP_LABEL_CHARS = 120;
+const isDate = (v) => typeof v === 'string' && WEEK_RE.test(v) && !Number.isNaN(Date.parse(v));
+const isText = (v, max) => typeof v === 'string' && v.length <= max;
+const isSubset = (v, allowed) => Array.isArray(v) && v.length <= allowed.length && new Set(v).size === v.length && v.every((x) => allowed.includes(x));
+export function validateWriteUpForm(raw) {
+    if (!raw || typeof raw !== 'object')
+        return null;
+    const f = raw;
+    if (!isDate(f.date))
+        return null;
+    if (!isText(f.employee, WRITEUP_SHORT_CHARS) || !f.employee.trim())
+        return null;
+    if (!isSubset(f.violations, WRITEUP_VIOLATIONS) || !isSubset(f.actions, WRITEUP_ACTIONS))
+        return null;
+    const short = ['manager', 'otherSpecify', 'employeeSignature', 'managerSignature'];
+    const long = ['incident', 'incidentCont', 'expected', 'employeeComments'];
+    if (!short.every((k) => isText(f[k], WRITEUP_SHORT_CHARS)))
+        return null;
+    if (!long.every((k) => isText(f[k], WRITEUP_LONG_CHARS)))
+        return null;
+    if (![f.employeeSignedDate, f.managerSignedDate].every((d) => d === '' || isDate(d)))
+        return null;
+    const form = Object.fromEntries([...short, ...long, 'employeeSignedDate', 'managerSignedDate'].map((k) => [k, f[k]]));
+    return { date: f.date, employee: f.employee.trim(), violations: f.violations, actions: f.actions, ...form };
+}
+export function validateWriteUpLabel(raw) {
+    const label = raw && typeof raw === 'object' ? raw.label : undefined;
+    return isText(label, WRITEUP_LABEL_CHARS) ? label.trim() : null;
+}
+function writeUpKey(id) {
+    return `writeup:${id}`;
+}
+async function putWriteUp(env, doc) {
+    // No TTL: these are personnel records. The metadata is the list row, so listing needs no per-record reads.
+    const metadata = { date: doc.form.date, employee: doc.form.employee, label: doc.label };
+    await env.SCHEDULES.put(writeUpKey(doc.id), JSON.stringify(doc), { metadata });
+}
+/** Newest date first, then employee name. */
+export async function listWriteUps(env) {
+    const out = [];
+    let cursor;
+    do {
+        const page = await env.SCHEDULES.list({ prefix: 'writeup:', cursor });
+        for (const key of page.keys) {
+            const meta = key.metadata;
+            if (meta)
+                out.push({ id: key.name.slice('writeup:'.length), ...meta });
+        }
+        cursor = page.list_complete ? undefined : page.cursor;
+    } while (cursor);
+    return out.sort((a, b) => b.date.localeCompare(a.date) || a.employee.localeCompare(b.employee));
+}
 export function goldenWriteError(env) {
     return env.SCHEDULE_WRITE_TOKEN ? null : 'write_not_configured';
 }
@@ -631,6 +689,18 @@ export function isStaffEditAuthorized(request, env) {
     if (request.headers.get('Authorization') === `Bearer ${staffPassword(env)}`)
         return true;
     return isGoldenWriteAuthorized(request, env);
+}
+/** Manager-token gate for private data. Null when authorized, else the error response to return. */
+async function managerAuthError(request, env) {
+    if (goldenWriteError(env))
+        return json({ error: 'write_not_configured' }, 503, request, env);
+    if (isGoldenWriteAuthorized(request, env))
+        return null;
+    // Wrong codes share the gate's guess budget so these routes can't be used to brute-force the token.
+    if (!(await checkVerifyThrottle(env, clientIp(request)))) {
+        return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
+    }
+    return json({ error: 'unauthorized' }, 401, request, env);
 }
 function clientIp(request) {
     return request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ?? 'unknown';
@@ -768,15 +838,9 @@ export default {
         if (cashoutMatch && (request.method === 'GET' || request.method === 'PUT')) {
             const store = cashoutMatch[1];
             const date = cashoutMatch[2];
-            if (goldenWriteError(env))
-                return json({ error: 'write_not_configured' }, 503, request, env);
-            if (!isGoldenWriteAuthorized(request, env)) {
-                // Wrong codes share the gate's guess budget so this route can't be used to brute-force the token.
-                if (!(await checkVerifyThrottle(env, clientIp(request)))) {
-                    return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
-                }
-                return json({ error: 'unauthorized' }, 401, request, env);
-            }
+            const denied = await managerAuthError(request, env);
+            if (denied)
+                return denied;
             const noStore = { 'Cache-Control': 'no-store' };
             if (request.method === 'GET' && !date) {
                 const to = url.searchParams.get('to') ?? '';
@@ -815,6 +879,51 @@ export default {
             const doc = { v: 1, store, date, ...valid, updatedAt: new Date().toISOString() };
             await env.SCHEDULES.put(cashoutKey(store, date), JSON.stringify(doc), { expirationTtl: CASHOUT_TTL_SECONDS });
             return json({ updatedAt: doc.updatedAt }, 200, request, env);
+        }
+        // Employee write-ups: manager token for reads and writes. The form is fixed once saved; only the label changes.
+        const writeUpMatch = path.match(/^\/api\/writeups(?:\/([A-Za-z0-9_-]{10})(\/label)?)?$/);
+        if (writeUpMatch) {
+            const [, id, labelPath] = writeUpMatch;
+            const route = !id ? `${request.method} list` : labelPath ? `${request.method} label` : `${request.method} one`;
+            if (!['GET list', 'POST list', 'GET one', 'PUT label'].includes(route))
+                return json({ error: 'not_found' }, 404, request, env);
+            const denied = await managerAuthError(request, env);
+            if (denied)
+                return denied;
+            const noStore = { 'Cache-Control': 'no-store' };
+            if (route === 'GET list')
+                return json({ writeUps: await listWriteUps(env) }, 200, request, env, noStore);
+            const existing = id ? safeParse((await env.SCHEDULES.get(writeUpKey(id))) ?? '') : null;
+            if (route === 'GET one') {
+                return existing ? json(existing, 200, request, env, noStore) : json({ error: 'not_found' }, 404, request, env);
+            }
+            if (!(await checkWriteThrottle(env, clientIp(request)))) {
+                return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
+            }
+            let body;
+            try {
+                body = await readBody(request);
+            }
+            catch {
+                return json({ error: 'body_too_large' }, 413, request, env);
+            }
+            const now = new Date().toISOString();
+            if (route === 'POST list') {
+                const form = validateWriteUpForm(body);
+                if (!form)
+                    return json({ error: 'invalid_body' }, 400, request, env);
+                const doc = { v: 1, id: newShareId(), form, label: '', createdAt: now, labelUpdatedAt: null };
+                await putWriteUp(env, doc);
+                return json({ id: doc.id, createdAt: doc.createdAt }, 201, request, env);
+            }
+            if (!existing)
+                return json({ error: 'not_found' }, 404, request, env);
+            const label = validateWriteUpLabel(body);
+            if (label === null)
+                return json({ error: 'invalid_body' }, 400, request, env);
+            // shortcut: last save wins on the label, add a rev check if managers start overwriting each other.
+            await putWriteUp(env, { ...existing, label, labelUpdatedAt: now });
+            return json({ label, labelUpdatedAt: now }, 200, request, env);
         }
         if (request.method === 'POST' && path === '/api/weeks') {
             if (!(await checkWriteThrottle(env, clientIp(request)))) {

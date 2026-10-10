@@ -39,6 +39,14 @@ Plus two more stores, keyed separately per station:
   Reads AND writes need the manager token (cash figures, not public). Days
   expire after 31 days; last save wins.
 
+- Employee write-ups (`/api/writeups`): one record per write-up
+  (`writeup:{id}`), entered on `/internal/write-ups`. `GET /api/writeups` lists
+  them by date (newest first) then employee, `POST /api/writeups` saves a new
+  one, `GET /api/writeups/{id}` reads one, and `PUT /api/writeups/{id}/label`
+  rewrites its manager label. The form itself is never edited after saving.
+  Reads AND writes need the manager token. Records never expire. The list row
+  (date, employee, label) is kept as KV key metadata so listing needs no reads.
+
 Stations: `CR3-diningroom` (default, owns pre-partition legacy data),
 `CR3-kitchen`, `CR2-kitchen`, `CR2-diningroom`. Omit `?restaurant=` to read the
 default station. Unknown `?restaurant=` values answer `400 invalid_restaurant`.
