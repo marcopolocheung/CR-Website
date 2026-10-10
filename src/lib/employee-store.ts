@@ -13,6 +13,9 @@ export type RosterEmployee = Pick<
   | 'maxDoublesPerWeek'
   | 'incompatibleEmployeeIds'
   | 'active'
+  | 'suspendedFrom'
+  | 'suspendedUntil'
+  | 'priority'
 >
 
 export function toRosterEmployee(employee: Employee): RosterEmployee {
@@ -27,6 +30,9 @@ export function toRosterEmployee(employee: Employee): RosterEmployee {
     maxDoublesPerWeek: employee.maxDoublesPerWeek,
     incompatibleEmployeeIds: employee.incompatibleEmployeeIds ?? [],
     active: employee.active,
+    suspendedFrom: employee.suspendedFrom,
+    suspendedUntil: employee.suspendedUntil,
+    priority: employee.priority,
   }
 }
 

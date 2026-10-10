@@ -9,6 +9,7 @@ import {
   type WeeklyStaffingTemplate,
 } from './types'
 import { minutes } from './time'
+import { dateForDay } from './week'
 
 const am = { start: minutes(9, 30), end: minutes(16) }
 const pm = { start: minutes(16), end: minutes(23) }
@@ -237,11 +238,12 @@ export const seedTemplate: WeeklyStaffingTemplate = Object.fromEntries(
   }),
 ) as WeeklyStaffingTemplate
 
-export function expandTemplate(template: WeeklyStaffingTemplate): StaffingSlot[] {
+export function expandTemplate(template: WeeklyStaffingTemplate, weekStart?: string): StaffingSlot[] {
   return DAYS.flatMap((day) =>
     template[day].map((slot, index) => ({
       ...slot,
       day,
+      ...(weekStart ? { date: dateForDay(weekStart, day) } : {}),
       id: `${day.toLowerCase()}-${slot.period.toLowerCase()}-${index}-${slot.label.toLowerCase().replaceAll(' ', '-')}`,
     })),
   )

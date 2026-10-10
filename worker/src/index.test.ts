@@ -310,6 +310,11 @@ test('employee roster bodies are strictly validated', () => {
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ roles: ['Chef!'] })], baseRev: 0 }), null, 'role slugs stay lowercase')
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ roles: ['line cook'] })], baseRev: 0 }), null, 'spaces rejected')
   assert.ok(validateRosterBody({ employees: [rosterEmployee({ roles: ['cook', 'mv-prep'] })], baseRev: 0 }), 'kitchen posts accepted')
+  assert.ok(validateRosterBody({ employees: [rosterEmployee({ suspendedFrom: '2026-10-12', suspendedUntil: '2026-10-20', priority: 1 })], baseRev: 0 }), 'suspension and priority accepted')
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ suspendedFrom: '2026-10-20', suspendedUntil: '2026-10-12' })], baseRev: 0 }), null, 'backwards range rejected')
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ suspendedUntil: '2026-10-12' })], baseRev: 0 }), null, 'end without start rejected')
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ suspendedFrom: 'next week' })], baseRev: 0 }), null, 'bad date rejected')
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ priority: 0 })], baseRev: 0 }), null, 'priority out of range rejected')
   assert.ok(validateRosterBody({ employees: [rosterEmployee({ roles: ['sushi-chef'] })], baseRev: 0 }), 'custom posts accepted')
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ recurringAvailability: { Someday: [] } })], baseRev: 0 }), null)
   assert.equal(

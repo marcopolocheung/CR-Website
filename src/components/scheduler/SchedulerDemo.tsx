@@ -15,6 +15,8 @@ import {
   generateSchedule,
   isEmployeeAvailableForSlot,
   isEmployeeQualified,
+  isSuspendedOn,
+  DEFAULT_PRIORITY,
   isValidRoleSlug,
   minutes,
   normalizeRoleSlug,
@@ -561,6 +563,11 @@ function availabilityText(employee: Employee, day: DayOfWeek) {
   return `${day} availability is ${ranges.map((range) => formatTimeRange(range)).join(', ')}`
 }
 
+function suspensionText(employee: Employee) {
+  const until = employee.suspendedUntil ?? employee.suspendedFrom
+  return until === employee.suspendedFrom ? `on ${employee.suspendedFrom}` : `${employee.suspendedFrom} to ${until}`
+}
+
 function trainedRolesText(employee: Employee) {
   if (employee.roles.length === 0) return 'nothing yet'
   return employee.roles.map((role) => roleLabel(role)).join(', ')
@@ -599,6 +606,7 @@ function dragErrorMessage(employee: Employee, slot: StaffingSlot, violations: Va
   if (!first) return `${employee.name} cannot work ${day} ${periodLabels[slot.period]}.`
 
   if (first.code === 'unqualified_employee') return `${employee.name} is not trained for ${slot.label} — trained for ${trainedRolesText(employee)}.`
+  if (first.code === 'unavailable_employee' && isSuspendedOn(employee, slot.date)) return `${employee.name} is suspended ${suspensionText(employee)}.`
   if (first.code === 'unavailable_employee') return `${employee.name} is not free ${day} ${periodLabels[slot.period]} (${formatTimeRange(slot)}). ${employee.name} ${availabilityText(employee, slot.day)}.`
   if (first.code === 'inactive_employee') return `${employee.name} is off the list (inactive).`
   if (first.code === 'overlapping_assignment') {
@@ -721,6 +729,7 @@ function reviewLabel(
   if (violation.code === 'unqualified_employee') return `${name} is not trained for ${position} — trained for ${employee ? trainedRolesText(employee) : 'nothing listed'}.`
   if (violation.code === 'unavailable_employee') {
     if (!slot || !employee) return `${name} cannot work ${shift}.`
+    if (isSuspendedOn(employee, slot.date)) return `${name} is suspended ${suspensionText(employee)}.`
     return `${name} is not free ${shift} (${formatTimeRange(slot)}). ${name} ${availabilityText(employee, slot.day)}.`
   }
   if (violation.code === 'inactive_employee') return `${name} is off the list (inactive).`
@@ -833,6 +842,7 @@ function unassignableReason({
 }): string | null {
   if (!employee.active) return 'off the list'
   if (!isEmployeeQualified(employee, slot)) return 'not trained'
+  if (isSuspendedOn(employee, slot.date)) return 'suspended'
   if (!isEmployeeAvailableForSlot(employee, slot)) return 'not free'
   const others = assignments.filter((assignment) => assignment.slotId !== slot.id)
   const proposed = [...others, { slotId: slot.id, employeeId: employee.id }]
@@ -1069,7 +1079,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setGeneratedWeeks((current) => ({ ...current, [weekStart]: next }))
   }
 
-  const slots = useMemo(() => expandTemplate(template), [template])
+  const slots = useMemo(() => expandTemplate(template, weekStart || undefined), [template, weekStart])
   // Readiness matches the solver: optional spots (not yet hired) never block the week.
   const readinessProblems = useMemo(
     () => preflightDiagnostics(employees, slots.filter((slot) => slot.required)),
@@ -1693,7 +1703,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     const previousAssignments = variant === 'similarWeek' ? weeks[shiftWeek(weekStart, -1)] ?? assignments : assignments
     try {
       const result = generateSchedule(
-        { employees, template },
+        { employees, template, weekStart },
         {
           strategy: variant,
           referenceAssignments: previousAssignments,
@@ -3182,7 +3192,8 @@ function EmployeeCard({
           )}
         </div>
         <p className="mt-2 text-xs text-zinc-500">
-          Max {employee.maxDaysPerWeek ?? 7} days · {employee.allowDoubles ? `doubles${employee.maxDoublesPerWeek !== undefined ? ` (max ${employee.maxDoublesPerWeek})` : ''}` : 'no doubles'}
+          Max {employee.maxDaysPerWeek ?? 7} days · {employee.allowDoubles ? `doubles${employee.maxDoublesPerWeek !== undefined ? ` (max ${employee.maxDoublesPerWeek})` : ''}` : 'no doubles'} · Priority {employee.priority ?? DEFAULT_PRIORITY}
+          {employee.suspendedFrom && ` · Suspended ${suspensionText(employee)}`}
         </p>
       </div>
     )
@@ -3297,6 +3308,60 @@ function EmployeeCard({
         />
         New hire (any position, still limited by max days)
       </label>
+
+      <label className="mt-3 block text-sm text-zinc-700">
+        Priority
+        <select
+          className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          value={employee.priority ?? DEFAULT_PRIORITY}
+          onChange={(event) => onUpdate(employee.id, { priority: Number(event.target.value) })}
+        >
+          {[1, 2, 3, 4, 5].map((rank) => (
+            <option key={rank} value={rank}>
+              {rank === 1 ? '1 (scheduled first)' : rank === 5 ? '5 (scheduled last)' : rank === DEFAULT_PRIORITY ? `${rank} (normal)` : rank}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <fieldset className="mt-3">
+        <legend className="text-sm text-zinc-700">Suspended (not scheduled on these dates)</legend>
+        <div className="mt-1 grid grid-cols-2 gap-3">
+          <label className="text-xs text-zinc-600">
+            From
+            <input
+              type="date"
+              className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              value={employee.suspendedFrom ?? ''}
+              onChange={(event) => {
+                const from = event.target.value || undefined
+                const until = from && employee.suspendedUntil && employee.suspendedUntil >= from ? employee.suspendedUntil : from
+                onUpdate(employee.id, { suspendedFrom: from, suspendedUntil: until })
+              }}
+            />
+          </label>
+          <label className="text-xs text-zinc-600">
+            Through
+            <input
+              type="date"
+              className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              value={employee.suspendedUntil ?? ''}
+              min={employee.suspendedFrom}
+              disabled={!employee.suspendedFrom}
+              onChange={(event) => onUpdate(employee.id, { suspendedUntil: event.target.value || employee.suspendedFrom })}
+            />
+          </label>
+        </div>
+        {employee.suspendedFrom && (
+          <button
+            type="button"
+            className="mt-1 text-xs font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            onClick={() => onUpdate(employee.id, { suspendedFrom: undefined, suspendedUntil: undefined })}
+          >
+            Clear suspension
+          </button>
+        )}
+      </fieldset>
 
       <Disclosure summary="Edit availability" tone="quiet">
         <AvailabilityGridEditor
