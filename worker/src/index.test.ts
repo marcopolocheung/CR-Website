@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import handler, {
+  cashoutHistoryDates,
   goldenMonthsForWeek,
   goldenWeeksForMonth,
   isValidId,
@@ -15,6 +16,7 @@ import handler, {
   validateRosterBody,
   validateTemplateBody,
   validateUpdateBody,
+  validateCashoutBody,
 } from './index'
 
 function mockEnv(token = 'manager-token', staffPassword?: string) {
@@ -890,4 +892,62 @@ test('staff password falls back to the hardcoded demo value and locked stations 
   const custom = mockEnv('manager-token', 'hunter2')
   assert.equal((await handler.fetch(staffVerify('hunter2'), custom)).status, 200)
   assert.equal((await handler.fetch(staffVerify('test'), custom)).status, 401)
+})
+
+const cashier = { name: 'Alice', counts: [5, 2, 0, 1, 0, 2, 0, 2, 0, 0, 0], toast: '520' }
+const cashoutBody = {
+  sheet: { am: [cashier], pm: [], zReport: '' },
+  totals: { amDeposit: 51250, pmDeposit: 0, amOverShort: -750, pmOverShort: 0, deposit: 51250, overShort: -750, zOverShort: null },
+}
+
+function authed(method: string, path: string, body?: unknown, token = 'manager-token'): Request {
+  return new Request(`https://api.test${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}` },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+}
+
+test('cash-out days need the manager token to read or write', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(request('GET', '/api/cashout/CR3/2026-10-10'), env)).status, 401)
+  assert.equal((await handler.fetch(authed('PUT', '/api/cashout/CR3/2026-10-10', cashoutBody, 'wrong'), env)).status, 401)
+  assert.equal((await handler.fetch(request('GET', '/api/cashout/CR3?to=2026-10-10'), env)).status, 401)
+})
+
+test('cash-out day saves, loads, and shows in the 30-day history', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(authed('GET', '/api/cashout/CR3/2026-10-10'), env)).status, 404)
+  assert.equal((await handler.fetch(authed('PUT', '/api/cashout/CR3/2026-10-10', cashoutBody), env)).status, 200)
+  assert.equal((await handler.fetch(authed('PUT', '/api/cashout/CR3/2026-09-10', cashoutBody), env)).status, 200)
+
+  const day = await (await handler.fetch(authed('GET', '/api/cashout/CR3/2026-10-10'), env)).json()
+  assert.deepEqual(day.sheet, cashoutBody.sheet)
+  assert.equal(day.totals.amDeposit, 51250)
+
+  const history = await (await handler.fetch(authed('GET', '/api/cashout/CR3?to=2026-10-10'), env)).json()
+  // 2026-09-10 is 30 days back, one past the window.
+  assert.deepEqual(history.days.map((d: { date: string }) => d.date), ['2026-10-10'])
+  const other = await (await handler.fetch(authed('GET', '/api/cashout/CR2?to=2026-10-10'), env)).json()
+  assert.deepEqual(other.days, [])
+})
+
+test('cash-out bodies are strictly validated', () => {
+  assert.ok(validateCashoutBody(cashoutBody))
+  const bad = (patch: (b: typeof cashoutBody) => unknown) => validateCashoutBody(patch(structuredClone(cashoutBody)))
+  assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, am: [{ ...cashier, counts: [1, 2] }] } })), null)
+  assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, am: [{ ...cashier, counts: cashier.counts.map(() => -1) }] } })), null)
+  assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, zReport: '1e9' } })), null)
+  assert.equal(bad((b) => ({ ...b, totals: { ...b.totals, deposit: 1.5 } })), null)
+  assert.equal(bad((b) => ({ ...b, totals: { ...b.totals, deposit: null } })), null)
+  assert.ok(bad((b) => ({ ...b, totals: { ...b.totals, pmOverShort: null, overShort: null } })))
+  assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, pm: Array(21).fill(cashier) } })), null)
+})
+
+test('cash-out history spans 30 days, newest first, across a month edge', () => {
+  const dates = cashoutHistoryDates('2026-03-01')
+  assert.equal(dates.length, 30)
+  assert.equal(dates[0], '2026-03-01')
+  assert.equal(dates[1], '2026-02-28')
+  assert.equal(dates.at(-1), '2026-01-31')
 })

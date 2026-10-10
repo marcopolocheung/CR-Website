@@ -9,7 +9,8 @@
     "scheduler:test": "node --import jiti/register --test src/lib/scheduler/scheduler.test.ts src/lib/scheduler/week-visibility.test.ts src/lib/schedule-share.test.ts src/lib/schedule-store.test.ts worker/src/index.test.ts",
     "scheduler:verify": "node scripts/verify-schedule-store.mjs",
     "scheduler:seed-kitchens": "node scripts/seed-kitchen-stations.mjs",
-    "seo:check": "node scripts/seo-check.mjs"
+    "seo:check": "node scripts/seo-check.mjs",
+    "cashout:test": "node --import jiti/register --test src/lib/cashout.test.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.1",
