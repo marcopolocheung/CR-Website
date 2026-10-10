@@ -399,6 +399,9 @@ export type StoredEmployee = {
   incompatibleEmployeeIds: string[]
   active: boolean
   newHire: boolean
+  suspendedFrom?: string
+  suspendedUntil?: string
+  priority?: number
 }
 
 export type RosterDoc = {
@@ -473,6 +476,16 @@ function isValidStoredEmployee(value: unknown): value is StoredEmployee {
   }
   if (typeof employee.active !== 'boolean') return false
   if (employee.newHire !== undefined && typeof employee.newHire !== 'boolean') return false
+  for (const date of [employee.suspendedFrom, employee.suspendedUntil]) {
+    if (date !== undefined && (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date))) return false
+  }
+  if (employee.suspendedUntil !== undefined && employee.suspendedFrom === undefined) return false
+  if (employee.suspendedFrom !== undefined && employee.suspendedUntil !== undefined && (employee.suspendedUntil as string) < (employee.suspendedFrom as string)) {
+    return false
+  }
+  if (employee.priority !== undefined) {
+    if (typeof employee.priority !== 'number' || !Number.isInteger(employee.priority) || employee.priority < 1 || employee.priority > 5) return false
+  }
   return true
 }
 

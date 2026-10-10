@@ -36,6 +36,7 @@ export const ROLES: readonly string[] = Array.from(new Set([...DINING_ROLES, ...
 
 export type DayOfWeek = (typeof DAYS)[number]
 export type ShiftPeriod = (typeof PERIODS)[number]
+export const DEFAULT_PRIORITY = 3
 export type Role = string
 
 const ROLE_DISPLAY_NAMES: Record<string, string> = {
@@ -132,6 +133,11 @@ export type Employee = {
   incompatibleEmployeeIds?: string[]
   active: boolean
   newHire?: boolean
+  /** Inclusive YYYY-MM-DD dates; the person cannot be scheduled on any day in this range. */
+  suspendedFrom?: string
+  suspendedUntil?: string
+  /** 1 (picked first) to 5 (picked last). Unset means 3. */
+  priority?: number
 }
 
 export type StaffingSlot = {
@@ -143,9 +149,11 @@ export type StaffingSlot = {
   start: number
   end: number
   required: boolean
+  /** YYYY-MM-DD, set when the template is expanded for a specific week. */
+  date?: string
 }
 
-export type StaffingTemplateSlot = Omit<StaffingSlot, 'id' | 'day'>
+export type StaffingTemplateSlot = Omit<StaffingSlot, 'id' | 'day' | 'date'>
 
 export type WeeklyStaffingTemplate = Record<DayOfWeek, StaffingTemplateSlot[]>
 
@@ -158,6 +166,8 @@ export type ScheduleAssignment = {
 export type SchedulerInput = {
   employees: Employee[]
   template: WeeklyStaffingTemplate
+  /** Dates the slots so suspensions apply. */
+  weekStart?: string
 }
 
 export type ValidationCode =

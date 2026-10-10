@@ -777,3 +777,62 @@ test('extra mid and evening slots schedule on top of core AM/PM coverage', () =>
   assert.equal(bySlot.get(slotIdFor('Mid support', 'AM')), 'mid')
   assert.equal(bySlot.get(slotIdFor('Evening support', 'PM')), 'evening')
 })
+
+test('suspended employees are skipped only on dates inside the range', () => {
+  const server = (id: string, extra: Partial<Employee> = {}): Employee => ({
+    id,
+    name: id,
+    roles: ['server'],
+    recurringAvailability: Object.fromEntries(DAYS.map((day) => [day, [{ start: minutes(9), end: minutes(23) }]])),
+    maxDaysPerWeek: 7,
+    allowDoubles: true,
+    incompatibleEmployeeIds: [],
+    active: true,
+    ...extra,
+  })
+  const template = Object.fromEntries(DAYS.map((day) => [day, []])) as unknown as WeeklyStaffingTemplate
+  template.Monday = [{ period: 'AM', role: 'server', label: 'Server', start: minutes(9), end: minutes(16), required: true }]
+  template.Wednesday = [{ period: 'AM', role: 'server', label: 'Server', start: minutes(9), end: minutes(16), required: true }]
+  // Week of 2026-10-11: Monday is 10-12, Wednesday is 10-14.
+  const suspended = server('sus', { suspendedFrom: '2026-10-12', suspendedUntil: '2026-10-13', priority: 1 })
+  const result = generateSchedule({ employees: [suspended, server('backup')], template, weekStart: '2026-10-11' })
+  assert.equal(result.status, 'FEASIBLE')
+  if (result.status !== 'FEASIBLE') return
+  const slots = expandTemplate(template, '2026-10-11')
+  const byDay = new Map(result.assignments.map((a) => [slots.find((s) => s.id === a.slotId)?.day, a.employeeId]))
+  assert.equal(byDay.get('Monday'), 'backup')
+  assert.equal(byDay.get('Wednesday'), 'sus', 'back after the range ends, and priority 1 wins')
+
+  // Without a week the suspension cannot be dated, so nothing is blocked.
+  const undated = generateSchedule({ employees: [suspended], template })
+  assert.equal(undated.status, 'FEASIBLE')
+  // With a week, the only person being suspended makes Monday impossible.
+  assert.equal(generateSchedule({ employees: [suspended], template, weekStart: '2026-10-11' }).status, 'INFEASIBLE')
+})
+
+test('higher priority staff are picked first for required and optional spots', () => {
+  const server = (id: string, priority?: number): Employee => ({
+    id,
+    name: id,
+    roles: ['server'],
+    recurringAvailability: { Monday: [{ start: minutes(9), end: minutes(23) }] },
+    maxDaysPerWeek: 7,
+    allowDoubles: false,
+    incompatibleEmployeeIds: [],
+    active: true,
+    priority,
+  })
+  const template = Object.fromEntries(DAYS.map((day) => [day, []])) as unknown as WeeklyStaffingTemplate
+  template.Monday = [
+    { period: 'AM', role: 'server', label: 'Server', start: minutes(9), end: minutes(16), required: true },
+    { period: 'PM', role: 'server', label: 'Extra', start: minutes(16), end: minutes(23), required: false },
+  ]
+  // Alphabetical tiebreak would pick "a" first; priority must override it.
+  const result = generateSchedule({ employees: [server('a', 5), server('b'), server('c', 1)], template })
+  assert.equal(result.status, 'FEASIBLE')
+  if (result.status !== 'FEASIBLE') return
+  const slots = expandTemplate(template)
+  const bySlot = new Map(result.assignments.map((a) => [slots.find((s) => s.id === a.slotId)?.label, a.employeeId]))
+  assert.equal(bySlot.get('Server'), 'c')
+  assert.equal(bySlot.get('Extra'), 'b')
+})

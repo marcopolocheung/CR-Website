@@ -26,7 +26,13 @@ export function getEmployeeAvailability(employee: Employee, day: DayOfWeek, date
   return employee.recurringAvailability[day] ?? []
 }
 
+export function isSuspendedOn(employee: Employee, date?: string) {
+  if (!date || !employee.suspendedFrom) return false
+  return date >= employee.suspendedFrom && date <= (employee.suspendedUntil ?? employee.suspendedFrom)
+}
+
 export function isEmployeeAvailableForSlot(employee: Employee, slot: StaffingSlot) {
+  if (isSuspendedOn(employee, slot.date)) return false
   return getEmployeeAvailability(employee, slot.day).some((range) =>
     rangeContains(range, { start: slot.start, end: slot.end }),
   )

@@ -1,4 +1,4 @@
-import { DAYS } from './types'
+import { DAYS, DEFAULT_PRIORITY } from './types'
 import type {
   DayOfWeek,
   Diagnostic,
@@ -62,7 +62,7 @@ type GenerateOptions = {
 }
 
 export function generateSchedule(input: SchedulerInput, options: GenerateOptions = {}): GenerateScheduleResult {
-  const allSlots = expandTemplate(input.template)
+  const allSlots = expandTemplate(input.template, input.weekStart)
   const slots = allSlots.filter((slot) => slot.required)
   const optionalSlots = allSlots.filter((slot) => !slot.required)
   const diagnostics = preflightDiagnostics(input.employees, slots)
@@ -197,6 +197,7 @@ function fillOptionalSlots(
       .filter((employee) => basicCandidate(employee, slot) && canAssign(employees, employee, slot, state))
       .sort(
         (a, b) =>
+          priorityOf(a) - priorityOf(b) ||
           a.roles.length - b.roles.length ||
           hoursAssigned(a, state) - hoursAssigned(b, state) ||
           a.name.localeCompare(b.name),
@@ -207,6 +208,13 @@ function fillOptionalSlots(
   }
   return filled
 }
+
+function priorityOf(employee: Employee) {
+  return employee.priority ?? DEFAULT_PRIORITY
+}
+
+// Each rank step outweighs about a day of already-assigned work, so rank leads but fairness still counts.
+const PRIORITY_WEIGHT = 15
 
 function hoursAssigned(employee: Employee, state: SolverState) {
   return (state.employeeSlots.get(employee.id) ?? []).reduce((total, slot) => total + hoursFor(slot), 0)
@@ -528,7 +536,8 @@ function candidateScore(
     hours * weights.hour +
     wouldAddDay * weights.addDay +
     wouldDouble * weights.double +
-    maxDayPressure -
+    maxDayPressure +
+    (priorityOf(employee) - DEFAULT_PRIORITY) * PRIORITY_WEIGHT -
     keepsReference * weights.keep -
     dayPreference
   )
