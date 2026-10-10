@@ -61,8 +61,8 @@ function CodeGate({ onUnlock }: { onUnlock: (token: string) => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="max-w-md mx-auto my-16 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Cash Out</h1>
+    <form onSubmit={submit} className="max-w-md my-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">Cash out</h2>
       <p className="text-sm text-gray-600 mb-4">Enter the manager code, the same one that unlocks the scheduler demo.</p>
       <label htmlFor="cashout-code" className="block text-sm font-medium text-gray-700 mb-1">Manager code</label>
       <input
@@ -94,10 +94,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   )
 }
 
-export default function CashOut() {
-  const [token, setToken] = useState('')
-  if (!token) return <CodeGate onUnlock={setToken} />
-  return <CashOutSheet token={token} onLocked={() => setToken('')} />
+export default function CashOut({ token, onUnlock, onLocked }: { token: string; onUnlock: (token: string) => void; onLocked: () => void }) {
+  if (!token) return <CodeGate onUnlock={onUnlock} />
+  return <CashOutSheet token={token} onLocked={onLocked} />
 }
 
 function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void }) {
@@ -180,9 +179,9 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
   const day = dayTotals(sheet.am, sheet.pm, sheet.zReport)
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Cash Out</h1>
+        <h2 className="text-xl font-semibold text-gray-900">Cash out</h2>
         <div className="flex gap-2 print:hidden">
           <button onClick={() => window.print()} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50">
             Print

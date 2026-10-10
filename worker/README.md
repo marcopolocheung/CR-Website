@@ -33,8 +33,8 @@ Plus two more stores, keyed separately per station:
 
 - Cash-out days (`/api/cashout/{CR3|CR2}/{YYYY-MM-DD}`): one saved cash-out
   sheet per store per day (`cashout:{store}:{date}`), with each cashier's counts
-  and the computed AM/PM deposit and over/short. Written by `/internal/cash-out`,
-  read by that page and by the excel-converter to fill its deposit cells.
+  and the computed AM/PM deposit and over/short. Written by `/internal/bookkeeping` (Cash out tab),
+  read by that page and its Daily sales report tab to fill the deposit cells.
   `GET /api/cashout/{store}?to={date}` lists the 30 days ending at `to`.
   Reads AND writes need the manager token (cash figures, not public). Days
   expire after 31 days; last save wins.
