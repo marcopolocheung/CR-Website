@@ -5,6 +5,13 @@ const WEEK_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const MAX_CIPHER_CHARS = 16384;
 const MAX_BODY_CHARS = 20000;
+/** Cash-out days live 31 days so the 30-day history always has its oldest day. */
+const CASHOUT_TTL_SECONDS = 31 * 86400;
+const CASHOUT_HISTORY_DAYS = 30;
+const CASHOUT_STORES = ['CR3', 'CR2'];
+const CASHOUT_DENOMINATIONS = 11;
+const MAX_CASHIERS_PER_SHIFT = 20;
+const MONEY_INPUT_RE = /^-?\d{0,7}(\.\d{0,2})?$/;
 const DOC_TTL_SECONDS = 31536000;
 const WRITE_LIMIT_PER_HOUR = 60;
 /** Gate guesses get their own budget so they can never lock out legitimate saves. */
@@ -553,6 +560,55 @@ export function normalizeTemplateDoc(raw) {
         return null;
     return { v: 1, rev: doc.rev, template: valid.template, updatedAt: doc.updatedAt };
 }
+function validateCashier(raw) {
+    if (!raw || typeof raw !== 'object')
+        return null;
+    const c = raw;
+    if (typeof c.name !== 'string' || c.name.length > 60)
+        return null;
+    if (typeof c.toast !== 'string' || !MONEY_INPUT_RE.test(c.toast))
+        return null;
+    if (!Array.isArray(c.counts) || c.counts.length !== CASHOUT_DENOMINATIONS)
+        return null;
+    if (!c.counts.every((n) => Number.isInteger(n) && n >= 0 && n <= 100000))
+        return null;
+    return { name: c.name, counts: c.counts, toast: c.toast };
+}
+const isCents = (n) => Number.isInteger(n) && Math.abs(n) < 1e10;
+/** Totals are computed by the cash-out page; the Worker only checks their shape. */
+export function validateCashoutBody(raw) {
+    if (!raw || typeof raw !== 'object')
+        return null;
+    const body = raw;
+    const sheet = body.sheet;
+    const totals = body.totals;
+    if (!sheet || !totals)
+        return null;
+    if (typeof sheet.zReport !== 'string' || !MONEY_INPUT_RE.test(sheet.zReport))
+        return null;
+    const shifts = [sheet.am, sheet.pm].map((shift) => Array.isArray(shift) && shift.length <= MAX_CASHIERS_PER_SHIFT ? shift.map(validateCashier) : null);
+    if (shifts.some((shift) => !shift || shift.some((c) => !c)))
+        return null;
+    const deposits = ['amDeposit', 'pmDeposit', 'deposit'];
+    // Over/short is null while its Toast or Z figure is still blank.
+    const overShorts = ['amOverShort', 'pmOverShort', 'overShort', 'zOverShort'];
+    if (!deposits.every((k) => isCents(totals[k])))
+        return null;
+    if (!overShorts.every((k) => totals[k] === null || isCents(totals[k])))
+        return null;
+    return {
+        sheet: { am: shifts[0], pm: shifts[1], zReport: sheet.zReport },
+        totals: Object.fromEntries([...deposits, ...overShorts].map((k) => [k, totals[k]])),
+    };
+}
+function cashoutKey(store, date) {
+    return `cashout:${store}:${date}`;
+}
+/** The 30 dates ending at `to`, newest first (UTC date math, no time zones involved). */
+export function cashoutHistoryDates(to) {
+    const end = Date.parse(`${to}T00:00:00Z`);
+    return Array.from({ length: CASHOUT_HISTORY_DAYS }, (_, i) => new Date(end - i * 86400000).toISOString().slice(0, 10));
+}
 export function goldenWriteError(env) {
     return env.SCHEDULE_WRITE_TOKEN ? null : 'write_not_configured';
 }
@@ -706,6 +762,59 @@ export default {
             if (!isGoldenWriteAuthorized(request, env))
                 return json({ error: 'unauthorized' }, 401, request, env);
             return json({ ok: true }, 200, request, env);
+        }
+        // Cash-out days: manager token for reads and writes — these are cash figures.
+        const cashoutMatch = path.match(/^\/api\/cashout\/(CR3|CR2)(?:\/(\d{4}-\d{2}-\d{2}))?$/);
+        if (cashoutMatch && (request.method === 'GET' || request.method === 'PUT')) {
+            const store = cashoutMatch[1];
+            const date = cashoutMatch[2];
+            if (goldenWriteError(env))
+                return json({ error: 'write_not_configured' }, 503, request, env);
+            if (!isGoldenWriteAuthorized(request, env)) {
+                // Wrong codes share the gate's guess budget so this route can't be used to brute-force the token.
+                if (!(await checkVerifyThrottle(env, clientIp(request)))) {
+                    return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
+                }
+                return json({ error: 'unauthorized' }, 401, request, env);
+            }
+            const noStore = { 'Cache-Control': 'no-store' };
+            if (request.method === 'GET' && !date) {
+                const to = url.searchParams.get('to') ?? '';
+                if (!WEEK_RE.test(to) || Number.isNaN(Date.parse(to)))
+                    return json({ error: 'invalid_to' }, 400, request, env);
+                const raws = await Promise.all(cashoutHistoryDates(to).map((d) => env.SCHEDULES.get(cashoutKey(store, d))));
+                const days = raws.flatMap((raw) => {
+                    const doc = raw ? safeParse(raw) : null;
+                    return doc ? [{ date: doc.date, totals: doc.totals, updatedAt: doc.updatedAt }] : [];
+                });
+                return json({ days }, 200, request, env, noStore);
+            }
+            if (!date || Number.isNaN(Date.parse(date)))
+                return json({ error: 'not_found' }, 404, request, env);
+            if (request.method === 'GET') {
+                const raw = await env.SCHEDULES.get(cashoutKey(store, date));
+                const doc = raw ? safeParse(raw) : null;
+                if (!doc)
+                    return json({ error: 'not_found' }, 404, request, env);
+                return json(doc, 200, request, env, noStore);
+            }
+            if (!(await checkWriteThrottle(env, clientIp(request)))) {
+                return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
+            }
+            let body;
+            try {
+                body = await readBody(request);
+            }
+            catch {
+                return json({ error: 'body_too_large' }, 413, request, env);
+            }
+            const valid = validateCashoutBody(body);
+            if (!valid)
+                return json({ error: 'invalid_body' }, 400, request, env);
+            // shortcut: last save wins, add a rev check if two managers ever edit the same day at once.
+            const doc = { v: 1, store, date, ...valid, updatedAt: new Date().toISOString() };
+            await env.SCHEDULES.put(cashoutKey(store, date), JSON.stringify(doc), { expirationTtl: CASHOUT_TTL_SECONDS });
+            return json({ updatedAt: doc.updatedAt }, 200, request, env);
         }
         if (request.method === 'POST' && path === '/api/weeks') {
             if (!(await checkWriteThrottle(env, clientIp(request)))) {

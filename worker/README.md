@@ -31,6 +31,14 @@ Plus two more stores, keyed separately per station:
   `POST /api/staff/undo` can step back through recent saves. `employees: null`
   means no crew has been saved yet; the app falls back to its built-in crew.
 
+- Cash-out days (`/api/cashout/{CR3|CR2}/{YYYY-MM-DD}`): one saved cash-out
+  sheet per store per day (`cashout:{store}:{date}`), with each cashier's counts
+  and the computed AM/PM deposit and over/short. Written by `/internal/bookkeeping` (Cash out tab),
+  read by that page and its Daily sales report tab to fill the deposit cells.
+  `GET /api/cashout/{store}?to={date}` lists the 30 days ending at `to`.
+  Reads AND writes need the manager token (cash figures, not public). Days
+  expire after 31 days; last save wins.
+
 Stations: `CR3-diningroom` (default, owns pre-partition legacy data),
 `CR3-kitchen`, `CR2-kitchen`, `CR2-diningroom`. Omit `?restaurant=` to read the
 default station. Unknown `?restaurant=` values answer `400 invalid_restaurant`.

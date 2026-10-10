@@ -9,7 +9,8 @@
     "scheduler:test": "node --import jiti/register --test src/lib/scheduler/scheduler.test.ts src/lib/scheduler/week-visibility.test.ts src/lib/schedule-share.test.ts src/lib/schedule-store.test.ts worker/src/index.test.ts",
     "scheduler:verify": "node scripts/verify-schedule-store.mjs",
     "scheduler:seed-kitchens": "node scripts/seed-kitchen-stations.mjs",
-    "seo:check": "node scripts/seo-check.mjs"
+    "seo:check": "node scripts/seo-check.mjs",
+    "cashout:test": "node --import jiti/register --test src/lib/cashout.test.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.1",
@@ -17,12 +18,15 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.27",
+    "exceljs": "4.4.0",
     "next": "^16.1.6",
+    "papaparse": "5.5.3",
     "postcss": "^8.5.8",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "tailwindcss": "^4.2.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "xlsx": "0.18.5"
   }
 }
