@@ -17,17 +17,27 @@ import handler, {
   validateTemplateBody,
   validateUpdateBody,
   validateCashoutBody,
+  validateWriteUpForm,
 } from './index'
 
 function mockEnv(token = 'manager-token', staffPassword?: string) {
   const data = new Map<string, string>()
+  const metadata = new Map<string, unknown>()
   return {
     SCHEDULES: {
       async get(key: string) {
         return data.get(key) ?? null
       },
-      async put(key: string, value: string) {
+      async put(key: string, value: string, options?: { metadata?: unknown }) {
         data.set(key, value)
+        metadata.set(key, options?.metadata)
+      },
+      // One key per page so the cursor loop is exercised.
+      async list({ prefix, cursor }: { prefix: string; cursor?: string }) {
+        const names = [...data.keys()].filter((k) => k.startsWith(prefix)).sort()
+        const i = cursor ? Number(cursor) : 0
+        const keys = names.slice(i, i + 1).map((name) => ({ name, metadata: metadata.get(name) }))
+        return { keys, list_complete: i + 1 >= names.length, cursor: String(i + 1) }
       },
     },
     SCHEDULE_WRITE_TOKEN: token,
@@ -600,6 +610,9 @@ test('legacy singleton docs fall back to the default restaurant only', async () 
       async put(key: string, value: string) {
         data.set(key, value)
       },
+      async list() {
+        return { keys: [], list_complete: true }
+      },
     },
     SCHEDULE_WRITE_TOKEN: 'manager-token',
   }
@@ -955,4 +968,73 @@ test('cash-out history spans 30 days, newest first, across a month edge', () => 
   assert.equal(dates[0], '2026-03-01')
   assert.equal(dates[1], '2026-02-28')
   assert.equal(dates.at(-1), '2026-01-31')
+})
+
+const writeUp = {
+  date: '2026-10-09',
+  employee: 'Alice Smith',
+  manager: 'Bob',
+  violations: ['attendance', 'others'],
+  otherSpecify: 'Phone on line',
+  actions: ['verbal'],
+  incident: 'Late three times this week.',
+  incidentCont: '',
+  expected: 'Arrive on time.',
+  employeeComments: '',
+  employeeSignature: '',
+  employeeSignedDate: '',
+  managerSignature: 'Bob',
+  managerSignedDate: '2026-10-09',
+}
+
+test('write-ups need the manager token to read or write', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(request('GET', '/api/writeups'), env)).status, 401)
+  assert.equal((await handler.fetch(authed('POST', '/api/writeups', writeUp, 'wrong'), env)).status, 401)
+  assert.equal((await handler.fetch(request('GET', '/api/writeups/abcdefghij'), env)).status, 401)
+  assert.equal((await handler.fetch(request('PUT', '/api/writeups/abcdefghij/label', { label: 'x' }), env)).status, 401)
+})
+
+test('write-ups save, list newest first, and only the label can change', async () => {
+  const env = mockEnv()
+  const save = async (form: object) => {
+    const res = await handler.fetch(authed('POST', '/api/writeups', form), env)
+    assert.equal(res.status, 201)
+    return ((await res.json()) as { id: string }).id
+  }
+  const alice = await save(writeUp)
+  await save({ ...writeUp, employee: 'Carl', date: '2026-10-09' })
+  await save({ ...writeUp, employee: 'Dana', date: '2026-10-10' })
+
+  const list = (await (await handler.fetch(authed('GET', '/api/writeups'), env)).json()) as { writeUps: { employee: string }[] }
+  assert.deepEqual(list.writeUps.map((w) => w.employee), ['Dana', 'Alice Smith', 'Carl'])
+
+  const labeled = await handler.fetch(authed('PUT', `/api/writeups/${alice}/label`, { label: '  Final warning  ' }), env)
+  assert.equal(labeled.status, 200)
+  const doc = (await (await handler.fetch(authed('GET', `/api/writeups/${alice}`), env)).json()) as {
+    form: typeof writeUp
+    label: string
+  }
+  assert.equal(doc.label, 'Final warning')
+  assert.deepEqual(doc.form, writeUp)
+  const listed = (await (await handler.fetch(authed('GET', '/api/writeups'), env)).json()) as { writeUps: { label: string }[] }
+  assert.equal(listed.writeUps[1].label, 'Final warning')
+
+  // The form itself has no update route.
+  assert.equal((await handler.fetch(authed('PUT', `/api/writeups/${alice}`, writeUp), env)).status, 404)
+  assert.equal((await handler.fetch(authed('PUT', '/api/writeups/missing123/label', { label: 'x' }), env)).status, 404)
+  assert.equal((await handler.fetch(authed('PUT', `/api/writeups/${alice}/label`, { label: 'x'.repeat(121) }), env)).status, 400)
+})
+
+test('write-up forms are strictly validated', () => {
+  assert.ok(validateWriteUpForm(writeUp))
+  const bad = (patch: object) => validateWriteUpForm({ ...writeUp, ...patch })
+  assert.equal(bad({ employee: '   ' }), null)
+  assert.equal(bad({ date: '10/09/2026' }), null)
+  assert.equal(bad({ violations: ['stealing'] }), null)
+  assert.equal(bad({ actions: ['verbal', 'verbal'] }), null)
+  assert.equal(bad({ incident: 'x'.repeat(3001) }), null)
+  assert.equal(bad({ managerSignedDate: 'yesterday' }), null)
+  assert.equal(bad({ manager: undefined }), null)
+  assert.equal((validateWriteUpForm({ ...writeUp, extra: 'dropped' }) as Record<string, unknown>).extra, undefined)
 })

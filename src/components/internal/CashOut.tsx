@@ -40,7 +40,7 @@ function Money({ cents, signed }: { cents: number | null; signed?: boolean }) {
 }
 
 /** Manager code gate. Same token as the scheduler demo; kept in memory only, never stored. */
-function CodeGate({ onUnlock }: { onUnlock: (token: string) => void }) {
+export function CodeGate({ onUnlock, title = 'Cash out' }: { onUnlock: (token: string) => void; title?: string }) {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -62,7 +62,7 @@ function CodeGate({ onUnlock }: { onUnlock: (token: string) => void }) {
 
   return (
     <form onSubmit={submit} className="max-w-md my-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-2">Cash out</h2>
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">{title}</h2>
       <p className="text-sm text-gray-600 mb-4">Enter the manager code, the same one that unlocks the scheduler demo.</p>
       <label htmlFor="cashout-code" className="block text-sm font-medium text-gray-700 mb-1">Manager code</label>
       <input
