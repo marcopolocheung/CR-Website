@@ -192,3 +192,17 @@ async function requestJson(path: string, init?: RequestInit): Promise<{ status: 
     clearTimeout(timer)
   }
 }
+
+/**
+ * One message for any scheduler save or check failure. `what` names the thing being saved, e.g.
+ * "staff list". Conflicts say to reload because the other person's copy is on the server now.
+ */
+export function saveErrorMessage(caught: unknown, what: string): string {
+  if (caught instanceof StoreAuthError) return 'That code was not accepted. Check for typos and try again.'
+  if (caught instanceof StoreConflictError) return `Someone else saved the ${what} first. Reload the page to see their copy, then try again.`
+  if (caught instanceof StoreRejectedError) return caught.message
+  if (caught instanceof StoreNotFoundError) return 'The schedule store did not recognize this request. Reload the page and try again.'
+  if (caught instanceof StoreUnavailableError) return `${caught.message} Your edits are safe on this screen — try again in a moment.`
+  return `Something went wrong saving the ${what}.`
+}
+

@@ -1,35 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { StoreAuthError, StoreUnavailableError, verifyWriteToken } from '@/lib/schedule-store'
+import { saveErrorMessage, verifyWriteToken } from '@/lib/schedule-store'
 
-/** sessionStorage marker that the demo gate was unlocked. The code itself is never stored. */
-export const DEMO_GATE_KEY = 'cr-scheduler-unlocked'
+const ManagerCodeContext = createContext('')
+
+/** The manager code this visit unlocked with. Every scheduler save sends it, so nobody types it twice. */
+export function useManagerCode() {
+  return useContext(ManagerCodeContext)
+}
 
 /**
- * Code gate in front of the scheduler demo. The code is the same manager
- * write token used to publish schedules — checked live against the Worker
- * (`GET /api/auth/verify`), never stored anywhere. Unlocking only reveals
- * the demo UI in this tab; publishing still asks for the token again.
+ * Code gate in front of the scheduler. The code is the manager write token, checked live against
+ * the Worker (`GET /api/auth/verify`). It is held in memory for this visit only — never written to
+ * storage — so a reload or a new tab asks again. Mounted in the scheduler layout so moving between
+ * stations keeps it.
  */
 export default function DemoGate({ children }: { children: ReactNode }) {
-  // Default locked so the first render matches the statically prerendered
-  // HTML (no sessionStorage on the server); the effect below unlocks when
-  // this tab already passed the gate.
-  const [unlocked, setUnlocked] = useState(false)
+  const [unlockedCode, setUnlockedCode] = useState('')
   const [code, setCode] = useState('')
   const [showCode, setShowCode] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    try {
-      setUnlocked(window.sessionStorage.getItem(DEMO_GATE_KEY) === '1')
-    } catch {
-      setUnlocked(false)
-    }
-  }, [])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -38,34 +31,23 @@ export default function DemoGate({ children }: { children: ReactNode }) {
     setError('')
     try {
       await verifyWriteToken(code)
-      try {
-        window.sessionStorage.setItem(DEMO_GATE_KEY, '1')
-      } catch {
-        // Private mode etc. — the gate still unlocks for this page view.
-      }
+      setUnlockedCode(code)
       setCode('')
-      setUnlocked(true)
     } catch (caught) {
-      if (caught instanceof StoreAuthError) {
-        setError('That code was not accepted. Check for typos and try again, or ask whoever runs the Worker for the current one.')
-      } else if (caught instanceof StoreUnavailableError) {
-        setError(`${caught.message} Your code was not checked — try again in a moment.`)
-      } else {
-        setError('Something went wrong checking the code.')
-      }
+      setError(saveErrorMessage(caught, 'code'))
     } finally {
       setBusy(false)
     }
   }
 
-  if (unlocked) return <>{children}</>
+  if (unlockedCode) return <ManagerCodeContext.Provider value={unlockedCode}>{children}</ManagerCodeContext.Provider>
 
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Scheduler demo</p>
       <h1 className="mt-1 text-2xl font-bold">Enter the manager code</h1>
       <p className="mt-2 text-sm text-zinc-600">
-        This demo is for managers only. Use the same code you type when publishing schedules — it is checked, never saved.
+        This demo is for managers only. You only type the code once — every save on this visit uses it. It is never saved.
       </p>
       <form onSubmit={submit} className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
         <label className="text-sm font-medium text-zinc-800" htmlFor="demo-gate-code">
