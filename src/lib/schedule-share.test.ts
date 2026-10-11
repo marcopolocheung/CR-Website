@@ -128,14 +128,21 @@ test('the template hash is stable and changes with the shift layout', () => {
 test('a kitchen week published with the default kitchen rules opens on /schedule', () => {
   // The editor publishes with dated slots; the viewer reads with undated ones — the hash must agree.
   const published = templateHashForSlots(expandTemplate(defaultTemplateForRestaurant('CR3-kitchen'), '2026-10-11'))
-  assert.equal(layoutForWeek(null, 'CR3-kitchen', published).matches, true)
+  assert.equal(layoutForWeek([null], 'CR3-kitchen', published).matches, true)
   // The dining-room layout is not a stand-in for a kitchen station.
-  assert.equal(layoutForWeek(null, 'CR3-diningroom', published).matches, false)
+  assert.equal(layoutForWeek([null], 'CR3-diningroom', published).matches, false)
+})
+
+test('a kitchen week published before kitchen posts existed still opens', () => {
+  const published = templateHashForSlots(expandTemplate(seedTemplate, '2026-09-13'))
+  const { slots, matches } = layoutForWeek([null, null], 'CR3-kitchen', published)
+  assert.equal(matches, true)
+  assert.equal(templateHashForSlots(slots), published)
 })
 
 test('a week published with its own saved rules is read with those rules', () => {
   const custom = { ...seedTemplate, Monday: seedTemplate.Monday.slice(1) }
   const published = templateHashForSlots(expandTemplate(custom, '2026-10-11'))
-  assert.equal(layoutForWeek(custom, 'CR3-diningroom', published).matches, true)
-  assert.equal(layoutForWeek(null, 'CR3-diningroom', published).matches, false)
+  assert.equal(layoutForWeek([custom], 'CR3-diningroom', published).matches, true)
+  assert.equal(layoutForWeek([null], 'CR3-diningroom', published).matches, false)
 })

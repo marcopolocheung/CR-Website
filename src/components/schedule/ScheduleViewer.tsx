@@ -24,14 +24,16 @@ import { fetchTemplate } from '@/lib/template-store'
 /** A published week plus the shift layout it was published against. */
 type ViewerWeek = GoldenWeekDoc & { slots: StaffingSlot[]; layoutMatches: boolean }
 
-// Rules are saved per week, so each week is checked against its own layout — never a station-wide one.
+// Rules are saved per week, so each week is read with the layout it was published with.
 async function withLayouts(weeks: GoldenWeekDoc[], restaurantId?: string): Promise<ViewerWeek[]> {
+  if (weeks.length === 0) return []
+  // One request per week: the Worker answers a week with no rules of its own with the station's rules.
   return Promise.all(
     weeks.map(async (doc) => {
       const saved = await fetchTemplate(restaurantId, doc.weekStart)
         .then((templateDoc) => templateDoc.template)
         .catch(() => null)
-      const { slots, matches } = layoutForWeek(saved, restaurantId, doc.templateHash)
+      const { slots, matches } = layoutForWeek([saved], restaurantId, doc.templateHash)
       return { ...doc, slots, layoutMatches: matches }
     }),
   )

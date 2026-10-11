@@ -6,7 +6,7 @@
  * manager token, which the Worker checks — see schedule-store.ts.
  */
 
-import { defaultTemplateForRestaurant, expandTemplate } from './scheduler/data'
+import { defaultTemplateForRestaurant, expandTemplate, seedTemplate } from './scheduler/data'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeeklyStaffingTemplate } from './scheduler'
 
 export const SHARE_VERSION = 1
@@ -22,12 +22,20 @@ export function templateHashForSlots(slots: Pick<StaffingSlot, 'id'>[]): string 
 }
 
 /**
- * The shift layout a published week is read with: the rules saved for that week, else the
- * station's own built-in rules. `matches` is false when the week was published with other rules.
+ * The shift layout a published week is read with. Tries, in order: the rules saved for that week,
+ * the station's saved rules, the station's built-in rules, and the original dining-room rules every
+ * station used before kitchen posts existed. The first one whose hash matches the week wins — the
+ * hash pins the exact slot list, so a match is never a guess. `matches` is false when none fit.
  */
-export function layoutForWeek(saved: WeeklyStaffingTemplate | null, restaurantId: string | undefined, templateHash: string) {
-  const slots = expandTemplate(saved ?? defaultTemplateForRestaurant(restaurantId))
-  return { slots, matches: templateHashForSlots(slots) === templateHash }
+export function layoutForWeek(
+  saved: (WeeklyStaffingTemplate | null | undefined)[],
+  restaurantId: string | undefined,
+  templateHash: string,
+) {
+  const candidates = [...saved.filter((template) => template != null), defaultTemplateForRestaurant(restaurantId), seedTemplate]
+  const layouts = candidates.map((template) => expandTemplate(template))
+  const match = layouts.find((slots) => templateHashForSlots(slots) === templateHash)
+  return { slots: match ?? layouts[0], matches: match !== undefined }
 }
 
 export type PublishedWeek = {
