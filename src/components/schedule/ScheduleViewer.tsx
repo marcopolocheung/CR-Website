@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   DAYS,
   currentMonthKey,
+  currentWeekStart,
   dateForDay,
   expandTemplate,
   formatDayLabel,
@@ -12,22 +13,37 @@ import {
   hoursFor,
   monthGridForMonth,
   monthLabel,
-  seedTemplate,
   shiftMonth,
   todayIsoDate,
   type StaffingSlot,
-  type WeeklyStaffingTemplate,
 } from '@/lib/scheduler'
-import { templateHashForSlots, type PublishedWeek } from '@/lib/schedule-share'
+import { layoutForWeek, type PublishedWeek } from '@/lib/schedule-share'
 import { fetchGoldenMonth, type GoldenWeekDoc } from '@/lib/schedule-store'
 import { fetchTemplate } from '@/lib/template-store'
 
+/** A published week plus the shift layout it was published against. */
+type ViewerWeek = GoldenWeekDoc & { slots: StaffingSlot[]; layoutMatches: boolean }
+
+// Rules are saved per week, so each week is checked against its own layout — never a station-wide one.
+async function withLayouts(weeks: GoldenWeekDoc[], restaurantId?: string): Promise<ViewerWeek[]> {
+  return Promise.all(
+    weeks.map(async (doc) => {
+      const saved = await fetchTemplate(restaurantId, doc.weekStart)
+        .then((templateDoc) => templateDoc.template)
+        .catch(() => null)
+      const { slots, matches } = layoutForWeek(saved, restaurantId, doc.templateHash)
+      return { ...doc, slots, layoutMatches: matches }
+    }),
+  )
+}
+
+function personStorageKey(restaurantId?: string) {
+  return `chinarose.schedule.person.${restaurantId ?? 'default'}`
+}
+
 export default function ScheduleViewer({ restaurantId, restaurantName }: { restaurantId?: string; restaurantName?: string } = {}) {
-  const [template, setTemplate] = useState<WeeklyStaffingTemplate>(seedTemplate)
-  const slots = useMemo(() => expandTemplate(template), [template])
-  const templateHash = useMemo(() => templateHashForSlots(slots), [slots])
   const [monthKey, setMonthKey] = useState('')
-  const [docs, setDocs] = useState<GoldenWeekDoc[]>([])
+  const [docs, setDocs] = useState<ViewerWeek[]>([])
   const [monthRev, setMonthRev] = useState(0)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -40,28 +56,26 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
   liveRef.current = { monthKey, monthRev, ready, busy: loading || refreshing }
   const openWeekStartRef = useRef<string | null>(null)
   openWeekStartRef.current = openWeekStart
+  const autoOpenedRef = useRef(false)
 
   useEffect(() => {
     setMonthKey(currentMonthKey())
-    setReady(true)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    fetchTemplate(restaurantId)
-      .then((doc) => {
-        if (!cancelled && doc.rev > 0 && doc.template) {
-          setTemplate(doc.template)
-        }
-      })
-      .catch(() => {
-        // Keep the built-in default layout — the templateHash mismatch banner
-        // below already tells staff when a published week no longer matches it.
-      })
-    return () => {
-      cancelled = true
+    try {
+      setOnlyPerson(window.localStorage.getItem(personStorageKey(restaurantId)) ?? '')
+    } catch {
+      // Private mode — the picker just starts on Everyone.
     }
+    setReady(true)
   }, [restaurantId])
+
+  function choosePerson(person: string) {
+    setOnlyPerson(person)
+    try {
+      window.localStorage.setItem(personStorageKey(restaurantId), person)
+    } catch {
+      return
+    }
+  }
 
   useEffect(() => {
     if (!ready || !monthKey) return
@@ -70,10 +84,17 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
     setLoadError('')
     setStatusNote('')
     fetchGoldenMonth(monthKey, 0, restaurantId)
-      .then((month) => {
+      .then(async (month) => {
+        const weeks = await withLayouts(month.weeks, restaurantId)
         if (cancelled) return
-        setDocs(month.weeks)
+        setDocs(weeks)
         setMonthRev(month.rev)
+        // First visit opens this week straight away — that is what staff came for.
+        if (!autoOpenedRef.current) {
+          autoOpenedRef.current = true
+          const thisWeek = weeks.find((doc) => doc.weekStart === currentWeekStart() && doc.layoutMatches)
+          if (thisWeek) setOpenWeekStart(thisWeek.weekStart)
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -100,7 +121,7 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
         if (source === 'manual') setStatusNote('You are up to date.')
         return
       }
-      setDocs(month.weeks)
+      setDocs(await withLayouts(month.weeks, restaurantId))
       setMonthRev(month.rev)
       setLoadError('')
       if (openWeekStartRef.current && !month.weeks.some((doc) => doc.weekStart === openWeekStartRef.current)) {
@@ -157,7 +178,6 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
     setMonthKey(next)
     setMonthRev(0)
     setOpenWeekStart(null)
-    setOnlyPerson('')
     setStatusNote('')
   }
 
@@ -167,11 +187,10 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
 
   function goBack() {
     setOpenWeekStart(null)
-    setOnlyPerson('')
   }
 
   const openDoc = docs.find((doc) => doc.weekStart === openWeekStart) ?? null
-  const layoutMismatch = openDoc !== null && openDoc.templateHash !== templateHash
+  const layoutMismatch = openDoc !== null && !openDoc.layoutMatches
 
   if (openDoc && !layoutMismatch) {
     const week: PublishedWeek = openDoc.week
@@ -197,9 +216,9 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
         </div>
         <WeekView
           week={week}
-          slots={slots}
-          onlyPerson={onlyPerson}
-          onOnlyPersonChange={setOnlyPerson}
+          slots={openDoc.slots}
+          onlyPerson={week.people.includes(onlyPerson) ? onlyPerson : ''}
+          onOnlyPersonChange={choosePerson}
           onBack={goBack}
         />
       </div>
@@ -250,7 +269,6 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
         refreshing={refreshing}
         loadError={loadError}
         statusNote={statusNote}
-        templateHash={templateHash}
         selectedWeekStart={openWeekStart}
         onMonthChange={goToMonth}
         onRefresh={refresh}
@@ -267,19 +285,17 @@ function MonthBrowser({
   refreshing,
   loadError,
   statusNote,
-  templateHash,
   selectedWeekStart,
   onMonthChange,
   onRefresh,
   onOpenWeek,
 }: {
   monthKey: string
-  docs: GoldenWeekDoc[]
+  docs: ViewerWeek[]
   loading: boolean
   refreshing: boolean
   loadError: string
   statusNote: string
-  templateHash: string
   selectedWeekStart: string | null
   onMonthChange: (monthKey: string) => void
   onRefresh: () => void
@@ -355,7 +371,7 @@ function MonthBrowser({
             <ul className="mt-1 space-y-2">
               {grid.map((row) => {
                 const doc = docByWeek.get(row.weekStart)
-                const mismatched = doc !== undefined && doc.templateHash !== templateHash
+                const mismatched = doc !== undefined && !doc.layoutMatches
                 const published = doc !== undefined && !mismatched
                 const selected = selectedWeekStart === row.weekStart
                 const isTodayWeek = todayWeekStart === row.weekStart

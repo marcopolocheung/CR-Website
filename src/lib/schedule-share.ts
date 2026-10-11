@@ -6,7 +6,8 @@
  * manager token, which the Worker checks — see schedule-store.ts.
  */
 
-import type { Employee, ScheduleAssignment, StaffingSlot } from './scheduler'
+import { defaultTemplateForRestaurant, expandTemplate } from './scheduler/data'
+import type { Employee, ScheduleAssignment, StaffingSlot, WeeklyStaffingTemplate } from './scheduler'
 
 export const SHARE_VERSION = 1
 
@@ -18,6 +19,15 @@ export function templateHashForSlots(slots: Pick<StaffingSlot, 'id'>[]): string 
     hash = Math.imul(hash, 0x01000193)
   }
   return (hash >>> 0).toString(16).padStart(8, '0')
+}
+
+/**
+ * The shift layout a published week is read with: the rules saved for that week, else the
+ * station's own built-in rules. `matches` is false when the week was published with other rules.
+ */
+export function layoutForWeek(saved: WeeklyStaffingTemplate | null, restaurantId: string | undefined, templateHash: string) {
+  const slots = expandTemplate(saved ?? defaultTemplateForRestaurant(restaurantId))
+  return { slots, matches: templateHashForSlots(slots) === templateHash }
 }
 
 export type PublishedWeek = {

@@ -133,7 +133,8 @@ export default function PublishPanel({
   }, [weekStart, weekLabel, restaurantId])
 
   const willSaveRoster = Boolean(rosterDirty && onRosterSaved && rosterRev !== undefined)
-  const willSaveTemplate = Boolean(templateDirty && template && onTemplateSaved && templateRev !== undefined)
+  // A week with no rules of its own (rev 0) saves them too: /schedule checks each week against its own saved layout.
+  const willSaveTemplate = Boolean((templateDirty || templateRev === 0) && template && onTemplateSaved && templateRev !== undefined)
 
   async function save() {
     if (filled === 0 || !token || busy) return
