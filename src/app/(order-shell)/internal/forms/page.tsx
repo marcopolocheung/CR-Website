@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
+import WriteUps from '@/components/internal/WriteUps'
 
-export const metadata: Metadata = { title: 'Forms' }
+export const metadata: Metadata = { title: 'Forms & write-ups' }
 
 // Files live in public/internal/forms.
 const FORMS = [
@@ -20,7 +21,8 @@ const FORMS = [
 export default function FormsPage() {
   const base = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/internal/forms`
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <>
+    <div className="max-w-3xl mx-auto px-4 py-8 print:hidden">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Forms</h1>
       <p className="text-sm text-gray-600 mb-6">Blank forms to download and print. PDFs open in the browser; Excel and Word files download.</p>
       <ul className="divide-y divide-gray-200 border border-gray-200 rounded">
@@ -33,13 +35,8 @@ export default function FormsPage() {
           </li>
         ))}
       </ul>
-      <p className="text-sm text-gray-600 mt-6">
-        Write-ups can also be filled in and saved online on the{' '}
-        <a href={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/internal/write-ups`} className="text-red-700 font-medium hover:underline">
-          write-ups page
-        </a>{' '}
-        (manager code needed).
-      </p>
     </div>
+    <WriteUps />
+    </>
   )
 }
