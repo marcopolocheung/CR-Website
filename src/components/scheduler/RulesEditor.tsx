@@ -132,7 +132,7 @@ export function TemplateEditor({
       <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
         <h2 className="font-semibold">Shift rules (locked)</h2>
         <p className="mt-0.5 text-sm text-zinc-600">
-          The spots below are locked for this station — press Edit crew &amp; rules on the Staff tab to change this week’s rules. You build
+          The spots below are locked for this station — enter the staff password on the Staff tab to change this week’s rules. You build
           the week by putting the crew into them and moving people around.
         </p>
         <div className="mt-3 space-y-3">

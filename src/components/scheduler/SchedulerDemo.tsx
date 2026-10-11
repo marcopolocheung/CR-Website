@@ -30,7 +30,7 @@ import {
   formatUpdatedAt,
 } from '@/lib/scheduler'
 import { fetchRoster, rosterFingerprint, saveRoster } from '@/lib/employee-store'
-import { fetchStaff, saveStaff, staffFingerprint, undoStaff, type StaffWriteResult } from '@/lib/staff-store'
+import { fetchStaff, saveStaff, staffFingerprint, undoStaff, verifyStaffPassword, type StaffWriteResult } from '@/lib/staff-store'
 import { fetchTemplate, saveTemplate, templateFingerprint } from '@/lib/template-store'
 import { fetchGoldenMonth, fetchGoldenWeek, saveErrorMessage, type GoldenWeekDoc } from '@/lib/schedule-store'
 import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForWeek, publishedWeekFingerprint, templateHashForSlots } from '@/lib/schedule-share'
@@ -48,7 +48,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // Schedule-only stations (CR3 Kitchen) ship a built-in crew and default rules.
   // The crew (`/api/staff`) is one per station, shared by every week, with the
   // last saved change undoable; the rules are per-week like other stations.
-  // Both stay read-only until "Edit crew & rules" is on, so nobody edits by accident.
+  // Both stay read-only until the staff password is entered on the Staff tab.
   const scheduleOnly = isScheduleOnlyRestaurant(restaurantId)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
@@ -81,7 +81,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [staffCanUndo, setStaffCanUndo] = useState(false)
   const [staffUpdatedAt, setStaffUpdatedAt] = useState<string | null>(null)
   const [staffBaseline, setStaffBaseline] = useState<string | null>(null)
-  const [staffUnlocked, setStaffUnlocked] = useState(false)
+  // The staff password, once accepted, for this page view only — never stored. It is the editing
+  // privilege for CR3 Kitchen's crew and rules; the manager code alone does not unlock them.
+  const [staffPassword, setStaffPassword] = useState('')
+  const staffUnlocked = staffPassword !== ''
+  const [passwordInput, setPasswordInput] = useState('')
+  const [checkingPassword, setCheckingPassword] = useState(false)
   const [staffLoadError, setStaffLoadError] = useState('')
   const employees = scheduleOnly
     ? staffDraft ?? defaultRoster
@@ -388,7 +393,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setStaffCanUndo(false)
     setStaffUpdatedAt(null)
     setStaffBaseline(null)
-    setStaffUnlocked(false)
+    setStaffPassword('')
     setStaffLoadError('')
   }, [restaurantId])
 
@@ -1282,11 +1287,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       }
       if (staffDirty && staffDraft) {
         what = 'crew'
-        applyStaffResult(await saveStaff(staffDraft, staffRev, managerCode, restaurantId))
+        applyStaffResult(await saveStaff(staffDraft, staffRev, staffPassword, restaurantId))
       }
       if ((templateDirty || (alsoRules && templateRev === 0)) && ruleProblems.length === 0) {
         what = 'shift rules'
-        const result = await saveTemplate(template, templateRev, managerCode, restaurantId, target)
+        // CR3 Kitchen rules are the password holder's to change; publishing a week still saves them with the manager code.
+        const result = await saveTemplate(template, templateRev, scheduleOnly && staffPassword ? staffPassword : managerCode, restaurantId, target)
         setTemplateSaved(target, result.rev, result.updatedAt, templateFingerprint(template))
       }
       return true
@@ -1304,12 +1310,27 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     if (saved) setSetupNotice(`Saved the ${setupParts.join(' and ')}.`)
   }
 
+  async function unlockCrewEditing() {
+    if (!passwordInput || checkingPassword) return
+    setCheckingPassword(true)
+    setSetupError('')
+    try {
+      await verifyStaffPassword(passwordInput, restaurantId)
+      setStaffPassword(passwordInput)
+      setPasswordInput('')
+    } catch (caught) {
+      setSetupError(saveErrorMessage(caught, 'crew').replace('That code was not accepted', 'That staff password was not accepted'))
+    } finally {
+      setCheckingPassword(false)
+    }
+  }
+
   async function undoCrewSave() {
     if (savingSetup || !staffCanUndo) return
     setSavingSetup(true)
     setSetupError('')
     try {
-      applyStaffResult(await undoStaff(staffRev, managerCode, restaurantId))
+      applyStaffResult(await undoStaff(staffRev, staffPassword, restaurantId))
       setSetupNotice('Undid the last saved crew change.')
     } catch (caught) {
       setSetupError(saveErrorMessage(caught, 'crew'))
@@ -1853,16 +1874,42 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 <p className="min-w-0 flex-1 text-xs text-zinc-600">
                   {staffUnlocked
                     ? 'Editing the crew and shift rules. Crew changes apply to every week.'
-                    : 'The crew and shift rules are locked so they are not changed by accident.'}
+                    : 'The crew and shift rules are locked. Enter the staff password to edit them.'}
                 </p>
-                <button
-                  type="button"
-                  className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                  onClick={() => setStaffUnlocked((on) => !on)}
-                  aria-pressed={staffUnlocked}
-                >
-                  {staffUnlocked ? 'Done editing' : 'Edit crew & rules'}
-                </button>
+                {staffUnlocked ? (
+                  <button
+                    type="button"
+                    className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+                    onClick={() => setStaffPassword('')}
+                  >
+                    Lock
+                  </button>
+                ) : (
+                  <form
+                    className="flex gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      void unlockCrewEditing()
+                    }}
+                  >
+                    <input
+                      className="w-40 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+                      type="password"
+                      autoComplete="off"
+                      value={passwordInput}
+                      onChange={(event) => setPasswordInput(event.target.value)}
+                      placeholder="Staff password"
+                      aria-label="Staff password"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+                      disabled={!passwordInput || checkingPassword}
+                    >
+                      {checkingPassword ? 'Checking…' : 'Unlock editing'}
+                    </button>
+                  </form>
+                )}
                 {staffUnlocked && (
                   <button
                     type="button"
