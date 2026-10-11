@@ -4,8 +4,8 @@ import type { Employee } from './scheduler'
 
 /**
  * Station crew store (`/api/staff`). Unlike the per-week roster, a schedule-only
- * station keeps ONE crew shared by every week. Writes take the manager code (the
- * Worker also accepts the staff password). The Worker keeps a short history of replaced crews so the
+ * station keeps ONE crew shared by every week, editable only with the staff
+ * password. The Worker keeps a short history of replaced crews so the
  * last saved change can be undone.
  */
 export type StaffSnapshot = {
@@ -59,6 +59,19 @@ export async function fetchStaff(restaurantId?: string): Promise<StaffSnapshot> 
   if (status === 403) {
     throw new StoreUnavailableError('Staff editing is not enabled for this station.')
   }
+  throw new StoreUnavailableError()
+}
+
+/** Unlock check for the crew editor. Resolves on the right staff password. */
+export async function verifyStaffPassword(password: string, restaurantId?: string): Promise<void> {
+  const { status } = await requestJson(`/api/staff/verify${staffQuery(restaurantId)}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${password}` },
+  })
+  if (status === 200) return
+  if (status === 401) throw new StoreAuthError()
+  if (status === 429) throw new StoreUnavailableError('Too many wrong passwords. Wait a bit and try again.')
+  if (status === 503) throw new StoreUnavailableError('Staff editing is not set up on the server yet.')
   throw new StoreUnavailableError()
 }
 
