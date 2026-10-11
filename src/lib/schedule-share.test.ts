@@ -2,12 +2,13 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   SHARE_VERSION,
+  layoutForWeek,
   assignmentsFromPublishedWeek,
   templateHashForSlots,
   type PublishedWeek,
   buildPublishedWeek,
 } from './schedule-share'
-import { expandTemplate, seedEmployees, seedTemplate } from './scheduler/data'
+import { defaultTemplateForRestaurant, expandTemplate, seedEmployees, seedTemplate } from './scheduler/data'
 import { generateSchedule } from './scheduler/solver'
 
 
@@ -122,4 +123,26 @@ test('the template hash is stable and changes with the shift layout', () => {
   assert.match(templateHashForSlots(slots), /^[0-9a-f]{8}$/)
   assert.equal(templateHashForSlots(slots), templateHashForSlots(expandTemplate(seedTemplate)))
   assert.notEqual(templateHashForSlots(slots), templateHashForSlots(slots.slice(1)))
+})
+
+test('a kitchen week published with the default kitchen rules opens on /schedule', () => {
+  // The editor publishes with dated slots; the viewer reads with undated ones — the hash must agree.
+  const published = templateHashForSlots(expandTemplate(defaultTemplateForRestaurant('CR3-kitchen'), '2026-10-11'))
+  assert.equal(layoutForWeek([null], 'CR3-kitchen', published).matches, true)
+  // The dining-room layout is not a stand-in for a kitchen station.
+  assert.equal(layoutForWeek([null], 'CR3-diningroom', published).matches, false)
+})
+
+test('a kitchen week published before kitchen posts existed still opens', () => {
+  const published = templateHashForSlots(expandTemplate(seedTemplate, '2026-09-13'))
+  const { slots, matches } = layoutForWeek([null, null], 'CR3-kitchen', published)
+  assert.equal(matches, true)
+  assert.equal(templateHashForSlots(slots), published)
+})
+
+test('a week published with its own saved rules is read with those rules', () => {
+  const custom = { ...seedTemplate, Monday: seedTemplate.Monday.slice(1) }
+  const published = templateHashForSlots(expandTemplate(custom, '2026-10-11'))
+  assert.equal(layoutForWeek([custom], 'CR3-diningroom', published).matches, true)
+  assert.equal(layoutForWeek([null], 'CR3-diningroom', published).matches, false)
 })
