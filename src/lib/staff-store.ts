@@ -98,7 +98,7 @@ function handleStaffWrite(status: number, body: unknown): StaffWriteResult {
   if (status === 403) throw new StoreUnavailableError('Staff editing is not enabled for this station.')
   if (status === 503) {
     throw new StoreUnavailableError(
-      'The crew store is not set up for saving yet. Set the STAFF_EDIT_PASSWORD secret on the Worker and try again.',
+      'Saving is not set up on the server yet. Ask whoever manages the website to finish setup.',
     )
   }
   if (status === 409) {

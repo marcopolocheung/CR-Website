@@ -106,7 +106,7 @@ export default function PublishPanel({
       })
       .catch(() => {
         if (!cancelled) {
-          setError('Could not reach the schedule store. You can still edit — publishing will retry the connection.')
+          setError('Could not reach the server. You can still edit — publishing will try again.')
         }
       })
       .finally(() => {
@@ -153,16 +153,16 @@ export default function PublishPanel({
     <section className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm print:hidden">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Publish {weekLabel}{restaurantName ? ` for ${restaurantName}` : ''} to /schedule</h2>
+          <h2 className="text-lg font-semibold">Publish {weekLabel}{restaurantName ? ` for ${restaurantName}` : ''} to staff</h2>
           <p className="mt-1 text-sm text-zinc-600">
-            {filled} filled spot{filled === 1 ? '' : 's'} will be included. One schedule, no links or codes.
+            {filled} filled spot{filled === 1 ? '' : 's'} will be included. Staff see it on the staff schedule page — no links or codes.
             Last published: {baseRev === null ? 'never' : formatUpdatedAt(serverUpdatedAt)}.
             {unsavedSetup.length > 0 && <> Your unsaved {unsavedSetup.join(' and ')} will save first.</>}
           </p>
         </div>
         <button
           type="button"
-          className="shrink-0 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="shrink-0 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={onClose}
         >
           Close
@@ -173,7 +173,7 @@ export default function PublishPanel({
         <label className="text-sm font-medium text-zinc-800">
           What to call it
           <input
-            className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -189,7 +189,7 @@ export default function PublishPanel({
           >
             <button
               type="button"
-              className={`flex-1 rounded border px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${
+              className={`flex-1 rounded border px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 ${
                 visible
                   ? 'border-green-700 bg-green-700 text-white'
                   : 'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100'
@@ -201,7 +201,7 @@ export default function PublishPanel({
             </button>
             <button
               type="button"
-              className={`flex-1 rounded border px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${
+              className={`flex-1 rounded border px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 ${
                 visible
                   ? 'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100'
                   : 'border-zinc-700 bg-zinc-700 text-white'
@@ -218,13 +218,13 @@ export default function PublishPanel({
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="inline-flex items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="inline-flex items-center justify-center gap-2 rounded bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={publish}
           disabled={busy || loading || !dirty || filled === 0}
         >
           {busy ? 'Publishing…' : baseRev === null ? 'Publish' : 'Publish updates'}
         </button>
-        {!dirty && baseRev !== null && <span className="text-sm text-green-800">/schedule is up to date.</span>}
+        {!dirty && baseRev !== null && <span className="text-sm text-green-800">Staff see the latest version.</span>}
         {dirty && baseRev !== null && (
           <span className="text-sm font-medium text-amber-800">You have changes staff cannot see yet.</span>
         )}
@@ -242,7 +242,7 @@ export default function PublishPanel({
             <div>
               <a
                 href={`sms:?&body=${encodeURIComponent(`Schedule for ${weekLabel} is up: ${scheduleUrl}`)}`}
-                className="inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
               >
                 Text my contacts
               </a>

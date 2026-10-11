@@ -113,7 +113,7 @@ export async function saveRoster(
   if (status === 400) throw new StoreRejectedError('The server refused this staff list. Check names, positions, and availability, then try again.')
   if (status === 503) {
     throw new StoreUnavailableError(
-      'The roster store is not set up for saving yet. Set the SCHEDULE_WRITE_TOKEN secret on the Worker and try again.',
+      'Saving is not set up on the server yet. Ask whoever manages the website to finish setup.',
     )
   }
   if (status === 409) {

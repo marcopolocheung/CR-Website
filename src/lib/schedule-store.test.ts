@@ -189,7 +189,7 @@ test('saveGoldenWeek sends the write token and maps 401 to auth', async () => {
   }
 })
 
-test('saveGoldenWeek maps 503 to an unavailable error naming the missing secret', async () => {
+test('saveGoldenWeek maps 503 to an unavailable error saying saving is not set up', async () => {
   const restore = mockFetchOnce(() => ({ status: 503, payload: { error: 'write_not_configured' } }))
   try {
     const caught = await saveGoldenWeek(
@@ -201,7 +201,7 @@ test('saveGoldenWeek maps 503 to an unavailable error naming the missing secret'
       (error: unknown) => error,
     )
     assert.ok(caught instanceof StoreUnavailableError)
-    assert.match((caught as StoreUnavailableError).message, /SCHEDULE_WRITE_TOKEN/)
+    assert.match((caught as StoreUnavailableError).message, /not set up on the server/)
   } finally {
     restore()
   }

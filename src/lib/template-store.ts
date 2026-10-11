@@ -61,7 +61,7 @@ export async function saveTemplate(
   if (status === 400) throw new StoreRejectedError('The server refused these shift rules. Fix the spots marked in red on the Shift rules tab.')
   if (status === 503) {
     throw new StoreUnavailableError(
-      'The template store is not set up for saving yet. Set the SCHEDULE_WRITE_TOKEN secret on the Worker and try again.',
+      'Saving is not set up on the server yet. Ask whoever manages the website to finish setup.',
     )
   }
   if (status === 409) {
