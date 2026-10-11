@@ -203,7 +203,7 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
             <span className="text-sm text-zinc-600">This schedule updates itself when your manager publishes changes.</span>
             <button
               type="button"
-              className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
               onClick={refresh}
               disabled={refreshing}
             >
@@ -231,7 +231,7 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
     <div className="mx-auto w-full max-w-none px-4 py-10">
       <div className="mx-auto max-w-2xl">
         {restaurantName && (
-          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{restaurantName}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{restaurantName}</p>
         )}
         <h1 className="mt-1 text-2xl font-bold text-zinc-900">Staff schedule</h1>
         <p className="mt-2 text-zinc-700">
@@ -246,7 +246,7 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                 onClick={refresh}
                 disabled={refreshing}
               >
@@ -254,7 +254,7 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
               </button>
               <button
                 type="button"
-                className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                 onClick={goBack}
               >
                 All weeks
@@ -382,15 +382,15 @@ function MonthBrowser({
                     key={row.weekStart}
                     className={`overflow-hidden rounded-lg border bg-white shadow-sm ${
                       selected
-                        ? 'border-red-800 ring-2 ring-red-800'
+                        ? 'border-zinc-900 ring-2 ring-zinc-900'
                         : isTodayWeek
-                          ? 'border-red-300 bg-red-50/50'
+                          ? 'border-blue-300 bg-blue-50/50'
                           : 'border-zinc-200'
                     }`}
                   >
                     <button
                       type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-default"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:cursor-default"
                       disabled={!published}
                       aria-pressed={published ? selected : undefined}
                       aria-label={
@@ -415,7 +415,7 @@ function MonthBrowser({
                         </span>
                       </span>
                       {isTodayWeek && (
-                        <span className="shrink-0 rounded-full bg-red-800 px-2 py-0.5 text-[11px] font-bold text-white">
+                        <span className="shrink-0 rounded-full bg-blue-700 px-2 py-0.5 text-[11px] font-bold text-white">
                           This week
                         </span>
                       )}
@@ -439,11 +439,11 @@ function MonthBrowser({
                           key={day.date}
                           className={`py-1.5 text-center text-xs tabular-nums ${
                             day.isToday
-                              ? 'font-bold text-red-800'
+                              ? 'font-bold text-blue-800'
                               : day.inMonth
                                 ? 'text-zinc-700'
                                 : 'text-zinc-300'
-                          } ${day.isToday ? 'rounded-full bg-red-100' : ''}`}
+                          } ${day.isToday ? 'rounded-full bg-blue-100' : ''}`}
                         >
                           {day.dayOfMonth}
                         </span>
@@ -509,7 +509,7 @@ function WeekView({
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <button
           type="button"
-          className="text-sm font-semibold text-red-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="text-sm font-semibold text-zinc-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={onBack}
         >
           &lsaquo; All weeks
@@ -517,7 +517,7 @@ function WeekView({
         {todayDay && (
           <button
             type="button"
-            className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             onClick={jumpToToday}
           >
             Today
@@ -525,7 +525,7 @@ function WeekView({
         )}
         <button
           type="button"
-          className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={() => window.print()}
         >
           Print
@@ -540,7 +540,7 @@ function WeekView({
         <label className="text-sm font-medium text-zinc-800 print:hidden">
           <span className="sr-only">Whose shifts to show</span>
           <select
-            className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:w-56"
+            className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 sm:w-56"
             value={onlyPerson}
             onChange={(event) => onOnlyPersonChange(event.target.value)}
           >
@@ -562,12 +562,12 @@ function WeekView({
               key={day}
               id={`staff-day-${day}`}
               aria-label={`${day}${isToday ? ', today' : ''}`}
-              className={`scroll-mt-4 rounded-lg border bg-white p-3 shadow-sm ${isToday ? 'border-red-300' : 'border-zinc-200'}`}
+              className={`scroll-mt-4 rounded-lg border bg-white p-3 shadow-sm ${isToday ? 'border-blue-300' : 'border-zinc-200'}`}
             >
               <h2 className="flex items-center gap-2 font-semibold text-zinc-900">
                 {formatDayLabel(week.weekStart, day)}
                 {isToday && (
-                  <span className="rounded-full bg-red-800 px-2 py-0.5 text-xs font-bold text-white">Today</span>
+                  <span className="rounded-full bg-blue-700 px-2 py-0.5 text-xs font-bold text-white">Today</span>
                 )}
                 <span className="ml-auto text-xs font-normal text-zinc-500">
                   {shifts.length} shift{shifts.length === 1 ? '' : 's'}
@@ -608,7 +608,7 @@ function WeekView({
                     key={day}
                     scope="col"
                     className={`min-w-0 border border-zinc-300 px-1.5 py-2 text-xs font-semibold uppercase tracking-wide ${
-                      isToday ? 'bg-red-100 text-red-900' : date < today ? 'bg-zinc-100 text-zinc-400' : 'bg-zinc-100 text-zinc-600'
+                      isToday ? 'bg-blue-100 text-blue-900' : date < today ? 'bg-zinc-100 text-zinc-400' : 'bg-zinc-100 text-zinc-600'
                     }`}
                   >
                     <span className="block truncate">{formatDayLabel(week.weekStart, day)}</span>
@@ -656,7 +656,7 @@ function WeekView({
                   <td
                     key={day}
                     className={`min-w-0 border border-zinc-300 px-1.5 py-2 text-xs font-semibold uppercase tracking-wide ${
-                      isToday ? 'bg-red-100 text-red-900' : date < today ? 'bg-zinc-100 text-zinc-400' : 'bg-zinc-100 text-zinc-600'
+                      isToday ? 'bg-blue-100 text-blue-900' : date < today ? 'bg-zinc-100 text-zinc-400' : 'bg-zinc-100 text-zinc-600'
                     }`}
                   >
                     <span className="block truncate">{formatDayLabel(week.weekStart, day)}</span>
@@ -702,14 +702,14 @@ function WeekView({
 function DayCell({ shifts, isToday, isPast }: { shifts: StaffingSlot[]; isToday: boolean; isPast: boolean }) {
   if (shifts.length === 0) {
     return (
-      <td className={`border border-zinc-300 px-2 py-2 ${isToday ? 'bg-red-50' : 'bg-zinc-100'}`}>
+      <td className={`border border-zinc-300 px-2 py-2 ${isToday ? 'bg-blue-50' : 'bg-zinc-100'}`}>
         <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Off</span>
       </td>
     )
   }
 
   return (
-    <td className={`min-w-0 border border-zinc-300 px-1.5 py-2 ${isToday ? 'bg-red-50' : 'bg-white'} ${isPast ? 'opacity-60' : ''}`}>
+    <td className={`min-w-0 border border-zinc-300 px-1.5 py-2 ${isToday ? 'bg-blue-50' : 'bg-white'} ${isPast ? 'opacity-60' : ''}`}>
       <ul className="min-w-0 space-y-1">
         {shifts.map((slot) => (
           <li key={slot.id} className="min-w-0">

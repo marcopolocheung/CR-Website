@@ -44,10 +44,10 @@ export default function DemoGate({ children }: { children: ReactNode }) {
 
   return (
     <div className="mx-auto max-w-md px-4 py-10">
-      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Scheduler demo</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Scheduler</p>
       <h1 className="mt-1 text-2xl font-bold">Enter the manager code</h1>
       <p className="mt-2 text-sm text-zinc-600">
-        This demo is for managers only. You only type the code once — every save on this visit uses it. It is never saved.
+        For managers only. You type the code once — every save on this visit uses it. It is never stored.
       </p>
       <form onSubmit={submit} className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
         <label className="text-sm font-medium text-zinc-800" htmlFor="demo-gate-code">
@@ -56,7 +56,7 @@ export default function DemoGate({ children }: { children: ReactNode }) {
         <div className="mt-1 flex gap-2">
           <input
             id="demo-gate-code"
-            className="min-w-0 flex-1 rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="min-w-0 flex-1 rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             value={code}
             type={showCode ? 'text' : 'password'}
             autoComplete="off"
@@ -66,7 +66,7 @@ export default function DemoGate({ children }: { children: ReactNode }) {
           />
           <button
             type="button"
-            className="shrink-0 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="shrink-0 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             onClick={() => setShowCode((show) => !show)}
             aria-pressed={showCode}
           >
@@ -75,10 +75,10 @@ export default function DemoGate({ children }: { children: ReactNode }) {
         </div>
         <button
           type="submit"
-          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           disabled={busy || !code}
         >
-          {busy ? 'Checking…' : 'Unlock the demo'}
+          {busy ? 'Checking…' : 'Open the scheduler'}
         </button>
         {error && <p className="mt-2 text-sm font-medium text-red-800">{error}</p>}
       </form>

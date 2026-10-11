@@ -7,8 +7,8 @@ export async function generateMetadata({ params }: { params: Promise<{ restauran
   const { restaurantId } = await params
   const station = isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
   return {
-    title: station ? `${station} — Scheduler` : 'Scheduler Demo',
-    description: 'Internal deterministic employee scheduling demo for China Rose.',
+    title: station ? `${station} — Scheduler` : 'Scheduler',
+    description: 'Weekly staff scheduler for China Rose managers.',
     robots: {
       index: false,
       follow: false,

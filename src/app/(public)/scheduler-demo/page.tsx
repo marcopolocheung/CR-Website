@@ -3,8 +3,8 @@ import Link from 'next/link'
 import { RESTAURANTS, RESTAURANT_IDS } from '@/data/restaurants'
 
 export const metadata: Metadata = {
-  title: 'Scheduler Demo',
-  description: 'Internal deterministic employee scheduling demo for China Rose.',
+  title: 'Scheduler',
+  description: 'Weekly staff scheduler for China Rose managers.',
   robots: {
     index: false,
     follow: false,
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function SchedulerDemoPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
-      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Scheduler demo</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Scheduler</p>
       <h1 className="mt-1 text-2xl font-bold">Pick a station</h1>
       <p className="mt-2 text-sm text-zinc-600">
         Each station keeps its own staff list, rules, and published weeks. Nothing is shared between stations.

@@ -24,7 +24,7 @@ export class StoreConflictError extends Error {
 
 export class StoreAuthError extends Error {
   constructor() {
-    super('That write token did not work. Ask for the current one and try again.')
+    super('That code did not work. Ask for the current one and try again.')
     this.name = 'StoreAuthError'
   }
 }
@@ -122,7 +122,7 @@ export async function saveGoldenWeek(
   if (status === 400) throw new StoreRejectedError('The server refused this week. Reload the page and publish again.')
   if (status === 503) {
     throw new StoreUnavailableError(
-      'The schedule store is not set up for saving yet. Set the SCHEDULE_WRITE_TOKEN secret on the Worker and try again.',
+      'Saving is not set up on the server yet. Ask whoever manages the website to finish setup.',
     )
   }
   if (status === 409) {
@@ -163,7 +163,7 @@ export class StoreRejectedError extends Error {
 }
 
 export class StoreUnavailableError extends Error {
-  constructor(message = 'Could not reach the schedule store.') {
+  constructor(message = 'Could not reach the server.') {
     super(message)
     this.name = 'StoreUnavailableError'
   }

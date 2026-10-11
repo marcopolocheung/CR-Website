@@ -167,7 +167,7 @@ const periodLabels: Record<ShiftPeriod, string> = {
 }
 
 const KNOWN_ROLE_CHIP_CLASSES: Record<string, string> = {
-  lead: 'border-red-200 bg-red-50 text-red-900',
+  lead: 'border-rose-200 bg-rose-50 text-rose-900',
   manager: 'border-violet-200 bg-violet-50 text-violet-900',
   server: 'border-sky-200 bg-sky-50 text-sky-900',
   cashier: 'border-emerald-200 bg-emerald-50 text-emerald-900',
@@ -503,6 +503,8 @@ function cloneEmployeeList(employees: Employee[]) {
 }
 
 const emptyAssignments: ScheduleAssignment[] = []
+
+const UNDO_LIMIT = 30
 
 const onboardingStorageKey = 'chinarose.scheduler.onboardingDismissed'
 
@@ -1277,7 +1279,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       })
       .catch(() => {
         if (!cancelled) {
-          setRosterLoadError('Could not reach the staff list store. Showing the built-in demo list — save once the connection works to keep changes.')
+          setRosterLoadError('Could not reach the server. Showing the starting staff list, not your saved one — do not save over it.')
           setDefaultRosterLoaded(true)
         }
       })
@@ -1310,7 +1312,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         const seed = cloneEmployees(restaurantId)
         setStaffDraft(seed)
         setStaffBaseline(staffFingerprint(seed))
-        setStaffLoadError('Could not reach the crew store. Showing the built-in crew — saving is paused until the connection works.')
+        setStaffLoadError('Could not reach the server. Showing the starting crew, not your saved one — do not save over it.')
         setStaffLoaded(true)
       })
     return () => {
@@ -1338,7 +1340,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       })
       .catch(() => {
         if (!cancelled) {
-          setTemplateLoadError('Could not reach the schedule-rules store. Showing the built-in default rules — save once the connection works to keep changes.')
+          setTemplateLoadError('Could not reach the server. Showing the starting shift rules, not your saved ones — do not save over them.')
           setDefaultTemplateLoaded(true)
         }
       })
@@ -1380,7 +1382,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           current[weekStart] ? current : { ...current, [weekStart]: cloneEmployeeList(defaultRoster) },
         )
         setRosterLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
-        setRosterLoadError('Could not reach the staff list store. Showing the built-in demo list — save once the connection works to keep changes.')
+        setRosterLoadError('Could not reach the server. Showing the starting staff list, not your saved one — do not save over it.')
       })
     return () => {
       cancelled = true
@@ -1416,7 +1418,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           current[weekStart] ? current : { ...current, [weekStart]: cloneTemplate(defaultTemplate) },
         )
         setTemplateLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
-        setTemplateLoadError('Could not reach the schedule-rules store. Showing the built-in default rules — save once the connection works to keep changes.')
+        setTemplateLoadError('Could not reach the server. Showing the starting shift rules, not your saved ones — do not save over them.')
       })
     return () => {
       cancelled = true
@@ -1539,6 +1541,21 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => window.removeEventListener('keydown', cancelOnEscape)
   }, [dragState, moveSource])
 
+  // Ctrl/Cmd+Z undoes the last change — but never while typing, where the browser's own undo applies.
+  const undoRef = useRef(undoLastChange)
+  undoRef.current = undoLastChange
+  useEffect(() => {
+    function undoOnShortcut(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.key.toLowerCase() !== 'z') return
+      const target = event.target as HTMLElement | null
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
+      event.preventDefault()
+      undoRef.current()
+    }
+    window.addEventListener('keydown', undoOnShortcut)
+    return () => window.removeEventListener('keydown', undoOnShortcut)
+  }, [])
+
   const staffStatsById = useMemo(() => new Map(stats.map((stat) => [stat.employeeId, stat])), [stats])
   const filteredEmployees = useMemo(() => {
     const query = staffQuery.trim().toLowerCase()
@@ -1602,8 +1619,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setWeekStatus((current) => ({ ...current, [targetWeek]: status }))
     setDiagnostics([
       status === 'on'
-        ? 'That week is now on. Staff see it on /schedule once you save.'
-        : 'That week is now off. Staff stop seeing it once you save.',
+        ? 'That week will show to staff once you publish it.'
+        : 'That week will be hidden from staff once you publish it.',
     ])
   }
 
@@ -1674,7 +1691,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         weekStatus: { ...weekStatus },
         diagnostics: [...diagnostics],
       },
-      ...current.slice(0, 5),
+      // shortcut: 30 snapshots of every week in memory, fine for a manager's session; trim if weeks pile up.
+      ...current.slice(0, UNDO_LIMIT - 1),
     ])
   }
 
@@ -1693,6 +1711,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setGeneratedWeeks(cloneWeeks(snapshot.generatedWeeks))
     setWeekStatus({ ...snapshot.weekStatus })
     setDiagnostics([`Undone: ${snapshot.label}.`])
+    setLastReport(null)
     setHistory(rest)
     setDropFeedback(null)
     setDragState(null)
@@ -1866,7 +1885,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   function reset() {
     // Inline confirm in the header calls this only after an explicit second click.
     // remember() keeps the pre-reset state so Undo can bring it back.
-    remember('reset demo')
+    remember('started over')
     setEmployees(cloneEmployees(restaurantId))
     setTemplate(cloneTemplate(undefined, restaurantId))
     setWeeks({})
@@ -2192,8 +2211,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex w-full max-w-none flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-              {restaurantName ? `${restaurantName} · Scheduler` : 'Scheduler demo'}
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              {restaurantName ? `${restaurantName} · Scheduler` : 'Scheduler'}
             </p>
             <h1 className="text-2xl font-bold md:text-3xl">Weekly staff schedule</h1>
             {currentPublishState && (
@@ -2219,7 +2238,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               {isGenerating ? 'Making schedule…' : 'Make schedule'}
             </Button>
             <select
-              className="rounded border border-zinc-300 bg-white px-2 py-2 text-sm text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              className="rounded border border-zinc-300 bg-white px-2 py-2 text-sm text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
               aria-label="How to build the week"
               value={selectedVariant}
               onChange={(event) => setSelectedVariant(event.target.value as ScheduleVariant)}
@@ -2241,13 +2260,21 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               disabled={!weekStart || storeLoading || ruleProblems.length > 0}
               title={
                 storeLoading
-                  ? 'Waiting for the schedule store — saving is paused until the saved data loads.'
+                  ? 'Waiting for your saved data to load.'
                   : ruleProblems.length > 0
                     ? 'Fix the shift rules marked in red first.'
-                    : 'Save this week to the /schedule golden schedule.'
+                    : 'Send this week to the staff schedule page.'
               }
             >
               Publish to staff
+            </Button>
+            <Button
+              onClick={undoLastChange}
+              icon="undo"
+              disabled={history.length === 0}
+              title={history[0] ? `Undo ${history[0].label} (Ctrl+Z)` : 'Nothing to undo yet.'}
+            >
+              Undo
             </Button>
             {keptCount > 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-700">
@@ -2258,14 +2285,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             <span aria-hidden="true" className="mx-1 hidden h-8 w-px bg-zinc-200 sm:block" />
             <Disclosure summary="More actions" tone="quiet">
               <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  onClick={undoLastChange}
-                  icon="undo"
-                  disabled={history.length === 0}
-                  title={history[0] ? `Undo ${history[0].label}` : 'Nothing to undo yet.'}
-                >
-                  Undo
-                </Button>
                 <Button
                   onClick={() => {
                     flushSync(() => setTab('schedule'))
@@ -2282,17 +2301,17 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                     <span className="text-xs font-semibold text-red-900">Clear everything? You can undo.</span>
                     <button
                       type="button"
-                      className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                       onClick={reset}
                     >
                       Yes, start over
                     </button>
                     <button
                       type="button"
-                      className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                       onClick={() => setConfirmingReset(false)}
                     >
-                      Keep everything
+                      Cancel
                     </button>
                   </span>
                 ) : (
@@ -2321,8 +2340,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               key={id}
               type="button"
               aria-pressed={tab === id}
-              className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${
-                tab === id ? 'border-red-800 text-red-900' : 'border-transparent text-zinc-600 hover:text-zinc-900'
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 ${
+                tab === id ? 'border-zinc-900 text-zinc-950' : 'border-transparent text-zinc-600 hover:text-zinc-900'
               }`}
               onClick={() => setTab(id)}
             >
@@ -2335,29 +2354,27 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       <main className="mx-auto w-full max-w-none min-w-0 space-y-4 overflow-x-clip px-4 py-5">
           {storeLoading && (
             <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">
-              <h2 className="text-sm font-semibold text-zinc-900">Connecting to the schedule store…</h2>
+              <h2 className="text-sm font-semibold text-zinc-900">Loading your saved schedule…</h2>
               <p className="mt-1 text-sm text-zinc-600">
-                Showing the built-in defaults until the saved staff list, rules, and published week load. Saving is
-                paused so defaults cannot overwrite what is on the server — a deploy never deletes server data, it
-                just reloads this page.
+                Showing the starting setup until your saved staff list, rules, and published week load. Saving waits
+                until they do, so nothing on the server gets overwritten.
               </p>
             </section>
           )}
 
           {!storeLoading && storeOffline && (
             <section className="rounded-lg border border-amber-500 bg-amber-50 p-4 shadow-sm print:hidden" role="alert">
-              <h2 className="text-sm font-semibold text-amber-950">Could not reach the schedule store</h2>
+              <h2 className="text-sm font-semibold text-amber-950">Could not reach the server</h2>
               <p className="mt-1 text-sm text-amber-900">
-                What you see below is the built-in demo list, not your saved data — your staff, rules, and published
-                weeks are still on the server. Do not save these defaults over them. Check your connection, then
-                retry.
+                What you see below is the starting setup, not your saved data — your staff, rules, and published
+                weeks are still safe on the server. Do not save over them. Check your connection, then try again.
               </p>
               <button
                 type="button"
                 className="mt-3 inline-flex items-center gap-2 rounded border border-amber-700 bg-white px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                 onClick={() => window.location.reload()}
               >
-                Retry connection
+                Try again
               </button>
             </section>
           )}
@@ -2368,22 +2385,22 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
           {isNewStation && (
             <section className="rounded-lg border border-sky-300 bg-sky-50 p-4 shadow-sm print:hidden">
-              <h2 className="text-sm font-semibold text-sky-950">New station — start from the China Rose template or blank</h2>
+              <h2 className="text-sm font-semibold text-sky-950">New station — start from the usual China Rose setup, or blank</h2>
               <p className="mt-1 text-sm text-sky-900">
-                Nothing is saved for{restaurantName ? ` ${restaurantName}` : ' this station'} yet. The list below is the built-in
-                template so you have something to work from. Save to keep it, or start blank.
+                Nothing is saved for{restaurantName ? ` ${restaurantName}` : ' this station'} yet. The list below is the usual
+                setup so you have something to work from. Save to keep it, or start blank.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   className="rounded border border-sky-700 bg-sky-700 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
-                  onClick={() => setDiagnostics(['Template ready — review the staff list, then save the staff list and rules to keep them.'])}
+                  onClick={() => setDiagnostics(['Starting setup kept — review the staff list, then press Save changes.'])}
                 >
-                  Keep template
+                  Use this setup
                 </button>
                 <button
                   type="button"
-                  className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                   onClick={startBlankStation}
                 >
                   Start blank
@@ -2514,7 +2531,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 {weekStart && weekStart !== currentWeekStart() && (
                   <button
                     type="button"
-                    className="ml-2 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="ml-2 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                     onClick={() => goToWeek(currentWeekStart())}
                   >
                     This week
@@ -2524,7 +2541,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               <div className="flex flex-wrap items-center gap-2 print:hidden">
                     <button
                   type="button"
-                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                   onClick={copyPriorWeek}
                   disabled={!weekStart}
                   title="Copy last week's assignments into this week."
@@ -2535,23 +2552,23 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                   <span className="inline-flex flex-wrap items-center gap-1.5">
                     <button
                       type="button"
-                      className="rounded bg-red-800 px-2 py-1 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      className="rounded bg-red-800 px-2 py-1 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                       onClick={clearWeek}
                     >
                       Yes, clear
                     </button>
                     <button
                       type="button"
-                      className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                       onClick={() => setConfirmingClearWeek(false)}
                     >
-                      Keep
+                      Cancel
                     </button>
                   </span>
                 ) : (
                   <button
                     type="button"
-                    className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                     onClick={() => setConfirmingClearWeek(true)}
                     disabled={!weekStart || assignments.length === 0}
                     title="Remove every assignment from this week. You can undo."
@@ -2652,7 +2669,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 </ul>
                 <button
                   type="button"
-                  className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                   onClick={restoreEverything}
                 >
                   <Icon name="reset" />
@@ -2728,7 +2745,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 </p>
                 <button
                   type="button"
-                  className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                   onClick={() => setStaffUnlocked((on) => !on)}
                   aria-pressed={staffUnlocked}
                 >
@@ -2737,7 +2754,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 {staffUnlocked && (
                   <button
                     type="button"
-                    className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                     onClick={() => void undoCrewSave()}
                     disabled={!staffCanUndo || savingSetup || staffDirty}
                     title={staffDirty ? 'Save or undo your unsaved edits first.' : staffCanUndo ? 'Bring back the crew as it was before the last save.' : 'No saved crew change to undo.'}
@@ -2764,19 +2781,19 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             {!scheduleOnly && (
             <>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-zinc-600">Mistake? Bring back the built-in demo list.</p>
+              <p className="text-xs text-zinc-600">Mistake? Go back to the starting staff list.</p>
               <button
                 type="button"
-                className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                 onClick={restoreDefaultRoster}
                 disabled={isDefaultRoster}
                 title={
                   isDefaultRoster
-                    ? 'Already using the built-in demo staff list.'
-                    : 'Replace the staff list with the built-in demo list. You can undo, then save to keep them.'
+                    ? 'Already using the starting staff list.'
+                    : 'Replace this week’s staff list with the starting list. You can undo, then save to keep it.'
                 }
               >
-                Restore default staff
+                Use starting staff list
               </button>
             </div>
 
@@ -2786,23 +2803,23 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 <span className="inline-flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                     onClick={clearStaff}
                   >
                     Yes, clear all
                   </button>
                   <button
                     type="button"
-                    className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                     onClick={() => setConfirmingClearStaff(false)}
                   >
-                    Keep
+                    Cancel
                   </button>
                 </span>
               ) : (
                 <button
                   type="button"
-                  className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                   onClick={() => setConfirmingClearStaff(true)}
                   disabled={employees.length === 0}
                   title="Remove everyone from the staff list. You can undo, then save to keep it."
@@ -2817,7 +2834,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 <p className="text-xs text-zinc-600">Keep a copy of a staff list on this device and bring it back anytime.</p>
                 <div className="mt-2 flex gap-2">
                   <input
-                    className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                     value={snapshotName}
                     onChange={(event) => setSnapshotName(event.target.value)}
                     placeholder={`Name this list (${employees.length} staff)`}
@@ -2825,7 +2842,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                   />
                   <button
                     type="button"
-                    className="shrink-0 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="shrink-0 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                     onClick={saveStaffSnapshot}
                     disabled={employees.length === 0}
                     title="Save a copy of the current staff list on this device."
@@ -2844,7 +2861,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                         <div className="flex shrink-0 gap-1.5">
                           <button
                             type="button"
-                            className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                            className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                             onClick={() => restoreStaffSnapshot(snapshot)}
                             title={`Replace the staff list with “${snapshot.name}”. You can undo.`}
                           >
@@ -2852,7 +2869,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                           </button>
                           <button
                             type="button"
-                            className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                            className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                             onClick={() => deleteStaffSnapshot(snapshot.id)}
                             title={`Delete “${snapshot.name}”.`}
                           >
@@ -2872,7 +2889,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               <label className="block text-sm font-medium text-zinc-800">
                 <span className="sr-only">Search staff</span>
                 <input
-                  className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                   value={staffQuery}
                   onChange={(event) => setStaffQuery(event.target.value)}
                   placeholder={employees.length > 8 ? `Search ${employees.length} staff by name or position` : 'Search by name or position'}
@@ -3196,7 +3213,7 @@ function EmployeeForm({
       <label className="block text-sm font-medium text-zinc-800">
         Employee name
         <input
-          className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           value={draft.name}
           onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
           placeholder="Name"
@@ -3224,7 +3241,7 @@ function EmployeeForm({
         </div>
         <div className="mt-2 flex gap-2">
           <input
-            className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             value={customRole}
             onChange={(event) => setCustomRole(event.target.value)}
             onKeyDown={(event) => {
@@ -3239,7 +3256,7 @@ function EmployeeForm({
           />
           <button
             type="button"
-            className="shrink-0 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="shrink-0 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             disabled={!normalizeRoleSlug(customRole)}
             onClick={() => {
               onAddCustomRole(customRole)
@@ -3278,7 +3295,7 @@ function EmployeeForm({
         <label className="text-sm font-medium text-zinc-800">
           Max days (1–7)
           <input
-            className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             min={1}
             max={7}
             type="number"
@@ -3307,7 +3324,7 @@ function EmployeeForm({
 
       <button
         type="button"
-        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
         disabled={!canAddEmployee}
         onClick={onAdd}
         title={saveHint ?? 'Save this person to the staff list.'}
@@ -3412,23 +3429,23 @@ function EmployeeCard({
           <span className="text-xs font-semibold text-red-900">Remove {employee.name} from the staff list?</span>
           <button
             type="button"
-            className="rounded bg-red-800 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="rounded bg-red-800 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             onClick={() => onRemove(employee.id)}
           >
             Yes, remove
           </button>
           <button
             type="button"
-            className="rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             onClick={() => setConfirmingRemove(false)}
           >
-            Keep them
+            Cancel
           </button>
         </div>
       ) : (
         <button
           type="button"
-          className="mt-2 text-xs font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="mt-2 text-xs font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={() => setConfirmingRemove(true)}
         >
           Remove from staff list
@@ -3471,7 +3488,7 @@ function EmployeeCard({
         <label className="text-sm text-zinc-700">
           Max days (1–7)
           <input
-            className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             min={1}
             max={7}
             type="number"
@@ -3501,7 +3518,7 @@ function EmployeeCard({
       <label className="mt-3 block text-sm text-zinc-700">
         Priority
         <select
-          className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           value={employee.priority ?? DEFAULT_PRIORITY}
           onChange={(event) => onUpdate(employee.id, { priority: Number(event.target.value) })}
         >
@@ -3520,7 +3537,7 @@ function EmployeeCard({
             From
             <input
               type="date"
-              className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
               value={employee.suspendedFrom ?? ''}
               onChange={(event) => {
                 const from = event.target.value || undefined
@@ -3533,7 +3550,7 @@ function EmployeeCard({
             Through
             <input
               type="date"
-              className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
               value={employee.suspendedUntil ?? ''}
               min={employee.suspendedFrom}
               disabled={!employee.suspendedFrom}
@@ -3544,7 +3561,7 @@ function EmployeeCard({
         {employee.suspendedFrom && (
           <button
             type="button"
-            className="mt-1 text-xs font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="mt-1 text-xs font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             onClick={() => onUpdate(employee.id, { suspendedFrom: undefined, suspendedUntil: undefined })}
           >
             Clear suspension
@@ -3602,7 +3619,7 @@ function ShiftRolesEditor({
   const [period, setPeriod] = useState<ShiftPeriod>('AM')
   const [role, setRole] = useState(employee.roles[0] ?? roles[0] ?? '')
   const selectClass =
-    'rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+    'rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
 
   function save(next: Employee['shiftRoles']) {
     onUpdate(employee.id, { shiftRoles: next && next.length > 0 ? next : undefined })
@@ -3622,7 +3639,7 @@ function ShiftRolesEditor({
               </span>
               <button
                 type="button"
-                className="font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                 onClick={() => save(shiftRoles.filter((candidate) => candidate !== shiftRole))}
                 aria-label={`Remove ${shiftRole.day} ${periodLabels[shiftRole.period]} rule`}
               >
@@ -3656,7 +3673,7 @@ function ShiftRolesEditor({
         </select>
         <button
           type="button"
-          className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           disabled={!role}
           onClick={() =>
             save([...shiftRoles.filter((candidate) => candidate.day !== day || candidate.period !== period), { day, period, role }])
@@ -3813,7 +3830,7 @@ function GuidedFixPanel({
                   <button
                     key={candidate.id}
                     type="button"
-                    className="inline-flex items-center gap-2 rounded border border-green-500 bg-green-50 px-3 py-2 text-sm font-semibold text-green-950 hover:bg-green-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="inline-flex items-center gap-2 rounded border border-green-500 bg-green-50 px-3 py-2 text-sm font-semibold text-green-950 hover:bg-green-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                     onClick={() => onPickEmployee(candidate.id)}
                   >
                     <Icon name="check" />
@@ -3924,7 +3941,7 @@ function MonthStrip({
               role="option"
               aria-selected={selected}
               className={`flex min-w-0 items-center gap-1.5 rounded border px-2 py-1.5 text-left ${
-                selected ? 'border-red-800 bg-red-50' : 'border-zinc-200 bg-white hover:bg-zinc-50'
+                selected ? 'border-zinc-900 bg-zinc-50 ring-1 ring-zinc-900' : 'border-zinc-200 bg-white hover:bg-zinc-50'
               } ${status === 'off' ? 'opacity-70' : ''}`}
             >
               <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onSelectWeek(week)} title={formatWeekRange(week)}>
@@ -3964,7 +3981,7 @@ function FlipSwitch({
       aria-label={label}
       title={label}
       onClick={onFlip}
-      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${
+      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 ${
         on ? 'bg-green-600' : 'bg-zinc-300'
       }`}
     >
@@ -4025,7 +4042,7 @@ function GenerationReportBanner({ report, onDismiss }: { report: GenerationRepor
       </p>
       <button
         type="button"
-        className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+        className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
         onClick={onDismiss}
       >
         Dismiss
@@ -4264,16 +4281,16 @@ function TemplateEditor({
         <div className="flex shrink-0 gap-2">
           <button
             type="button"
-            className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             onClick={onUseDefault}
             disabled={isDefaultTemplate}
             title={
               isDefaultTemplate
-                ? 'Already using the built-in default rules.'
-                : 'Replace these rules with the built-in defaults. You can undo, then save to keep them.'
+                ? 'Already using the starting rules.'
+                : 'Replace this week’s rules with the starting rules. You can undo, then save to keep them.'
             }
           >
-            Restore default rules
+            Use starting rules
           </button>
         </div>
       </div>
@@ -4302,7 +4319,7 @@ function TemplateEditor({
               <h4 className="text-sm font-semibold text-zinc-900">{day}</h4>
               <button
                 type="button"
-                className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                 onClick={() => addSlot(day)}
               >
                 + Add spot
@@ -4371,7 +4388,7 @@ function TemplateEditor({
                   </label>
                   <button
                     type="button"
-                    className="ml-auto rounded border border-red-300 bg-white px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="ml-auto rounded border border-red-300 bg-white px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                     onClick={() => removeSlot(day, index)}
                   >
                     Remove
@@ -4407,8 +4424,8 @@ function Button({
 }) {
   const className =
     tone === 'primary'
-      ? 'inline-flex items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
-      : 'inline-flex items-center justify-center gap-2 rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+      ? 'inline-flex items-center justify-center gap-2 rounded bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
+      : 'inline-flex items-center justify-center gap-2 rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
 
   return (
     <button type="button" className={className} onClick={onClick} disabled={disabled || loading} aria-busy={loading} title={title}>
@@ -4442,8 +4459,8 @@ function IconButton({
 }) {
   const className =
     tone === 'accent'
-      ? 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-red-200 bg-red-50 text-red-800 hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
-      : 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+      ? 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
+      : 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
 
   return (
     <button type="button" className={className} onClick={onClick} disabled={disabled} aria-label={label} title={label}>
@@ -4464,7 +4481,7 @@ function Disclosure({
   if (tone === 'quiet') {
     return (
       <details className="px-1">
-        <summary className="cursor-pointer py-1 text-sm text-zinc-500 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700">
+        <summary className="cursor-pointer py-1 text-sm text-zinc-500 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">
           {summary}
         </summary>
         <div className="py-2">{children}</div>
@@ -4474,7 +4491,7 @@ function Disclosure({
 
   return (
     <details className="rounded-lg border border-zinc-200 bg-white shadow-sm">
-      <summary className="cursor-pointer px-4 py-3 font-semibold text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700">
+      <summary className="cursor-pointer px-4 py-3 font-semibold text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">
         {summary}
       </summary>
       <div className="border-t border-zinc-100 px-4 py-3">{children}</div>
@@ -4759,7 +4776,7 @@ function ShiftRow({
       <div className="flex min-w-0 flex-col gap-1.5 px-2 py-2">
         <button
           type="button"
-          className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={() => onOpenShift(open ? null : shiftKey)}
           aria-expanded={open}
           aria-controls={`${shiftKey}-detail`}
@@ -4891,7 +4908,7 @@ function OpenShiftDetail({
       {shiftSlots.some((slot) => changedSlotIds.has(slot.id)) && (
         <button
           type="button"
-          className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={() => onResetShift(shiftKey)}
         >
           <Icon name="reset" />
@@ -5152,7 +5169,7 @@ function SlotEditor({
         </div>
       </div>
       <select
-        className="mt-3 w-full rounded border border-zinc-300 bg-white px-2 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+        className="mt-3 w-full rounded border border-zinc-300 bg-white px-2 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
         value={assignment?.employeeId ?? ''}
         onChange={(event) => onAssign(slot.id, event.target.value)}
       >
@@ -5243,7 +5260,7 @@ function assignmentChipClass({
   },
 ) {
   const base =
-    'flex min-h-11 w-full min-w-0 items-center gap-1.5 rounded border px-1.5 py-1.5 text-left transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700' +
+    'flex min-h-11 w-full min-w-0 items-center gap-1.5 rounded border px-1.5 py-1.5 text-left transition duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900' +
     (isHighlighted ? ' ring-2 ring-offset-1 ring-blue-500' : '')
 
   if (isSource) {
