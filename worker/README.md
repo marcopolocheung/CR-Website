@@ -149,7 +149,7 @@ Employee roster (public read, token-guarded write, same token as the golden sche
 Staffing template (public read, token-guarded write, same token as the golden schedule):
 
 - `GET /api/template` → `200 { template, rev, updatedAt }` (`template: null`, `rev: 0` if nothing saved yet — callers should fall back to their own default layout)
-- `PUT /api/template { template, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev, updatedAt }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`.
+- `PUT /api/template { template, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev, updatedAt }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`. Schedule-only stations (CR3 Kitchen) accept only per-week saves (`?weekStart=`, `403 station_locked` otherwise), authorized by the staff password or the manager token.
 
 Station crew (public read, password-guarded write, schedule-only stations only):
 
@@ -158,7 +158,7 @@ Station crew (public read, password-guarded write, schedule-only stations only):
 - `PUT /api/staff?restaurant=CR3-kitchen { employees, baseRev }` with `Authorization: Bearer <staff password>` → `200|201 { employees, rev, updatedAt, canUndo }`, `401 unauthorized`, `403 staff_editing_not_enabled`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`. Removing someone from `employees` and saving is a real, persisted delete.
 - `POST /api/staff/undo?restaurant=CR3-kitchen { baseRev }` with `Authorization: Bearer <staff password>` → `200 { employees, rev, updatedAt, canUndo }` restoring the crew replaced by the last save, `409 { error: "nothing_to_undo", rev }` when there is nothing left. The first save is undoable back to `employees: null` (the built-in crew).
 
-Crew writes accept the staff password **or** the manager token. The staff password unlocks nothing else — publishing still needs `SCHEDULE_WRITE_TOKEN`.
+Crew writes (and CR3 Kitchen per-week rule saves) accept the staff password **or** the manager token. The staff password unlocks nothing else — publishing still needs `SCHEDULE_WRITE_TOKEN`.
 
 ## Notes
 

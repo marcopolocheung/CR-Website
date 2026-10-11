@@ -904,10 +904,10 @@ function buildFixIssues(
 
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
   const restaurantName = restaurantId && isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
-  // Schedule-only stations (CR3 Kitchen) ship a built-in crew and fixed rules.
-  // The rules stay fixed, but the crew can be edited after unlocking with the
-  // staff password (`/api/staff`): one crew per station, shared by every week,
-  // with the last saved change undoable. Until unlocked the crew is read-only.
+  // Schedule-only stations (CR3 Kitchen) ship a built-in crew and default rules.
+  // Both unlock with the staff password: the crew (`/api/staff`) is one per
+  // station, shared by every week, with the last saved change undoable; the
+  // rules are per-week like other stations. Until unlocked both are read-only.
   const scheduleOnly = isScheduleOnlyRestaurant(restaurantId)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
@@ -947,7 +947,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     : weekStart
       ? rosters[weekStart] ?? defaultRoster
       : defaultRoster
-  const template = scheduleOnly ? defaultTemplate : weekStart ? (templates[weekStart] ?? defaultTemplate) : defaultTemplate
+  const template = weekStart ? (templates[weekStart] ?? defaultTemplate) : defaultTemplate
   const rosterRev = weekStart ? (rosterRevs[weekStart] ?? 0) : 0
   const rosterServerSnapshot = weekStart ? (rosterSnapshots[weekStart] ?? null) : null
   const rosterUpdatedAt = weekStart ? (rosterUpdatedAts[weekStart] ?? null) : null
@@ -1041,9 +1041,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [publishedWeeks, setPublishedWeeks] = useState<Record<string, GoldenWeekDoc | null>>({})
   const [hydratedWeeks, setHydratedWeeks] = useState<Record<string, boolean>>({})
   const [templatePanelOpen, setTemplatePanelOpen] = useState(false)
-  const templateDirty = scheduleOnly
-    ? false
-    : !templateLoaded
+  const templateDirty = !templateLoaded
       ? false
       : templateServerSnapshot === null
         ? templateFingerprint(template) !== templateFingerprint(defaultTemplateForRestaurant(restaurantId))
@@ -1361,10 +1359,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   useEffect(() => {
     if (!weekStart || !defaultTemplateLoaded || templateLoadedWeeks[weekStart]) return
     let cancelled = false
-    if (scheduleOnly) {
-      setTemplateLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
-      return
-    }
     fetchTemplate(restaurantId, weekStart)
       .then((doc) => {
         if (cancelled) return
@@ -1396,7 +1390,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [weekStart, restaurantId, defaultTemplateLoaded, defaultTemplate, templateLoadedWeeks, scheduleOnly])
+  }, [weekStart, restaurantId, defaultTemplateLoaded, defaultTemplate, templateLoadedWeeks])
 
   useEffect(() => {
     if (!weekStart) return
@@ -1551,14 +1545,14 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       if (priorRoster) {
         setRosters((current) => ({ ...current, [weekStart]: cloneEmployeeList(priorRoster) }))
       }
-      const priorTemplate = templates[prior]
-      if (priorTemplate) {
-        setTemplates((current) => ({ ...current, [weekStart]: cloneTemplate(priorTemplate) }))
-      }
+    }
+    const priorTemplate = templates[prior]
+    if (priorTemplate) {
+      setTemplates((current) => ({ ...current, [weekStart]: cloneTemplate(priorTemplate) }))
     }
     setDiagnostics([
       scheduleOnly
-        ? 'Prior week copied here — schedule only. The saved crew and rules stay as they are. Publish when it looks right.'
+        ? 'Prior week copied here — schedule and rules. The saved crew stays as it is. Publish when it looks right.'
         : 'Prior week copied here — schedule, staff list, and rules. Review it, then publish when it looks right.',
     ])
   }
@@ -1588,8 +1582,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       setStaffDraft(cloneEmployeeList(snapshot.employees))
     } else if (target) {
       setRosters((current) => ({ ...current, [target]: cloneEmployeeList(snapshot.employees) }))
-      setTemplates((current) => ({ ...current, [target]: cloneTemplate(snapshot.template) }))
     }
+    if (target) setTemplates((current) => ({ ...current, [target]: cloneTemplate(snapshot.template) }))
     setWeeks(cloneWeeks(snapshot.weeks))
     setGeneratedWeeks(cloneWeeks(snapshot.generatedWeeks))
     setWeekStatus({ ...snapshot.weekStatus })
@@ -2430,7 +2424,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             <TemplateEditor
               template={template}
               roles={availableRoles}
-              readOnly={scheduleOnly}
+              readOnly={scheduleOnly && !staffUnlocked}
               onChange={(next) => {
                 remember('changed schedule rules')
                 setTemplate(next)
@@ -3957,9 +3951,10 @@ function TemplateEditor({
 }) {
   if (readOnly) {
     return (
-      <Disclosure summary="Schedule rules (fixed)" tone="quiet">
+      <Disclosure summary="Schedule rules (locked)" tone="quiet">
         <p className="text-sm text-zinc-600">
-          The spots below are fixed for this station. You build the week by putting the crew into them and moving people around.
+          The spots below are locked for this station — unlock with the staff password to change this week’s rules. You build
+          the week by putting the crew into them and moving people around.
         </p>
         <div className="mt-3 space-y-3">
           {DAYS.map((day) => (

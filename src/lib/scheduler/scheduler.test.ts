@@ -528,6 +528,7 @@ test('CR03 built-in crew covers every required kitchen slot', () => {
   // Every required spot is filled, lunch + dinner cook each day, no Sunday late prep.
   assert.ok(slots.every((slot) => bySlot.get(slot.id)))
   assert.equal(slots.filter((slot) => slot.role === 'cook').length, 14)
+  assert.equal(slots.filter((slot) => slot.label === 'Line Cook (AM)' && slot.period === 'AM').length, 7)
   assert.equal(slots.filter((slot) => slot.period === 'PM' && slot.required).length, 28)
   assert.equal(slots.filter((slot) => slot.day === 'Sunday' && slot.label === 'M/V Prep (late)').length, 0)
 })

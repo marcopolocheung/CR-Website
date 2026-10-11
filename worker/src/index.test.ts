@@ -737,7 +737,7 @@ test('templates are isolated per week and fall back to the global seed', async (
   assert.equal(bad.status, 400)
 })
 
-test('schedule-only stations refuse roster and template writes', async () => {
+test('schedule-only stations refuse roster and global template writes', async () => {
   const env = mockEnv()
   const lockedRoster = await handler.fetch(
     new Request('https://api.test/api/employees?restaurant=CR3-kitchen', {
@@ -760,6 +760,16 @@ test('schedule-only stations refuse roster and template writes', async () => {
   )
   assert.equal(lockedTemplate.status, 403)
   assert.deepEqual(await lockedTemplate.json(), { error: 'station_locked' })
+
+  // Per-week rules unlock with the staff password; a wrong password is refused.
+  const weekTemplate = (password: string) =>
+    new Request('https://api.test/api/template?restaurant=CR3-kitchen&weekStart=2026-09-13', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${password}` },
+      body: JSON.stringify({ template: templatePayload(), baseRev: 0 }),
+    })
+  assert.equal((await handler.fetch(weekTemplate('nope'), env)).status, 401)
+  assert.equal((await handler.fetch(weekTemplate('test'), env)).status, 201)
 
   // An unlocked station still accepts the same writes.
   const openRoster = await handler.fetch(
