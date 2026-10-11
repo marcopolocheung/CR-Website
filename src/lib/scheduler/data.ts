@@ -41,8 +41,8 @@ export const schedulerAssumptions = [
   'The Sunday noon third-person and Thursday/Friday noon fourth-person notes are listed as unresolved ambiguities instead of encoded as separate slots.',
   'Desiree, Shorty, and Dolores have no confirmed weekly limits in the source text, so the demo config uses seven max days and makes that editable.',
   'Kitchen pages (CR02/CR03) use kitchen posts only — no dining-room posts. Managers can add custom posts from the UI.',
-  'CR03 Kitchen rules are fixed in code from the CR03_K rules sheet. Its crew starts from the sheet (with later hires) and can be edited — roles, availability, add and remove — only after unlocking staff editing with the staff password. Saved crew changes apply to every week and the last save can be undone.',
-  'CR03 runs the sheet’s two shifts: a lunch (AM) crew of Cook + M/V Prep (early/late) and a dinner (PM) crew of Cook + Line Cook + F.R. Cook + Dishwasher. Evening-only staff are scheduled into the Dinner column. Shadow, Meat Prep, and the extra lunch F.R. Cook / Dishwasher spots ship as optional cover.',
+  'CR03 Kitchen rules start from the CR03_K rules sheet; each week’s rules can be changed after unlocking with the staff password. Its crew starts from the sheet (with later hires) and can be edited — roles, availability, add and remove — only after unlocking staff editing with the staff password. Saved crew changes apply to every week and the last save can be undone.',
+  'CR03 runs the sheet’s two shifts: a lunch (AM) crew of Cook + Line Cook + M/V Prep (early/late) and a dinner (PM) crew of Cook + Line Cook + F.R. Cook + Dishwasher. Evening-only staff are scheduled into the Dinner column. Shadow, Meat Prep, and the extra lunch F.R. Cook / Dishwasher spots ship as optional cover.',
   'CR03 lunch spots use the sheet’s AM window (10:15am-4pm Sunday, 9am-4pm otherwise) so both 9am-start and 10:15am-start workers fit; dinner spots use 4-11pm, except Dishwasher which starts at 5pm so the 5pm-start staff (Jayden, Cris) can take it.',
   'CR03 optional spots are filled automatically when a valid candidate exists (e.g. Stef on Shadow, Cris on Meat Prep when he is not on Dishwasher). Unfilled optional spots show as open and never block the week.',
   'A Meat / Veggie Prep qualification also covers Meat Prep, but not the other way around — a meat-prep-only worker (Cris) cannot cover M/V Prep.',
@@ -531,7 +531,7 @@ const CR03_EARLY_MV: Record<DayOfWeek, { start: number; end: number }> = {
 
 /**
  * CR03 Kitchen rules. The sheet runs a lunch (AM) and a dinner (PM) shift, so
- * the board does too: the lunch crew is Cook + M/V Prep (early/late) and the
+ * the board does too: the lunch crew is Cook + Line Cook + M/V Prep (early/late) and the
  * dinner crew is Cook + Line Cook + F.R. Cook + Dishwasher. Evening-only staff
  * therefore land in the Dinner column instead of Morning. Shadow, Meat Prep,
  * and the extra lunch spots ship as optional cover for the rest of the crew.
@@ -544,6 +544,7 @@ export const seedKitchenTemplateCR03: WeeklyStaffingTemplate = Object.fromEntrie
       sunday
         ? kitchenSlot('cook', 'Cook (AM)', minutes(10, 15), minutes(16))
         : kitchenSlot('cook', 'Cook (AM)', minutes(9), minutes(16)),
+      kitchenSlot('line-cook', 'Line Cook (AM)', sunday ? minutes(10, 15) : minutes(9), minutes(16)),
       kitchenSlot('mv-prep', 'M/V Prep (early)', CR03_EARLY_MV[day].start, CR03_EARLY_MV[day].end),
     ]
     if (!sunday) {

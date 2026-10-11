@@ -110,8 +110,8 @@ export default function StaffPanel({
       <div className="mt-3 rounded border border-zinc-200 bg-zinc-50 p-3">
         <h3 className="text-sm font-semibold text-zinc-900">Edit this crew</h3>
         <p className="mt-0.5 text-xs text-zinc-600">
-          The crew, roles, and availability are locked. Enter the staff password to edit them. Saved changes apply to
-          every week and can be undone.
+          The crew, roles, availability, and this week’s schedule rules are locked. Enter the staff password to edit them.
+          Crew changes apply to every week and can be undone.
         </p>
         <form
           className="mt-2 flex gap-2"

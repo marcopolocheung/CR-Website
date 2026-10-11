@@ -63,11 +63,11 @@ export type RestaurantId = (typeof RESTAURANTS)[number]
 export const DEFAULT_RESTAURANT: RestaurantId = 'CR3-diningroom'
 
 /**
- * Stations whose shift rules are fixed in code. The per-week roster and
- * template PUTs are refused here so a schedule-only user cannot change the
- * rules (or fork the crew week to week) by calling the API directly. The crew
- * is editable through the password-gated `/api/staff` route instead, and the
- * schedule itself stays writable.
+ * Stations whose default shift rules are fixed in code. Roster PUTs and the
+ * global template PUT are refused here so nobody can fork the crew week to week
+ * or replace the built-in rules. The crew is editable through the
+ * password-gated `/api/staff` route, per-week rules accept the same staff
+ * password, and the schedule itself stays writable.
  */
 export const SCHEDULE_ONLY_RESTAURANTS: readonly RestaurantId[] = ['CR3-kitchen']
 
@@ -840,7 +840,7 @@ function staffPassword(env: Env): string {
   return env.STAFF_EDIT_PASSWORD || DEFAULT_STAFF_EDIT_PASSWORD
 }
 
-/** Crew edits accept the staff password or the manager token. The password unlocks nothing else. */
+/** Crew and schedule-only per-week rule edits accept the staff password or the manager token. */
 export function isStaffEditAuthorized(request: Request, env: Env): boolean {
   if (request.headers.get('Authorization') === `Bearer ${staffPassword(env)}`) return true
   return isGoldenWriteAuthorized(request, env)
@@ -1445,9 +1445,14 @@ export default {
       }
 
       if (request.method === 'PUT') {
-        if (goldenWriteError(env)) return json({ error: 'write_not_configured' }, 503, request, env)
-        if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
-        if (isScheduleOnlyRestaurant(restaurant)) return json({ error: 'station_locked' }, 403, request, env)
+        // Schedule-only stations: per-week rules unlock with the staff password; the global seed stays fixed in code.
+        if (isScheduleOnlyRestaurant(restaurant)) {
+          if (!weekStart) return json({ error: 'station_locked' }, 403, request, env)
+          if (!isStaffEditAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
+        } else {
+          if (goldenWriteError(env)) return json({ error: 'write_not_configured' }, 503, request, env)
+          if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
+        }
         if (!(await checkWriteThrottle(env, clientIp(request)))) {
           return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
         }

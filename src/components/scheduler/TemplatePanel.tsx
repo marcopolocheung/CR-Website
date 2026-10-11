@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { saveTemplate } from '@/lib/template-store'
 import { StoreAuthError, StoreConflictError, StoreUnavailableError } from '@/lib/schedule-store'
 import type { WeeklyStaffingTemplate } from '@/lib/scheduler'
+import { isScheduleOnlyRestaurant } from '@/data/restaurants'
 
 export default function TemplatePanel({
   template,
@@ -82,7 +83,7 @@ export default function TemplatePanel({
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => setToken(event.target.value)}
-          placeholder="Manager write token"
+          placeholder={isScheduleOnlyRestaurant(restaurantId) ? 'Staff password' : 'Manager write token'}
         />
         <button
           type="button"
