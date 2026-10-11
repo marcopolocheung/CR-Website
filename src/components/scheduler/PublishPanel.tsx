@@ -1,21 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { buildPublishedWeek, publishedWeekFingerprint, templateHashForSlots } from '@/lib/schedule-share'
-import { saveRoster } from '@/lib/employee-store'
-import { saveTemplate } from '@/lib/template-store'
 import {
-  StoreAuthError,
   StoreConflictError,
-  StoreNotFoundError,
-  StoreRejectedError,
-  StoreUnavailableError,
   fetchGoldenWeek,
+  saveErrorMessage,
   saveGoldenWeek,
   type GoldenWeekDoc,
 } from '@/lib/schedule-store'
-import type { Employee, ScheduleAssignment, StaffingSlot, WeekStatus, WeeklyStaffingTemplate } from '@/lib/scheduler'
+import type { Employee, ScheduleAssignment, StaffingSlot, WeekStatus } from '@/lib/scheduler'
 import { formatUpdatedAt } from '@/lib/scheduler/time'
+import { useManagerCode } from './DemoGate'
 
 const scheduleChannelName = 'chinarose-schedule'
 
@@ -40,13 +36,8 @@ export default function PublishPanel({
   onClose,
   restaurantId,
   restaurantName,
-  template,
-  rosterRev,
-  templateRev,
-  rosterDirty,
-  templateDirty,
-  onRosterSaved,
-  onTemplateSaved,
+  unsavedSetup,
+  onSaveSetup,
   onPublished,
 }: {
   weekStart: string
@@ -58,20 +49,15 @@ export default function PublishPanel({
   onVisibilityChange: (status: WeekStatus) => void
   onClose: () => void
   restaurantId?: string
-  template?: WeeklyStaffingTemplate
-  rosterRev?: number
-  templateRev?: number
-  rosterDirty?: boolean
-  templateDirty?: boolean
-  onRosterSaved?: (rev: number, updatedAt: string | null) => void
-  onTemplateSaved?: (rev: number, updatedAt: string | null) => void
   restaurantName?: string
-  onPublished?: (doc: GoldenWeekDoc) => void
+  /** Unsaved parts of this week's setup, e.g. ['staff list', 'shift rules']. They save first. */
+  unsavedSetup: string[]
+  /** Saves the setup with the manager code; false when it failed (it shows its own error). */
+  onSaveSetup: () => Promise<boolean>
+  onPublished: (doc: GoldenWeekDoc) => void
 }) {
+  const managerCode = useManagerCode()
   const [name, setName] = useState(`Week of ${weekLabel}`)
-  const [token, setToken] = useState('')
-  const [showToken, setShowToken] = useState(false)
-  const tokenInputRef = useRef<HTMLInputElement>(null)
   const [baseRev, setBaseRev] = useState<number | null>(null)
   const [serverFingerprint, setServerFingerprint] = useState<string | null>(null)
   const [serverVisible, setServerVisible] = useState<boolean | null>(null)
@@ -94,9 +80,10 @@ export default function PublishPanel({
     () => buildPublishedWeek({ weekStart, name, slots, employees, assignments }),
     [weekStart, name, slots, employees, assignments],
   )
-  const fingerprint = publishedWeekFingerprint({ weekStart, people: week.people, slotPeople: week.slotPeople })
+  const fingerprint = publishedWeekFingerprint(week)
   const dirty =
-    serverFingerprint === null ? filled > 0 : serverFingerprint !== fingerprint || serverVisible !== visible
+    unsavedSetup.length > 0 ||
+    (serverFingerprint === null ? filled > 0 : serverFingerprint !== fingerprint || serverVisible !== visible)
 
   useEffect(() => {
     setName(`Week of ${weekLabel}`)
@@ -106,8 +93,6 @@ export default function PublishPanel({
     setServerUpdatedAt(null)
     setError('')
     setNotice('')
-    setToken('')
-    tokenInputRef.current?.focus()
     let cancelled = false
     setLoading(true)
     fetchGoldenWeek(weekStart, restaurantId)
@@ -121,7 +106,7 @@ export default function PublishPanel({
       })
       .catch(() => {
         if (!cancelled) {
-          setError('Could not reach the schedule store. You can still edit — saving will retry the connection.')
+          setError('Could not reach the schedule store. You can still edit — publishing will retry the connection.')
         }
       })
       .finally(() => {
@@ -132,93 +117,32 @@ export default function PublishPanel({
     }
   }, [weekStart, weekLabel, restaurantId])
 
-  const willSaveRoster = Boolean(rosterDirty && onRosterSaved && rosterRev !== undefined)
-  // A week with no rules of its own (rev 0) saves them too: /schedule checks each week against its own saved layout.
-  const willSaveTemplate = Boolean((templateDirty || templateRev === 0) && template && onTemplateSaved && templateRev !== undefined)
-
-  async function save() {
-    if (filled === 0 || !token || busy) return
+  async function publish() {
+    if (filled === 0 || busy) return
     setBusy(true)
     setError('')
     setNotice('')
     try {
-      if (willSaveRoster) {
-        try {
-          const rosterResult = await saveRoster(employees, rosterRev ?? 0, token, restaurantId, weekStart)
-          onRosterSaved?.(rosterResult.rev, rosterResult.updatedAt)
-        } catch (caught) {
-          if (caught instanceof StoreConflictError) {
-            setError('The staff list changed on the server. Reload the page to see it, then publish again.')
-          } else if (caught instanceof StoreAuthError) {
-            setError('That token was not accepted. Check for typos and try again, or ask whoever runs the Worker for the current one.')
-          } else if (caught instanceof StoreRejectedError) {
-            setError(caught.message)
-          } else if (caught instanceof StoreUnavailableError) {
-            setError(`${caught.message} Your edits are safe on this screen — try again in a moment.`)
-          } else {
-            setError('Something went wrong saving the staff list.')
-          }
-          return
-        }
-      }
-      if (willSaveTemplate && template) {
-        try {
-          const templateResult = await saveTemplate(template, templateRev ?? 0, token, restaurantId, weekStart)
-          onTemplateSaved?.(templateResult.rev, templateResult.updatedAt)
-        } catch (caught) {
-          if (caught instanceof StoreConflictError) {
-            setError('The schedule rules changed on the server. Reload the page to see them, then publish again.')
-          } else if (caught instanceof StoreAuthError) {
-            setError('That token was not accepted. Check for typos and try again, or ask whoever runs the Worker for the current one.')
-          } else if (caught instanceof StoreRejectedError) {
-            setError(caught.message)
-          } else if (caught instanceof StoreUnavailableError) {
-            setError(`${caught.message} Your edits are safe on this screen — try again in a moment.`)
-          } else {
-            setError('Something went wrong saving the schedule rules.')
-          }
-          return
-        }
-      }
+      if (!(await onSaveSetup())) return
       const templateHash = templateHashForSlots(slots)
-      const result = await saveGoldenWeek(weekStart, { week, templateHash, visible, baseRev: baseRev ?? 0 }, token, restaurantId)
-      onPublished?.({ v: 3, weekStart, rev: result.rev, week, visible, templateHash, updatedAt: result.updatedAt ?? new Date().toISOString() })
+      const result = await saveGoldenWeek(weekStart, { week, templateHash, visible, baseRev: baseRev ?? 0 }, managerCode, restaurantId)
+      onPublished({ v: 3, weekStart, rev: result.rev, week, visible, templateHash, updatedAt: result.updatedAt ?? new Date().toISOString() })
       setBaseRev(result.rev)
       setServerFingerprint(fingerprint)
       setServerVisible(visible)
       setServerUpdatedAt(result.updatedAt)
       broadcastSave(weekStart, restaurantId)
-      setToken('')
-      const savedExtras = [willSaveRoster && 'staff list', willSaveTemplate && 'rules'].filter(Boolean).join(' and ')
-      setNotice(
-        visible
-          ? savedExtras
-            ? `Saved ${savedExtras} and week. Staff now see this week on /schedule.`
-            : 'Saved. Staff now see this week on /schedule.'
-          : savedExtras
-            ? `Saved ${savedExtras} and week. This week stays hidden from staff until you turn it on.`
-            : 'Saved. This week stays hidden from staff until you turn it on.',
-      )
+      setNotice(visible ? 'Published. Staff now see this week.' : 'Saved. This week stays hidden from staff until you turn it on.')
     } catch (caught) {
-      if (caught instanceof StoreAuthError) {
-        setError('That token was not accepted. Check for typos and try again, or ask whoever runs the Worker for the current one.')
-      } else if (caught instanceof StoreConflictError) {
+      if (caught instanceof StoreConflictError) {
         setBaseRev(caught.rev)
         setError(
           caught.rev === 0
-            ? 'This week is not on the server yet. Press Save again to create it.'
-            : 'Someone else saved this week first. Press Save again to overwrite with your copy.',
-        )
-      } else if (caught instanceof StoreRejectedError) {
-        setError(caught.message)
-      } else if (caught instanceof StoreUnavailableError) {
-        setError(`${caught.message} Your edits are safe on this screen — try again in a moment.`)
-      } else if (caught instanceof StoreNotFoundError) {
-        setError(
-          'The schedule store did not recognize that week. The Worker is probably still running the old version — redeploy worker/dashboard.js.',
+            ? 'This week is not on the server yet. Press Publish again to create it.'
+            : 'Someone else published this week first. Press Publish again to replace it with your copy.',
         )
       } else {
-        setError('Something went wrong saving.')
+        setError(saveErrorMessage(caught, 'week'))
       }
     } finally {
       setBusy(false)
@@ -233,9 +157,7 @@ export default function PublishPanel({
           <p className="mt-1 text-sm text-zinc-600">
             {filled} filled spot{filled === 1 ? '' : 's'} will be included. One schedule, no links or codes.
             Last published: {baseRev === null ? 'never' : formatUpdatedAt(serverUpdatedAt)}.
-            {(willSaveRoster || willSaveTemplate) && (
-              <> Your unsaved {[willSaveRoster && 'staff list', willSaveTemplate && 'rules'].filter(Boolean).join(' and ')} will save first with the same token, so a reload brings back exactly this setup.</>
-            )}
+            {unsavedSetup.length > 0 && <> Your unsaved {unsavedSetup.join(' and ')} will save first.</>}
           </p>
         </div>
         <button
@@ -293,49 +215,21 @@ export default function PublishPanel({
         </div>
       </div>
 
-      <div className="mt-3">
-        <label className="text-sm font-medium text-zinc-800" htmlFor="publish-token">
-          Manager write token
-        </label>
-        <div className="mt-1 flex gap-2">
-          <input
-            id="publish-token"
-            ref={tokenInputRef}
-            className="min-w-0 flex-1 rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            value={token}
-            type={showToken ? 'text' : 'password'}
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => setToken(event.target.value)}
-            placeholder="Type the token to save"
-          />
-          <button
-            type="button"
-            className="shrink-0 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            onClick={() => setShowToken((show) => !show)}
-            aria-pressed={showToken}
-          >
-            {showToken ? 'Hide' : 'Show'}
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-zinc-500">Not saved anywhere — you'll type it again next time too. Ask whoever runs the Worker for it.</p>
-      </div>
-
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
           className="inline-flex items-center justify-center gap-2 rounded bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-          onClick={save}
-          disabled={busy || loading || !token || !dirty || filled === 0}
+          onClick={publish}
+          disabled={busy || loading || !dirty || filled === 0}
         >
-          {busy ? 'Saving...' : baseRev === null ? 'Save to /schedule' : 'Save updates to /schedule'}
+          {busy ? 'Publishing…' : baseRev === null ? 'Publish' : 'Publish updates'}
         </button>
         {!dirty && baseRev !== null && <span className="text-sm text-green-800">/schedule is up to date.</span>}
         {dirty && baseRev !== null && (
           <span className="text-sm font-medium text-amber-800">You have changes staff cannot see yet.</span>
         )}
         {baseRev === null && !loading && (
-          <span className="text-sm text-zinc-600">Not on the server yet — saving creates it.</span>
+          <span className="text-sm text-zinc-600">Not on the server yet — publishing creates it.</span>
         )}
       </div>
       {filled === 0 && <p className="mt-2 text-sm text-zinc-600">Make a schedule for this week first.</p>}

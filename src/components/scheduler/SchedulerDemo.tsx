@@ -55,16 +55,14 @@ import {
   formatUpdatedAt,
   getEmployeeAvailability,
 } from '@/lib/scheduler'
-import { fetchRoster, rosterFingerprint } from '@/lib/employee-store'
-import { fetchStaff, staffFingerprint, type StaffWriteResult } from '@/lib/staff-store'
-import { fetchTemplate, templateFingerprint } from '@/lib/template-store'
-import { fetchGoldenMonth, fetchGoldenWeek, type GoldenWeekDoc } from '@/lib/schedule-store'
+import { fetchRoster, rosterFingerprint, saveRoster } from '@/lib/employee-store'
+import { fetchStaff, saveStaff, staffFingerprint, undoStaff, type StaffWriteResult } from '@/lib/staff-store'
+import { fetchTemplate, saveTemplate, templateFingerprint } from '@/lib/template-store'
+import { fetchGoldenMonth, fetchGoldenWeek, saveErrorMessage, type GoldenWeekDoc } from '@/lib/schedule-store'
 import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForWeek, publishedWeekFingerprint, templateHashForSlots } from '@/lib/schedule-share'
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
+import { useManagerCode } from './DemoGate'
 import PublishPanel from './PublishPanel'
-import RosterPanel from './RosterPanel'
-import StaffPanel from './StaffPanel'
-import TemplatePanel from './TemplatePanel'
 
 type EmployeeDraft = {
   name: string
@@ -919,9 +917,9 @@ function buildFixIssues(
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
   const restaurantName = restaurantId && isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
   // Schedule-only stations (CR3 Kitchen) ship a built-in crew and default rules.
-  // Both unlock with the staff password: the crew (`/api/staff`) is one per
-  // station, shared by every week, with the last saved change undoable; the
-  // rules are per-week like other stations. Until unlocked both are read-only.
+  // The crew (`/api/staff`) is one per station, shared by every week, with the
+  // last saved change undoable; the rules are per-week like other stations.
+  // Both stay read-only until "Edit crew & rules" is on, so nobody edits by accident.
   const scheduleOnly = isScheduleOnlyRestaurant(restaurantId)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
@@ -1034,7 +1032,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [confirmingClearStaff, setConfirmingClearStaff] = useState(false)
   const [staffSnapshots, setStaffSnapshots] = useState<StaffSnapshot[]>([])
   const [snapshotName, setSnapshotName] = useState('')
-  const [rosterPanelOpen, setRosterPanelOpen] = useState(false)
   // Before the first server response arrives the editor only holds the built-in
   // seeds. Treat dirty as false until loaded so Publish never tries to save
   // seeds over live data with a stale rev.
@@ -1059,7 +1056,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [layoutMismatchWeeks, setLayoutMismatchWeeks] = useState<Record<string, boolean>>({})
   const [liveMonthWeeks, setLiveMonthWeeks] = useState<Record<string, boolean>>({})
   const [copyingPrior, setCopyingPrior] = useState(false)
-  const [templatePanelOpen, setTemplatePanelOpen] = useState(false)
+  const managerCode = useManagerCode()
+  const [savingSetup, setSavingSetup] = useState(false)
+  const [setupError, setSetupError] = useState('')
+  const [setupNotice, setSetupNotice] = useState('')
   const templateDirty = !templateLoaded
       ? false
       : templateServerSnapshot === null
@@ -2126,18 +2126,65 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setStaffUpdatedAt(result.updatedAt)
   }
 
-  function handleStaffSaved(result: StaffWriteResult) {
-    applyStaffResult(result)
-    setIgnoredIssueIds([])
-    setGuidedChoosing(false)
-    setDiagnostics(['Crew saved. It now applies to every week — make the schedule again to use it.'])
+  const setupParts = [
+    rosterDirty && 'staff list',
+    staffDirty && 'crew',
+    templateDirty && 'shift rules',
+  ].filter((part): part is string => Boolean(part))
+
+  /**
+   * Saves every unsaved part of this week's setup — staff list (or crew) and shift rules — with the
+   * manager code. Publish runs this first so a reload brings back exactly what staff were sent.
+   * `alsoRules` saves rules that were never saved for this week, so /schedule can read the week.
+   * Returns false and shows why when anything fails; parts saved before the failure stay saved.
+   */
+  async function saveSetup({ alsoRules = false } = {}): Promise<boolean> {
+    if (!weekStart || storeLoading) return false
+    setSetupError('')
+    setSetupNotice('')
+    const target = weekStart
+    let what = 'staff list'
+    try {
+      if (rosterDirty) {
+        const result = await saveRoster(employees, rosterRev, managerCode, restaurantId, target)
+        setRosterSaved(target, result.rev, result.updatedAt, rosterFingerprint(employees))
+      }
+      if (staffDirty && staffDraft) {
+        what = 'crew'
+        applyStaffResult(await saveStaff(staffDraft, staffRev, managerCode, restaurantId))
+      }
+      if ((templateDirty || (alsoRules && templateRev === 0)) && ruleProblems.length === 0) {
+        what = 'shift rules'
+        const result = await saveTemplate(template, templateRev, managerCode, restaurantId, target)
+        setTemplateSaved(target, result.rev, result.updatedAt, templateFingerprint(template))
+      }
+      return true
+    } catch (caught) {
+      setSetupError(saveErrorMessage(caught, what))
+      return false
+    }
   }
 
-  function handleStaffUndone(result: StaffWriteResult) {
-    applyStaffResult(result)
-    setIgnoredIssueIds([])
-    setGuidedChoosing(false)
-    setDiagnostics(['Undid the last saved crew change.'])
+  async function saveSetupNow() {
+    if (savingSetup || setupParts.length === 0) return
+    setSavingSetup(true)
+    const saved = await saveSetup()
+    setSavingSetup(false)
+    if (saved) setSetupNotice(`Saved the ${setupParts.join(' and ')}.`)
+  }
+
+  async function undoCrewSave() {
+    if (savingSetup || !staffCanUndo) return
+    setSavingSetup(true)
+    setSetupError('')
+    try {
+      applyStaffResult(await undoStaff(staffRev, managerCode, restaurantId))
+      setSetupNotice('Undid the last saved crew change.')
+    } catch (caught) {
+      setSetupError(saveErrorMessage(caught, 'crew'))
+    } finally {
+      setSavingSetup(false)
+    }
   }
 
   return (
@@ -2357,17 +2404,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               onClose={() => setSharing(false)}
               restaurantId={restaurantId}
               restaurantName={restaurantName ?? undefined}
-              template={template}
-              rosterRev={rosterRev}
-              templateRev={templateRev}
-              rosterDirty={rosterDirty}
-              templateDirty={templateDirty}
-              onRosterSaved={(rev, updatedAt) => {
-                setRosterSaved(weekStart, rev, updatedAt, rosterFingerprint(employees))
-              }}
-              onTemplateSaved={(rev, updatedAt) => {
-                setTemplateSaved(weekStart, rev, updatedAt, templateFingerprint(template))
-              }}
+              unsavedSetup={setupParts}
+              onSaveSetup={() => saveSetup({ alsoRules: true })}
               onPublished={(doc) => {
                 setPublishedWeeks((current) => ({ ...current, [weekStart]: doc }))
                 setPublishedBaselines((current) => ({ ...current, [weekStart]: assignmentFingerprint(assignments) }))
@@ -2375,6 +2413,39 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 setLayoutMismatchWeeks((current) => ({ ...current, [weekStart]: false }))
               }}
             />
+          )}
+
+          {(setupParts.length > 0 || setupError || setupNotice) && (
+            <section
+              className={`flex flex-col gap-2 rounded-lg border p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between print:hidden ${
+                setupError ? 'border-red-300 bg-red-50' : setupParts.length > 0 ? 'border-amber-400 bg-amber-50' : 'border-green-300 bg-green-50'
+              }`}
+              role="status"
+            >
+              <p className="text-sm text-zinc-900">
+                {setupError ? (
+                  <span className="font-medium text-red-900">{setupError}</span>
+                ) : setupParts.length > 0 ? (
+                  <>
+                    <span className="font-semibold">Unsaved {setupParts.join(' and ')}.</span> They reset if you leave. Publishing also saves them.
+                  </>
+                ) : (
+                  <span className="font-medium text-green-900">{setupNotice}</span>
+                )}
+              </p>
+              {setupParts.length > 0 && (
+                <Button
+                  tone="primary"
+                  onClick={() => void saveSetupNow()}
+                  icon="check"
+                  loading={savingSetup}
+                  disabled={storeLoading || ruleProblems.length > 0}
+                  title={ruleProblems.length > 0 ? 'Fix the shift rules marked in red first.' : undefined}
+                >
+                  Save changes
+                </Button>
+              )}
+            </section>
           )}
 
           {diagnostics.length > 0 && (
@@ -2612,19 +2683,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               }}
               onUseDefault={restoreDefaultTemplate}
               isDefaultTemplate={isDefaultTemplate}
-              rev={templateRev}
               dirty={templateDirty}
               loadError={templateLoadError}
-              loadPending={storeLoading}
-              panelOpen={templatePanelOpen}
-              onTogglePanel={() => setTemplatePanelOpen((open) => !open)}
-              onSaved={(rev, updatedAt) => {
-                if (weekStart) setTemplateSaved(weekStart, rev, updatedAt, templateFingerprint(template))
-              }}
-              onClosePanel={() => setTemplatePanelOpen(false)}
               restaurantId={restaurantId}
               updatedAt={templateUpdatedAt}
-              weekStart={weekStart}
             />
           )}
 
@@ -2638,22 +2700,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 </p>
                 <p className="mt-0.5 text-xs text-zinc-500">
                   {scheduleOnly
-                    ? staffUnlocked
-                      ? `Editable crew for this station — saves apply to every week${staffDirty ? ' · unsaved changes' : ''}`
-                      : 'Crew for this station. Roles, availability, and the people on it are locked — unlock with the staff password to edit.'
+                    ? `One crew for every week. Last saved: ${formatUpdatedAt(staffUpdatedAt)}${staffDirty ? ' · unsaved changes' : ''}`
                     : `Last saved: ${formatUpdatedAt(rosterUpdatedAt)}${rosterDirty ? ' · unsaved changes' : ''} · changes stay in this week only`}
                 </p>
               </div>
               {(!scheduleOnly || staffUnlocked) && (
                 <div className="flex shrink-0 items-center gap-1.5">
-                  {!scheduleOnly && (
-                    <IconButton
-                      icon="check"
-                      label={storeLoading ? 'Waiting for the schedule store' : rosterPanelOpen ? 'Close save staff list' : 'Save staff list'}
-                      onClick={() => setRosterPanelOpen((open) => !open)}
-                      disabled={storeLoading}
-                    />
-                  )}
                   <IconButton
                     icon={employeePanelOpen ? 'close' : 'plus'}
                     label={employeePanelOpen ? 'Close employee form' : 'Add employee'}
@@ -2668,35 +2720,32 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             {scheduleOnly && staffLoadError && <p className="mt-2 text-xs font-medium text-amber-800">{staffLoadError}</p>}
 
             {scheduleOnly && (
-              <StaffPanel
-                employees={employees}
-                rev={staffRev}
-                canUndo={staffCanUndo}
-                updatedAt={staffUpdatedAt}
-                dirty={staffDirty}
-                loadPending={!staffLoaded}
-                unlocked={staffUnlocked}
-                restaurantId={restaurantId}
-                onUnlock={() => setStaffUnlocked(true)}
-                onLock={() => setStaffUnlocked(false)}
-                onSaved={handleStaffSaved}
-                onUndone={handleStaffUndone}
-              />
-            )}
-
-            {rosterPanelOpen && !scheduleOnly && (
-              <RosterPanel
-                employees={employees}
-                rev={rosterRev}
-                dirty={rosterDirty}
-                loadPending={storeLoading}
-                onSaved={(rev, updatedAt) => {
-                  if (weekStart) setRosterSaved(weekStart, rev, updatedAt, rosterFingerprint(employees))
-                }}
-                onClose={() => setRosterPanelOpen(false)}
-                restaurantId={restaurantId}
-                weekStart={weekStart}
-              />
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded border border-zinc-200 bg-zinc-50 p-3">
+                <p className="min-w-0 flex-1 text-xs text-zinc-600">
+                  {staffUnlocked
+                    ? 'Editing the crew and shift rules. Crew changes apply to every week.'
+                    : 'The crew and shift rules are locked so they are not changed by accident.'}
+                </p>
+                <button
+                  type="button"
+                  className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  onClick={() => setStaffUnlocked((on) => !on)}
+                  aria-pressed={staffUnlocked}
+                >
+                  {staffUnlocked ? 'Done editing' : 'Edit crew & rules'}
+                </button>
+                {staffUnlocked && (
+                  <button
+                    type="button"
+                    className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={() => void undoCrewSave()}
+                    disabled={!staffCanUndo || savingSetup || staffDirty}
+                    title={staffDirty ? 'Save or undo your unsaved edits first.' : staffCanUndo ? 'Bring back the crew as it was before the last save.' : 'No saved crew change to undo.'}
+                  >
+                    Undo last crew save
+                  </button>
+                )}
+              </div>
             )}
 
             {employeePanelOpen && (!scheduleOnly || staffUnlocked) && (
@@ -4127,17 +4176,10 @@ function TemplateEditor({
   onChange,
   onUseDefault,
   isDefaultTemplate,
-  rev,
   dirty,
   loadError,
-  loadPending,
-  panelOpen,
-  onTogglePanel,
-  onSaved,
-  onClosePanel,
   restaurantId,
   updatedAt,
-  weekStart,
   readOnly = false,
   problems,
 }: {
@@ -4146,17 +4188,10 @@ function TemplateEditor({
   onChange: (template: WeeklyStaffingTemplate) => void
   onUseDefault: () => void
   isDefaultTemplate: boolean
-  rev: number
   dirty: boolean
   loadError: string
-  loadPending: boolean
-  panelOpen: boolean
-  onTogglePanel: () => void
-  onSaved: (rev: number, updatedAt: string | null) => void
-  onClosePanel: () => void
   restaurantId?: string
   updatedAt: string | null
-  weekStart?: string
   readOnly?: boolean
   problems: RuleProblem[]
 }) {
@@ -4165,7 +4200,7 @@ function TemplateEditor({
       <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
         <h2 className="font-semibold">Shift rules (locked)</h2>
         <p className="mt-0.5 text-sm text-zinc-600">
-          The spots below are locked for this station — unlock with the staff password to change this week’s rules. You build
+          The spots below are locked for this station — press Edit crew &amp; rules on the Staff tab to change this week’s rules. You build
           the week by putting the crew into them and moving people around.
         </p>
         <div className="mt-3 space-y-3">
@@ -4223,7 +4258,7 @@ function TemplateEditor({
             Evening 4:00 PM - 7:00 PM) on top of the core AM/PM spots.
           </p>
           <p className="mt-0.5 text-xs text-zinc-500">
-            Last saved: {formatUpdatedAt(updatedAt)}{dirty ? ' · unsaved changes' : ''} · changes stay in this week only
+            Last saved: {formatUpdatedAt(updatedAt)}{dirty ? ' · unsaved changes — use Save changes above' : ''} · changes stay in this week only
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -4240,15 +4275,6 @@ function TemplateEditor({
           >
             Restore default rules
           </button>
-          <button
-            type="button"
-            className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            onClick={onTogglePanel}
-            disabled={loadPending || problems.length > 0}
-            title={loadPending ? 'Waiting for the schedule store.' : problems.length > 0 ? 'Fix the spots marked in red first.' : undefined}
-          >
-            {panelOpen ? 'Close save rules' : 'Save rules'}
-          </button>
         </div>
       </div>
       {loadError && <p className="mt-2 text-xs font-medium text-amber-800">{loadError}</p>}
@@ -4260,11 +4286,6 @@ function TemplateEditor({
               <li key={`${problem.day}-${problem.index}`}>{problem.message}</li>
             ))}
           </ul>
-        </div>
-      )}
-      {panelOpen && problems.length === 0 && (
-        <div className="mt-2">
-          <TemplatePanel template={template} rev={rev} dirty={dirty} loadPending={loadPending} onSaved={onSaved} onClose={onClosePanel} restaurantId={restaurantId} weekStart={weekStart} />
         </div>
       )}
       <datalist id="scheduler-role-options">
