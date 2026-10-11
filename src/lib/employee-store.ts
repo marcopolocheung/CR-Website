@@ -1,4 +1,4 @@
-import { getScheduleApiBase, StoreAuthError, StoreConflictError, StoreUnavailableError } from './schedule-store'
+import { getScheduleApiBase, StoreAuthError, StoreConflictError, StoreRejectedError, StoreUnavailableError } from './schedule-store'
 import type { Employee } from './scheduler'
 
 export type RosterEmployee = Pick<
@@ -110,6 +110,7 @@ export async function saveRoster(
     body: JSON.stringify({ employees: employees.map(toRosterEmployee), baseRev }),
   })
   if (status === 401) throw new StoreAuthError()
+  if (status === 400) throw new StoreRejectedError('The server refused this staff list. Check names, positions, and availability, then try again.')
   if (status === 503) {
     throw new StoreUnavailableError(
       'The roster store is not set up for saving yet. Set the SCHEDULE_WRITE_TOKEN secret on the Worker and try again.',

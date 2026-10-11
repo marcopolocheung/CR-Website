@@ -1,5 +1,5 @@
 import { DAYS, type WeeklyStaffingTemplate } from './scheduler'
-import { getScheduleApiBase, StoreAuthError, StoreConflictError, StoreUnavailableError } from './schedule-store'
+import { getScheduleApiBase, StoreAuthError, StoreConflictError, StoreRejectedError, StoreUnavailableError } from './schedule-store'
 
 function isValidTemplate(value: unknown): value is WeeklyStaffingTemplate {
   if (!value || typeof value !== 'object') return false
@@ -58,6 +58,7 @@ export async function saveTemplate(
     body: JSON.stringify({ template, baseRev }),
   })
   if (status === 401) throw new StoreAuthError()
+  if (status === 400) throw new StoreRejectedError('The server refused these shift rules. Fix the spots marked in red on the Shift rules tab.')
   if (status === 503) {
     throw new StoreUnavailableError(
       'The template store is not set up for saving yet. Set the SCHEDULE_WRITE_TOKEN secret on the Worker and try again.',

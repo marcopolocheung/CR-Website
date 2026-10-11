@@ -1,4 +1,4 @@
-import { getScheduleApiBase, StoreAuthError, StoreConflictError, StoreUnavailableError } from './schedule-store'
+import { getScheduleApiBase, StoreAuthError, StoreConflictError, StoreRejectedError, StoreUnavailableError } from './schedule-store'
 import { isRosterEmployee, toRosterEmployee } from './employee-store'
 import type { Employee } from './scheduler'
 
@@ -107,6 +107,7 @@ export async function undoStaff(
 
 function handleStaffWrite(status: number, body: unknown): StaffWriteResult {
   if (status === 401) throw new StoreAuthError()
+  if (status === 400) throw new StoreRejectedError('The server refused this crew. Check names, positions, and availability, then try again.')
   if (status === 403) throw new StoreUnavailableError('Staff editing is not enabled for this station.')
   if (status === 503) {
     throw new StoreUnavailableError(

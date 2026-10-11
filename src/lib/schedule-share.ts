@@ -78,6 +78,11 @@ export function buildPublishedWeek({
   return { version: SHARE_VERSION, weekStart, name, people, slotPeople }
 }
 
+/** Compares two published weeks by who works where — the name staff see is ignored. */
+export function publishedWeekFingerprint(week: Pick<PublishedWeek, 'weekStart' | 'people' | 'slotPeople'>) {
+  return JSON.stringify({ w: week.weekStart, p: week.people, s: week.slotPeople })
+}
+
 /**
  * Rebuilds editor assignments from a published week. Slot order is canonical from
  * the template, so index i of slotPeople always means slots[i]. Names that no
