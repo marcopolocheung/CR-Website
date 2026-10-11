@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { saveStaff, undoStaff, verifyStaffPassword, type StaffWriteResult } from '@/lib/staff-store'
-import { StoreAuthError, StoreConflictError, StoreUnavailableError } from '@/lib/schedule-store'
+import { StoreAuthError, StoreConflictError, StoreRejectedError,
+  StoreUnavailableError } from '@/lib/schedule-store'
 import type { Employee } from '@/lib/scheduler'
 
 /**
@@ -51,6 +52,7 @@ export default function StaffPanel({
     if (caught instanceof StoreConflictError) {
       return 'Someone else saved the crew first. Reload the page, then try again.'
     }
+    if (caught instanceof StoreRejectedError) return caught.message
     if (caught instanceof StoreUnavailableError) {
       return `${caught.message} Your edits are safe on this screen — try again in a moment.`
     }

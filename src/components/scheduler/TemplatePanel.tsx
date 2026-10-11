@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { saveTemplate } from '@/lib/template-store'
-import { StoreAuthError, StoreConflictError, StoreUnavailableError } from '@/lib/schedule-store'
+import { StoreAuthError, StoreConflictError, StoreRejectedError,
+  StoreUnavailableError } from '@/lib/schedule-store'
 import type { WeeklyStaffingTemplate } from '@/lib/scheduler'
 import { isScheduleOnlyRestaurant } from '@/data/restaurants'
 
@@ -46,6 +47,8 @@ export default function TemplatePanel({
         setError('That token was not accepted. Check for typos and try again.')
       } else if (caught instanceof StoreConflictError) {
         setError('Someone else saved the rules first. Reload the page, then try again.')
+      } else if (caught instanceof StoreRejectedError) {
+        setError(caught.message)
       } else if (caught instanceof StoreUnavailableError) {
         setError(`${caught.message} Your edits are safe on this screen — try again in a moment.`)
       } else {

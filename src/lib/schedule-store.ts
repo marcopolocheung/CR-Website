@@ -119,6 +119,7 @@ export async function saveGoldenWeek(
   })
   if (status === 404) throw new StoreNotFoundError()
   if (status === 401) throw new StoreAuthError()
+  if (status === 400) throw new StoreRejectedError('The server refused this week. Reload the page and publish again.')
   if (status === 503) {
     throw new StoreUnavailableError(
       'The schedule store is not set up for saving yet. Set the SCHEDULE_WRITE_TOKEN secret on the Worker and try again.',
@@ -151,6 +152,14 @@ export async function verifyWriteToken(token: string): Promise<void> {
     throw new StoreUnavailableError('Too many wrong codes. Wait a bit and try again.')
   }
   throw new StoreUnavailableError()
+}
+
+/** The Worker refused the data itself (HTTP 400) — retrying the same thing will not help. */
+export class StoreRejectedError extends Error {
+  constructor(message = 'The server refused this data. Check the highlighted fields and try again.') {
+    super(message)
+    this.name = 'StoreRejectedError'
+  }
 }
 
 export class StoreUnavailableError extends Error {

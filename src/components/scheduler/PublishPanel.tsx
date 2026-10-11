@@ -1,23 +1,21 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { buildPublishedWeek, templateHashForSlots } from '@/lib/schedule-share'
+import { buildPublishedWeek, publishedWeekFingerprint, templateHashForSlots } from '@/lib/schedule-share'
 import { saveRoster } from '@/lib/employee-store'
 import { saveTemplate } from '@/lib/template-store'
 import {
   StoreAuthError,
   StoreConflictError,
   StoreNotFoundError,
+  StoreRejectedError,
   StoreUnavailableError,
   fetchGoldenWeek,
   saveGoldenWeek,
+  type GoldenWeekDoc,
 } from '@/lib/schedule-store'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeekStatus, WeeklyStaffingTemplate } from '@/lib/scheduler'
 import { formatUpdatedAt } from '@/lib/scheduler/time'
-
-function canonicalWeek(week: { weekStart: string; people: string[]; slotPeople: number[] }) {
-  return JSON.stringify({ w: week.weekStart, p: week.people, s: week.slotPeople })
-}
 
 const scheduleChannelName = 'chinarose-schedule'
 
@@ -49,6 +47,7 @@ export default function PublishPanel({
   templateDirty,
   onRosterSaved,
   onTemplateSaved,
+  onPublished,
 }: {
   weekStart: string
   weekLabel: string
@@ -67,6 +66,7 @@ export default function PublishPanel({
   onRosterSaved?: (rev: number, updatedAt: string | null) => void
   onTemplateSaved?: (rev: number, updatedAt: string | null) => void
   restaurantName?: string
+  onPublished?: (doc: GoldenWeekDoc) => void
 }) {
   const [name, setName] = useState(`Week of ${weekLabel}`)
   const [token, setToken] = useState('')
@@ -94,7 +94,7 @@ export default function PublishPanel({
     () => buildPublishedWeek({ weekStart, name, slots, employees, assignments }),
     [weekStart, name, slots, employees, assignments],
   )
-  const fingerprint = canonicalWeek({ weekStart, people: week.people, slotPeople: week.slotPeople })
+  const fingerprint = publishedWeekFingerprint({ weekStart, people: week.people, slotPeople: week.slotPeople })
   const dirty =
     serverFingerprint === null ? filled > 0 : serverFingerprint !== fingerprint || serverVisible !== visible
 
@@ -114,7 +114,7 @@ export default function PublishPanel({
       .then((doc) => {
         if (cancelled || !doc) return
         setBaseRev(doc.rev)
-        setServerFingerprint(canonicalWeek(doc.week))
+        setServerFingerprint(publishedWeekFingerprint(doc.week))
         setServerVisible(doc.visible)
         setServerUpdatedAt(doc.updatedAt)
         setName(doc.week.name)
@@ -151,6 +151,8 @@ export default function PublishPanel({
             setError('The staff list changed on the server. Reload the page to see it, then publish again.')
           } else if (caught instanceof StoreAuthError) {
             setError('That token was not accepted. Check for typos and try again, or ask whoever runs the Worker for the current one.')
+          } else if (caught instanceof StoreRejectedError) {
+            setError(caught.message)
           } else if (caught instanceof StoreUnavailableError) {
             setError(`${caught.message} Your edits are safe on this screen — try again in a moment.`)
           } else {
@@ -168,6 +170,8 @@ export default function PublishPanel({
             setError('The schedule rules changed on the server. Reload the page to see them, then publish again.')
           } else if (caught instanceof StoreAuthError) {
             setError('That token was not accepted. Check for typos and try again, or ask whoever runs the Worker for the current one.')
+          } else if (caught instanceof StoreRejectedError) {
+            setError(caught.message)
           } else if (caught instanceof StoreUnavailableError) {
             setError(`${caught.message} Your edits are safe on this screen — try again in a moment.`)
           } else {
@@ -176,12 +180,9 @@ export default function PublishPanel({
           return
         }
       }
-      const result = await saveGoldenWeek(
-        weekStart,
-        { week, templateHash: templateHashForSlots(slots), visible, baseRev: baseRev ?? 0 },
-        token,
-        restaurantId,
-      )
+      const templateHash = templateHashForSlots(slots)
+      const result = await saveGoldenWeek(weekStart, { week, templateHash, visible, baseRev: baseRev ?? 0 }, token, restaurantId)
+      onPublished?.({ v: 3, weekStart, rev: result.rev, week, visible, templateHash, updatedAt: result.updatedAt ?? new Date().toISOString() })
       setBaseRev(result.rev)
       setServerFingerprint(fingerprint)
       setServerVisible(visible)
@@ -208,6 +209,8 @@ export default function PublishPanel({
             ? 'This week is not on the server yet. Press Save again to create it.'
             : 'Someone else saved this week first. Press Save again to overwrite with your copy.',
         )
+      } else if (caught instanceof StoreRejectedError) {
+        setError(caught.message)
       } else if (caught instanceof StoreUnavailableError) {
         setError(`${caught.message} Your edits are safe on this screen — try again in a moment.`)
       } else if (caught instanceof StoreNotFoundError) {

@@ -35,6 +35,10 @@ import {
   summarizeSchedule,
   validateSchedule,
   weeksForMonth,
+  publishState,
+  templateProblems,
+  type PublishState,
+  type RuleProblem,
   type DayOfWeek,
   type Diagnostic,
   type Employee,
@@ -54,8 +58,8 @@ import {
 import { fetchRoster, rosterFingerprint } from '@/lib/employee-store'
 import { fetchStaff, staffFingerprint, type StaffWriteResult } from '@/lib/staff-store'
 import { fetchTemplate, templateFingerprint } from '@/lib/template-store'
-import { fetchGoldenWeek, type GoldenWeekDoc } from '@/lib/schedule-store'
-import { assignmentsFromPublishedWeek, templateHashForSlots } from '@/lib/schedule-share'
+import { fetchGoldenMonth, fetchGoldenWeek, type GoldenWeekDoc } from '@/lib/schedule-store'
+import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForWeek, publishedWeekFingerprint, templateHashForSlots } from '@/lib/schedule-share'
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
 import PublishPanel from './PublishPanel'
 import RosterPanel from './RosterPanel'
@@ -536,6 +540,7 @@ function uniqueMessages(messages: string[]) {
 
 function assignmentFingerprint(list: ScheduleAssignment[]) {
   return list
+    .filter((assignment) => assignment.employeeId)
     .map((assignment) => `${assignment.slotId}:${assignment.employeeId}`)
     .sort()
     .join('|')
@@ -1038,7 +1043,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     : !rosterLoaded
       ? false
       : rosterServerSnapshot === null
-        ? employees.length > 0
+        ? rosterFingerprint(employees) !== rosterFingerprint(defaultRoster)
         : rosterFingerprint(employees) !== rosterServerSnapshot
   // Crew edits for schedule-only stations compare against the last saved crew.
   const staffDirty =
@@ -1049,6 +1054,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [confirmingClearWeek, setConfirmingClearWeek] = useState(false)
   const [publishedWeeks, setPublishedWeeks] = useState<Record<string, GoldenWeekDoc | null>>({})
   const [hydratedWeeks, setHydratedWeeks] = useState<Record<string, boolean>>({})
+  // Who works where as last loaded from or published to the server, per week — the bar for "unpublished edits".
+  const [publishedBaselines, setPublishedBaselines] = useState<Record<string, string>>({})
+  const [layoutMismatchWeeks, setLayoutMismatchWeeks] = useState<Record<string, boolean>>({})
+  const [liveMonthWeeks, setLiveMonthWeeks] = useState<Record<string, boolean>>({})
+  const [copyingPrior, setCopyingPrior] = useState(false)
   const [templatePanelOpen, setTemplatePanelOpen] = useState(false)
   const templateDirty = !templateLoaded
       ? false
@@ -1070,10 +1080,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const generatedAssignments = generatedWeeks[weekStart] ?? emptyAssignments
   const weekVisibility = weekStart ? statusForWeek(weekStatus, weekStart, assignments) : 'off'
   const monthWeeks = monthKey ? weeksForMonth(monthKey) : []
-  const onWeeksCount = useMemo(
-    () => Object.keys(weeks).filter((key) => statusForWeek(weekStatus, key, weeks[key] ?? []) === 'on').length,
-    [weeks, weekStatus],
-  )
 
   function setAssignments(next: ScheduleAssignment[] | ((current: ScheduleAssignment[]) => ScheduleAssignment[])) {
     setWeeks((current) => {
@@ -1087,6 +1093,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   const slots = useMemo(() => expandTemplate(template, weekStart || undefined), [template, weekStart])
+  const ruleProblems = useMemo(() => templateProblems(template), [template])
   // Readiness matches the solver: optional spots (not yet hired) never block the week.
   const readinessProblems = useMemo(
     () => preflightDiagnostics(employees, slots.filter((slot) => slot.required)),
@@ -1166,7 +1173,30 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const ignoredCount = fixIssues.filter((issue) => ignoredIssueIds.includes(issue.id)).length
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
   const keptCount = assignments.filter((assignment) => assignment.locked && assignment.employeeId).length
-  const schedulePassing = assignments.length > 0 && violations.length === 0
+  // Only empty required spots block printing — warnings the fix panel lets you skip never do.
+  const schedulePassing = assignments.length > 0 && !violations.some((violation) => violation.code === 'missing_assignment')
+  const publishedDoc = weekStart ? publishedWeeks[weekStart] : undefined
+  const currentPublishState: PublishState | null =
+    publishedDoc === undefined
+      ? null
+      : publishState({
+          published: publishedDoc,
+          fingerprintOnScreen: publishedWeekFingerprint(
+            buildPublishedWeek({ weekStart, name: '', slots, employees, assignments }),
+          ),
+          publishedFingerprint: publishedDoc ? publishedWeekFingerprint(publishedDoc.week) : null,
+          visibleOnScreen: weekVisibility === 'on',
+        })
+  const otherWeeksWithEdits = Object.keys(weeks).filter(
+    (week) => week !== weekStart && assignmentFingerprint(weeks[week] ?? []) !== (publishedBaselines[week] ?? ''),
+  )
+  // Edits made on this screen since the week was loaded or published — not drift in the staff list.
+  const currentWeekUnpublished =
+    Boolean(weekStart) &&
+    (assignmentFingerprint(assignments) !== (publishedBaselines[weekStart] ?? '') ||
+      Boolean(publishedDoc && publishedDoc.visible !== (weekVisibility === 'on')))
+  const hasUnsavedWork =
+    currentWeekUnpublished || otherWeeksWithEdits.length > 0 || rosterDirty || templateDirty || staffDirty
   const selectedRoles = availableRoles.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && (selectedRoles.length > 0 || draft.newHire)
 
@@ -1424,14 +1454,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     }
     if (templateHashForSlots(slots) !== doc.templateHash) {
       setHydratedWeeks((current) => ({ ...current, [weekStart]: true }))
-      setDiagnostics((current) =>
-        current.length > 0
-          ? current
-          : ['The published week uses different shift rules, so it was not loaded into the editor. Review the rules before overwriting it.'],
-      )
+      setLayoutMismatchWeeks((current) => ({ ...current, [weekStart]: true }))
       return
     }
     const hydrated = assignmentsFromPublishedWeek({ slots, employees, published: doc.week })
+    setPublishedBaselines((current) => ({ ...current, [weekStart]: assignmentFingerprint(hydrated) }))
     setWeeks((current) => (current[weekStart] ? current : { ...current, [weekStart]: hydrated }))
     setGeneratedWeeks((current) =>
       current[weekStart] ? current : { ...current, [weekStart]: hydrated.map((assignment) => ({ ...assignment })) },
@@ -1441,6 +1468,54 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       setDiagnostics((current) => [...current, 'Loaded the published week from the server.'])
     }
   }, [weekStart, restaurantId, rosterLoaded, templateLoaded, publishedWeeks, hydratedWeeks, slots, employees, weeks])
+
+  useEffect(() => {
+    if (!monthKey) return
+    let cancelled = false
+    // The month list only returns weeks staff can see — that is what "Live" means in the week strip.
+    fetchGoldenMonth(monthKey, 0, restaurantId)
+      .then((month) => {
+        if (cancelled) return
+        setLiveMonthWeeks((current) => {
+          const next = { ...current }
+          for (const week of weeksForMonth(monthKey)) next[week] = month.weeks.some((doc) => doc.weekStart === week)
+          return next
+        })
+      })
+      .catch(() => {
+        return
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [monthKey, restaurantId])
+
+  // Closing the tab, reloading, or following a link drops every edit that is not published or saved.
+  useEffect(() => {
+    if (!hasUnsavedWork) return
+    const message = 'You have changes that are not published or saved. Leave anyway?'
+    function warnOnUnload(event: BeforeUnloadEvent) {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    // In-app links swap the page without an unload, so they need their own check.
+    function warnOnLink(event: MouseEvent) {
+      const link = (event.target as Element | null)?.closest?.('a[href]')
+      if (!link || link.getAttribute('target') === '_blank' || event.defaultPrevented) return
+      const href = link.getAttribute('href') ?? ''
+      if (href.startsWith('#') || href.startsWith('sms:') || href.startsWith('mailto:')) return
+      if (!window.confirm(message)) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    }
+    window.addEventListener('beforeunload', warnOnUnload)
+    document.addEventListener('click', warnOnLink, true)
+    return () => {
+      window.removeEventListener('beforeunload', warnOnUnload)
+      document.removeEventListener('click', warnOnLink, true)
+    }
+  }, [hasUnsavedWork])
 
   function dismissOnboarding() {
     setOnboardingDismissed(true)
@@ -1515,7 +1590,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   function goToMonth(nextMonth: string) {
     if (!nextMonth || nextMonth === monthKey) return
     setMonthKey(nextMonth)
-    const firstWeek = weeksForMonth(nextMonth)[0]
+    // The first row usually starts last month; opening it would move the month back again.
+    const monthWeeks = weeksForMonth(nextMonth)
+    const firstWeek = monthWeeks.find((week) => monthKeyForWeek(week) === nextMonth) ?? monthWeeks[0]
     if (firstWeek) goToWeek(firstWeek)
   }
 
@@ -1530,12 +1607,39 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     ])
   }
 
-  function copyPriorWeek() {
-    if (!weekStart) return
+  /**
+   * Last week's assignments — from this session if it was opened, else from what was published.
+   * Read against last week's own rules so a rules change in between cannot misfile anyone.
+   */
+  async function loadPriorWeek(prior: string): Promise<ScheduleAssignment[]> {
+    const inMemory = weeks[prior]
+    if (inMemory && inMemory.length > 0) return inMemory
+    const doc = await fetchGoldenWeek(prior, restaurantId)
+    if (!doc) return []
+    const savedRules = templates[prior] ?? (await fetchTemplate(restaurantId, prior).then((found) => found.template))
+    const { slots: priorSlots, matches } = layoutForWeek([savedRules], restaurantId, doc.templateHash)
+    if (!matches) return []
+    const priorAssignments = assignmentsFromPublishedWeek({ slots: priorSlots, employees, published: doc.week })
+    // Only spots that still exist this week can be copied.
+    const slotIds = new Set(slots.map((slot) => slot.id))
+    return priorAssignments.filter((assignment) => slotIds.has(assignment.slotId))
+  }
+
+  async function copyPriorWeek() {
+    if (!weekStart || copyingPrior) return
     const prior = shiftWeek(weekStart, -1)
-    const source = weeks[prior] ?? emptyAssignments
+    setCopyingPrior(true)
+    let source: ScheduleAssignment[]
+    try {
+      source = await loadPriorWeek(prior)
+    } catch {
+      setDiagnostics(['Could not load last week from the server. Check the connection and try again.'])
+      return
+    } finally {
+      setCopyingPrior(false)
+    }
     if (source.length === 0) {
-      setDiagnostics(['The prior week has no schedule to copy yet.'])
+      setDiagnostics(['Last week has nothing to copy — it was never made or published.'])
       return
     }
     remember('copied the prior week')
@@ -1695,8 +1799,17 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setGuidedChoosing(false)
     // Let the spinner paint before the synchronous solver blocks the main thread.
     await new Promise((resolve) => setTimeout(resolve, 350))
-    // similarWeek should anchor to the week before this one, not to whatever is on screen.
-    const previousAssignments = variant === 'similarWeek' ? weeks[shiftWeek(weekStart, -1)] ?? assignments : assignments
+    let previousAssignments = assignments
+    if (variant === 'similarWeek') {
+      // Anchor to last week as published, not to whatever is on screen.
+      const prior = await loadPriorWeek(shiftWeek(weekStart, -1)).catch(() => [])
+      if (prior.length === 0) {
+        setDiagnostics(['Last week has nothing to match yet — publish it first, or pick another way to build the week.'])
+        setIsGenerating(false)
+        return
+      }
+      previousAssignments = prior
+    }
     try {
       const result = generateSchedule(
         { employees, template, weekStart },
@@ -2036,9 +2149,14 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               {restaurantName ? `${restaurantName} · Scheduler` : 'Scheduler demo'}
             </p>
             <h1 className="text-2xl font-bold md:text-3xl">Weekly staff schedule</h1>
-            {onWeeksCount > 0 && (
-              <p className="mt-1 text-sm text-zinc-600">
-                {onWeeksCount} week{onWeeksCount === 1 ? '' : 's'} on · off weeks stay hidden from staff
+            {currentPublishState && (
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600">
+                <PublishStateBadge state={currentPublishState} />
+                {otherWeeksWithEdits.length > 0 && (
+                  <span>
+                    {otherWeeksWithEdits.length} other week{otherWeeksWithEdits.length === 1 ? '' : 's'} with unpublished changes
+                  </span>
+                )}
               </p>
             )}
           </div>
@@ -2073,11 +2191,13 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             <Button
               onClick={() => setSharing((open) => !open)}
               icon="share"
-              disabled={!weekStart || storeLoading}
+              disabled={!weekStart || storeLoading || ruleProblems.length > 0}
               title={
                 storeLoading
                   ? 'Waiting for the schedule store — saving is paused until the saved data loads.'
-                  : 'Save this week to the /schedule golden schedule.'
+                  : ruleProblems.length > 0
+                    ? 'Fix the shift rules marked in red first.'
+                    : 'Save this week to the /schedule golden schedule.'
               }
             >
               Publish to staff
@@ -2106,7 +2226,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                   }}
                   icon="print"
                   disabled={!schedulePassing}
-                  title={!schedulePassing ? 'Fix every spot before printing.' : 'Print the passing schedule.'}
+                  title={!schedulePassing ? 'Fill every required spot before printing.' : 'Print this week.'}
                 >
                   Print
                 </Button>
@@ -2147,7 +2267,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             [
               ['schedule', 'Schedule'],
               ['staff', `Staff (${activeEmployeeCount})`],
-              ['rules', 'Shift rules'],
+              ['rules', ruleProblems.length > 0 ? `Shift rules (${ruleProblems.length} to fix)` : 'Shift rules'],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -2225,7 +2345,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             </section>
           )}
 
-          {sharing && weekStart && (
+          {sharing && weekStart && ruleProblems.length === 0 && (
             <PublishPanel
               weekStart={weekStart}
               weekLabel={formatWeekRange(weekStart)}
@@ -2247,6 +2367,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               }}
               onTemplateSaved={(rev, updatedAt) => {
                 setTemplateSaved(weekStart, rev, updatedAt, templateFingerprint(template))
+              }}
+              onPublished={(doc) => {
+                setPublishedWeeks((current) => ({ ...current, [weekStart]: doc }))
+                setPublishedBaselines((current) => ({ ...current, [weekStart]: assignmentFingerprint(assignments) }))
+                setLiveMonthWeeks((current) => ({ ...current, [weekStart]: doc.visible }))
+                setLayoutMismatchWeeks((current) => ({ ...current, [weekStart]: false }))
               }}
             />
           )}
@@ -2293,6 +2419,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               onSelectWeek={goToWeek}
               onSelectMonth={goToMonth}
               onToggleWeek={setWeekVisibility}
+              liveWeeks={liveMonthWeeks}
+              currentState={currentPublishState}
+              editedWeeks={otherWeeksWithEdits}
             />
             <div className="mt-4 flex flex-col gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-1">
@@ -2369,9 +2498,30 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               )}
             </p>
 
-            {weekVisibility === 'off' && weekStart && (
-              <div className="mt-3 rounded border border-zinc-300 bg-zinc-100 p-3 text-sm text-zinc-700" role="status">
-                This week is off and hidden from staff. Turn it on to share it.
+            {weekStart && layoutMismatchWeeks[weekStart] && assignments.length === 0 && (
+              <div className="mt-3 rounded border border-amber-500 bg-amber-50 p-3 text-sm text-amber-950" role="alert">
+                <p className="font-semibold">This week is published, but with different shift rules — so it is not shown here.</p>
+                <p className="mt-1">
+                  Staff still see the published version. Making and publishing a schedule here replaces it. Check the Shift
+                  rules tab first.
+                </p>
+              </div>
+            )}
+            {weekStart && currentPublishState && currentPublishState !== 'live' && (assignments.length > 0 || currentPublishState === 'hidden') && (
+              <div
+                className="mt-3 flex flex-col gap-2 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between print:hidden"
+                role="status"
+              >
+                <p>
+                  {currentPublishState === 'hidden'
+                    ? 'Published, but turned off — staff cannot see this week. Turn it on, then publish.'
+                    : currentPublishState === 'changed'
+                      ? 'You have changes staff cannot see yet. Publish to send them.'
+                      : 'Staff cannot see this week yet. Publish it when it looks right.'}
+                </p>
+                <Button onClick={() => setSharing(true)} icon="share" disabled={storeLoading}>
+                  Publish to staff
+                </Button>
               </div>
             )}
 
@@ -2455,6 +2605,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               template={template}
               roles={availableRoles}
               readOnly={scheduleOnly && !staffUnlocked}
+              problems={ruleProblems}
               onChange={(next) => {
                 remember('changed schedule rules')
                 setTemplate(next)
@@ -3670,6 +3821,9 @@ function MonthStrip({
   onSelectWeek,
   onSelectMonth,
   onToggleWeek,
+  liveWeeks,
+  currentState,
+  editedWeeks,
 }: {
   monthKey: string
   weekStart: string
@@ -3679,6 +3833,9 @@ function MonthStrip({
   onSelectWeek: (weekStart: string) => void
   onSelectMonth: (monthKey: string) => void
   onToggleWeek: (weekStart: string, status: WeekStatus) => void
+  liveWeeks: Record<string, boolean>
+  currentState: PublishState | null
+  editedWeeks: string[]
 }) {
   if (!monthKey) return null
   return (
@@ -3701,6 +3858,17 @@ function MonthStrip({
           const status = statusForWeek(weekStatus, week, list)
           const selected = week === weekStart
           const filled = list.filter((assignment) => assignment.employeeId).length
+          // What staff see right now — the switch only takes effect once the week is published.
+          const state: PublishState =
+            week === weekStart && currentState
+              ? currentState
+              : editedWeeks.includes(week)
+                ? liveWeeks[week]
+                  ? 'changed'
+                  : 'draft'
+                : liveWeeks[week]
+                  ? 'live'
+                  : 'draft'
           return (
             <div
               key={week}
@@ -3712,15 +3880,15 @@ function MonthStrip({
             >
               <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onSelectWeek(week)} title={formatWeekRange(week)}>
                 <span className="block truncate text-xs font-semibold text-zinc-900">{formatWeekRange(week)}</span>
-                <span className="mt-0.5 flex items-center gap-1 text-[11px] text-zinc-500">
-                  <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${status === 'on' ? 'bg-green-600' : 'bg-zinc-300'}`} />
-                  {status === 'on' ? 'On' : 'Off'} · {filled} filled
+                <span className="mt-0.5 flex items-center gap-1 text-[11px] text-zinc-600">
+                  <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${publishStateMeta[state].dot}`} />
+                  {publishStateMeta[state].short} · {filled} filled
                 </span>
               </button>
               <FlipSwitch
                 on={status === 'on'}
                 onFlip={() => onToggleWeek(week, status === 'on' ? 'off' : 'on')}
-                label={`Week of ${formatWeekRange(week)}`}
+                label={`Show week of ${formatWeekRange(week)} to staff when published`}
               />
             </div>
           )
@@ -3744,8 +3912,8 @@ function FlipSwitch({
       type="button"
       role="switch"
       aria-checked={on}
-      aria-label={`${label} ${on ? 'on' : 'off'}`}
-      title={on ? `Turn ${label.toLowerCase()} off.` : `Turn ${label.toLowerCase()} on.`}
+      aria-label={label}
+      title={label}
       onClick={onFlip}
       className={`relative h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${
         on ? 'bg-green-600' : 'bg-zinc-300'
@@ -3758,6 +3926,27 @@ function FlipSwitch({
         }`}
       />
     </button>
+  )
+}
+
+const publishStateMeta: Record<PublishState, { short: string; long: string; dot: string; badge: string }> = {
+  live: { short: 'Live', long: 'Staff see this week', dot: 'bg-green-600', badge: 'border-green-300 bg-green-50 text-green-900' },
+  changed: {
+    short: 'Unpublished changes',
+    long: 'Changes not published yet',
+    dot: 'bg-amber-500',
+    badge: 'border-amber-400 bg-amber-50 text-amber-950',
+  },
+  hidden: { short: 'Hidden', long: 'Published but hidden from staff', dot: 'bg-zinc-400', badge: 'border-zinc-300 bg-zinc-100 text-zinc-800' },
+  draft: { short: 'Not published', long: 'Not published — staff cannot see it', dot: 'bg-zinc-300', badge: 'border-zinc-300 bg-white text-zinc-700' },
+}
+
+function PublishStateBadge({ state }: { state: PublishState }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${publishStateMeta[state].badge}`}>
+      <span aria-hidden="true" className={`h-2 w-2 rounded-full ${publishStateMeta[state].dot}`} />
+      {publishStateMeta[state].long}
+    </span>
   )
 }
 
@@ -3950,6 +4139,7 @@ function TemplateEditor({
   updatedAt,
   weekStart,
   readOnly = false,
+  problems,
 }: {
   template: WeeklyStaffingTemplate
   roles: string[]
@@ -3968,6 +4158,7 @@ function TemplateEditor({
   updatedAt: string | null
   weekStart?: string
   readOnly?: boolean
+  problems: RuleProblem[]
 }) {
   if (readOnly) {
     return (
@@ -4053,15 +4244,25 @@ function TemplateEditor({
             type="button"
             className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             onClick={onTogglePanel}
-            disabled={loadPending}
-            title={loadPending ? 'Waiting for the schedule store.' : undefined}
+            disabled={loadPending || problems.length > 0}
+            title={loadPending ? 'Waiting for the schedule store.' : problems.length > 0 ? 'Fix the spots marked in red first.' : undefined}
           >
             {panelOpen ? 'Close save rules' : 'Save rules'}
           </button>
         </div>
       </div>
       {loadError && <p className="mt-2 text-xs font-medium text-amber-800">{loadError}</p>}
-      {panelOpen && (
+      {problems.length > 0 && (
+        <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-xs text-red-900" role="alert">
+          <p className="font-semibold">Fix {problems.length === 1 ? 'this spot' : `these ${problems.length} spots`} before saving:</p>
+          <ul className="mt-1 list-disc pl-4">
+            {problems.map((problem) => (
+              <li key={`${problem.day}-${problem.index}`}>{problem.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {panelOpen && problems.length === 0 && (
         <div className="mt-2">
           <TemplatePanel template={template} rev={rev} dirty={dirty} loadPending={loadPending} onSaved={onSaved} onClose={onClosePanel} restaurantId={restaurantId} weekStart={weekStart} />
         </div>
@@ -4089,7 +4290,14 @@ function TemplateEditor({
             <div className="mt-2 space-y-2">
               {template[day].length === 0 && <p className="text-xs text-zinc-500">No spots this day.</p>}
               {template[day].map((slot, index) => (
-                <div key={index} className="flex flex-wrap items-center gap-1.5 rounded bg-zinc-50 p-1.5">
+                <div
+                  key={index}
+                  className={`flex flex-wrap items-center gap-1.5 rounded p-1.5 ${
+                    problems.some((problem) => problem.day === day && problem.index === index)
+                      ? 'bg-red-50 ring-1 ring-red-400'
+                      : 'bg-zinc-50'
+                  }`}
+                >
                   <select
                     className="rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs"
                     value={slot.period}
@@ -4119,6 +4327,7 @@ function TemplateEditor({
                     value={slot.label}
                     onChange={(event) => updateSlot(day, index, { label: event.target.value })}
                     placeholder="Label"
+                    aria-label="Label for this spot"
                   />
                   <TimeField
                     ariaLabel="Spot start time"
