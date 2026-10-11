@@ -10,7 +10,7 @@
     "scheduler:verify": "node scripts/verify-schedule-store.mjs",
     "scheduler:seed-kitchens": "node scripts/seed-kitchen-stations.mjs",
     "seo:check": "node scripts/seo-check.mjs",
-    "cashout:test": "node --import jiti/register --test src/lib/cashout.test.ts"
+    "cashout:test": "node --import jiti/register --test src/lib/cashout.test.ts src/lib/dashboard.test.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.1",
