@@ -582,6 +582,36 @@ test('M/V prep qualification implies meat prep, but not the reverse', () => {
   assert.equal(isEmployeeQualified(mp, mvSlot), false)
 })
 
+test('a shift role limits a person to one post on that shift only', () => {
+  const anyDay = Object.fromEntries(DAYS.map((day) => [day, [{ start: minutes(9), end: minutes(23) }]]))
+  const maria: Employee = {
+    id: 'maria',
+    name: 'Maria',
+    roles: ['cook', 'dishwasher'],
+    recurringAvailability: anyDay,
+    allowDoubles: true,
+    active: true,
+    newHire: true,
+    shiftRoles: [{ day: 'Tuesday', period: 'PM', role: 'dishwasher' }],
+  }
+  const cook: StaffingSlot = { id: 'c', day: 'Tuesday', period: 'PM', role: 'cook', label: 'Cook', start: minutes(16), end: minutes(23), required: true }
+  const dish: StaffingSlot = { ...cook, id: 'd', role: 'dishwasher', label: 'Dishwasher' }
+  assert.equal(isEmployeeQualified(maria, cook), false, 'shift role beats both trained roles and new-hire')
+  assert.equal(isEmployeeQualified(maria, dish), true)
+  assert.equal(isEmployeeQualified(maria, { ...cook, period: 'AM' }), true, 'other shifts are untouched')
+
+  const other: Employee = { ...maria, id: 'other', name: 'Other', newHire: false, shiftRoles: undefined }
+  const template = Object.fromEntries(DAYS.map((day) => [day, []])) as unknown as WeeklyStaffingTemplate
+  template.Tuesday = [
+    { period: 'PM', role: 'cook', label: 'Cook', start: minutes(16), end: minutes(23), required: true },
+    { period: 'PM', role: 'dishwasher', label: 'Dishwasher', start: minutes(16), end: minutes(23), required: true },
+  ]
+  const result = generateSchedule({ employees: [maria, other], template })
+  assert.notEqual(result.status, 'INFEASIBLE')
+  const dishSlot = expandTemplate(template).find((slot) => slot.role === 'dishwasher')
+  assert.equal(result.assignments.find((assignment) => assignment.slotId === dishSlot?.id)?.employeeId, 'maria')
+})
+
 test('optional spots are filled when a candidate exists, and left open when not', () => {
   const solo: Employee = {
     id: 'solo',

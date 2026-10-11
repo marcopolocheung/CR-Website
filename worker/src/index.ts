@@ -414,6 +414,7 @@ export type StoredEmployee = {
   suspendedFrom?: string
   suspendedUntil?: string
   priority?: number
+  shiftRoles?: { day: string; period: string; role: string }[]
 }
 
 export type RosterDoc = {
@@ -497,6 +498,17 @@ function isValidStoredEmployee(value: unknown): value is StoredEmployee {
   }
   if (employee.priority !== undefined) {
     if (typeof employee.priority !== 'number' || !Number.isInteger(employee.priority) || employee.priority < 1 || employee.priority > 5) return false
+  }
+  if (employee.shiftRoles !== undefined) {
+    if (!Array.isArray(employee.shiftRoles) || employee.shiftRoles.length > ROSTER_DAYS.length * 2) return false
+    const seen = new Set<string>()
+    for (const entry of employee.shiftRoles as unknown[]) {
+      if (!entry || typeof entry !== 'object') return false
+      const { day, period, role } = entry as Record<string, unknown>
+      if (typeof day !== 'string' || !ROSTER_DAYS.includes(day) || (period !== 'AM' && period !== 'PM') || !isValidRole(role)) return false
+      if (seen.has(`${day}:${period}`)) return false
+      seen.add(`${day}:${period}`)
+    }
   }
   return true
 }

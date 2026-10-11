@@ -323,6 +323,11 @@ test('employee roster bodies are strictly validated', () => {
   assert.ok(validateRosterBody({ employees: [rosterEmployee({ suspendedFrom: '2026-10-12', suspendedUntil: '2026-10-20', priority: 1 })], baseRev: 0 }), 'suspension and priority accepted')
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ suspendedFrom: '2026-10-20', suspendedUntil: '2026-10-12' })], baseRev: 0 }), null, 'backwards range rejected')
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ suspendedUntil: '2026-10-12' })], baseRev: 0 }), null, 'end without start rejected')
+  const tuePm = { day: 'Tuesday', period: 'PM', role: 'dishwasher' }
+  assert.ok(validateRosterBody({ employees: [rosterEmployee({ shiftRoles: [tuePm] })], baseRev: 0 }), 'shift role accepted')
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ shiftRoles: [{ ...tuePm, period: 'Noon' }] })], baseRev: 0 }), null, 'unknown period rejected')
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ shiftRoles: [{ ...tuePm, role: 'Dish Washer' }] })], baseRev: 0 }), null, 'bad role slug rejected')
+  assert.equal(validateRosterBody({ employees: [rosterEmployee({ shiftRoles: [tuePm, { ...tuePm, role: 'cook' }] })], baseRev: 0 }), null, 'two roles on one shift rejected')
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ suspendedFrom: 'next week' })], baseRev: 0 }), null, 'bad date rejected')
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ priority: 0 })], baseRev: 0 }), null, 'priority out of range rejected')
   assert.ok(validateRosterBody({ employees: [rosterEmployee({ roles: ['sushi-chef'] })], baseRev: 0 }), 'custom posts accepted')

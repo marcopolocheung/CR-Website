@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import {
   DAYS,
   PERIODS,
@@ -23,7 +24,7 @@ import {
   preflightDiagnostics,
   rangesOverlap,
   rolesForRestaurant,
-  schedulerAssumptions,
+  shiftRoleFor,
   currentWeekStart,
   formatDayLabel,
   formatWeekRange,
@@ -349,11 +350,11 @@ const pmShift = { start: minutes(16), end: minutes(23) }
 const midShift = { start: minutes(12), end: minutes(19) }
 const eveningShift = { start: minutes(16), end: minutes(19) }
 
-const scheduleVariants: { id: ScheduleVariant; label: string; description: string; icon: IconName }[] = [
-  { id: 'balanced', label: 'Balanced', description: 'Spreads the work across everyone.', icon: 'spark' },
-  { id: 'fewestDoubles', label: 'Fewest doubles', description: 'Avoids putting anyone on both shifts in one day.', icon: 'target' },
-  { id: 'similarWeek', label: 'Like last week', description: 'Keeps as much of the previous week as the rules allow.', icon: 'lock' },
-  { id: 'fairHours', label: 'Similar hours for all', description: 'Evens out how many hours each person gets.', icon: 'undo' },
+const scheduleVariants: { id: ScheduleVariant; label: string; description: string }[] = [
+  { id: 'balanced', label: 'Balanced', description: 'Spreads the work across everyone.' },
+  { id: 'fewestDoubles', label: 'Fewest doubles', description: 'Avoids putting anyone on both shifts in one day.' },
+  { id: 'similarWeek', label: 'Like last week', description: 'Keeps as much of the previous week as the rules allow.' },
+  { id: 'fairHours', label: 'Similar hours for all', description: 'Evens out how many hours each person gets.' },
 ]
 
 function cloneEmployees(restaurantId?: string) {
@@ -573,6 +574,12 @@ function trainedRolesText(employee: Employee) {
   return employee.roles.map((role) => roleLabel(role)).join(', ')
 }
 
+function notTrainedText(employee: Employee, slot: StaffingSlot) {
+  const onlyRole = shiftRoleFor(employee, slot.day, slot.period)
+  if (onlyRole && onlyRole !== slot.role) return `${employee.name} only works ${roleLabel(onlyRole)} on ${slot.day} ${periodLabels[slot.period]}.`
+  return `${employee.name} is not trained for ${slot.label} — trained for ${trainedRolesText(employee)}.`
+}
+
 function diagnosticLabel(diagnostic: Diagnostic, weekStart: string) {
   const day = diagnostic.day && weekStart ? formatDayLabel(weekStart, diagnostic.day) : diagnostic.day
   const where = day && diagnostic.period ? `${day} ${periodLabels[diagnostic.period]}` : null
@@ -605,7 +612,7 @@ function dragErrorMessage(employee: Employee, slot: StaffingSlot, violations: Va
   const first = violations[0]
   if (!first) return `${employee.name} cannot work ${day} ${periodLabels[slot.period]}.`
 
-  if (first.code === 'unqualified_employee') return `${employee.name} is not trained for ${slot.label} — trained for ${trainedRolesText(employee)}.`
+  if (first.code === 'unqualified_employee') return notTrainedText(employee, slot)
   if (first.code === 'unavailable_employee' && isSuspendedOn(employee, slot.date)) return `${employee.name} is suspended ${suspensionText(employee)}.`
   if (first.code === 'unavailable_employee') return `${employee.name} is not free ${day} ${periodLabels[slot.period]} (${formatTimeRange(slot)}). ${employee.name} ${availabilityText(employee, slot.day)}.`
   if (first.code === 'inactive_employee') return `${employee.name} is off the list (inactive).`
@@ -726,7 +733,7 @@ function reviewLabel(
   const name = employee?.name ?? 'Someone'
 
   if (violation.code === 'missing_assignment') return `${shift} needs ${position}${slot ? ` (${formatTimeRange(slot)})` : ''}.`
-  if (violation.code === 'unqualified_employee') return `${name} is not trained for ${position} — trained for ${employee ? trainedRolesText(employee) : 'nothing listed'}.`
+  if (violation.code === 'unqualified_employee') return employee && slot ? notTrainedText(employee, slot) : `${name} is not trained for ${position}.`
   if (violation.code === 'unavailable_employee') {
     if (!slot || !employee) return `${name} cannot work ${shift}.`
     if (isSuspendedOn(employee, slot.date)) return `${name} is suspended ${suspensionText(employee)}.`
@@ -841,6 +848,8 @@ function unassignableReason({
   assignments: ScheduleAssignment[]
 }): string | null {
   if (!employee.active) return 'off the list'
+  const onlyRole = shiftRoleFor(employee, slot.day, slot.period)
+  if (onlyRole && onlyRole !== slot.role) return `only ${roleLabel(onlyRole)} that shift`
   if (!isEmployeeQualified(employee, slot)) return 'not trained'
   if (isSuspendedOn(employee, slot.date)) return 'suspended'
   if (!isEmployeeAvailableForSlot(employee, slot)) return 'not free'
@@ -1011,8 +1020,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [staffQuery, setStaffQuery] = useState('')
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
+  const [tab, setTab] = useState<'schedule' | 'staff' | 'rules'>('schedule')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [generatingVariant, setGeneratingVariant] = useState<ScheduleVariant | null>(null)
   const [lastReport, setLastReport] = useState<GenerationReport | null>(null)
   const reportId = useRef(0)
   const [onboardingDismissed, setOnboardingDismissed] = useState(true)
@@ -1158,14 +1167,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
   const keptCount = assignments.filter((assignment) => assignment.locked && assignment.employeeId).length
   const schedulePassing = assignments.length > 0 && violations.length === 0
-  const blockers = [
-    activeEmployeeCount === 0 ? 'Nobody is marked as working.' : null,
-    readinessProblems.length > 0
-      ? `${readinessProblems.length} shift${readinessProblems.length === 1 ? '' : 's'} nobody on the list can cover.`
-      : null,
-    assignments.length === 0 ? 'No schedule has been made yet.' : null,
-    assignments.length > 0 && !schedulePassing ? 'Some spots still need fixing.' : null,
-  ].filter((blocker): blocker is string => Boolean(blocker))
   const selectedRoles = availableRoles.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && (selectedRoles.length > 0 || draft.newHire)
 
@@ -1633,11 +1634,13 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     } else {
       setDraft(blankDraft(defaultRoleForRestaurant(restaurantId), allDays([fullDay]), availableRoles))
     }
+    setTab('staff')
     setEmployeePanelOpen(true)
   }
 
   function fixNextIssue() {
     if (!nextIssue) return
+    setTab('schedule')
     setGuidedChoosing(true)
     openSlot(nextIssue.slot?.id)
     const shiftKey = nextIssue.slot ? `${nextIssue.slot.day}-${nextIssue.slot.period}` : null
@@ -1687,7 +1690,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     if (isGenerating) return
     remember('previous schedule')
     setSelectedVariant(variant)
-    setGeneratingVariant(variant)
     setIsGenerating(true)
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
@@ -1745,7 +1747,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       })
     } finally {
       setIsGenerating(false)
-      setGeneratingVariant(null)
     }
   }
 
@@ -1872,12 +1873,13 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setAssignments((current) => {
       const existing = current.find((assignment) => assignment.slotId === slotId)
       if (!employeeId) return current.filter((assignment) => assignment.slotId !== slotId)
+      // A hand-picked person stays put when the week is made again.
       if (existing) {
         return current.map((assignment) =>
-          assignment.slotId === slotId ? { ...assignment, employeeId } : assignment,
+          assignment.slotId === slotId ? { ...assignment, employeeId, locked: true } : assignment,
         )
       }
-      return [...current, { slotId, employeeId }]
+      return [...current, { slotId, employeeId, locked: true }]
     })
   }
 
@@ -2025,19 +2027,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setDiagnostics(['Undid the last saved crew change.'])
   }
 
-  function makeInfeasible() {
-    remember('gap example')
-    setEmployees((current) =>
-      current.map((employee) =>
-        employee.roles.includes('lead') || employee.roles.includes('manager')
-          ? { ...employee, active: false }
-          : employee,
-      ),
-    )
-    setIgnoredIssueIds([])
-    setDiagnostics(['Everyone who can run a shift is now off the list. Press Make schedule to see what a week with missing cover looks like.'])
-  }
-
   return (
     <div className="bg-zinc-100 text-zinc-950">
       <header className="border-b border-zinc-200 bg-white">
@@ -2064,6 +2053,20 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             >
               {isGenerating ? 'Making schedule…' : 'Make schedule'}
             </Button>
+            <select
+              className="rounded border border-zinc-300 bg-white px-2 py-2 text-sm text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              aria-label="How to build the week"
+              value={selectedVariant}
+              onChange={(event) => setSelectedVariant(event.target.value as ScheduleVariant)}
+              disabled={isGenerating}
+              title={`${scheduleVariants.find((variant) => variant.id === selectedVariant)?.description} Anyone marked Keep stays put.`}
+            >
+              {scheduleVariants.map((variant) => (
+                <option key={variant.id} value={variant.id}>
+                  {variant.label}
+                </option>
+              ))}
+            </select>
             <Button onClick={fixNextIssue} icon="target" disabled={!nextIssue} badge={visibleFixIssues.length}>
               Fix next issue
             </Button>
@@ -2097,7 +2100,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                   Undo
                 </Button>
                 <Button
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    flushSync(() => setTab('schedule'))
+                    window.print()
+                  }}
                   icon="print"
                   disabled={!schedulePassing}
                   title={!schedulePassing ? 'Fix every spot before printing.' : 'Print the passing schedule.'}
@@ -2136,10 +2142,30 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             Add someone to the staff list before making a schedule.
           </p>
         )}
+        <nav className="mx-auto flex w-full max-w-none gap-1 px-4 print:hidden" aria-label="Scheduler sections">
+          {(
+            [
+              ['schedule', 'Schedule'],
+              ['staff', `Staff (${activeEmployeeCount})`],
+              ['rules', 'Shift rules'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={tab === id}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${
+                tab === id ? 'border-red-800 text-red-900' : 'border-transparent text-zinc-600 hover:text-zinc-900'
+              }`}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
       </header>
 
-      <div className="mx-auto grid w-full max-w-none min-w-0 gap-5 overflow-x-clip px-4 py-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
-        <main className="order-1 min-w-0 space-y-4">
+      <main className="mx-auto w-full max-w-none min-w-0 space-y-4 overflow-x-clip px-4 py-5">
           {storeLoading && (
             <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">
               <h2 className="text-sm font-semibold text-zinc-900">Connecting to the schedule store…</h2>
@@ -2225,6 +2251,20 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             />
           )}
 
+          {diagnostics.length > 0 && (
+            <div aria-live="polite" className="print:hidden">
+              <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
+                <ul className="space-y-1 text-sm text-zinc-700">
+                  {diagnostics.map((message, index) => (
+                    <li key={`${message}-${index}`}>{message}</li>
+                  ))}
+                </ul>
+              </Disclosure>
+            </div>
+          )}
+
+          {tab === 'schedule' && (
+          <>
           <GuidedFixPanel
             nextIssue={nextIssue}
             weekStart={weekStart}
@@ -2282,8 +2322,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2 print:hidden">
-                <WeekVisibilityToggle weekStart={weekStart} status={weekVisibility} onToggle={setWeekVisibility} />
-                <button
+                    <button
                   type="button"
                   className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
                   onClick={copyPriorWeek}
@@ -2323,7 +2362,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               </div>
             </div>
             <p className="mt-1 text-sm text-zinc-600 print:hidden">
-              Click a name to move it, then click where it goes.
+              Click a name to move it, then click where it goes. Open a shift to pick someone — picks stay put when you
+              make the schedule again.
               {weekStart && publishedWeeks[weekStart] && (
                 <> Last published: {formatUpdatedAt(publishedWeeks[weekStart]?.updatedAt)}.</>
               )}
@@ -2379,9 +2419,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               onActivateSlot={activateSlot}
               roles={availableRoles}
             />
-            <div className="print:hidden">
-              <VariantControls selectedVariant={selectedVariant} pendingVariant={generatingVariant} disabled={isGenerating} onGenerate={(id) => void generate(id)} />
-            </div>
           </section>
 
           {changes.length > 0 && (
@@ -2404,23 +2441,16 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             </div>
           )}
 
-          {diagnostics.length > 0 && (
-            <div aria-live="polite" className="print:hidden">
-              <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
-                <ul className="space-y-1 text-sm text-zinc-700">
-                  {diagnostics.map((message, index) => (
-                    <li key={`${message}-${index}`}>{message}</li>
-                  ))}
-                </ul>
-              </Disclosure>
-            </div>
-          )}
-
           <div className="space-y-1 pt-2 print:hidden">
             <Disclosure summary="Hours for each person" tone="quiet">
               <HoursSummary stats={stats} employees={employees} />
             </Disclosure>
 
+          </div>
+          </>
+          )}
+
+          {tab === 'rules' && (
             <TemplateEditor
               template={template}
               roles={availableRoles}
@@ -2445,29 +2475,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               updatedAt={templateUpdatedAt}
               weekStart={weekStart}
             />
+          )}
 
-          <Disclosure summary="About this demo" tone="quiet">
-            <ul className="space-y-2 text-sm text-zinc-700">
-              {schedulerAssumptions.map((assumption) => (
-                <li key={assumption}>{assumption}</li>
-              ))}
-            </ul>
-            {!scheduleOnly && (
-              <button
-                type="button"
-                className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                onClick={makeInfeasible}
-              >
-                <Icon name="warning" />
-                Show what a missing-coverage week looks like
-              </button>
-            )}
-            </Disclosure>
-          </div>
-        </main>
-
-        <aside className="order-2 min-w-0 space-y-4 print:hidden">
-          <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+          {tab === 'staff' && (
+          <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-semibold">Staff{weekStart ? ` — week of ${formatWeekRange(weekStart)}` : ''}</h2>
@@ -2667,11 +2678,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                   placeholder={employees.length > 8 ? `Search ${employees.length} staff by name or position` : 'Search by name or position'}
                 />
               </label>
-              <details className="mt-2" open={staffQuery.trim().length > 0}>
-                <summary className="cursor-pointer text-sm font-semibold text-zinc-800">
-                  Everyone on the list ({filteredEmployees.length}/{employees.length})
-                </summary>
-                <div className="mt-3 space-y-3">
+              <p className="mt-2 text-sm font-semibold text-zinc-800">
+                Everyone on the list ({filteredEmployees.length}/{employees.length})
+              </p>
+              <div className="mt-3 grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {filteredEmployees.map((employee) => (
                     <EmployeeCard
                       key={employee.id}
@@ -2686,29 +2696,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                   {filteredEmployees.length === 0 && (
                     <p className="text-sm text-zinc-600">Nobody matches &ldquo;{staffQuery.trim()}&rdquo;.</p>
                   )}
-                </div>
-              </details>
+              </div>
             </div>
           </section>
-
-          {blockers.length > 0 && (
-            <section className="rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
-              <h2 className="font-semibold text-amber-950">Before you print</h2>
-              <ul className="mt-3 space-y-2">
-                {blockers.map((blocker) => (
-                  <li key={blocker} className="flex items-start gap-2 text-sm text-amber-900">
-                    <span className="mt-0.5 shrink-0 text-amber-700">
-                      <Icon name="warning" />
-                    </span>
-                    {blocker}
-                  </li>
-                ))}
-              </ul>
-            </section>
           )}
-
-        </aside>
-      </div>
+      </main>
     </div>
   )
 }
@@ -3189,6 +3181,9 @@ function EmployeeCard({
           Max {employee.maxDaysPerWeek ?? 7} days · {employee.allowDoubles ? `doubles${employee.maxDoublesPerWeek !== undefined ? ` (max ${employee.maxDoublesPerWeek})` : ''}` : 'no doubles'} · Priority {employee.priority ?? DEFAULT_PRIORITY}
           {employee.suspendedFrom && ` · Suspended ${suspensionText(employee)}`}
         </p>
+        {(employee.shiftRoles?.length ?? 0) > 0 && (
+          <p className="mt-1 text-xs text-zinc-600">Only as: {shiftRolesText(employee)}</p>
+        )}
       </div>
     )
   }
@@ -3357,6 +3352,8 @@ function EmployeeCard({
         )}
       </fieldset>
 
+      <ShiftRolesEditor employee={employee} roles={visibleRoles} onUpdate={onUpdate} />
+
       <Disclosure summary="Edit availability" tone="quiet">
         <AvailabilityGridEditor
           recurringAvailability={employee.recurringAvailability}
@@ -3382,6 +3379,93 @@ function EmployeeCard({
         />
       </Disclosure>
     </div>
+  )
+}
+
+function shiftRolesText(employee: Employee) {
+  return (employee.shiftRoles ?? [])
+    .map((shiftRole) => `${shiftRole.day.slice(0, 3)} ${periodLabels[shiftRole.period]} → ${roleLabel(shiftRole.role)}`)
+    .join(', ')
+}
+
+function ShiftRolesEditor({
+  employee,
+  roles,
+  onUpdate,
+}: {
+  employee: Employee
+  roles: string[]
+  onUpdate: (employeeId: string, update: Partial<Employee>) => void
+}) {
+  const shiftRoles = employee.shiftRoles ?? []
+  const [day, setDay] = useState<DayOfWeek>(DAYS[0])
+  const [period, setPeriod] = useState<ShiftPeriod>('AM')
+  const [role, setRole] = useState(employee.roles[0] ?? roles[0] ?? '')
+  const selectClass =
+    'rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+
+  function save(next: Employee['shiftRoles']) {
+    onUpdate(employee.id, { shiftRoles: next && next.length > 0 ? next : undefined })
+  }
+
+  return (
+    <Disclosure summary={`Only one position on a shift${shiftRoles.length > 0 ? ` (${shiftRoles.length})` : ''}`} tone="quiet">
+      <p className="text-xs text-zinc-600">
+        On these shifts {employee.name} is only scheduled in the position picked here. Other shifts use every position above.
+      </p>
+      {shiftRoles.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {shiftRoles.map((shiftRole) => (
+            <li key={`${shiftRole.day}-${shiftRole.period}`} className="flex items-center justify-between gap-2 rounded bg-zinc-50 px-2 py-1 text-xs">
+              <span>
+                {shiftRole.day} {periodLabels[shiftRole.period]} → <span className="font-semibold">{roleLabel(shiftRole.role)}</span>
+              </span>
+              <button
+                type="button"
+                className="font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                onClick={() => save(shiftRoles.filter((candidate) => candidate !== shiftRole))}
+                aria-label={`Remove ${shiftRole.day} ${periodLabels[shiftRole.period]} rule`}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <select className={selectClass} aria-label="Day" value={day} onChange={(event) => setDay(event.target.value as DayOfWeek)}>
+          {DAYS.map((candidate) => (
+            <option key={candidate} value={candidate}>
+              {candidate}
+            </option>
+          ))}
+        </select>
+        <select className={selectClass} aria-label="Shift" value={period} onChange={(event) => setPeriod(event.target.value as ShiftPeriod)}>
+          {PERIODS.map((candidate) => (
+            <option key={candidate} value={candidate}>
+              {periodLabels[candidate]}
+            </option>
+          ))}
+        </select>
+        <select className={selectClass} aria-label="Position" value={role} onChange={(event) => setRole(event.target.value)}>
+          {roles.map((candidate) => (
+            <option key={candidate} value={candidate}>
+              {roleLabel(candidate)}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          disabled={!role}
+          onClick={() =>
+            save([...shiftRoles.filter((candidate) => candidate.day !== day || candidate.period !== period), { day, period, role }])
+          }
+        >
+          {shiftRoles.some((candidate) => candidate.day === day && candidate.period === period) ? 'Replace' : 'Add'}
+        </button>
+      </div>
+    </Disclosure>
   )
 }
 
@@ -3646,25 +3730,6 @@ function MonthStrip({
   )
 }
 
-function WeekVisibilityToggle({
-  weekStart,
-  status,
-  onToggle,
-}: {
-  weekStart: string
-  status: WeekStatus
-  onToggle: (weekStart: string, status: WeekStatus) => void
-}) {
-  if (!weekStart) return null
-  const on = status === 'on'
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <FlipSwitch on={on} onFlip={() => onToggle(weekStart, on ? 'off' : 'on')} label="This week" />
-      <span className={`text-xs font-bold ${on ? 'text-green-900' : 'text-zinc-500'}`}>Week {on ? 'on' : 'off'}</span>
-    </span>
-  )
-}
-
 function FlipSwitch({
   on,
   onFlip,
@@ -3727,51 +3792,6 @@ function GenerationReportBanner({ report, onDismiss }: { report: GenerationRepor
       >
         Dismiss
       </button>
-    </div>
-  )
-}
-
-function VariantControls({
-  selectedVariant,
-  pendingVariant,
-  disabled = false,
-  onGenerate,
-}: {
-  selectedVariant: ScheduleVariant
-  pendingVariant: ScheduleVariant | null
-  disabled?: boolean
-  onGenerate: (variant: ScheduleVariant) => void
-}) {
-  return (
-    <div className="mt-4 border-t border-zinc-100 pt-4">
-      <p className="text-sm text-zinc-600">Other ways to build this week. Anyone marked Keep stays put.</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-      {scheduleVariants.map((variant) => {
-        const pending = pendingVariant === variant.id
-        return (
-          <button
-            key={variant.id}
-            type="button"
-            className={`inline-flex items-center justify-center gap-2 rounded border px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-not-allowed disabled:opacity-70 ${
-              selectedVariant === variant.id
-                ? 'border-red-800 bg-red-800 text-white'
-                : 'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100'
-            }`}
-            onClick={() => onGenerate(variant.id)}
-            disabled={disabled}
-            aria-busy={pending}
-            title={pending ? 'Building this schedule…' : variant.description}
-          >
-            {pending ? (
-              <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Icon name={variant.icon} />
-            )}
-            {pending ? 'Making…' : variant.label}
-          </button>
-        )
-      })}
-      </div>
     </div>
   )
 }
@@ -3951,8 +3971,9 @@ function TemplateEditor({
 }) {
   if (readOnly) {
     return (
-      <Disclosure summary="Schedule rules (locked)" tone="quiet">
-        <p className="text-sm text-zinc-600">
+      <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
+        <h2 className="font-semibold">Shift rules (locked)</h2>
+        <p className="mt-0.5 text-sm text-zinc-600">
           The spots below are locked for this station — unlock with the staff password to change this week’s rules. You build
           the week by putting the crew into them and moving people around.
         </p>
@@ -3979,7 +4000,7 @@ function TemplateEditor({
             </div>
           ))}
         </div>
-      </Disclosure>
+      </section>
     )
   }
 
@@ -4001,10 +4022,11 @@ function TemplateEditor({
   }
 
   return (
-    <Disclosure summary="Schedule rules" tone="quiet">
+    <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm text-zinc-600">Who the restaurant needs on each shift for this week. Add, remove, or change any spot.</p>
+          <h2 className="font-semibold">Shift rules</h2>
+          <p className="mt-0.5 text-sm text-zinc-600">Who the restaurant needs on each shift for this week. Add, remove, or change any spot.</p>
           <p className="mt-0.5 text-xs text-zinc-500">
             Extra 12-7 / 4-7 help goes here as an added spot with exact times (e.g. Mid 12:00 PM - 4:00 PM,
             Evening 4:00 PM - 7:00 PM) on top of the core AM/PM spots.
@@ -4130,7 +4152,7 @@ function TemplateEditor({
           </div>
         ))}
       </div>
-    </Disclosure>
+    </section>
   )
 }
 
@@ -4941,7 +4963,7 @@ function SlotEditor({
           checked={assignment?.locked ?? false}
           onChange={(event) => onLock(slot.id, event.target.checked)}
         />
-        Keep this person here
+        Keep here when making the schedule
       </label>
       {isDropTarget && movePreview && (
         <div

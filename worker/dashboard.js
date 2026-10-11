@@ -403,6 +403,21 @@ function isValidStoredEmployee(value) {
         if (typeof employee.priority !== 'number' || !Number.isInteger(employee.priority) || employee.priority < 1 || employee.priority > 5)
             return false;
     }
+    if (employee.shiftRoles !== undefined) {
+        if (!Array.isArray(employee.shiftRoles) || employee.shiftRoles.length > ROSTER_DAYS.length * 2)
+            return false;
+        const seen = new Set();
+        for (const entry of employee.shiftRoles) {
+            if (!entry || typeof entry !== 'object')
+                return false;
+            const { day, period, role } = entry;
+            if (typeof day !== 'string' || !ROSTER_DAYS.includes(day) || (period !== 'AM' && period !== 'PM') || !isValidRole(role))
+                return false;
+            if (seen.has(`${day}:${period}`))
+                return false;
+            seen.add(`${day}:${period}`);
+        }
+    }
     return true;
 }
 export function validateRosterBody(body) {
