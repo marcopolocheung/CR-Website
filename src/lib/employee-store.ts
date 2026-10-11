@@ -16,6 +16,7 @@ export type RosterEmployee = Pick<
   | 'suspendedFrom'
   | 'suspendedUntil'
   | 'priority'
+  | 'shiftRoles'
 >
 
 export function toRosterEmployee(employee: Employee): RosterEmployee {
@@ -33,6 +34,7 @@ export function toRosterEmployee(employee: Employee): RosterEmployee {
     suspendedFrom: employee.suspendedFrom,
     suspendedUntil: employee.suspendedUntil,
     priority: employee.priority,
+    shiftRoles: employee.shiftRoles,
   }
 }
 

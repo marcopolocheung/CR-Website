@@ -116,6 +116,13 @@ export type ShiftPreference = {
   weight: number
 }
 
+/** Locks a person to one post on one recurring shift, e.g. Tuesday PM only as Dishwasher. */
+export type ShiftRole = {
+  day: DayOfWeek
+  period: ShiftPeriod
+  role: Role
+}
+
 export type Employee = {
   id: string
   name: string
@@ -130,6 +137,7 @@ export type Employee = {
   preferredDaysPerWeek?: number
   preferredHoursPerWeek?: number
   preferences?: ShiftPreference[]
+  shiftRoles?: ShiftRole[]
   incompatibleEmployeeIds?: string[]
   active: boolean
   newHire?: boolean

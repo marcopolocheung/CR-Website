@@ -3,6 +3,7 @@ import type {
   Employee,
   ScheduleAssignment,
   ScheduleStats,
+  ShiftPeriod,
   StaffingSlot,
   TimeRange,
   ValidationViolation,
@@ -47,7 +48,13 @@ const IMPLIED_ROLES: Record<string, string> = {
   'meat-prep': 'mv-prep',
 }
 
+export function shiftRoleFor(employee: Employee, day: DayOfWeek, period: ShiftPeriod) {
+  return employee.shiftRoles?.find((shiftRole) => shiftRole.day === day && shiftRole.period === period)?.role
+}
+
 export function isEmployeeQualified(employee: Employee, slot: StaffingSlot) {
+  const onlyRole = shiftRoleFor(employee, slot.day, slot.period)
+  if (onlyRole) return onlyRole === slot.role
   if (employee.newHire) return true
   if (employee.roles.includes(slot.role)) return true
   const impliedBy = IMPLIED_ROLES[slot.role]
