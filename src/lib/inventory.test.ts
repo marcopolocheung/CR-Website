@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ITEMS, ordersBySupplier, parseAmount, suggestOrder } from './inventory'
+import { DEFAULT_SHEETS, listProblem, newItemId, ordersBySupplier, parseAmount, suggestOrder } from './inventory'
+
+const ITEMS = DEFAULT_SHEETS.flatMap(s => s.items)
 
 test('item ids are unique and fit the Worker pattern', () => {
   const ids = ITEMS.map(i => i.id)
@@ -31,6 +33,23 @@ test('orders top up to Use, matching the paper sheets', () => {
 })
 
 test('orders group by supplier and skip blanks', () => {
-  const groups = ordersBySupplier({ rice: { inv: '11', order: '4' }, sugar: { inv: '5', order: '3' }, egg: { inv: '3', order: ' ' } })
+  const groups = ordersBySupplier(DEFAULT_SHEETS, { rice: { inv: '11', order: '4' }, sugar: { inv: '5', order: '3' }, egg: { inv: '3', order: ' ' } })
   assert.deepEqual(groups.map(g => [g.sup, g.lines.map(l => l.order)]), [['D', ['3']], ['L/D', ['4']]])
+})
+
+test('new item ids are readable and never collide', () => {
+  const taken = new Set(['pork'])
+  assert.equal(newItemId('Pork', taken), 'pork-2')
+  assert.equal(newItemId('Pork', taken), 'pork-3')
+  assert.equal(newItemId('Bok Choy (Baby)', taken), 'bok-choy-baby')
+  assert.equal(newItemId('✓✓', taken), 'item')
+})
+
+test('edited lists are checked before saving', () => {
+  assert.equal(listProblem(DEFAULT_SHEETS), null)
+  const edit = (patch: object) => [{ ...DEFAULT_SHEETS[0], items: [{ ...DEFAULT_SHEETS[0].items[0], ...patch }] }]
+  assert.match(listProblem(edit({ name: '  ' }))!, /needs an item name/)
+  assert.match(listProblem(edit({ use: 'lots' }))!, /Use must be a number/)
+  assert.equal(listProblem(edit({ use: '1 1/2' })), null)
+  assert.equal(listProblem(edit({ use: '' })), null)
 })

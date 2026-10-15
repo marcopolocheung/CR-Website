@@ -18,6 +18,7 @@ import handler, {
   validateUpdateBody,
   validateCashoutBody,
   validateInventoryBody,
+  validateInventoryListBody,
   validateWriteUpForm,
 } from './index'
 
@@ -1018,6 +1019,52 @@ test('inventory bodies are strictly validated', () => {
   assert.equal(validateInventoryBody({ counts: { rice: null } }), null)
   const many = Object.fromEntries(Array.from({ length: 301 }, (_, i) => [`item-${i}`, { inv: '', order: '' }]))
   assert.equal(validateInventoryBody({ counts: many }), null)
+})
+
+const listSheet = { id: 'cooler', useLabel: 'Use', showSup: true, items: [{ id: 'egg', name: 'Egg', sup: 'D/L', use: '5', gray: true }] }
+const pepsiSheet = { id: 'pepsi', title: 'PEPSI PRODCUTS', account: '3923058', useLabel: 'UNOPEN BOX', showSup: false, items: [{ id: 'pepsi', name: 'PEPSI', sup: 'Pepsi', use: '6', gray: false }] }
+
+test('the inventory item list needs the manager token and starts empty', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(request('GET', '/api/inventory/CR3/list'), env)).status, 401)
+  assert.equal((await handler.fetch(authed('PUT', '/api/inventory/CR3/list', { sheets: [listSheet], baseRev: 0 }, 'wrong'), env)).status, 401)
+  const empty = await (await handler.fetch(authed('GET', '/api/inventory/CR3/list'), env)).json()
+  assert.deepEqual([empty.rev, empty.sheets], [0, null])
+})
+
+test('inventory item list saves with a rev and rejects stale writes', async () => {
+  const env = mockEnv()
+  const save = (baseRev: number, sheets: unknown[] = [listSheet, pepsiSheet]) =>
+    handler.fetch(authed('PUT', '/api/inventory/CR3/list', { sheets, baseRev }), env)
+  const first = await save(0)
+  assert.equal(first.status, 200)
+  assert.equal((await first.json()).rev, 1)
+  const stale = await save(0)
+  assert.equal(stale.status, 409)
+  assert.equal((await stale.json()).rev, 1)
+  assert.equal((await save(1)).status, 200)
+  const saved = await (await handler.fetch(authed('GET', '/api/inventory/CR3/list'), env)).json()
+  assert.equal(saved.rev, 2)
+  assert.deepEqual(saved.sheets, [listSheet, pepsiSheet])
+  // A count day still saves alongside the list.
+  assert.equal((await handler.fetch(authed('PUT', '/api/inventory/CR3/2026-10-15', inventoryBody), env)).status, 200)
+})
+
+test('inventory item lists are strictly validated', () => {
+  const ok = { sheets: [listSheet, pepsiSheet], baseRev: 0 }
+  assert.ok(validateInventoryListBody(ok))
+  const withItem = (patch: object) => ({ sheets: [{ ...listSheet, items: [{ ...listSheet.items[0], ...patch }] }], baseRev: 0 })
+  assert.equal(validateInventoryListBody({ ...ok, baseRev: -1 }), null)
+  assert.equal(validateInventoryListBody({ sheets: [], baseRev: 0 }), null)
+  assert.equal(validateInventoryListBody(withItem({ name: '   ' })), null)
+  assert.equal(validateInventoryListBody(withItem({ id: 'Bad Id' })), null)
+  assert.equal(validateInventoryListBody(withItem({ use: '✓' })), null)
+  assert.equal(validateInventoryListBody(withItem({ gray: 'yes' })), null)
+  assert.equal(validateInventoryListBody(withItem({ extra: '<script>' }))?.sheets[0].items[0].hasOwnProperty('extra'), false)
+  // Ids are unique across sheets, since counts are keyed by item id alone.
+  assert.equal(validateInventoryListBody({ sheets: [listSheet, { ...pepsiSheet, items: listSheet.items }], baseRev: 0 }), null)
+  const many = Array.from({ length: 301 }, (_, i) => ({ ...listSheet.items[0], id: `item-${i}` }))
+  assert.equal(validateInventoryListBody({ sheets: [{ ...listSheet, items: many }], baseRev: 0 }), null)
 })
 
 const writeUp = {

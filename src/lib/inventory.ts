@@ -22,7 +22,7 @@ const sheet = (id: string, rows: Row[], extra: Partial<InventorySheet> = {}): In
   items: rows.map(([name, sup, use, gray, note]) => ({ id: toId(name), name, sup, use, gray: gray === 1, note })),
 })
 
-export const SHEETS: InventorySheet[] = [
+export const DEFAULT_SHEETS: InventorySheet[] = [
   sheet('to-go', [
     ['Fortune Cookies', 'D', '1', 0],
     ['CUP HOLDER', 'L', '1/2', 1],
@@ -179,8 +179,6 @@ export const SHEETS: InventorySheet[] = [
   ]),
 ]
 
-export const ITEMS = SHEETS.flatMap(s => s.items)
-
 /** "3", "1/2", or "1 1/2" → number; anything else (✓, "3B/2T", blank) → null. */
 export function parseAmount(text: string): number | null {
   const t = text.trim()
@@ -201,13 +199,40 @@ export function suggestOrder(use: string, inv: string): string {
 }
 
 /** Every non-empty order, grouped by supplier in sheet order. */
-export function ordersBySupplier(counts: InventoryCounts): { sup: string; lines: { item: InventoryItem; order: string }[] }[] {
+export function ordersBySupplier(sheets: InventorySheet[], counts: InventoryCounts): { sup: string; lines: { item: InventoryItem; order: string }[] }[] {
   const groups = new Map<string, { item: InventoryItem; order: string }[]>()
-  for (const item of ITEMS) {
+  for (const item of sheets.flatMap(s => s.items)) {
     const order = counts[item.id]?.order.trim()
     if (!order) continue
     const sup = item.sup || 'No supplier'
     groups.set(sup, [...(groups.get(sup) ?? []), { item, order }])
   }
   return [...groups].map(([sup, lines]) => ({ sup, lines }))
+}
+
+// Matches the Worker's limits so a bad list is caught before Save.
+export const MAX_ITEMS = 300
+const USE_RE = /^[A-Za-z0-9./ ]{0,12}$/
+
+/** A readable id from the name, unique against `taken` (which it then joins). */
+export function newItemId(name: string, taken: Set<string>): string {
+  const base = toId(name).slice(0, 50) || 'item'
+  let id = base
+  for (let n = 2; taken.has(id); n++) id = `${base}-${n}`
+  taken.add(id)
+  return id
+}
+
+/** First thing wrong with an edited list, in words a manager can act on. */
+export function listProblem(sheets: InventorySheet[]): string | null {
+  const items = sheets.flatMap(s => s.items)
+  if (items.length > MAX_ITEMS) return `The list can hold ${MAX_ITEMS} items; it has ${items.length}.`
+  for (const item of items) {
+    if (!item.name.trim()) return 'Every row needs an item name.'
+    if (item.name.length > 60) return `"${item.name.slice(0, 20)}…" is too long. Keep names under 60 characters.`
+    if (item.sup.length > 10) return `${item.name}: keep SUP under 10 characters.`
+    if (!USE_RE.test(item.use) || (item.use.trim() && parseAmount(item.use) === null)) return `${item.name}: Use must be a number like 3 or 1/2, or blank.`
+    if ((item.note ?? '').length > 20) return `${item.name}: keep the note under 20 characters.`
+  }
+  return null
 }

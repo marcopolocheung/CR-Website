@@ -2,9 +2,19 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { CodeGate } from './CashOut'
-import { CHECK, SHEETS, ordersBySupplier, suggestOrder, type InventoryCounts, type InventoryItem, type InventorySheet } from '@/lib/inventory'
-import { fetchInventoryHistory, saveInventoryDay, type InventoryDay } from '@/lib/inventory-store'
-import { StoreAuthError } from '@/lib/schedule-store'
+import {
+  CHECK,
+  DEFAULT_SHEETS,
+  listProblem,
+  newItemId,
+  ordersBySupplier,
+  suggestOrder,
+  type InventoryCounts,
+  type InventoryItem,
+  type InventorySheet,
+} from '@/lib/inventory'
+import { fetchInventoryHistory, fetchInventoryList, saveInventoryDay, saveInventoryList, type InventoryDay } from '@/lib/inventory-store'
+import { StoreAuthError, StoreConflictError } from '@/lib/schedule-store'
 
 const STORAGE_KEY = 'cr-inventory'
 // The paper sheets have five INV / ORDER pairs: four earlier counts plus today.
@@ -19,6 +29,9 @@ const button = 'px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50'
 const cellBorder = 'border border-black'
 // Earlier days are hidden on phones so today's INV / ORDER fit without scrolling.
 const pastOnly = 'max-sm:hidden'
+// New rows get a temporary id until the list is saved; real ids never start with "-".
+const isNewId = (id: string) => id.startsWith('-')
+let nextNewId = 0
 
 /** CR3 supply inventory: the clipboard sheets on screen, behind the manager code. */
 export default function Inventory() {
@@ -36,6 +49,10 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
   const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sheets, setSheets] = useState<InventorySheet[]>(DEFAULT_SHEETS)
+  const [listRev, setListRev] = useState(0)
+  // The item list being edited, or null while counting.
+  const [draft, setDraft] = useState<InventorySheet[] | null>(null)
 
   const run = useCallback(
     async (task: () => Promise<string | void>) => {
@@ -65,6 +82,9 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
     }
     setLoaded(true)
     run(async () => {
+      const list = await fetchInventoryList(token)
+      setSheets(list.sheets ?? DEFAULT_SHEETS)
+      setListRev(list.rev)
       const days = await fetchInventoryHistory(start, token)
       setHistory(days)
       const saved = days.find(d => d.date === start)
@@ -95,13 +115,35 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
       return `Saved ${date}.`
     })
 
+  const saveList = () => {
+    if (!draft) return
+    const problem = listProblem(draft)
+    if (problem) return setStatus(problem)
+    run(async () => {
+      const taken = new Set(draft.flatMap(sh => sh.items.map(i => i.id)))
+      const next = draft.map(sh => ({ ...sh, items: sh.items.map(i => ({ ...i, name: i.name.trim(), id: isNewId(i.id) ? newItemId(i.name, taken) : i.id })) }))
+      try {
+        setListRev(await saveInventoryList(next, listRev, token))
+      } catch (caught) {
+        if (!(caught instanceof StoreConflictError)) throw caught
+        const latest = await fetchInventoryList(token)
+        setSheets(latest.sheets ?? DEFAULT_SHEETS)
+        setListRev(latest.rev)
+        return 'Someone else saved the list while you were editing. Your changes are still on screen: Save list again to replace theirs, or Cancel to see theirs.'
+      }
+      setSheets(next)
+      setDraft(null)
+      return 'Item list saved.'
+    })
+  }
+
   const setInv = (item: InventoryItem, inv: string) =>
     setCounts(c => ({ ...c, [item.id]: { inv, order: suggestOrder(item.use, inv) } }))
   const setOrder = (item: InventoryItem, order: string) =>
     setCounts(c => ({ ...c, [item.id]: { inv: c[item.id]?.inv ?? '', order } }))
 
   const past = history.filter(d => d.date < date).slice(0, PAST_COLUMNS).reverse()
-  const orders = ordersBySupplier(counts)
+  const orders = ordersBySupplier(sheets, counts)
   const orderText = [`CR3 order ${date}`, ...orders.map(g => `\n${g.sup}\n${g.lines.map(l => `  ${l.item.name}: ${l.order}`).join('\n')}`)].join('\n')
 
   return (
@@ -117,24 +159,49 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
           />
         </div>
-        <button onClick={save} disabled={busy} className={`${button} bg-red-600 text-white hover:bg-red-700`}>Save count</button>
-        <button onClick={() => window.print()} className={`${button} border border-gray-300 hover:bg-gray-50`}>Print</button>
-        <button
-          onClick={() => confirm('Clear every count on screen? Saved counts are not touched.') && setCounts({})}
-          className={`${button} border border-red-300 text-red-700 hover:bg-red-50`}
-        >
-          Clear
-        </button>
+        {draft ? (
+          <>
+            <button onClick={saveList} disabled={busy} className={`${button} bg-red-600 text-white hover:bg-red-700`}>Save list</button>
+            <button onClick={() => confirm('Drop your changes to the item list?') && setDraft(null)} className={`${button} border border-gray-300 hover:bg-gray-50`}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={save} disabled={busy} className={`${button} bg-red-600 text-white hover:bg-red-700`}>Save count</button>
+            <button onClick={() => window.print()} className={`${button} border border-gray-300 hover:bg-gray-50`}>Print</button>
+            <button
+              onClick={() => confirm('Clear every count on screen? Saved counts are not touched.') && setCounts({})}
+              className={`${button} border border-red-300 text-red-700 hover:bg-red-50`}
+            >
+              Clear
+            </button>
+            <button onClick={() => setDraft(structuredClone(sheets))} disabled={busy} className={`${button} border border-gray-300 hover:bg-gray-50`}>
+              Edit list
+            </button>
+          </>
+        )}
         <p role="status" className="text-sm text-gray-700">{status}</p>
       </div>
       <p className="text-sm text-gray-600 mb-6 print:hidden">
-        Write a count in INV, or tap {CHECK} if there is enough. ORDER fills in with what it takes to get back to Use; change it if needed.
+        {draft
+          ? 'Change names, suppliers, and Use numbers, shade rows gray, reorder, add, or remove items. Counts already saved stay with their item even if it is renamed.'
+          : `Write a count in INV, or tap ${CHECK} if there is enough. ORDER fills in with what it takes to get back to Use; change it if needed.`}
       </p>
 
-      {SHEETS.map(sheet => (
-        <SheetTable key={sheet.id} sheet={sheet} date={date} past={past} counts={counts} onInv={setInv} onOrder={setOrder} />
-      ))}
+      {draft
+        ? draft.map((sheet, si) => (
+            <EditSheetTable
+              key={sheet.id}
+              sheet={sheet}
+              onChange={items => setDraft(d => d && d.map((sh, i) => (i === si ? { ...sh, items } : sh)))}
+            />
+          ))
+        : sheets.map(sheet => (
+            <SheetTable key={sheet.id} sheet={sheet} date={date} past={past} counts={counts} onInv={setInv} onOrder={setOrder} />
+          ))}
 
+      {!draft && (
       <section className="mt-10 max-w-xl print:break-before-page">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-semibold text-gray-900">Order list · {shortDate(date)}</h2>
@@ -165,7 +232,74 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
           ))
         )}
       </section>
+      )}
     </div>
+  )
+}
+
+function EditSheetTable({ sheet, onChange }: { sheet: InventorySheet; onChange: (items: InventoryItem[]) => void }) {
+  const items = sheet.items
+  const update = (index: number, patch: Partial<InventoryItem>) => onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)))
+  const move = (index: number, by: number) => {
+    const next = [...items]
+    const [item] = next.splice(index, 1)
+    next.splice(index + by, 0, item)
+    onChange(next)
+  }
+  const remove = (index: number) => {
+    const name = items[index].name.trim()
+    if (!name || confirm(`Remove ${name}? Its saved counts stay on the server but stop showing.`)) onChange(items.filter((_, i) => i !== index))
+  }
+  const add = () => onChange([...items, { id: `-new-${nextNewId++}`, name: '', sup: '', use: '', gray: false }])
+  const field = 'bg-transparent px-1 py-1 text-center font-bold border border-dashed border-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500'
+  const icon = 'w-7 h-7 rounded hover:bg-white/70 disabled:opacity-30'
+
+  return (
+    <section className="mb-10 overflow-x-auto">
+      <div className="w-max max-w-full">
+        {sheet.title && <h2 className="font-bold underline mb-1">{sheet.title}</h2>}
+        <table className="border-collapse border-2 border-black text-sm bg-white font-sans">
+          <thead>
+            <tr className="font-bold">
+              <th scope="col" className={`${cellBorder} px-2 py-1`}>ITEM</th>
+              {sheet.showSup && <th scope="col" className={`${cellBorder} px-1 py-1`}>SUP</th>}
+              <th scope="col" className={`${cellBorder} px-2 py-1 leading-tight`}>{sheet.useLabel}</th>
+              <th scope="col" className={`${cellBorder} px-2 py-1`}>Gray</th>
+              <th scope="col" className={`${cellBorder} px-2 py-1`}><span className="sr-only">Move or remove</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, i) => {
+              const label = item.name.trim() || `Row ${i + 1}`
+              return (
+                <tr key={item.id} className={item.gray ? GRAY : ''}>
+                  <td className={`${cellBorder} p-1`}>
+                    <input aria-label={`${label} name`} value={item.name} maxLength={60} onChange={e => update(i, { name: e.target.value })} className={`${field} w-28 sm:w-80`} />
+                  </td>
+                  {sheet.showSup && (
+                    <td className={`${cellBorder} p-1`}>
+                      <input aria-label={`${label} supplier`} value={item.sup} maxLength={10} onChange={e => update(i, { sup: e.target.value })} className={`${field} w-10 sm:w-14`} />
+                    </td>
+                  )}
+                  <td className={`${cellBorder} p-1`}>
+                    <input aria-label={`${label} use`} value={item.use} maxLength={12} onChange={e => update(i, { use: e.target.value })} className={`${field} w-10 sm:w-14`} />
+                  </td>
+                  <td className={`${cellBorder} px-2 text-center`}>
+                    <input type="checkbox" aria-label={`${label} gray`} checked={item.gray} onChange={e => update(i, { gray: e.target.checked })} className="w-4 h-4 accent-gray-600" />
+                  </td>
+                  <td className={`${cellBorder} px-1 whitespace-nowrap`}>
+                    <button onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${label} up`} className={icon}>↑</button>
+                    <button onClick={() => move(i, 1)} disabled={i === items.length - 1} aria-label={`Move ${label} down`} className={icon}>↓</button>
+                    <button onClick={() => remove(i)} aria-label={`Remove ${label}`} className={`${icon} text-red-700`}>✕</button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <button onClick={add} className="mt-2 px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">+ Add item</button>
+      </div>
+    </section>
   )
 }
 
