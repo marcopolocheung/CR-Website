@@ -637,6 +637,34 @@ export function cashoutHistoryDates(to) {
     const end = Date.parse(`${to}T00:00:00Z`);
     return Array.from({ length: CASHOUT_HISTORY_DAYS }, (_, i) => new Date(end - i * 86400000).toISOString().slice(0, 10));
 }
+// --- Supply inventory counts (one sheet per store per day) ---
+const INVENTORY_TTL_SECONDS = 366 * 86400;
+const INVENTORY_HISTORY_DAYS = 14;
+const MAX_INVENTORY_ITEMS = 300;
+const INVENTORY_ITEM_RE = /^[a-z0-9-]{1,60}$/;
+// Counts like "3", "1/2", "3B/2T", or the ✓ mark for "enough".
+const INVENTORY_CELL_RE = /^[A-Za-z0-9./ ✓]{0,12}$/;
+export function validateInventoryBody(raw) {
+    const counts = raw?.counts;
+    if (!counts || typeof counts !== 'object' || Array.isArray(counts))
+        return null;
+    const entries = Object.entries(counts);
+    if (entries.length > MAX_INVENTORY_ITEMS)
+        return null;
+    const out = {};
+    for (const [id, cell] of entries) {
+        const { inv, order } = (cell ?? {});
+        if (!INVENTORY_ITEM_RE.test(id) || typeof inv !== 'string' || typeof order !== 'string')
+            return null;
+        if (!INVENTORY_CELL_RE.test(inv) || !INVENTORY_CELL_RE.test(order))
+            return null;
+        out[id] = { inv, order };
+    }
+    return { counts: out };
+}
+function inventoryKey(store, date) {
+    return `inventory:${store}:${date}`;
+}
 // --- Employee write-ups (record of corrective action) ---
 export const WRITEUP_VIOLATIONS = ['attendance', 'job-performance', 'conduct', 'company-policy', 'others'];
 export const WRITEUP_ACTIONS = ['verbal', 'written', 'suspension', 'termination'];
@@ -906,6 +934,46 @@ export default {
             // shortcut: last save wins, add a rev check if two managers ever edit the same day at once.
             const doc = { v: 1, store, date, ...valid, updatedAt: new Date().toISOString() };
             await env.SCHEDULES.put(cashoutKey(store, date), JSON.stringify(doc), { expirationTtl: CASHOUT_TTL_SECONDS });
+            return json({ updatedAt: doc.updatedAt }, 200, request, env);
+        }
+        // Inventory counts: manager token for reads and writes. GET returns the last 14 days so the sheet can show earlier columns.
+        const inventoryMatch = path.match(/^\/api\/inventory\/(CR3)(?:\/(\d{4}-\d{2}-\d{2}))?$/);
+        if (inventoryMatch && ((request.method === 'GET' && !inventoryMatch[2]) || (request.method === 'PUT' && inventoryMatch[2]))) {
+            const store = inventoryMatch[1];
+            const date = inventoryMatch[2];
+            const denied = await managerAuthError(request, env);
+            if (denied)
+                return denied;
+            if (request.method === 'GET') {
+                const to = url.searchParams.get('to') ?? '';
+                if (!WEEK_RE.test(to) || Number.isNaN(Date.parse(to)))
+                    return json({ error: 'invalid_to' }, 400, request, env);
+                const dates = cashoutHistoryDates(to).slice(0, INVENTORY_HISTORY_DAYS);
+                const raws = await Promise.all(dates.map((d) => env.SCHEDULES.get(inventoryKey(store, d))));
+                const days = raws.flatMap((raw) => {
+                    const doc = raw ? safeParse(raw) : null;
+                    return doc ? [{ date: doc.date, counts: doc.counts, updatedAt: doc.updatedAt }] : [];
+                });
+                return json({ days }, 200, request, env, { 'Cache-Control': 'no-store' });
+            }
+            if (Number.isNaN(Date.parse(date)))
+                return json({ error: 'not_found' }, 404, request, env);
+            if (!(await checkWriteThrottle(env, clientIp(request)))) {
+                return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' });
+            }
+            let body;
+            try {
+                body = await readBody(request);
+            }
+            catch {
+                return json({ error: 'body_too_large' }, 413, request, env);
+            }
+            const valid = validateInventoryBody(body);
+            if (!valid)
+                return json({ error: 'invalid_body' }, 400, request, env);
+            // shortcut: last save wins, add a rev check if two people ever count the same day at once.
+            const doc = { v: 1, store, date, ...valid, updatedAt: new Date().toISOString() };
+            await env.SCHEDULES.put(inventoryKey(store, date), JSON.stringify(doc), { expirationTtl: INVENTORY_TTL_SECONDS });
             return json({ updatedAt: doc.updatedAt }, 200, request, env);
         }
         // Employee write-ups: manager token for reads and writes. The form is fixed once saved; only the label changes.
