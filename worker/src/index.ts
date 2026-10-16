@@ -783,6 +783,46 @@ function inventoryKey(store: string, date: string) {
   return `inventory:${store}:${date}`
 }
 
+// The item list itself. Absent until a manager first saves it; the page then uses the built-in paper list.
+const MAX_INVENTORY_SHEETS = 20
+const MAX_INVENTORY_LIST_CHARS = 64000
+
+export type InventoryListItem = { id: string; name: string; sup: string; use: string; gray: boolean; note?: string }
+export type InventoryListSheet = { id: string; title?: string; account?: string; useLabel: string; showSup: boolean; items: InventoryListItem[] }
+export type InventoryListDoc = { v: 1; rev: number; sheets: InventoryListSheet[]; updatedAt: string }
+
+const optionalText = (v: unknown, max: number) => v === undefined || isText(v, max)
+
+export function validateInventoryListBody(raw: unknown): { sheets: InventoryListSheet[]; baseRev: number } | null {
+  const { sheets, baseRev } = (raw ?? {}) as Record<string, unknown>
+  if (!Number.isInteger(baseRev) || (baseRev as number) < 0) return null
+  if (!Array.isArray(sheets) || sheets.length < 1 || sheets.length > MAX_INVENTORY_SHEETS) return null
+  const ids = new Set<string>()
+  const out: InventoryListSheet[] = []
+  for (const sheet of sheets) {
+    const s = (sheet ?? {}) as Record<string, unknown>
+    if (!INVENTORY_ITEM_RE.test(String(s.id)) || !isText(s.useLabel, 20) || typeof s.showSup !== 'boolean') return null
+    if (!optionalText(s.title, 60) || !optionalText(s.account, 30) || !Array.isArray(s.items)) return null
+    const items: InventoryListItem[] = []
+    for (const item of s.items) {
+      const i = (item ?? {}) as Record<string, unknown>
+      if (typeof i.id !== 'string' || !INVENTORY_ITEM_RE.test(i.id) || ids.has(i.id)) return null
+      if (!isText(i.name, 60) || !i.name.trim() || !isText(i.sup, 10) || typeof i.gray !== 'boolean') return null
+      if (typeof i.use !== 'string' || !INVENTORY_CELL_RE.test(i.use) || i.use.includes('✓') || !optionalText(i.note, 20)) return null
+      ids.add(i.id)
+      items.push({ id: i.id, name: i.name, sup: i.sup, use: i.use, gray: i.gray, ...(i.note ? { note: i.note as string } : {}) })
+    }
+    const { title, account } = s as { title?: string; account?: string }
+    out.push({ id: String(s.id), ...(title ? { title } : {}), ...(account ? { account } : {}), useLabel: s.useLabel as string, showSup: s.showSup, items })
+  }
+  if (ids.size > MAX_INVENTORY_ITEMS) return null
+  return { sheets: out, baseRev: baseRev as number }
+}
+
+function inventoryListKey(store: string) {
+  return `inventory-list:${store}`
+}
+
 // --- Employee write-ups (record of corrective action) ---
 
 export const WRITEUP_VIOLATIONS = ['attendance', 'job-performance', 'conduct', 'company-policy', 'others'] as const
@@ -955,9 +995,9 @@ async function checkVerifyThrottle(env: Env, ip: string): Promise<boolean> {
   }
 }
 
-async function readBody(request: Request): Promise<unknown> {
+async function readBody(request: Request, maxChars = MAX_BODY_CHARS): Promise<unknown> {
   const text = await request.text()
-  if (text.length > MAX_BODY_CHARS) throw new Error('body_too_large')
+  if (text.length > maxChars) throw new Error('body_too_large')
   try {
     return JSON.parse(text)
   } catch {
@@ -1075,6 +1115,36 @@ export default {
       const doc: CashoutDay = { v: 1, store, date, ...valid, updatedAt: new Date().toISOString() }
       await env.SCHEDULES.put(cashoutKey(store, date), JSON.stringify(doc), { expirationTtl: CASHOUT_TTL_SECONDS })
       return json({ updatedAt: doc.updatedAt }, 200, request, env)
+    }
+
+    // Inventory item list: manager token for reads and writes, rev-checked so two editors cannot clobber each other.
+    const inventoryListMatch = path.match(/^\/api\/inventory\/(CR3)\/list$/)
+    if (inventoryListMatch && (request.method === 'GET' || request.method === 'PUT')) {
+      const store = inventoryListMatch[1]
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const current = safeParse((await env.SCHEDULES.get(inventoryListKey(store))) ?? '') as InventoryListDoc | null
+      if (request.method === 'GET') {
+        const body = current ?? { v: 1, rev: 0, sheets: null, updatedAt: null }
+        return json(body, 200, request, env, { 'Cache-Control': 'no-store' })
+      }
+
+      if (!(await checkWriteThrottle(env, clientIp(request)))) {
+        return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
+      }
+      let body: unknown
+      try {
+        body = await readBody(request, MAX_INVENTORY_LIST_CHARS)
+      } catch {
+        return json({ error: 'body_too_large' }, 413, request, env)
+      }
+      const valid = validateInventoryListBody(body)
+      if (!valid) return json({ error: 'invalid_body' }, 400, request, env)
+      const rev = current?.rev ?? 0
+      if (valid.baseRev !== rev) return json({ error: 'conflict', rev, updatedAt: current?.updatedAt }, 409, request, env)
+      const doc: InventoryListDoc = { v: 1, rev: rev + 1, sheets: valid.sheets, updatedAt: new Date().toISOString() }
+      await env.SCHEDULES.put(inventoryListKey(store), JSON.stringify(doc))
+      return json({ rev: doc.rev, updatedAt: doc.updatedAt }, 200, request, env)
     }
 
     // Inventory counts: manager token for reads and writes. GET returns the last 14 days so the sheet can show earlier columns.
