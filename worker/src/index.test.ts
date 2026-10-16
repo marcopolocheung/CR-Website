@@ -17,6 +17,7 @@ import handler, {
   validateTemplateBody,
   validateUpdateBody,
   validateCashoutBody,
+  validateInventoryBody,
   validateWriteUpForm,
 } from './index'
 
@@ -983,6 +984,40 @@ test('cash-out history spans 30 days, newest first, across a month edge', () => 
   assert.equal(dates[0], '2026-03-01')
   assert.equal(dates[1], '2026-02-28')
   assert.equal(dates.at(-1), '2026-01-31')
+})
+
+const inventoryBody = { counts: { rice: { inv: '11', order: '4' }, 'chicken-breast': { inv: '3B/2T', order: '' }, pork: { inv: '✓', order: '' } } }
+
+test('inventory counts need the manager token', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(request('GET', '/api/inventory/CR3?to=2026-10-08'), env)).status, 401)
+  assert.equal((await handler.fetch(authed('PUT', '/api/inventory/CR3/2026-10-08', inventoryBody, 'wrong'), env)).status, 401)
+  assert.equal((await handler.fetch(authed('PUT', '/api/inventory/CR2/2026-10-08', inventoryBody), env)).status, 404)
+})
+
+test('inventory days save and come back in the 14-day history, newest first', async () => {
+  const env = mockEnv()
+  for (const date of ['2026-10-01', '2026-10-04', '2026-10-08', '2026-09-24']) {
+    assert.equal((await handler.fetch(authed('PUT', `/api/inventory/CR3/${date}`, inventoryBody), env)).status, 200)
+  }
+  const history = await (await handler.fetch(authed('GET', '/api/inventory/CR3?to=2026-10-08'), env)).json()
+  // 2026-09-24 is 14 days back, one past the window.
+  assert.deepEqual(history.days.map((d: { date: string }) => d.date), ['2026-10-08', '2026-10-04', '2026-10-01'])
+  assert.deepEqual(history.days[0].counts, inventoryBody.counts)
+  assert.equal((await handler.fetch(authed('GET', '/api/inventory/CR3?to=soon'), env)).status, 400)
+  assert.equal((await handler.fetch(authed('PUT', '/api/inventory/CR3/2026-10-08', { counts: { rice: { inv: '<b>', order: '' } } }), env)).status, 400)
+})
+
+test('inventory bodies are strictly validated', () => {
+  assert.ok(validateInventoryBody(inventoryBody))
+  assert.ok(validateInventoryBody({ counts: {} }))
+  assert.equal(validateInventoryBody({ counts: [] }), null)
+  assert.equal(validateInventoryBody({ counts: { Rice: { inv: '1', order: '' } } }), null)
+  assert.equal(validateInventoryBody({ counts: { rice: { inv: 1, order: '' } } }), null)
+  assert.equal(validateInventoryBody({ counts: { rice: { inv: '1234567890123', order: '' } } }), null)
+  assert.equal(validateInventoryBody({ counts: { rice: null } }), null)
+  const many = Object.fromEntries(Array.from({ length: 301 }, (_, i) => [`item-${i}`, { inv: '', order: '' }]))
+  assert.equal(validateInventoryBody({ counts: many }), null)
 })
 
 const writeUp = {

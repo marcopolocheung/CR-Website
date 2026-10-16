@@ -10,6 +10,7 @@ import { StoreAuthError } from '@/lib/schedule-store'
 
 const PAGES = [
   { href: '/internal/bookkeeping', title: 'Bookkeeping', blurb: 'Cash out, daily sales report, employee hours' },
+  { href: '/internal/inventory', title: 'Inventory', blurb: 'CR3 supply counts and order list' },
   { href: '/scheduler-demo', title: 'Scheduler', blurb: 'Build and publish weekly schedules' },
   { href: '/internal/forms', title: 'Forms & write-ups', blurb: 'Blank forms and saved write-ups' },
 ]
