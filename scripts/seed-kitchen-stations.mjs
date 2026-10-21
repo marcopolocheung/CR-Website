@@ -23,7 +23,8 @@ const API = (apiFlag ? apiFlag.slice('--api='.length) : process.env.SCHEDULE_API
 const TOKEN = process.env.SCHEDULE_WRITE_TOKEN || ''
 
 async function getJson(path) {
-  const response = await fetch(`${API}${path}`, { cache: 'no-store' })
+  // Roster reads need the manager token too.
+  const response = await fetch(`${API}${path}`, { cache: 'no-store', headers: { Authorization: `Bearer ${TOKEN}` } })
   if (!response.ok) throw new Error(`GET ${path} -> ${response.status}`)
   return response.json()
 }

@@ -141,9 +141,9 @@ Golden schedule (public read, token-guarded write):
 - `GET /api/schedule/:weekStart` → `200 GoldenWeekDoc` or `404`
 - `PUT /api/schedule/:weekStart { week, templateHash, visible, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`.
 
-Employee roster (public read, token-guarded write, same token as the golden schedule):
+Employee roster (token-guarded read and write, same token as the golden schedule — rosters hold availability and who is kept apart, so they are not public):
 
-- `GET /api/employees` → `200 { employees, rev, updatedAt }` (empty roster if nothing saved yet)
+- `GET /api/employees` with `Authorization: Bearer <token>` → `200 { employees, rev, updatedAt }` (empty roster if nothing saved yet), `401 unauthorized`
 - `PUT /api/employees { employees, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev, updatedAt }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`. Removing an employee from `employees` and saving is a real, persisted delete.
 
 Staffing template (public read, token-guarded write, same token as the golden schedule):
@@ -151,9 +151,9 @@ Staffing template (public read, token-guarded write, same token as the golden sc
 - `GET /api/template` → `200 { template, rev, updatedAt }` (`template: null`, `rev: 0` if nothing saved yet — callers should fall back to their own default layout)
 - `PUT /api/template { template, baseRev }` with `Authorization: Bearer <token>` → `200|201 { rev, updatedAt }`, `401 unauthorized`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`. Schedule-only stations (CR3 Kitchen) accept only per-week saves (`?weekStart=`, `403 station_locked` otherwise), authorized by the staff password or the manager token.
 
-Station crew (public read, password-guarded write, schedule-only stations only):
+Station crew (token-guarded read, password-guarded write, schedule-only stations only):
 
-- `GET /api/staff?restaurant=CR3-kitchen` → `200 { employees, rev, updatedAt, canUndo }` (`employees: null` means no crew saved yet — fall back to the built-in crew). `403 staff_editing_not_enabled` for stations whose crew is not editable.
+- `GET /api/staff?restaurant=CR3-kitchen` with `Authorization: Bearer <token>` (manager token; the staff password does not read) → `200 { employees, rev, updatedAt, canUndo }`, `401 unauthorized` (`employees: null` means no crew saved yet — fall back to the built-in crew). `403 staff_editing_not_enabled` for stations whose crew is not editable.
 - `GET /api/staff/verify` with `Authorization: Bearer <staff password>` → `200 { ok: true }`, `401 unauthorized`. Read-only gate check for the crew editor — own throttle budget (30/hour per IP). The password defaults to the hardcoded `test` when `STAFF_EDIT_PASSWORD` is unset.
 - `PUT /api/staff?restaurant=CR3-kitchen { employees, baseRev }` with `Authorization: Bearer <staff password>` → `200|201 { employees, rev, updatedAt, canUndo }`, `401 unauthorized`, `403 staff_editing_not_enabled`, `409 { error: "conflict", rev }`. First save uses `baseRev: 0`. Removing someone from `employees` and saving is a real, persisted delete.
 - `POST /api/staff/undo?restaurant=CR3-kitchen { baseRev }` with `Authorization: Bearer <staff password>` → `200 { employees, rev, updatedAt, canUndo }` restoring the crew replaced by the last save, `409 { error: "nothing_to_undo", rev }` when there is nothing left. The first save is undoable back to `employees: null` (the built-in crew).

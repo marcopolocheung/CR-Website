@@ -1291,6 +1291,10 @@ export default {
                 return json({ error: 'invalid_weekStart' }, 400, request, env);
             const weekStart = weekParam.present && weekParam.valid ? weekParam.value : undefined;
             if (request.method === 'GET') {
+                // Rosters hold availability and who is kept apart, so reads need the manager token too.
+                const denied = await managerAuthError(request, env);
+                if (denied)
+                    return denied;
                 if (weekStart) {
                     const weekRaw = await env.SCHEDULES.get(rosterKeyForWeek(restaurant, weekStart));
                     const weekDoc = weekRaw ? normalizeRosterDoc(safeParse(weekRaw)) : null;
@@ -1361,6 +1365,9 @@ export default {
             if (!isStaffEditableRestaurant(restaurant))
                 return json({ error: 'staff_editing_not_enabled' }, 403, request, env);
             if (request.method === 'GET' && path === '/api/staff') {
+                const denied = await managerAuthError(request, env);
+                if (denied)
+                    return denied;
                 return json(staffResponse(await readStaffDoc(env, restaurant)), 200, request, env, { 'Cache-Control': 'no-store' });
             }
             // Unlock check for the staff editor — read-only, throttled like the demo gate.

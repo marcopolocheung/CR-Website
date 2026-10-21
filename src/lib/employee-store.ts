@@ -75,8 +75,12 @@ function rosterQuery(restaurantId?: string, weekStart?: string): string {
   return query ? `?${query}` : ''
 }
 
-export async function fetchRoster(restaurantId?: string, weekStart?: string): Promise<RosterDoc> {
-  const { status, body } = await requestJson(`/api/employees${rosterQuery(restaurantId, weekStart)}`)
+/** Rosters are private (availability, who is kept apart), so reads need the manager token. */
+export async function fetchRoster(token: string, restaurantId?: string, weekStart?: string): Promise<RosterDoc> {
+  const { status, body } = await requestJson(`/api/employees${rosterQuery(restaurantId, weekStart)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (status === 401) throw new StoreAuthError()
   if (status === 200 && body && typeof body === 'object' && 'employees' in body) {
     const { employees, rev, updatedAt, inherited } = body as {
       employees: unknown
