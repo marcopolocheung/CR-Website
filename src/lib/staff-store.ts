@@ -50,8 +50,12 @@ function parseStaffBody(body: unknown): StaffSnapshot | null {
   }
 }
 
-export async function fetchStaff(restaurantId?: string): Promise<StaffSnapshot> {
-  const { status, body } = await requestJson(`/api/staff${staffQuery(restaurantId)}`)
+/** The crew is private like the roster, so reads need the manager token (the staff password only edits). */
+export async function fetchStaff(token: string, restaurantId?: string): Promise<StaffSnapshot> {
+  const { status, body } = await requestJson(`/api/staff${staffQuery(restaurantId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (status === 401) throw new StoreAuthError()
   if (status === 200) {
     const parsed = parseStaffBody(body)
     if (parsed) return parsed

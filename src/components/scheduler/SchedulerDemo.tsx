@@ -406,7 +406,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       setDefaultRosterLoaded(true)
       return
     }
-    fetchRoster(restaurantId)
+    fetchRoster(managerCode, restaurantId)
       .then((doc) => {
         if (cancelled) return
         if (doc.rev > 0 && doc.employees.length > 0) {
@@ -424,7 +424,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [restaurantId, scheduleOnly])
+  }, [restaurantId, scheduleOnly, managerCode])
 
   // Schedule-only crew: load the saved crew (one per station, shared by every
   // week). No saved crew yet means the built-in seed, which stays editable.
@@ -433,7 +433,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     let cancelled = false
     setStaffLoadError('')
     setStaffLoaded(false)
-    fetchStaff(restaurantId)
+    fetchStaff(managerCode, restaurantId)
       .then((doc) => {
         if (cancelled) return
         // `null` means no crew saved yet; an empty array is a deliberately empty crew.
@@ -456,7 +456,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [restaurantId, scheduleOnly])
+  }, [restaurantId, scheduleOnly, managerCode])
 
   useEffect(() => {
     let cancelled = false
@@ -494,7 +494,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       setRosterLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
       return
     }
-    fetchRoster(restaurantId, weekStart)
+    fetchRoster(managerCode, restaurantId, weekStart)
       .then((doc) => {
         if (cancelled) return
         if (doc.rev > 0) {
@@ -519,7 +519,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [weekStart, restaurantId, defaultRosterLoaded, defaultRoster, rosterLoadedWeeks, scheduleOnly])
+  }, [weekStart, restaurantId, defaultRosterLoaded, defaultRoster, rosterLoadedWeeks, scheduleOnly, managerCode])
 
   useEffect(() => {
     if (!weekStart || !defaultTemplateLoaded || templateLoadedWeeks[weekStart]) return

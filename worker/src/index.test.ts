@@ -178,6 +178,10 @@ function rosterEmployee(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function rosterGet(query = '', token = 'manager-token'): Request {
+  return new Request(`https://api.test/api/employees${query}`, { headers: { Authorization: `Bearer ${token}` } })
+}
+
 function rosterPut(body: unknown, token = 'manager-token'): Request {
   return new Request('https://api.test/api/employees', {
     method: 'PUT',
@@ -356,7 +360,7 @@ test('roster writes need the manager token and create on first save, and real de
   assert.equal(created.status, 201)
   assert.equal(((await created.json()) as { rev: number }).rev, 1)
 
-  const fetched = await handler.fetch(new Request('https://api.test/api/employees'), env)
+  const fetched = await handler.fetch(rosterGet(''), env)
   assert.equal(fetched.status, 200)
   const doc = (await fetched.json()) as { rev: number; employees: { id: string }[] }
   assert.equal(doc.rev, 1)
@@ -370,9 +374,29 @@ test('roster writes need the manager token and create on first save, and real de
   assert.equal(deleted.status, 200)
   assert.equal(((await deleted.json()) as { rev: number }).rev, 2)
 
-  const afterDelete = await handler.fetch(new Request('https://api.test/api/employees'), env)
+  const afterDelete = await handler.fetch(rosterGet(''), env)
   const afterDeleteDoc = (await afterDelete.json()) as { employees: unknown[] }
   assert.deepEqual(afterDeleteDoc.employees, [])
+})
+
+test('roster and crew reads need the manager token', async () => {
+  const env = mockEnv('manager-token', 'test')
+  assert.equal((await handler.fetch(rosterPut({ employees: [rosterEmployee()], baseRev: 0 }), env)).status, 201)
+
+  // No token, a wrong token, and the staff password are all refused: rosters hold availability and who is kept apart.
+  assert.equal((await handler.fetch(new Request('https://api.test/api/employees'), env)).status, 401)
+  assert.equal((await handler.fetch(rosterGet('', 'wrong'), env)).status, 401)
+  assert.equal((await handler.fetch(rosterGet('?weekStart=2026-09-13', 'wrong'), env)).status, 401)
+  assert.equal((await handler.fetch(new Request('https://api.test/api/staff?restaurant=CR3-kitchen'), env)).status, 401)
+  assert.equal((await handler.fetch(staffGet('CR3-kitchen', 'test'), env)).status, 401)
+
+  const ok = await handler.fetch(rosterGet(), env)
+  assert.equal(ok.status, 200)
+  assert.deepEqual(((await ok.json()) as { employees: { id: string }[] }).employees.map((e) => e.id), ['mary'])
+  assert.equal((await handler.fetch(staffGet(), env)).status, 200)
+
+  // Reads fail closed when no manager token is configured.
+  assert.equal((await handler.fetch(rosterGet(), mockEnv(''))).status, 503)
 })
 
 test('roster writes fail closed without a configured token', async () => {
@@ -542,7 +566,7 @@ test('restaurant ids validate and default when omitted', () => {
 
 test('invalid restaurant ids fail closed', async () => {
   const env = mockEnv()
-  assert.equal((await handler.fetch(new Request('https://api.test/api/employees?restaurant=nope'), env)).status, 400)
+  assert.equal((await handler.fetch(rosterGet('?restaurant=nope'), env)).status, 400)
   assert.equal((await handler.fetch(new Request('https://api.test/api/template?restaurant=nope'), env)).status, 400)
   assert.equal((await handler.fetch(new Request('https://api.test/api/schedule?month=2026-09&restaurant=nope'), env)).status, 400)
   assert.equal((await handler.fetch(new Request('https://api.test/api/schedule/2026-09-13?restaurant=nope'), env)).status, 400)
@@ -562,18 +586,18 @@ test('rosters are isolated per restaurant', async () => {
   const createdOther = await handler.fetch(otherPut, env)
   assert.equal(createdOther.status, 201)
 
-  const fetchedDefault = await handler.fetch(new Request('https://api.test/api/employees'), env)
+  const fetchedDefault = await handler.fetch(rosterGet(''), env)
   const defaultDoc = (await fetchedDefault.json()) as { rev: number }
   assert.equal(defaultDoc.rev, 1)
 
-  const fetchedOther = await handler.fetch(new Request('https://api.test/api/employees?restaurant=CR2-kitchen'), env)
+  const fetchedOther = await handler.fetch(rosterGet('?restaurant=CR2-kitchen'), env)
   const otherDoc = (await fetchedOther.json()) as { rev: number }
   assert.equal(otherDoc.rev, 1)
 
   // Deleting in one station does not touch the other.
   const deleted = await handler.fetch(rosterPut({ employees: [], baseRev: 1 }), env)
   assert.equal(deleted.status, 200)
-  const afterOther = await handler.fetch(new Request('https://api.test/api/employees?restaurant=CR2-kitchen'), env)
+  const afterOther = await handler.fetch(rosterGet('?restaurant=CR2-kitchen'), env)
   const afterOtherDoc = (await afterOther.json()) as { employees: unknown[] }
   assert.equal(afterOtherDoc.employees.length, 1)
 })
@@ -623,9 +647,9 @@ test('legacy singleton docs fall back to the default restaurant only', async () 
     },
     SCHEDULE_WRITE_TOKEN: 'manager-token',
   }
-  const rosterDefault = await handler.fetch(new Request('https://api.test/api/employees'), env)
+  const rosterDefault = await handler.fetch(rosterGet(''), env)
   assert.equal(((await rosterDefault.json()) as { rev: number }).rev, 1)
-  const rosterOther = await handler.fetch(new Request('https://api.test/api/employees?restaurant=CR3-kitchen'), env)
+  const rosterOther = await handler.fetch(rosterGet('?restaurant=CR3-kitchen'), env)
   assert.equal(((await rosterOther.json()) as { rev: number }).rev, 0)
   const templateDefault = await handler.fetch(new Request('https://api.test/api/template'), env)
   assert.equal(((await templateDefault.json()) as { rev: number }).rev, 1)
@@ -665,7 +689,7 @@ test('rosters are isolated per week and fall back to the global seed', async () 
   const seed = await handler.fetch(rosterPut({ employees: [rosterEmployee()], baseRev: 0 }), env)
   assert.equal(seed.status, 201)
 
-  const emptyWeek1 = await handler.fetch(new Request(`https://api.test/api/employees?weekStart=${week1}`), env)
+  const emptyWeek1 = await handler.fetch(rosterGet(`?weekStart=${week1}`), env)
   assert.equal(emptyWeek1.status, 200)
   const emptyDoc = (await emptyWeek1.json()) as { employees: unknown[]; rev: number; inherited: boolean }
   assert.equal(emptyDoc.rev, 0)
@@ -680,13 +704,13 @@ test('rosters are isolated per week and fall back to the global seed', async () 
   const created2 = await handler.fetch(weekRosterPut(week2, { employees: twelve, baseRev: 0 }), env)
   assert.equal(created2.status, 201)
 
-  const fetched1 = await handler.fetch(new Request(`https://api.test/api/employees?weekStart=${week1}`), env)
+  const fetched1 = await handler.fetch(rosterGet(`?weekStart=${week1}`), env)
   const doc1 = (await fetched1.json()) as { employees: { id: string }[]; rev: number; inherited: boolean }
   assert.equal(doc1.rev, 1)
   assert.equal(doc1.inherited, false)
   assert.equal(doc1.employees.length, 11)
 
-  const fetched2 = await handler.fetch(new Request(`https://api.test/api/employees?weekStart=${week2}`), env)
+  const fetched2 = await handler.fetch(rosterGet(`?weekStart=${week2}`), env)
   const doc2 = (await fetched2.json()) as { employees: { id: string }[]; rev: number }
   assert.equal(doc2.employees.length, 12)
 
@@ -694,7 +718,7 @@ test('rosters are isolated per week and fall back to the global seed', async () 
   assert.equal(stale.status, 409)
   assert.equal(((await stale.json()) as { rev: number }).rev, 1)
 
-  const global = await handler.fetch(new Request('https://api.test/api/employees'), env)
+  const global = await handler.fetch(rosterGet(''), env)
   assert.equal(((await global.json()) as { employees: unknown[] }).employees.length, 1)
 
   const bad = await handler.fetch(new Request('https://api.test/api/employees?weekStart=sept-13'), env)
@@ -803,8 +827,8 @@ test('schedule-only stations still accept schedule writes', async () => {
   assert.equal(saved.status, 201)
 })
 
-function staffGet(restaurant = 'CR3-kitchen'): Request {
-  return new Request(`https://api.test/api/staff?restaurant=${restaurant}`)
+function staffGet(restaurant = 'CR3-kitchen', token = 'manager-token'): Request {
+  return new Request(`https://api.test/api/staff?restaurant=${restaurant}`, { headers: { Authorization: `Bearer ${token}` } })
 }
 
 function staffVerify(password: string | undefined, restaurant = 'CR3-kitchen'): Request {
