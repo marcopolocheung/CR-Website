@@ -8,7 +8,8 @@ import {
   type PublishedWeek,
   buildPublishedWeek,
 } from './schedule-share'
-import { defaultTemplateForRestaurant, expandTemplate, seedEmployees, seedTemplate } from './scheduler/data'
+import { defaultTemplateForRestaurant, expandTemplate, seedTemplate } from './scheduler/data'
+import { seedEmployees } from './scheduler/seed-crews'
 import { generateSchedule } from './scheduler/solver'
 
 
