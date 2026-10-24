@@ -4,12 +4,12 @@ parent: SCH
 title: "Add manager-entered requests and review"
 priority: P1
 delivery_class: CODE_AND_EXTERNAL
-status: planned
-owner: unassigned
+status: implemented
+owner: Codex
 implementation_dependencies: [SCH-01, UX-03]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: pending
 live_verification: pending
 ---
@@ -57,25 +57,25 @@ Affected areas: src/components/scheduler/SchedulerDemo.tsx; src/components/sched
 
 ## Implementation checklist
 
-- [ ] Capture entered-by and requested-for identities plus original request time
-- [ ] Show pending requests separately from effective approved exceptions
-- [ ] Preserve the request and reason through concurrent review attempts
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Capture entered-by and requested-for identities plus original request time
+- [x] Show pending requests separately from effective approved exceptions
+- [x] Preserve the request and reason through concurrent review attempts
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Capture entered-by and requested-for identities plus original request time. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Show pending requests separately from effective approved exceptions. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Preserve the request and reason through concurrent review attempts. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Capture entered-by and requested-for identities plus original request time. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Show pending requests separately from effective approved exceptions. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Preserve the request and reason through concurrent review attempts. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
@@ -96,16 +96,15 @@ Evidence specific to this task: the three task scenarios above must pass against
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | pending | Environment, operation IDs, deployment/resource evidence, or staff-session execution. |
 | Live verification | pending | Observed target-environment behavior or staff acceptance with date and operator. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Listed prerequisites are pending.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts/evidence: [schedule-requests.md](../schedule-requests.md#sch-02-manager-entry-and-review); `RequestsPanel.tsx`, `useScheduleRequests.ts`, scheduler integration/dictionaries and `scripts/test-schedule-requests.py`.
+- Local checks: request/domain/client 5, Worker 4, existing scheduler 128, dictionaries 3; build, types, SEO and tracker pass. Request browser suite and existing scheduler-view browser suite pass with synthetic loopback fixtures; desktop and Spanish 390px screenshots inspected.
+- Implementation/local verification done; activation/live pending. No backend/frontend deployment, provisioning, schema change or real personnel write.
+- Request fields are session memory; link/unload warnings protect unfinished work. Print/public output excludes private request details. Only the request panel is bilingual in this slice.
+- Codex continues SCH-03 using approved records. Preserve accepted requests/history on rollback; frontend release follows compatible backend activation.

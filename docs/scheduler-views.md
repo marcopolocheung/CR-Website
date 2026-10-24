@@ -29,6 +29,24 @@ errors are visible even when it is closed, with a button that opens and focuses
 the rules. CR3 Kitchen still requires the staff password to edit its shared crew
 or weekly rules; its scope explanation distinguishes those two behaviors.
 
+## New layout and the Classic switch
+
+October 24, 2026 — a second layout is now the default. It keeps the same state,
+handlers, board, and publish flow but shows less around them: one week grid, one
+dark button by stage, one clickable problem count, inline marks on the spot, and
+the rare tools (copy, clear, print, month, start over, changes) inside one More
+menu. The header carries a "Classic layout: Off/On" switch; the choice is
+remembered per device in `chinarose.scheduler.layout`. The old layout remains
+available unchanged as Classic, so flipping the switch never loses an assignment,
+undo history, the open week, or the manager code. Requests move below the board
+in the new layout and use plain dates and names. The new Staff & rules view keeps
+every staff field behind each person's Edit row and moves Shift rules into its own
+section.
+
+Still needs manager testing: whether the new default is faster to build and
+publish a week, and whether anyone reaches for Classic. Until that is done, keep
+the switch and both layouts.
+
 ## Research and tradeoffs
 
 - [GOV.UK: Tabs](https://design-system.service.gov.uk/components/tabs/) supports

@@ -4,12 +4,12 @@ parent: SCH
 title: "Apply approved exceptions to generation and validation"
 priority: P1
 delivery_class: CODE_ONLY
-status: planned
-owner: unassigned
+status: implemented
+owner: Claude
 implementation_dependencies: [SCH-01]
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
@@ -53,25 +53,25 @@ Affected areas: src/components/scheduler/SchedulerDemo.tsx; src/components/sched
 
 ## Implementation checklist
 
-- [ ] Test approved versus pending/declined requests against identical shifts
-- [ ] Report actionable coverage warnings and keep suspension separate
-- [ ] Preserve existing solver constraints, locking, and manual assignment recovery
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Test approved versus pending/declined requests against identical shifts
+- [x] Report actionable coverage warnings and keep suspension separate
+- [x] Preserve existing solver constraints, locking, and manual assignment recovery
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Test approved versus pending/declined requests against identical shifts. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Report actionable coverage warnings and keep suspension separate. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Preserve existing solver constraints, locking, and manual assignment recovery. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Test approved versus pending/declined requests against identical shifts. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Report actionable coverage warnings and keep suspension separate. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Preserve existing solver constraints, locking, and manual assignment recovery. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
@@ -90,16 +90,15 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
 | Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Listed prerequisites are pending.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts/evidence: [schedule-requests.md](../schedule-requests.md#sch-03-approved-exceptions-in-scheduling); `withApprovedRequests` in `src/lib/scheduler/requests.ts`, dated lookup in `validator.ts`, scheduler integration and messages.
+- Local checks: scheduler 129 (new SCH-03 scenario test), request domain/client 5; build, types, SEO pass. Request browser suite and existing scheduler-view browser suite pass with synthetic loopback fixtures.
+- Implementation/local verification done; no external operation. Frontend publication follows REL-04 after SCH-01/02 backend activation.
+- Approved exceptions are derived per displayed week and never written into the saved staff list, published week or print output.
+- Next: SCH-04 (publication revisions) is independent of this slice.
