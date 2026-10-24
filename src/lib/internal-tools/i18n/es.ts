@@ -6,7 +6,7 @@ const es: Record<keyof typeof en, string> = {
   "requests.loading": "Cargando solicitudes guardadas…",
   "requests.unconfigured": "El almacenamiento de solicitudes no está activo en este servidor. Puede seguir programando; todavía no se pueden guardar solicitudes aquí.",
   "requests.uncertain": "Los cambios de solicitudes no están confirmados. Reintente el mismo guardado o vuelva a cargar y revise las decisiones actuales.",
-  "requests.policy": "Los gerentes registran solicitudes recibidas por mensaje o conversación. Las fechas de trabajo de Chicago son inclusivas; un turno nocturno pertenece a su fecha de inicio. Las horas temporales sustituyen la disponibilidad de cada fecha elegida. Solo las solicitudes aprobadas afectan la programación después de la actualización de aplicación. La disponibilidad habitual y las suspensiones se mantienen separadas.",
+  "requests.policy": "Los gerentes registran solicitudes recibidas por mensaje o conversación. Las fechas de trabajo de Chicago son inclusivas; un turno nocturno pertenece a su fecha de inicio. Las horas temporales sustituyen la disponibilidad de cada fecha elegida. Solo las solicitudes aprobadas afectan la programación. La disponibilidad habitual y las suspensiones se mantienen separadas.",
   "requests.new": "Registrar una solicitud",
   "requests.employee": "Empleado solicitante",
   "requests.choose": "Elija un empleado",

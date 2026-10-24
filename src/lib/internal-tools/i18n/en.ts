@@ -5,7 +5,7 @@ const en = {
   "requests.loading": "Loading saved requests…",
   "requests.unconfigured": "Request storage is not active on this server. Existing scheduling remains available; new requests cannot be saved here yet.",
   "requests.uncertain": "Request changes have not been confirmed. Retry the exact save or reload and review the latest decisions.",
-  "requests.policy": "Managers enter requests received by text or conversation. Dates are inclusive Chicago business dates; an overnight shift belongs to its starting date. Temporary hours replace availability for each selected date. Only approved requests affect scheduling after the enforcement update. Recurring availability and suspensions stay separate.",
+  "requests.policy": "Managers enter requests received by text or conversation. Dates are inclusive Chicago business dates; an overnight shift belongs to its starting date. Temporary hours replace availability for each selected date. Only approved requests affect scheduling. Recurring availability and suspensions stay separate.",
   "requests.new": "Enter a request",
   "requests.employee": "Requested for",
   "requests.choose": "Choose an employee",
