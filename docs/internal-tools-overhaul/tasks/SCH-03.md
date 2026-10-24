@@ -4,7 +4,7 @@ parent: SCH
 title: "Apply approved exceptions to generation and validation"
 priority: P1
 delivery_class: CODE_ONLY
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [SCH-01]
 activation_dependencies: []

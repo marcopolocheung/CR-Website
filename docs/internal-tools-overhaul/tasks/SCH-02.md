@@ -4,7 +4,7 @@ parent: SCH
 title: "Add manager-entered requests and review"
 priority: P1
 delivery_class: CODE_AND_EXTERNAL
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [SCH-01, UX-03]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]
