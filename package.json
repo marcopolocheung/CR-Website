@@ -17,7 +17,7 @@
     "worker:types:local": "wrangler types worker/local-env.d.ts --config worker/wrangler.local.jsonc --env-interface LocalBindings --include-runtime false",
     "recovery:test": "node --import jiti/register --test src/lib/internal-tools/recovery.test.ts",
     "imports:test": "node --import jiti/register --test src/lib/converter/validation.test.ts src/lib/converter/sales-review.test.ts src/lib/converter/import-snapshot.test.ts src/lib/converter/sales-context.test.ts src/lib/converter/hours-review.test.ts src/lib/converter/employee-mapping.test.ts src/lib/converter/import-history.test.ts src/lib/converter/scheduled-actual.test.ts",
-    "forms:test": "node --import jiti/register --test src/lib/forms.test.ts",
+    "forms:test": "node --import jiti/register --test src/lib/forms.test.ts src/lib/internal-tools/writeup-draft.test.ts src/lib/internal-tools/drafts.test.ts",
     "imports:worker:test": "node --test worker/src/import-directory.test.mjs worker/src/import-history.test.mjs worker/src/published-hours.test.mjs",
     "scheduler:requests:test": "node --import jiti/register --test src/lib/scheduler/requests.test.ts src/lib/scheduler/request-store.test.ts",
     "scheduler:requests:worker:test": "node --test worker/src/schedule-requests.test.mjs"

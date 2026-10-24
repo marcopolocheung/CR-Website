@@ -500,5 +500,10 @@ const en = {
   "forms.noMatches": "No saved forms match these filters.",
   "forms.loadFailed": "Could not load saved forms. Your filters are kept.",
   "forms.retry": "Try again",
+  "formDrafts.writeUpTitle": "New write-up: choose the store, date and your name",
+  "formDrafts.intro": "Your work saves on this device as you type, so a reload or closed tab does not lose it. It is only on the server after you press Save.",
+  "formDrafts.saved": "Saved to the server. This copy stays on the device for reference.",
+  "formDrafts.alreadySaved": "This draft was already saved as a write-up. Saving again creates a second, separate write-up.",
+  "formDrafts.saveAnother": "Edit as a new write-up",
 } as const
 export default en
