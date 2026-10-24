@@ -4,7 +4,7 @@ parent: FORM
 title: "Add recoverable drafts and navigation protection"
 priority: P0
 delivery_class: CODE_ONLY
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [UX-05, UX-06]
 activation_dependencies: []

@@ -1,7 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CodeGate } from './CashOut'
+import { useInternalLanguage } from './InternalLanguage'
+import { useConfirmation, focusField } from './Feedback'
+import { useNavigationProtection } from './NavigationProtection'
+import RecoveryPanel from './RecoveryPanel'
+import { SingleFlight } from '@/lib/internal-tools/recovery'
+import { inventoryComparison, isInventorySheets } from '@/lib/internal-tools/inventory-recovery'
+import { errorKey, type Message } from '@/lib/internal-tools/i18n'
 import {
   CHECK,
   DEFAULT_SHEETS,
@@ -14,7 +21,7 @@ import {
   type InventorySheet,
 } from '@/lib/inventory'
 import { fetchInventoryHistory, fetchInventoryList, saveInventoryDay, saveInventoryList, type InventoryDay } from '@/lib/inventory-store'
-import { StoreAuthError, StoreConflictError } from '@/lib/schedule-store'
+import { StoreAuthError, StoreConflictError, StoreUnavailableError } from '@/lib/schedule-store'
 
 const STORAGE_KEY = 'cr-inventory'
 // The paper sheets have five INV / ORDER pairs: four earlier counts plus today.
@@ -25,7 +32,7 @@ const INK = 'text-blue-800'
 
 const today = () => new Date().toLocaleDateString('en-CA')
 const shortDate = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`
-const button = 'px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50'
+const button = 'min-h-11 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50'
 const cellBorder = 'border border-black'
 // Earlier days are hidden on phones so today's INV / ORDER fit without scrolling.
 const pastOnly = 'max-sm:hidden'
@@ -38,62 +45,85 @@ export default function Inventory() {
   // Manager token lives in memory only, like cash out.
   const [token, setToken] = useState('')
   const lock = useCallback(() => setToken(''), [])
-  if (!token) return <CodeGate onUnlock={setToken} title="Inventory" />
-  return <InventoryBook token={token} onLocked={lock} />
+  return <InventoryBook token={token} onUnlock={setToken} onLocked={lock} />
 }
 
-function InventoryBook({ token, onLocked }: { token: string; onLocked: () => void }) {
+function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock: (token: string) => void; onLocked: () => void }) {
+  const { t: tr } = useInternalLanguage()
+  const confirmation = useConfirmation()
+  const tokenRef = useRef(token); tokenRef.current = token
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  const restored = useRef(false)
+  const listSaving = useRef(new SingleFlight<void>())
   const [date, setDate] = useState(today)
   const [counts, setCounts] = useState<InventoryCounts>({})
   const [history, setHistory] = useState<InventoryDay[]>([])
   const [loaded, setLoaded] = useState(false)
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState<string | Message>('')
   const [busy, setBusy] = useState(false)
   const [sheets, setSheets] = useState<InventorySheet[]>(DEFAULT_SHEETS)
   const [listRev, setListRev] = useState(0)
   // The item list being edited, or null while counting.
   const [draft, setDraft] = useState<InventorySheet[] | null>(null)
+  const draftRef = useRef(draft); draftRef.current = draft
+  const dateRef = useRef(date); dateRef.current = date
+  const countsRef = useRef(counts); countsRef.current = counts
+  const listRevRef = useRef(listRev); listRevRef.current = listRev
+  const [conflict,setConflict] = useState(false)
+  const [serverList,setServerList] = useState<{rev:number;sheets:InventorySheet[] | null} | null>(null)
+  const [countDirty,setCountDirty] = useState(false)
+  const [deviceSaved,setDeviceSaved] = useState(false)
+  useNavigationProtection({ dirty: !!draft || countDirty, deviceSaved: !draft && deviceSaved })
 
   const run = useCallback(
-    async (task: () => Promise<string | void>) => {
+    async (task: () => Promise<string | Message | void>) => {
       setBusy(true)
       setStatus('')
       try {
         const message = await task()
-        if (message) setStatus(message)
+        if (mounted.current && tokenRef.current === token && message) setStatus(message)
       } catch (caught) {
+        if (!mounted.current || tokenRef.current !== token) return
+        setStatus({key:errorKey(caught)})
         if (caught instanceof StoreAuthError) onLocked()
-        else setStatus((caught as Error).message)
       } finally {
-        setBusy(false)
+        if (mounted.current && tokenRef.current === token) setBusy(false)
       }
     },
-    [onLocked],
+    [onLocked, token],
   )
 
-  // Restore the unsaved draft, then fill in from the server if the draft is empty.
+  // Restore once; reauthentication must not replace on-screen list/count edits.
   useEffect(() => {
-    let draft: { date: string; counts: InventoryCounts } | null = null
-    try { draft = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') } catch { /* corrupt save: start fresh */ }
-    const start = draft?.date ?? today()
-    if (draft) {
-      setDate(draft.date)
-      setCounts(draft.counts)
+    if (!token) return
+    let start = dateRef.current
+    if (!restored.current) {
+      let saved: { date: string; counts: InventoryCounts } | null = null
+      try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') } catch { /* original draft behavior; retain entered values on later failures */ }
+      start = saved?.date ?? today()
+      if (saved) { setDate(saved.date); setCounts(saved.counts); setCountDirty(!!Object.keys(saved.counts).length) }
+      setLoaded(true)
+      restored.current = true
     }
-    setLoaded(true)
     run(async () => {
       const list = await fetchInventoryList(token)
-      setSheets(list.sheets ?? DEFAULT_SHEETS)
-      setListRev(list.rev)
+      if (!Number.isSafeInteger(list.rev) || list.rev < 0 || (list.sheets !== null && !isInventorySheets(list.sheets))) throw new StoreUnavailableError()
+      if (!mounted.current || tokenRef.current !== token) return
+      if (!draftRef.current) { setSheets(list.sheets ?? DEFAULT_SHEETS); setListRev(list.rev) }
+      else if (list.rev !== listRevRef.current) { setConflict(true); setServerList(list) }
       const days = await fetchInventoryHistory(start, token)
+      if (!mounted.current || tokenRef.current !== token || dateRef.current !== start) return
       setHistory(days)
       const saved = days.find(d => d.date === start)
-      if (saved && !Object.keys(draft?.counts ?? {}).length) setCounts(saved.counts)
+      if (saved && !Object.keys(countsRef.current).length) setCounts(saved.counts)
     })
   }, [run, token])
 
   useEffect(() => {
-    if (loaded) localStorage.setItem(STORAGE_KEY, JSON.stringify({ date, counts }))
+    if (!loaded) return
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ date, counts })); setDeviceSaved(true) }
+    catch { setDeviceSaved(false); setStatus({key:'feedback.storageFailed'}) }
   }, [date, counts, loaded])
 
   const changeDate = (next: string) => {
@@ -103,44 +133,67 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
     setCounts({})
     run(async () => {
       const days = await fetchInventoryHistory(next, token)
-      setHistory(days)
-      setCounts(days.find(d => d.date === next)?.counts ?? {})
+      if (mounted.current && dateRef.current === next && tokenRef.current === token) {
+        setHistory(days)
+        if (!Object.keys(countsRef.current).length) setCounts(days.find(d => d.date === next)?.counts ?? {})
+      }
     })
   }
 
   const save = () =>
     run(async () => {
       await saveInventoryDay(date, counts, token)
+      if (countsRef.current === counts && dateRef.current === date) setCountDirty(false)
       setHistory(await fetchInventoryHistory(date, token))
       return `Saved ${date}.`
     })
 
   const saveList = () => {
-    if (!draft) return
+    if (!draft || conflict) return
     const problem = listProblem(draft)
     if (problem) return setStatus(problem)
-    run(async () => {
-      const taken = new Set(draft.flatMap(sh => sh.items.map(i => i.id)))
-      const next = draft.map(sh => ({ ...sh, items: sh.items.map(i => ({ ...i, name: i.name.trim(), id: isNewId(i.id) ? newItemId(i.name, taken) : i.id })) }))
+    const candidate = draft
+    return listSaving.current.run(() => run(async () => {
+      const taken = new Set(candidate.flatMap(sh => sh.items.map(i => i.id)))
+      const next = candidate.map(sh => ({ ...sh, items: sh.items.map(i => ({ ...i, name: i.name.trim(), id: isNewId(i.id) ? newItemId(i.name, taken) : i.id })) }))
       try {
-        setListRev(await saveInventoryList(next, listRev, token))
+        const rev = await saveInventoryList(next, listRev, token)
+        if (!mounted.current || tokenRef.current !== token) return
+        setListRev(rev)
       } catch (caught) {
-        if (!(caught instanceof StoreConflictError)) throw caught
-        const latest = await fetchInventoryList(token)
-        setSheets(latest.sheets ?? DEFAULT_SHEETS)
-        setListRev(latest.rev)
-        return 'Someone else saved the list while you were editing. Your changes are still on screen: Save list again to replace theirs, or Cancel to see theirs.'
+        if (!mounted.current || tokenRef.current !== token) return
+        if (caught instanceof StoreConflictError) {
+          // Keep the original base revision. Reading a newer revision must not
+          // silently turn the next save into permission to overwrite it.
+          setConflict(true); setServerList(null)
+          return {key:'recovery.conflict'}
+        }
+        throw caught
       }
       setSheets(next)
-      setDraft(null)
-      return 'Item list saved.'
-    })
+      if (draftRef.current === candidate) setDraft(null)
+      return {key:'recovery.listSaved'}
+    }))
+  }
+  const reloadList = () => run(async () => {
+    const latest = await fetchInventoryList(token)
+    if (!Number.isSafeInteger(latest.rev) || latest.rev < 0 || (latest.sheets !== null && !isInventorySheets(latest.sheets))) throw new StoreUnavailableError()
+    if (mounted.current && tokenRef.current === token) setServerList(latest)
+  })
+  const useServer = async () => {
+    if (!serverList || !await confirmation.ask({key:'recovery.replaceConfirm'},true,{key:'recovery.useServer'})) return
+    setSheets(serverList.sheets ?? DEFAULT_SHEETS); setListRev(serverList.rev)
+    setDraft(null); setConflict(false); setServerList(null)
+    requestAnimationFrame(() => focusField('inventory-edit-list'))
+  }
+  const cancelList = async () => {
+    if (!await confirmation.ask({key:'recovery.dropList'},true)) return
+    setDraft(null); setConflict(false); setServerList(null)
+    requestAnimationFrame(() => focusField('inventory-edit-list'))
   }
 
-  const setInv = (item: InventoryItem, inv: string) =>
-    setCounts(c => ({ ...c, [item.id]: { inv, order: suggestOrder(item.use, inv) } }))
-  const setOrder = (item: InventoryItem, order: string) =>
-    setCounts(c => ({ ...c, [item.id]: { inv: c[item.id]?.inv ?? '', order } }))
+  const setInv = (item: InventoryItem, inv: string) => { setCountDirty(true); setCounts(c => ({ ...c, [item.id]: { inv, order: suggestOrder(item.use, inv) } })) }
+  const setOrder = (item: InventoryItem, order: string) => { setCountDirty(true); setCounts(c => ({ ...c, [item.id]: { inv: c[item.id]?.inv ?? '', order } })) }
 
   const past = history.filter(d => d.date < date).slice(0, PAST_COLUMNS).reverse()
   const orders = ordersBySupplier(sheets, counts)
@@ -148,6 +201,8 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
 
   return (
     <div>
+      {!token && <CodeGate onUnlock={onUnlock} title={tr('nav.inventory')} />}
+      <div hidden={!token}>
       <div className="flex flex-wrap items-end gap-3 mb-6 print:hidden">
         <div>
           <label htmlFor="inventory-date" className="block text-sm font-medium text-gray-700 mb-1">Count date</label>
@@ -161,9 +216,9 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
         </div>
         {draft ? (
           <>
-            <button onClick={saveList} disabled={busy} className={`${button} bg-red-600 text-white hover:bg-red-700`}>Save list</button>
-            <button onClick={() => confirm('Drop your changes to the item list?') && setDraft(null)} className={`${button} border border-gray-300 hover:bg-gray-50`}>
-              Cancel
+            <button onClick={saveList} disabled={busy || conflict} className={`${button} bg-red-600 text-white hover:bg-red-700`}>{tr('recovery.saveList')}</button>
+            <button onClick={cancelList} disabled={busy} className={`${button} border border-gray-300 hover:bg-gray-50`}>
+              {tr('feedback.cancel')}
             </button>
           </>
         ) : (
@@ -176,12 +231,12 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
             >
               Clear
             </button>
-            <button onClick={() => setDraft(structuredClone(sheets))} disabled={busy} className={`${button} border border-gray-300 hover:bg-gray-50`}>
-              Edit list
+            <button id="inventory-edit-list" onClick={() => { setConflict(false); setServerList(null); setDraft(structuredClone(sheets)) }} disabled={busy} className={`${button} border border-gray-300 hover:bg-gray-50`}>
+              {tr('recovery.editList')}
             </button>
           </>
         )}
-        <p role="status" className="text-sm text-gray-700">{status}</p>
+        <p role="status" className="text-sm text-gray-700">{typeof status === 'string' ? status : tr(status.key,status.params)}</p>
       </div>
       <p className="text-sm text-gray-600 mb-6 print:hidden">
         {draft
@@ -189,14 +244,19 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
           : `Write a count in INV, or tap ${CHECK} if there is enough. ORDER fills in with what it takes to get back to Use; change it if needed.`}
       </p>
 
+      {draft && <RecoveryPanel message={{key:conflict ? 'recovery.conflict' : 'recovery.localList'}}
+        copyText={() => JSON.stringify({storeId:'CR3',baseRevision:listRev,sheets:draft},null,2)}
+        busy={busy} retryLabel={{key:'recovery.retryLegacy'}} onRetry={!conflict ? saveList : undefined} onReload={conflict ? reloadList : undefined}
+        onUseServer={serverList ? useServer : undefined}
+        rows={serverList ? inventoryComparison(draft,serverList.sheets ?? DEFAULT_SHEETS,tr) : undefined} />}
       {draft
-        ? draft.map((sheet, si) => (
+        ? <fieldset disabled={busy} className="min-w-0">{draft.map((sheet, si) => (
             <EditSheetTable
               key={sheet.id}
               sheet={sheet}
               onChange={items => setDraft(d => d && d.map((sh, i) => (i === si ? { ...sh, items } : sh)))}
             />
-          ))
+          ))}</fieldset>
         : sheets.map(sheet => (
             <SheetTable key={sheet.id} sheet={sheet} date={date} past={past} counts={counts} onInv={setInv} onOrder={setOrder} />
           ))}
@@ -233,6 +293,8 @@ function InventoryBook({ token, onLocked }: { token: string; onLocked: () => voi
         )}
       </section>
       )}
+      {confirmation.dialog}
+      </div>
     </div>
   )
 }

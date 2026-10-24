@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useNavigationProtection } from './NavigationProtection'
 import { useInternalLanguage } from './InternalLanguage'
 import { ErrorSummary, focusField, type FieldIssue } from './Feedback'
 import { errorKey, type Message, type TranslationKey } from '@/lib/internal-tools/i18n'
@@ -39,6 +40,7 @@ export default function SalesConverter({
   const [files, setFiles] = useState<FileMap>({ general: null, lunch: null, dinner: null })
   const [status, setStatus] = useState<Message | null>(null)
   const [issues, setIssues] = useState<FieldIssue[]>([])
+  useNavigationProtection({ dirty: Object.values(form).some(Boolean) || Object.values(files).some(Boolean), deviceSaved: false })
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm({ ...form, [e.target.name]: e.target.value })
