@@ -42,7 +42,8 @@ def run():
         page.locator('#tab-sales').tap()
         sales = page.locator('#panel-sales')
         # Scope the existing export action to its mounted converter panel.
-        download = sales.locator('button').last
+        download = sales.locator('#sc-download')
+        prepare = sales.locator('#sc-prepare')
         page.locator('#sc-first').fill('Original preparer')
         page.locator('#sc-date').fill('2026-10-20')
         page.locator('#sc-day').select_option('TUE')
@@ -50,7 +51,7 @@ def run():
         for key in ('general', 'lunch', 'dinner'):
             page.locator('#sc-file-' + key).set_input_files(source(key))
             expect(page.locator('#sc-file-' + key + '-feedback')).to_contain_text('File checks passed')
-        expect(download).to_be_enabled()
+        expect(prepare).to_be_enabled()
         page.locator('#sc-file-general').set_input_files(source('bad', 'bad-general.xlsx'))
         expect(page.locator('#sc-file-general')).to_have_attribute('aria-invalid', 'true')
         expect(page.locator('#sc-file-general-feedback')).to_contain_text('row 2')
@@ -74,7 +75,7 @@ def run():
         expect(page.locator('#sc-file-dinner-feedback')).to_contain_text('está vacío')
         expect(download).to_be_disabled()
         page.locator('#sc-file-dinner').set_input_files(source('dinner'))
-        expect(download).to_be_enabled()
+        expect(prepare).to_be_enabled()
         # A delayed old file read must not overwrite the replacement's result.
         page.evaluate("""() => {
           const original = File.prototype.arrayBuffer;
@@ -91,10 +92,15 @@ def run():
         expect(page.locator('#sc-file-general-feedback')).to_contain_text('pasó las comprobaciones')
         # Validate manual amounts rather than exporting parseFloat("12oops") as 12.
         page.locator('#sc-amDeposit').fill('12oops')
-        download.tap()
+        prepare.tap()
         expect(page.locator('#sc-amDeposit')).to_be_focused()
         expect(sales.get_by_role('alert')).to_contain_text('importe completo')
         page.locator('#sc-amDeposit').fill('123.45')
+        prepare.tap()
+        expect(page.locator('#sales-review-title')).to_be_focused()
+        expect(download).to_be_disabled()
+        page.locator('#sales-reviewed').tap()
+        expect(download).to_be_enabled()
         # Template failure retains every file and field and never claims a download.
         page.route('**/internal/daily-sales-template.xlsx', lambda route: route.fulfill(status=503))
         download.tap()

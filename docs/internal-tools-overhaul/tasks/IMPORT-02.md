@@ -4,12 +4,12 @@ parent: IMPORT
 title: "Add sales previews and reconciliation"
 priority: P0
 delivery_class: CODE_ONLY
-status: ready
-owner: unassigned
+status: complete
+owner: Codex
 implementation_dependencies: [IMPORT-01]
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
@@ -53,31 +53,31 @@ Affected areas: src/components/internal/SalesConverter.tsx; src/components/inter
 
 ## Implementation checklist
 
-- [ ] Show detected general/lunch/dinner reports and source section for each mapped figure
-- [ ] Flag missing or inconsistent sales/tax/payment/deposit totals before download
-- [ ] Compare the resulting workbook against known current-output fixtures
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Show detected general/lunch/dinner reports and source section for each mapped figure
+- [x] Flag missing or inconsistent sales/tax/payment/deposit totals before download
+- [x] Compare the resulting workbook against known current-output fixtures
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Show detected general/lunch/dinner reports and source section for each mapped figure. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Flag missing or inconsistent sales/tax/payment/deposit totals before download. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Compare the resulting workbook against known current-output fixtures. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Show detected general/lunch/dinner reports and source section for each mapped figure. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Flag missing or inconsistent sales/tax/payment/deposit totals before download. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Compare the resulting workbook against known current-output fixtures. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
 - `npm exec tsc -- --noEmit` for touched TypeScript.
 - `npm run build` for changed frontend/export behavior; `npm run seo:check` after a build when routing/static output changes.
-- Add focused fixture/behavior checks where this outcome introduces a new contract. No `imports:test`, `forms:test`, D1 migration runner, or Worker build script exists yet; exact new commands and fixtures are future deliverables and must be recorded in handoff.
+- Add focused fixture/behavior checks where this outcome introduces a new contract. `npm run imports:test` now includes source validation and sales review/parity tests. Exact browser commands and outcomes are in the guide below.
 - For affected UI, run `npm run dev` with a verified local/staging API override and exercise the scenarios above in both languages; browser/Playwright setup must be checked rather than assumed. Do not let local tests fall back to the production API.
 
 Expected result: every applicable acceptance scenario passes, preserved behavior remains readable, and failures leave an explicit recovery path. Existing commands above were checked in package.json; proposed commands must be implemented and labeled before execution. During this documentation package creation none of these application or external checks were run.
@@ -90,16 +90,18 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
 | Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: None for local implementation; IMPORT-01 is locally complete in the preceding stack.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts: `src/lib/converter/sales-review.ts`, `SalesReview.tsx`, updated `SalesConverter.tsx`/`fillTemplate.js`, bilingual dictionaries, synthetic fixtures, `sales-review.test.ts`, `scripts/test-import-review.py` and updated validation browser flow.
+- Acceptance and commands: [sales-review guide](../sales-review.md). Every 14 mapped source figure and four manual amount figures has row/header/raw-value/cell evidence; selected context and detected report sections are visible. Same-report arithmetic, missing totals/detail, cross-scope comparisons and unmapped coverage are flagged without inventing financial rules.
+- Output: actual checked-in template's known filled cells, unchanged formulas/styles/sheets/page setup verified; no payroll/cash/date-policy change. Download follows explicit session acknowledgement of the prepared snapshot.
+- Recovery: edits/replacement invalidate review; duplicate prepare/download coalesced; earlier cash-out result cannot overwrite newer input; template failure retains work. English/Spanish keyboard/touch phone/print and mounted-tab behavior pass. Session memory is explicit; no persisted/server review, new credentials or second-editor import API is claimed.
+- Checks: `npm run imports:test` 23/23, dictionary tests 3/3, TypeScript/build/SEO/diff checks PASS. Four final Playwright flows PASS (review, validation, language, feedback), synthetic loopback only. No external/staff operation.
+- Milestones: I/L done; E/V not applicable (CODE_ONLY). Frontend publication remains separate.
+- Next owner/action: IMPORT-03 is ready and remains unassigned until claimed on the successor branch. User requested imports-first, then cash-out; open PRs only, leave unmerged. [Current service session/delegated date choices](../imports-session.md).
+- Rollback: revert this scoped commit; preserve source files/device drafts; separately publish a compatible frontend only when authorized.
