@@ -8,7 +8,7 @@ export type SalesForm = Record<'firstName' | 'lastName' | 'day' | 'date' | 'loca
 export type SalesSources = Record<SalesSlot, { name: string; workbook: XLSX.WorkBook }>
 export type Figure = { cell: string; label: TranslationKey; value: number | null; slot: SalesSlot | 'form'; filename: string; sheet: string; row: number | null; column: string; raw: string | number | null; absent: boolean }
 export type Check = { id: string; label: TranslationKey; state: 'match' | 'different' | 'missing' | 'review'; left: number | null; right: number | null; difference: number | null }
-export type SalesReview = { context?: SalesContext; sources: { slot: SalesSlot; filename: string; sheets: string[] }[]; figures: Figure[]; checks: Check[]; metrics: Record<string, number>; form: SalesForm; unmappedCategories: { slot: SalesSlot; row: number; category: string; net: number | null; tax: number | null }[]; unmapped: { row: number; type: string; subtype: string; value: number }[] }
+export type SalesReview = { context?: SalesContext; sources: { slot: SalesSlot; filename: string; sheets: string[]; fingerprint?: string }[]; figures: Figure[]; checks: Check[]; metrics: Record<string, number>; form: SalesForm; unmappedCategories: { slot: SalesSlot; row: number; category: string; net: number | null; tax: number | null }[]; unmapped: { row: number; type: string; subtype: string; value: number }[] }
 const upper = (value: unknown) => typeof value === 'string' ? value.toUpperCase() : ''
 const rows = (wb: XLSX.WorkBook, sheet: string): Record<string, unknown>[] => wb.Sheets[sheet] ? XLSX.utils.sheet_to_json(wb.Sheets[sheet]) : []
 const cents = (value: number | null): number | null => {

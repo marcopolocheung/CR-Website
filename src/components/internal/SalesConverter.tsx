@@ -13,6 +13,7 @@ import { generateSalesOutput } from '@/lib/converter/fillTemplate'
 import { downloadWorkbookOutput, type WorkbookOutput } from '@/lib/converter/workbook-output'
 import { businessDate } from '@/lib/internal-tools/contracts'
 import { importStore, type ImportSnapshot } from '@/lib/converter/import-snapshot'
+import ImportHistory from './ImportHistory'
 import ImportRecovery from './ImportRecovery'
 import type { DraftContext } from '@/lib/internal-tools/drafts'
 import type { fetchCashoutSnapshot } from '@/lib/cashout-store'
@@ -38,8 +39,8 @@ const dollars = (cents: number | null) => (cents === null ? '' : (cents / 100).t
  * over/short fields from a saved cash-out day when the manager is unlocked.
  */
 export default function SalesConverter({
-  loadCashout,
-}: {
+  loadCashout, token = '',
+}: { token?: string;
   loadCashout: ((location: string, date: string) => ReturnType<typeof fetchCashoutSnapshot>) | null
 }) {
   const { t: tr } = useInternalLanguage()
@@ -137,7 +138,9 @@ export default function SalesConverter({
         lunch: { name: files.lunch.name, workbook: results[1].value! },
         dinner: { name: files.dinner.name, workbook: results[2].value! },
       }
-      setReview({ ...reviewSales(sources, { ...form, day: weekday(form.date) }), context: salesContext(sources, cashoutLink) })
+      const prepared = reviewSales(sources, { ...form, day: weekday(form.date) })
+      prepared.sources = prepared.sources.map((source, index) => ({ ...source, fingerprint: results[index].fingerprint }))
+      setReview({ ...prepared, context: salesContext(sources, cashoutLink) })
       setStatus({ key: 'salesReview.prepared' })
     } catch (err) {
       setStatus({ key: err instanceof SourceValidationError ? 'importValidation.blocked' : 'importValidation.exportFailed' })
@@ -273,6 +276,7 @@ export default function SalesConverter({
         {tr('imports.download')}
       </button>
       <button id="sc-next" type="button" disabled={busy} onClick={() => { void startNext() }} className="ml-2 mt-4 min-h-11 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">{tr('importRetention.startNext')}</button>
+      <ImportHistory token={token} context={context} snapshot={snapshot} preparer={`${form.firstName} ${form.lastName}`.trim()} accepted={acknowledged} busy={busy} hasWork={!!review} onRestore={restoreSnapshot} />
       <ImportRecovery context={context} preparer={`${form.firstName} ${form.lastName}`.trim()} snapshot={snapshot}
         hasWork={Object.values(form).some(Boolean) || Object.values(files).some(Boolean) || !!review} busy={busy} onRestore={restoreSnapshot} onSaved={setDeviceSaved} />
     </div>

@@ -75,7 +75,7 @@ export default function Bookkeeping() {
         <CashOut token={token} onUnlock={setToken} onLocked={lock} />
       </div>
       <div role="tabpanel" id="panel-sales" aria-labelledby="tab-sales" hidden={tab !== 'sales'}>
-        <SalesConverter loadCashout={token ? loadCashout : null} />
+        <SalesConverter token={token} loadCashout={token ? loadCashout : null} />
       </div>
       <div role="tabpanel" id="panel-hours" aria-labelledby="tab-hours" hidden={tab !== 'hours'}>
         <HoursConverter token={token} />

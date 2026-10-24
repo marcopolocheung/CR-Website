@@ -3,7 +3,7 @@ import type { TranslationKey } from '../internal-tools/i18n'
 
 export type SalesSlot = 'general' | 'lunch' | 'dinner'
 export type SourceIssue = { key: TranslationKey; params?: Record<string, string | number> }
-export type SourceResult<T> = { value: T | null; issues: SourceIssue[] }
+export type SourceResult<T> = { value: T | null; issues: SourceIssue[]; fingerprint?: string }
 export class SourceValidationError extends Error {
   constructor(public issues: SourceIssue[]) { super('Source validation failed'); this.name = 'SourceValidationError' }
 }
@@ -118,9 +118,12 @@ export async function readSalesFile(file: Pick<File, 'name' | 'size' | 'arrayBuf
   if (!file.size) return { value: null, issues: [problem('importValidation.empty')] }
   if (!/\.(xlsx|xls|csv)$/i.test(file.name)) return { value: null, issues: [problem('importValidation.salesType')] }
   try {
-    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+    const buffer = await file.arrayBuffer()
+    const workbook = XLSX.read(buffer, { type: 'array' })
     const issues = validateSalesWorkbook(workbook, slot)
-    return { value: issues.length ? null : workbook, issues }
+    const digest = await crypto.subtle.digest('SHA-256', buffer)
+    const fingerprint = 'sha256:' + Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2,'0')).join('')
+    return { value: issues.length ? null : workbook, issues, fingerprint }
   } catch { return { value: null, issues: [problem('importValidation.unreadable')] } }
 }
 
