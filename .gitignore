@@ -153,3 +153,6 @@ vite.config.ts.timestamp-*
 .wrangler/
 .dev.vars
 .dev.vars.*
+
+# Local Python browser-test helper cache
+scripts/__pycache__/

@@ -1,15 +1,20 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigationProtection } from './NavigationProtection'
 import { useInternalLanguage } from './InternalLanguage'
-import { ErrorSummary, focusField, type FieldIssue } from './Feedback'
+import { ErrorSummary, focusField, useConfirmation, type FieldIssue } from './Feedback'
 import { errorKey, type Message, type TranslationKey } from '@/lib/internal-tools/i18n'
 import { readSalesFile, sourceNumber, SourceValidationError } from '@/lib/converter/validation'
 import SourceFileInput, { UNCHECKED, type FileValidation } from './SourceFileInput'
 import { reviewSales, type SalesReview as Review } from '@/lib/converter/sales-review'
 import SalesReview from './SalesReview'
-import { downloadFilledWorkbook } from '@/lib/converter/fillTemplate'
+import { generateSalesOutput } from '@/lib/converter/fillTemplate'
+import { downloadWorkbookOutput, type WorkbookOutput } from '@/lib/converter/workbook-output'
+import { businessDate } from '@/lib/internal-tools/contracts'
+import { importStore, type ImportSnapshot } from '@/lib/converter/import-snapshot'
+import ImportRecovery from './ImportRecovery'
+import type { DraftContext } from '@/lib/internal-tools/drafts'
 import type { CashoutTotals } from '@/lib/cashout-store'
 
 type FileKey = 'general' | 'lunch' | 'dinner'
@@ -46,13 +51,18 @@ export default function SalesConverter({
   const [busy, setBusy] = useState(false)
   const [review, setReview] = useState<Review | null>(null)
   const [acknowledged, setAcknowledged] = useState(false)
+  const [output, setOutput] = useState<WorkbookOutput | null>(null)
+  const [deviceSaved, setDeviceSaved] = useState(false)
+  const [fileReset, setFileReset] = useState(0)
+  const [resumed, setResumed] = useState(false)
+  const confirmation = useConfirmation()
   const editVersion = useRef(0)
   const cashoutRequest = useRef(0)
   const [status, setStatus] = useState<Message | null>(null)
   const [issues, setIssues] = useState<FieldIssue[]>([])
-  useNavigationProtection({ dirty: Object.values(form).some(Boolean) || Object.values(files).some(Boolean), deviceSaved: false })
+  useNavigationProtection({ dirty: Object.values(form).some(Boolean) || Object.values(files).some(Boolean), deviceSaved })
 
-  function invalidateReview() { editVersion.current++; setReview(null); setAcknowledged(false); setStatus(null) }
+  function invalidateReview() { editVersion.current++; setReview(null); setOutput(null); setDeviceSaved(false); setAcknowledged(false); setStatus(null) }
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     invalidateReview()
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -88,6 +98,7 @@ export default function SalesConverter({
 
   async function selectFile(key: FileKey, file: File) {
     invalidateReview()
+    setResumed(false)
     const version = ++generation.current[key]
     setFiles(current => ({ ...current, [key]: file }))
     setStatus(null)
@@ -135,10 +146,35 @@ export default function SalesConverter({
     setBusy(true)
     setStatus({ key: 'imports.parsing' })
     try {
-      await downloadFilledWorkbook(review.metrics, review.form)
+      const generated = output ?? await generateSalesOutput(review.metrics, review.form)
+      if (!output) { setOutput(generated); setDeviceSaved(false) }
+      await downloadWorkbookOutput(generated)
       setStatus({ key: 'imports.downloaded' })
     } catch { setStatus({ key: 'importValidation.exportFailed' }) }
     finally { converting.current = false; setBusy(false) }
+  }
+
+  const context = useMemo<DraftContext | null>(() => {
+    const storeId = importStore(form.location), date = businessDate(form.date)
+    return storeId && date ? { task: 'sales-import', storeId, businessDate: date } : null
+  }, [form.location, form.date])
+  const snapshot = useMemo<ImportSnapshot | null>(() => review ? { version: 1, kind: 'sales', review, output } : null, [review, output])
+  function restoreSnapshot(snapshot: ImportSnapshot) {
+    if (snapshot.kind !== 'sales') return
+    invalidateReview()
+    for (const key of ['general','lunch','dinner'] as const) generation.current[key]++
+    setForm({ ...snapshot.review.form }); setFiles({ general: null, lunch: null, dinner: null })
+    setValidation({ general: UNCHECKED, lunch: UNCHECKED, dinner: UNCHECKED }); setFileReset(value => value + 1)
+    setReview(snapshot.review); setOutput(snapshot.output); setAcknowledged(false); setResumed(true); setIssues([])
+    setStatus({ key: 'importRetention.resumed' })
+  }
+  async function startNext() {
+    if (busy || (Object.values(form).some(Boolean) || Object.values(files).some(Boolean) || review) && !await confirmation.ask({ key: 'importRetention.startWarning' }, true)) return
+    invalidateReview()
+    for (const key of ['general','lunch','dinner'] as const) generation.current[key]++
+    setForm(EMPTY_FORM); setFiles({ general: null, lunch: null, dinner: null })
+    setValidation({ general: UNCHECKED, lunch: UNCHECKED, dinner: UNCHECKED }); setIssues([]); setResumed(false); setFileReset(value => value + 1)
+    setTimeout(() => focusField('sc-first'), 0)
   }
 
   const ready = Object.values(validation).every(value => value.valid && !value.checking)
@@ -150,6 +186,7 @@ export default function SalesConverter({
         {tr('imports.salesInstructions')}
       </p>
 
+      {confirmation.dialog}
       <ErrorSummary issues={issues} />
       <fieldset disabled={busy} className="min-w-0">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -183,7 +220,8 @@ export default function SalesConverter({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
         {(['general', 'lunch', 'dinner'] as FileKey[]).map(key => (
-          <SourceFileInput key={key} id={`sc-file-${key}`} label={`imports.${key}`} accept=".xlsx,.xls,.csv"
+          <SourceFileInput key={`${key}:${fileReset}`} id={`sc-file-${key}`} label={`imports.${key}`} accept=".xlsx,.xls,.csv"
+            beforeReplace={() => files[key] || review ? confirmation.ask({ key: 'importRetention.replaceWarning' }, true) : Promise.resolve(true)}
             file={files[key]} validation={validation[key]} disabled={busy} onFile={file => { void selectFile(key, file) }} />
         ))}
       </div>
@@ -217,12 +255,13 @@ export default function SalesConverter({
         ))}
       </div>
       </fieldset>
-      <p role="status" className="mt-2 text-sm text-gray-700 min-h-5">{status ? tr(status.key, status.params) : null}</p>
+      <p id="sc-status" role="status" className="mt-2 text-sm text-gray-700 min-h-5">{status ? tr(status.key, status.params) : null}</p>
 
       <button id="sc-prepare" type="button" onClick={handlePrepare} disabled={!ready || busy}
         className="mt-4 min-h-11 rounded-lg border border-red-600 px-6 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">
         {tr('salesReview.prepare')}
       </button>
+      {resumed && <p className="mt-3 text-sm text-gray-700">{tr('importRetention.resumed')}</p>}
       {review && <SalesReview review={review} acknowledged={acknowledged} onAcknowledge={setAcknowledged} />}
       <button id="sc-download" type="button"
         onClick={handleConvert}
@@ -231,6 +270,9 @@ export default function SalesConverter({
       >
         {tr('imports.download')}
       </button>
+      <button id="sc-next" type="button" disabled={busy} onClick={() => { void startNext() }} className="ml-2 mt-4 min-h-11 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">{tr('importRetention.startNext')}</button>
+      <ImportRecovery context={context} preparer={`${form.firstName} ${form.lastName}`.trim()} snapshot={snapshot}
+        hasWork={Object.values(form).some(Boolean) || Object.values(files).some(Boolean) || !!review} busy={busy} onRestore={restoreSnapshot} onSaved={setDeviceSaved} />
     </div>
   )
 }

@@ -15,7 +15,6 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
 | INV-02 | Add progress, remaining filters, and search | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [INV-02](tasks/INV-02.md) |
-| IMPORT-03 | Preserve inputs and repeat downloads | P0 | `CODE_ONLY` | IMPORT-01 | — | ready | unassigned | P/P/NA/NA | [IMPORT-03](tasks/IMPORT-03.md) |
 | FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [FORM-01](tasks/FORM-01.md) |
 | FORM-02 | Add recoverable drafts and navigation protection | P0 | `CODE_ONLY` | UX-05, UX-06 | — | ready | unassigned | P/P/NA/NA | [FORM-02](tasks/FORM-02.md) |
 | FORM-07 | Verify blank downloads and saved compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [FORM-07](tasks/FORM-07.md) |
@@ -116,6 +115,7 @@ Only direct decision blockers appear here. Dependent planned tasks inherit those
 | CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | UX-05 | — | complete | Codex | D/D/NA/NA | [CASH-01](tasks/CASH-01.md) |
 | IMPORT-01 | Validate source files with actionable errors | P0 | `CODE_ONLY` | UX-01, UX-03, UX-06 | — | complete | Codex | D/D/NA/NA | [IMPORT-01](tasks/IMPORT-01.md) |
 | IMPORT-02 | Add sales previews and reconciliation | P0 | `CODE_ONLY` | IMPORT-01 | — | complete | Codex | D/D/NA/NA | [IMPORT-02](tasks/IMPORT-02.md) |
+| IMPORT-03 | Preserve inputs and repeat downloads | P0 | `CODE_ONLY` | IMPORT-01, IMPORT-02 | — | complete | Codex | D/D/NA/NA | [IMPORT-03](tasks/IMPORT-03.md) |
 
 ## All tasks
 
@@ -175,7 +175,7 @@ This table is the complete ownership/status index, including ready decisions, pl
 | INV-10 | Verify historical counts after catalog changes | P0 | `CODE_AND_EXTERNAL` | INV-01, INV-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [INV-10](tasks/INV-10.md) |
 | IMPORT-01 | Validate source files with actionable errors | P0 | `CODE_ONLY` | UX-01, UX-03, UX-06 | — | complete | Codex | D/D/NA/NA | [IMPORT-01](tasks/IMPORT-01.md) |
 | IMPORT-02 | Add sales previews and reconciliation | P0 | `CODE_ONLY` | IMPORT-01 | — | complete | Codex | D/D/NA/NA | [IMPORT-02](tasks/IMPORT-02.md) |
-| IMPORT-03 | Preserve inputs and repeat downloads | P0 | `CODE_ONLY` | IMPORT-01 | — | ready | unassigned | P/P/NA/NA | [IMPORT-03](tasks/IMPORT-03.md) |
+| IMPORT-03 | Preserve inputs and repeat downloads | P0 | `CODE_ONLY` | IMPORT-01, IMPORT-02 | — | complete | Codex | D/D/NA/NA | [IMPORT-03](tasks/IMPORT-03.md) |
 | IMPORT-04 | Unify date/store handling and cash-out linkage | P1 | `CODE_ONLY` | IMPORT-02, DEC-01 | — | blocked | unassigned | P/P/NA/NA | [IMPORT-04](tasks/IMPORT-04.md) |
 | IMPORT-05 | Add hours previews and explicit date ranges | P0 | `CODE_ONLY` | IMPORT-01, DEC-01 | — | blocked | unassigned | P/P/NA/NA | [IMPORT-05](tasks/IMPORT-05.md) |
 | IMPORT-06 | Map employee IDs and show unmatched rows | P1 | `CODE_AND_EXTERNAL` | IMPORT-05, DATA-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [IMPORT-06](tasks/IMPORT-06.md) |

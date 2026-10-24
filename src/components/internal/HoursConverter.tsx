@@ -1,13 +1,18 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigationProtection } from './NavigationProtection'
 import { useInternalLanguage } from './InternalLanguage'
 import type { Message } from '@/lib/internal-tools/i18n'
-import { exportHoursRows, readHoursFile } from '@/lib/converter/parseCSV'
+import { generateHoursOutput, readHoursFile } from '@/lib/converter/parseCSV'
 import { SourceValidationError, type SourceResult, type HoursRow } from '@/lib/converter/validation'
 import SourceFileInput, { UNCHECKED, type FileValidation } from './SourceFileInput'
-import { ErrorSummary, focusField, type FieldIssue } from './Feedback'
+import { ErrorSummary, focusField, useConfirmation, type FieldIssue } from './Feedback'
+import { downloadWorkbookOutput, type WorkbookOutput } from '@/lib/converter/workbook-output'
+import { businessDate } from '@/lib/internal-tools/contracts'
+import { importStore, type ImportSnapshot } from '@/lib/converter/import-snapshot'
+import type { DraftContext } from '@/lib/internal-tools/drafts'
+import ImportRecovery from './ImportRecovery'
 import { LOCATIONS } from './SalesConverter'
 
 const inputClass =
@@ -27,20 +32,31 @@ export default function HoursConverter() {
   const converting = useRef(false)
   const [busy, setBusy] = useState(false)
   const [csvFile, setCsvFile] = useState<File | null>(null)
-  useNavigationProtection({ dirty: !!(plant || startDate || endDate || csvFile), deviceSaved: false })
+  const [rows, setRows] = useState<HoursRow[] | null>(null)
+  const [sourceName, setSourceName] = useState('')
+  const [preparer, setPreparer] = useState('')
+  const [output, setOutput] = useState<WorkbookOutput | null>(null)
+  const [deviceSaved, setDeviceSaved] = useState(false)
+  const [resumed, setResumed] = useState(false)
+  const [fileReset, setFileReset] = useState(0)
+  const confirmation = useConfirmation()
+  function invalidateOutput() { setOutput(null); setDeviceSaved(false); setStatus(null) }
+  useNavigationProtection({ dirty: !!(plant || startDate || endDate || preparer || csvFile), deviceSaved })
 
   async function selectFile(file: File) {
+    invalidateOutput(); setRows(null); setResumed(false); setSourceName(file.name)
     const version = ++generation.current
     setCsvFile(file)
     setStatus(null)
     setValidation({ ...UNCHECKED, checking: true })
     const result: SourceResult<HoursRow[]> = await readHoursFile(file)
     if (generation.current !== version) return
+    setRows(result.value)
     setValidation({ checking: false, valid: !!result.value, issues: result.issues })
   }
 
   async function handleConvertAndDownload() {
-    if (converting.current || !csvFile) return
+    if (converting.current || (!csvFile && !rows)) return
     const missing: FieldIssue[] = []
     if (!plant) missing.push({ fieldId: 'hc-location', message: { key: 'imports.chooseLocation' } })
     if (!startDate) missing.push({ fieldId: 'hc-start', message: { key: 'imports.pickDates' } })
@@ -52,24 +68,46 @@ export default function HoursConverter() {
     setBusy(true)
     setStatus({ key: 'imports.parsing' })
     try {
-      const result: SourceResult<HoursRow[]> = await readHoursFile(csvFile)
+      const result: SourceResult<HoursRow[]> = output && rows ? { value: rows, issues: [] } : csvFile ? await readHoursFile(csvFile) : { value: rows, issues: [] }
       setValidation({ checking: false, valid: !!result.value, issues: result.issues })
       if (!result.value) { setStatus({ key: 'importValidation.blocked' }); focusField('hc-file'); return }
-      await exportHoursRows(result.value, { location: plant, startDate, endDate })
+      const generated = output ?? await generateHoursOutput(result.value, { location: plant, startDate, endDate })
+      setRows(result.value)
+      if (!output) { setOutput(generated); setDeviceSaved(false) }
+      await downloadWorkbookOutput(generated)
       setStatus({ key: 'imports.downloaded' })
     } catch (err) {
       setStatus({ key: err instanceof SourceValidationError ? 'importValidation.blocked' : 'importValidation.exportFailed' })
     } finally { converting.current = false; setBusy(false) }
   }
 
+  const context = useMemo<DraftContext | null>(() => {
+    const storeId = importStore(plant), start = businessDate(startDate), end = businessDate(endDate)
+    return storeId && start && end && start <= end ? { task: 'hours-import', storeId, period: { start, end } } : null
+  }, [plant, startDate, endDate])
+  const snapshot = useMemo<ImportSnapshot | null>(() => rows && context ? { version: 1, kind: 'hours', sourceName, rows, metadata: { location: plant, startDate, endDate, preparer }, output } : null, [rows, context, sourceName, plant, startDate, endDate, preparer, output])
+  function restoreSnapshot(snapshot: ImportSnapshot) {
+    if (snapshot.kind !== 'hours') return
+    generation.current++; setDeviceSaved(false)
+    setPlant(snapshot.metadata.location); setStartDate(snapshot.metadata.startDate); setEndDate(snapshot.metadata.endDate); setPreparer(snapshot.metadata.preparer)
+    setRows(snapshot.rows); setSourceName(snapshot.sourceName); setOutput(snapshot.output); setCsvFile(null); setResumed(true)
+    setValidation(UNCHECKED); setIssues([]); setFileReset(value => value + 1); setStatus({ key: 'importRetention.resumed' })
+  }
+  async function startNext() {
+    if (busy || (plant || startDate || endDate || preparer || csvFile || rows) && !await confirmation.ask({ key: 'importRetention.startWarning' }, true)) return
+    generation.current++; invalidateOutput(); setRows(null); setSourceName(''); setPreparer(''); setPlant(''); setStartDate(''); setEndDate(''); setCsvFile(null)
+    setValidation(UNCHECKED); setIssues([]); setResumed(false); setFileReset(value => value + 1); setTimeout(() => focusField('hc-location'), 0)
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 max-w-xl">
       <h2 className="text-xl font-semibold text-gray-900 mb-5">{tr('imports.hoursTitle')}</h2>
+      {confirmation.dialog}
       <ErrorSummary issues={issues} />
       <fieldset disabled={busy} className="min-w-0 space-y-4">
         <div>
           <label htmlFor="hc-location" className={labelClass}>{tr('imports.location')}</label>
-          <select id="hc-location" aria-invalid={issues.some(issue => issue.fieldId === 'hc-location') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-location') ? 'hc-location-summary-error' : undefined} value={plant} onChange={e => setPlant(e.target.value)} className={inputClass}>
+          <select id="hc-location" aria-invalid={issues.some(issue => issue.fieldId === 'hc-location') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-location') ? 'hc-location-summary-error' : undefined} value={plant} onChange={e => { invalidateOutput(); setPlant(e.target.value) }} className={inputClass}>
             <option value="">{tr('imports.selectLocation')}</option>
             {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
@@ -77,24 +115,30 @@ export default function HoursConverter() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="hc-start" className={labelClass}>{tr('imports.startDate')}</label>
-            <input id="hc-start" aria-invalid={issues.some(issue => issue.fieldId === 'hc-start') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-start') ? 'hc-start-summary-error' : undefined} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputClass} />
+            <input id="hc-start" aria-invalid={issues.some(issue => issue.fieldId === 'hc-start') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-start') ? 'hc-start-summary-error' : undefined} type="date" value={startDate} onChange={e => { invalidateOutput(); setStartDate(e.target.value) }} className={inputClass} />
           </div>
           <div>
             <label htmlFor="hc-end" className={labelClass}>{tr('imports.endDate')}</label>
-            <input id="hc-end" aria-invalid={issues.some(issue => issue.fieldId === 'hc-end') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-end') ? 'hc-end-summary-error' : undefined} type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={inputClass} />
+            <input id="hc-end" aria-invalid={issues.some(issue => issue.fieldId === 'hc-end') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-end') ? 'hc-end-summary-error' : undefined} type="date" value={endDate} onChange={e => { invalidateOutput(); setEndDate(e.target.value) }} className={inputClass} />
           </div>
         </div>
-        <SourceFileInput id="hc-file" label="imports.hoursCsv" accept=".csv" file={csvFile} validation={validation}
+        <div><label htmlFor="hc-preparer" className={labelClass}>{tr('importRetention.preparer')}</label>
+          <input id="hc-preparer" value={preparer} maxLength={120} onChange={e => { setDeviceSaved(false); setPreparer(e.target.value) }} className={inputClass} /></div>
+        <SourceFileInput key={fileReset} id="hc-file" label="imports.hoursCsv" accept=".csv" file={csvFile} validation={validation}
+          beforeReplace={() => csvFile || rows ? confirmation.ask({ key: 'importRetention.replaceWarning' }, true) : Promise.resolve(true)}
           onFile={file => { void selectFile(file) }} />
       </fieldset>
-      <button
+      {resumed && <p className="mt-3 break-words text-sm text-gray-700">{tr('importRetention.resumed')} {sourceName}</p>}
+      <button id="hc-download" type="button"
         onClick={handleConvertAndDownload}
-        disabled={!validation.valid || validation.checking || busy}
+        disabled={(!validation.valid && !rows) || validation.checking || busy}
         className="mt-5 min-h-11 px-6 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
       >
         {tr('imports.download')}
       </button>
-      <p role="status" className="mt-2 text-sm text-gray-600">{status ? tr(status.key, status.params) : null}</p>
+      <button id="hc-next" type="button" disabled={busy} onClick={() => { void startNext() }} className="ml-2 mt-4 min-h-11 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">{tr('importRetention.startNext')}</button>
+      <ImportRecovery context={context} preparer={preparer} snapshot={snapshot} hasWork={!!(plant || startDate || endDate || preparer || csvFile || rows)} busy={busy} onRestore={restoreSnapshot} onSaved={setDeviceSaved} />
+      <p id="hc-status" role="status" className="mt-2 text-sm text-gray-600">{status ? tr(status.key, status.params) : null}</p>
     </div>
   )
 }
