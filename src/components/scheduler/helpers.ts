@@ -1,7 +1,6 @@
 import {
   DAYS,
   calculateScheduleStats,
-  defaultEmployeesForRestaurant,
   defaultTemplateForRestaurant,
   formatRoleLabel,
   formatTimeRange,
@@ -328,20 +327,6 @@ export const scheduleVariants: { id: ScheduleVariant; label: string; description
   { id: 'similarWeek', label: 'Like last week', description: 'Keeps as much of the previous week as the rules allow.' },
   { id: 'fairHours', label: 'Similar hours for all', description: 'Evens out how many hours each person gets.' },
 ]
-
-export function cloneEmployees(restaurantId?: string) {
-  return defaultEmployeesForRestaurant(restaurantId).map((employee) => ({
-    ...employee,
-    roles: [...employee.roles],
-    recurringAvailability: Object.fromEntries(
-      Object.entries(employee.recurringAvailability).map(([day, ranges]) => [
-        day,
-        ranges?.map((range) => ({ ...range })) ?? [],
-      ]),
-    ) as Employee['recurringAvailability'],
-    incompatibleEmployeeIds: [...(employee.incompatibleEmployeeIds ?? [])],
-  }))
-}
 
 export function cloneTemplate(source?: WeeklyStaffingTemplate, restaurantId?: string): WeeklyStaffingTemplate {
   const base = source ?? defaultTemplateForRestaurant(restaurantId)

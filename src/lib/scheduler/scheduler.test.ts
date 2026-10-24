@@ -4,12 +4,11 @@ import { DAYS, formatRoleLabel, isValidRoleSlug, normalizeRoleSlug, rolesForRest
 import {
   defaultEmployeesForRestaurant,
   defaultTemplateForRestaurant,
-  seedEmployees,
-  seedKitchenEmployeesCR03,
   seedKitchenTemplateCR03,
   seedTemplate,
   expandTemplate,
 } from './data'
+import { seedEmployees, seedKitchenEmployeesCR03 } from './seed-crews'
 import { SCHEDULE_STRATEGIES, generateSchedule, preflightDiagnostics, summarizeSchedule } from './solver'
 import { isEmployeeQualified, validateSchedule } from './validator'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeeklyStaffingTemplate } from './types'
@@ -487,8 +486,8 @@ test('custom posts slugify, validate, and label for display', () => {
   assert.equal(formatRoleLabel('sushi-chef'), 'Sushi Chef')
 })
 
-test('CR03 built-in crew covers every required kitchen slot', () => {
-  const employees = defaultEmployeesForRestaurant('CR3-kitchen')
+test('CR03 sample crew covers every required kitchen slot', () => {
+  const employees = structuredClone(seedKitchenEmployeesCR03)
   assert.equal(employees.length, 19)
   assert.deepEqual(
     employees.map((employee) => employee.id).sort(),
@@ -534,7 +533,7 @@ test('CR03 built-in crew covers every required kitchen slot', () => {
 })
 
 test('CR03 crew carries the sheet’s post qualifications and double limits', () => {
-  const employees = defaultEmployeesForRestaurant('CR3-kitchen')
+  const employees = structuredClone(seedKitchenEmployeesCR03)
   const byId = new Map(employees.map((employee) => [employee.id, employee]))
   assert.deepEqual(byId.get('muk')?.roles, ['cook'])
   assert.deepEqual(byId.get('alfredo')?.roles, ['fried-rice'])
@@ -738,7 +737,7 @@ test('max doubles per week is a hard constraint', () => {
 })
 
 test('optional spots never block readiness — only required slots are checked', () => {
-  const employees = defaultEmployeesForRestaurant('CR3-kitchen')
+  const employees = structuredClone(seedKitchenEmployeesCR03)
   const slots = expandTemplate(defaultTemplateForRestaurant('CR3-kitchen'))
   assert.ok(slots.some((slot) => !slot.required), 'kitchen template has optional cover')
   // The board checks readiness the way the solver does: required slots only.
@@ -751,10 +750,13 @@ test('optional spots never block readiness — only required slots are checked',
   )
 })
 
-test('CR03 kitchens never inherit the dining crew and CR02 starts empty', () => {
-  const cr03 = defaultEmployeesForRestaurant('CR3-kitchen')
+test('CR03 kitchens never inherit the dining crew and no station ships a built-in crew', () => {
+  const cr03 = seedKitchenEmployeesCR03
   assert.ok(cr03.every((employee) => !employee.roles.includes('server') && !employee.roles.includes('cashier')))
-  assert.deepEqual(defaultEmployeesForRestaurant('CR2-kitchen'), [])
+  // No station ships a built-in crew: names and availability stay on the Worker, behind the manager code.
+  for (const station of ['CR3-diningroom', 'CR3-kitchen', 'CR2-kitchen', 'CR2-diningroom', undefined]) {
+    assert.deepEqual(defaultEmployeesForRestaurant(station), [])
+  }
   const cr02Roles = new Set(defaultTemplateForRestaurant('CR2-kitchen').Sunday.map((slot) => slot.role))
   assert.ok(cr02Roles.has('meat-prep') && cr02Roles.has('manager') && !cr02Roles.has('server'))
   assert.ok(!seedKitchenEmployeesCR03.some((employee) => employee.id === 'mary'))

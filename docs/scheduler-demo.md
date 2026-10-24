@@ -79,8 +79,10 @@ concurrency (`409 conflict` means someone else saved first — saving again
 overwrites with your copy, and the first save of a week uses `baseRev: 0`).
 Stations are `CR3-diningroom`, `CR3-kitchen`, `CR2-kitchen`, `CR2-diningroom`
 (see `src/data/restaurants.ts`); roster and template are likewise namespaced
-per station. New stations start from the built-in China Rose template with a
-one-click Start blank option.
+per station. New stations start from the built-in China Rose shift template
+with an empty staff list. No staff names or availability ship in the page:
+the crews live on the Worker, and reading them needs the manager code. The
+sample crews in `src/lib/scheduler/seed-crews.ts` are test fixtures only.
 
 Reads are public: `/schedule` lists visible weeks for a month and needs no
 link or code. The viewer never polls — it revalidates with a cheap month-rev

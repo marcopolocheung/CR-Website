@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { expandTemplate, seedEmployees, seedTemplate } from '../../lib/scheduler/data'
+import { expandTemplate, seedTemplate } from '../../lib/scheduler/data'
+import { seedEmployees } from '../../lib/scheduler/seed-crews'
 import { buildMovePreview, candidatesForSlot, createEmployeeId, proposeMovedAssignments, spotStatus, unassignableReason } from './helpers'
 
 const slots = expandTemplate(seedTemplate, '2026-10-11')

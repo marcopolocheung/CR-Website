@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import {
   calculateScheduleStats,
-  defaultEmployeesForRestaurant,
   defaultRoleForRestaurant,
   defaultTemplateForRestaurant,
   expandTemplate,
@@ -37,7 +36,7 @@ import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForWeek, publis
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
 import { useManagerCode } from './DemoGate'
 import PublishPanel from './PublishPanel'
-import { DragState, DropFeedback, EmployeeDraft, GenerationReport, HistorySnapshot, MovePreview, ScheduleVariant, ShiftKey, StaffSnapshot, UNDO_LIMIT, WeekAssignments, allDays, assignmentFingerprint, blankDraft, buildFixIssues, buildMovePreview, candidatesForSlot, changesSince, cloneAssignmentList, cloneEmployeeList, cloneEmployees, cloneTemplate, cloneWeeks, createEmployeeId, diagnosticLabel, emptyAssignments, formatReportTime, fullDay, gapAvailability, onboardingStorageKey, proposeMovedAssignments, readOnboardingDismissed, readStaffSnapshots, roleLabel, rolesInUse, scheduleVariants, snapshotStorageKey, statusForWeek, unassignableReason, uniqueMessages } from './helpers'
+import { DragState, DropFeedback, EmployeeDraft, GenerationReport, HistorySnapshot, MovePreview, ScheduleVariant, ShiftKey, StaffSnapshot, UNDO_LIMIT, WeekAssignments, allDays, assignmentFingerprint, blankDraft, buildFixIssues, buildMovePreview, candidatesForSlot, changesSince, cloneAssignmentList, cloneEmployeeList, cloneTemplate, cloneWeeks, createEmployeeId, diagnosticLabel, emptyAssignments, formatReportTime, fullDay, gapAvailability, onboardingStorageKey, proposeMovedAssignments, readOnboardingDismissed, readStaffSnapshots, roleLabel, rolesInUse, scheduleVariants, snapshotStorageKey, statusForWeek, unassignableReason, uniqueMessages } from './helpers'
 import { Button, Disclosure, Icon, IconButton, PublishStateBadge } from './ui'
 import { EmployeeCard, EmployeeForm } from './StaffEditor'
 import { TemplateEditor } from './RulesEditor'
@@ -45,7 +44,7 @@ import { WeeklyScheduleBoard } from './ScheduleBoard'
 import { GenerationReportBanner, GuidedFixPanel, HoursSummary, MonthStrip, OnboardingBanner } from './SchedulePanels'
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
   const restaurantName = restaurantId && isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
-  // Schedule-only stations (CR3 Kitchen) ship a built-in crew and default rules.
+  // Schedule-only stations (CR3 Kitchen) ship default rules; their crew lives on the Worker.
   // The crew (`/api/staff`) is one per station, shared by every week, with the
   // last saved change undoable; the rules are per-week like other stations.
   // Both stay read-only until the staff password is entered on the Staff tab.
@@ -62,7 +61,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [rosterSnapshots, setRosterSnapshots] = useState<Record<string, string | null>>({})
   const [rosterUpdatedAts, setRosterUpdatedAts] = useState<Record<string, string | null>>({})
   const [rosterLoadedWeeks, setRosterLoadedWeeks] = useState<Record<string, boolean>>({})
-  const [defaultRoster, setDefaultRoster] = useState<Employee[]>(() => cloneEmployees(restaurantId))
+  const [defaultRoster, setDefaultRoster] = useState<Employee[]>([])
   const [defaultRosterLoaded, setDefaultRosterLoaded] = useState(false)
   const [defaultRosterRev, setDefaultRosterRev] = useState(0)
   const [templates, setTemplates] = useState<Record<string, WeeklyStaffingTemplate>>({})
@@ -74,7 +73,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [defaultTemplateLoaded, setDefaultTemplateLoaded] = useState(false)
   const [defaultTemplateRev, setDefaultTemplateRev] = useState(0)
   // Editable crew for schedule-only stations. `staffDraft` is null until the
-  // saved crew loads; until then the built-in crew shows.
+  // saved crew loads; until then the list is empty.
   const [staffDraft, setStaffDraft] = useState<Employee[] | null>(null)
   const [staffLoaded, setStaffLoaded] = useState(false)
   const [staffRev, setStaffRev] = useState(0)
@@ -88,6 +87,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [passwordInput, setPasswordInput] = useState('')
   const [checkingPassword, setCheckingPassword] = useState(false)
   const [staffLoadError, setStaffLoadError] = useState('')
+  // What "no saved crew" means for this station: its saved roster (empty if none).
+  const [staffFallback, setStaffFallback] = useState<Employee[]>([])
   const employees = scheduleOnly
     ? staffDraft ?? defaultRoster
     : weekStart
@@ -206,8 +207,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         ? templateFingerprint(template) !== templateFingerprint(defaultTemplateForRestaurant(restaurantId))
         : templateFingerprint(template) !== templateServerSnapshot
   const isDefaultRoster = useMemo(
-    () => rosterFingerprint(employees) === rosterFingerprint(defaultEmployeesForRestaurant(restaurantId)),
-    [employees, restaurantId],
+    () => rosterFingerprint(employees) === rosterFingerprint(defaultRoster),
+    [employees, defaultRoster],
   )
   const isDefaultTemplate = useMemo(
     () => templateFingerprint(template) === templateFingerprint(defaultTemplateForRestaurant(restaurantId)),
@@ -362,7 +363,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setRosterSnapshots({})
     setRosterUpdatedAts({})
     setRosterLoadedWeeks({})
-    setDefaultRoster(cloneEmployees(restaurantId))
+    setDefaultRoster([])
     setDefaultRosterLoaded(false)
     setDefaultRosterRev(0)
     setTemplates({})
@@ -417,7 +418,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       })
       .catch(() => {
         if (!cancelled) {
-          setRosterLoadError('Could not reach the server. Showing the starting staff list, not your saved one — do not save over it.')
+          setRosterLoadError('Could not load the staff list from the server. Saving is off until it loads — reload to try again.')
           setDefaultRosterLoaded(true)
         }
       })
@@ -427,17 +428,19 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }, [restaurantId, scheduleOnly, managerCode])
 
   // Schedule-only crew: load the saved crew (one per station, shared by every
-  // week). No saved crew yet means the built-in seed, which stays editable.
+  // week). No saved crew yet means the station's saved roster, which stays editable.
   useEffect(() => {
     if (!scheduleOnly) return
     let cancelled = false
     setStaffLoadError('')
     setStaffLoaded(false)
     fetchStaff(managerCode, restaurantId)
-      .then((doc) => {
-        if (cancelled) return
+      .then(async (doc) => {
         // `null` means no crew saved yet; an empty array is a deliberately empty crew.
-        const seed = doc.employees === null ? cloneEmployees(restaurantId) : (doc.employees as Employee[])
+        const fallback = doc.employees === null ? (await fetchRoster(managerCode, restaurantId)).employees : null
+        if (cancelled) return
+        const seed = fallback ? (fallback as Employee[]) : (doc.employees as Employee[])
+        setStaffFallback(fallback ? cloneEmployeeList(fallback as Employee[]) : [])
         setStaffDraft(cloneEmployeeList(seed))
         setStaffBaseline(staffFingerprint(seed))
         setStaffRev(doc.rev)
@@ -447,10 +450,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       })
       .catch(() => {
         if (cancelled) return
-        const seed = cloneEmployees(restaurantId)
-        setStaffDraft(seed)
-        setStaffBaseline(staffFingerprint(seed))
-        setStaffLoadError('Could not reach the server. Showing the starting crew, not your saved one — do not save over it.')
+        setStaffDraft([])
+        setStaffBaseline(staffFingerprint([]))
+        setStaffLoadError('Could not load the crew from the server. Saving is off until it loads — reload to try again.')
         setStaffLoaded(true)
       })
     return () => {
@@ -514,7 +516,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         if (cancelled) return
         seedWeek(weekStart, defaultRoster, null)
         setRosterLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
-        setRosterLoadError('Could not reach the server. Showing the starting staff list, not your saved one — do not save over it.')
+        setRosterLoadError('Could not load the staff list from the server. Saving is off until it loads — reload to try again.')
       })
     return () => {
       cancelled = true
@@ -1003,7 +1005,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     // Inline confirm in the header calls this only after an explicit second click.
     // remember() keeps the pre-reset state so Undo can bring it back.
     remember('started over')
-    setEmployees(cloneEmployees(restaurantId))
+    setEmployees(cloneEmployeeList(defaultRoster))
     setTemplate(cloneTemplate(undefined, restaurantId))
     setWeeks({})
     setGeneratedWeeks({})
@@ -1021,10 +1023,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   function restoreDefaultRoster() {
     if (isDefaultRoster) return
     remember('restored default staff list')
-    setEmployees(cloneEmployees(restaurantId))
+    setEmployees(cloneEmployeeList(defaultRoster))
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
-    setDiagnostics(['Staff list for this week restored to the built-in defaults. Save to keep it — Undo brings back your list.'])
+    setDiagnostics(['Staff list for this week restored to the station’s saved list. Save to keep it — Undo brings back your list.'])
   }
 
   function restoreDefaultTemplate() {
@@ -1034,17 +1036,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     setDiagnostics(['Schedule rules for this week restored to the built-in defaults. Save to keep them — Undo brings back your rules.'])
-  }
-
-  function startBlankStation() {
-    remember('started blank station')
-    setEmployees([])
-    setWeeks({})
-    setGeneratedWeeks({})
-    setWeekStatus({})
-    setIgnoredIssueIds([])
-    setGuidedChoosing(false)
-    setDiagnostics(['Blank staff list ready for this week. Add employees below, then save the staff list to keep it.'])
   }
 
   function clearWeek() {
@@ -1252,9 +1243,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   // The saved crew echoes back from the Worker after a save/undo. `employees: null`
-  // means "no saved crew", so fall back to the built-in seed.
+  // means "no saved crew", so fall back to the station's saved roster.
   function applyStaffResult(result: StaffWriteResult) {
-    const next = result.employees === null ? cloneEmployees(restaurantId) : result.employees
+    const next = result.employees === null ? cloneEmployeeList(staffFallback) : result.employees
     setStaffDraft(cloneEmployeeList(next))
     setStaffBaseline(staffFingerprint(next))
     setStaffRev(result.rev)
@@ -1276,6 +1267,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
    */
   async function saveSetup({ alsoRules = false } = {}): Promise<boolean> {
     if (!weekStart || storeLoading) return false
+    // An empty list shown after a failed load must never overwrite the saved staff.
+    if (rosterLoadError || staffLoadError) {
+      setSetupError('The staff list did not load, so saving is off. Reload the page and try again.')
+      return false
+    }
     setSetupError('')
     setSetupNotice('')
     const target = weekStart
@@ -1518,27 +1514,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
           {isNewStation && (
             <section className="rounded-lg border border-sky-300 bg-sky-50 p-4 shadow-sm print:hidden">
-              <h2 className="text-sm font-semibold text-sky-950">New station — start from the usual China Rose setup, or blank</h2>
+              <h2 className="text-sm font-semibold text-sky-950">New station — add your staff to begin</h2>
               <p className="mt-1 text-sm text-sky-900">
-                Nothing is saved for{restaurantName ? ` ${restaurantName}` : ' this station'} yet. The list below is the usual
-                setup so you have something to work from. Save to keep it, or start blank.
+                Nothing is saved for{restaurantName ? ` ${restaurantName}` : ' this station'} yet. The shifts below are the usual
+                China Rose setup. Add each person on the Staff tab, then press Save changes.
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded border border-sky-700 bg-sky-700 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
-                  onClick={() => setDiagnostics(['Starting setup kept — review the staff list, then press Save changes.'])}
-                >
-                  Use this setup
-                </button>
-                <button
-                  type="button"
-                  className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                  onClick={startBlankStation}
-                >
-                  Start blank
-                </button>
-              </div>
             </section>
           )}
 
@@ -1940,7 +1920,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             {!scheduleOnly && (
             <>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-zinc-600">Mistake? Go back to the starting staff list.</p>
+              <p className="text-xs text-zinc-600">Mistake? Go back to the station’s saved staff list.</p>
               <button
                 type="button"
                 className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
@@ -1948,11 +1928,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 disabled={isDefaultRoster}
                 title={
                   isDefaultRoster
-                    ? 'Already using the starting staff list.'
-                    : 'Replace this week’s staff list with the starting list. You can undo, then save to keep it.'
+                    ? 'Already using the saved staff list.'
+                    : 'Replace this week’s staff list with the station’s saved list. You can undo, then save to keep it.'
                 }
               >
-                Use starting staff list
+                Use saved staff list
               </button>
             </div>
 

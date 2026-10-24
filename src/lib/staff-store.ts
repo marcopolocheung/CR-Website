@@ -9,7 +9,7 @@ import type { Employee } from './scheduler'
  * last saved change can be undone.
  */
 export type StaffSnapshot = {
-  /** null means no crew has been saved yet — callers fall back to the built-in crew. */
+  /** null means no crew has been saved yet — callers fall back to the station's saved roster. */
   employees: Employee[] | null
   rev: number
   updatedAt: string | null
