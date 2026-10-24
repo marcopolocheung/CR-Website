@@ -12,7 +12,6 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UX-02 | Create navigation and visible working context | P0 | `CODE_ONLY` | UX-01 | — | ready | unassigned | P/P/NA/NA | [UX-02](tasks/UX-02.md) |
 | UX-04 | Establish keyboard and tablet interaction patterns | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-04](tasks/UX-04.md) |
-| UX-05 | Implement labeled drafts and shared-device handoff | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-05](tasks/UX-05.md) |
 | UX-06 | Handle unsaved changes, retries, and edit conflicts | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-06](tasks/UX-06.md) |
 | DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
@@ -110,6 +109,7 @@ Only direct decision blockers appear here. Dependent planned tasks inherit those
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UX-01 | Establish translations and local dictionaries | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [UX-01](tasks/UX-01.md) |
 | UX-03 | Standardize controls, feedback, and save indicators | P0 | `CODE_ONLY` | UX-01 | — | complete | Codex | D/D/NA/NA | [UX-03](tasks/UX-03.md) |
+| UX-05 | Implement labeled drafts and shared-device handoff | P0 | `CODE_ONLY` | UX-03 | — | complete | Codex | D/D/NA/NA | [UX-05](tasks/UX-05.md) |
 | DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
 | DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | complete | Codex | D/D/NA/NA | [DATA-02](tasks/DATA-02.md) |
 | DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | implemented | Codex | D/D/P/P | [DATA-05](tasks/DATA-05.md) |
@@ -131,7 +131,7 @@ This table is the complete ownership/status index, including ready decisions, pl
 | UX-02 | Create navigation and visible working context | P0 | `CODE_ONLY` | UX-01 | — | ready | unassigned | P/P/NA/NA | [UX-02](tasks/UX-02.md) |
 | UX-03 | Standardize controls, feedback, and save indicators | P0 | `CODE_ONLY` | UX-01 | — | complete | Codex | D/D/NA/NA | [UX-03](tasks/UX-03.md) |
 | UX-04 | Establish keyboard and tablet interaction patterns | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-04](tasks/UX-04.md) |
-| UX-05 | Implement labeled drafts and shared-device handoff | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-05](tasks/UX-05.md) |
+| UX-05 | Implement labeled drafts and shared-device handoff | P0 | `CODE_ONLY` | UX-03 | — | complete | Codex | D/D/NA/NA | [UX-05](tasks/UX-05.md) |
 | UX-06 | Handle unsaved changes, retries, and edit conflicts | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-06](tasks/UX-06.md) |
 | UX-07 | Standardize print layouts and bilingual output | P1 | `CODE_ONLY` | UX-01, DEC-07 | — | blocked | unassigned | P/P/NA/NA | [UX-07](tasks/UX-07.md) |
 | DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |

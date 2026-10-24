@@ -49,6 +49,8 @@ with sync_playwright() as p:
     expect(page.locator('#cashout-code')).to_have_attribute('aria-describedby', 'cashout-code-error')
     page.locator('#cashout-code').fill('synthetic-feedback-token')
     page.get_by_role('button', name='Unlock', exact=True).click()
+    page.locator('#draft-preparer').fill('Feedback test preparer')
+    page.get_by_role('button', name='Start new draft', exact=True).click()
     feedback = page.locator('[data-save-state]')
     expect(feedback).to_have_attribute('data-save-state', 'device')
     expect(feedback).to_contain_text('Saved on this device')
@@ -107,8 +109,10 @@ with sync_playwright() as p:
     expect(feedback).to_contain_text('No se pudo actualizar el historial')
     mode['history_fail'] = False
     # A change of record context invalidates the last acknowledged indicator.
+    page.get_by_role('button', name='Elegir otro borrador', exact=True).click()
     page.locator('#cashout-date').fill('2026-10-19')
-    expect(feedback).to_have_attribute('data-save-state', 'unsaved')
+    page.get_by_role('button', name='Empezar un borrador nuevo', exact=True).click()
+    expect(feedback).to_have_attribute('data-save-state', 'device')
     mode['fail'] = True
     page.get_by_role('button', name='Guardar día', exact=True).click()
     expect(feedback).to_have_attribute('data-save-state', 'waiting')
