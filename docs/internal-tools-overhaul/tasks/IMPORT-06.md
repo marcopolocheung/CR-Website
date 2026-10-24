@@ -4,12 +4,12 @@ parent: IMPORT
 title: "Map employee IDs and show unmatched rows"
 priority: P1
 delivery_class: CODE_AND_EXTERNAL
-status: planned
-owner: unassigned
-implementation_dependencies: [IMPORT-05, DATA-04]
+status: implemented
+owner: Codex
+implementation_dependencies: [IMPORT-05, DATA-04-IMPORT]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: pending
 live_verification: pending
 ---
@@ -42,7 +42,7 @@ See [current-state inventory](../current-state.md) and [supporting research](../
 **Needed to implement:**
 
 - [IMPORT-05](IMPORT-05.md) at `implemented` (or `complete`).
-- [DATA-04](DATA-04.md) at `implemented` (or `complete`).
+- [DATA-04-IMPORT](DATA-04-IMPORT.md) at `implemented`: the reviewed import directory slice. Wider DATA-04 remains pending; imports do not activate personnel administration.
 
 **Needed to activate:**
 
@@ -57,25 +57,25 @@ Affected areas: src/components/internal/SalesConverter.tsx; src/components/inter
 
 ## Implementation checklist
 
-- [ ] Keep rows lacking Employee External Id in the review and exception totals
-- [ ] Require explicit mapping for same-name people and record provenance
-- [ ] Reconcile included/excluded rows without silently dropping hours
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Keep rows lacking Employee External Id in the review and exception totals
+- [x] Require explicit mapping for same-name people and record provenance
+- [x] Reconcile included/excluded rows without silently dropping hours
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Keep rows lacking Employee External Id in the review and exception totals. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Require explicit mapping for same-name people and record provenance. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Reconcile included/excluded rows without silently dropping hours. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Keep rows lacking Employee External Id in the review and exception totals. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Require explicit mapping for same-name people and record provenance. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Reconcile included/excluded rows without silently dropping hours. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
@@ -97,16 +97,15 @@ Evidence specific to this task: the three task scenarios above must pass against
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | pending | Environment, operation IDs, deployment/resource evidence, or staff-session execution. |
 | Live verification | pending | Observed target-environment behavior or staff acceptance with date and operator. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Listed prerequisites are pending.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Scope/artifacts: [import-identity.md](../import-identity.md); Codex is the coordinating owner for touched shared files.
+- Checks/evidence: 41 import tests; 2 local D1 tests; 128 scheduler tests; build/types/SEO/dictionaries; mapping, retention and hours-preview browser flows passed. Local synthetic fixtures only; no live-system claim.
+- Implementation and local verification: done. External/live: pending; activation dependencies remain required.
+- Recovery/rollback and acceptance scenarios are recorded in the linked guide. Preserve prior records and drafts when reverting scoped changes.
+- Next owner/action: Codex continues the user-authorized six-PR import stack in one worktree. Open PRs only; no merging or auto-merge.
