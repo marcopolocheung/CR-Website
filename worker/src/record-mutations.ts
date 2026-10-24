@@ -1,3 +1,5 @@
+import { canonicalJson } from '../../src/lib/internal-tools/json'
+export { canonicalJson } from '../../src/lib/internal-tools/json'
 import type { D1Database } from '@cloudflare/workers-types'
 import {
   apiError, businessDate, ERROR_STATUS, isStationId, isStoreId, operationId, recordId, revision,
@@ -19,25 +21,6 @@ export type MutationResult<T extends Json> = { ok: true; record: RecordEnvelope<
   | { ok: false; status: number; body: ErrorEnvelope }
 const families: readonly RecordFamily[] = ['employee','membership','employee-mapping','schedule','schedule-request','cash-close','catalog','count','order','receipt','stock-event','import','form','follow-up','attachment']
 
-/** Canonical JSON makes object-key order irrelevant and rejects lossy JSON coercion. */
-export function canonicalJson(value: unknown): string {
-  const seen = new Set<object>()
-  function encode(input: unknown): string {
-    if (input === null || typeof input === 'boolean' || typeof input === 'string') return JSON.stringify(input)
-    if (typeof input === 'number' && Number.isFinite(input)) return JSON.stringify(input)
-    if (!input || typeof input !== 'object' || seen.has(input)) throw new Error('invalid_json')
-    if (!Array.isArray(input) && Object.getPrototypeOf(input) !== Object.prototype && Object.getPrototypeOf(input) !== null) throw new Error('invalid_json')
-    seen.add(input)
-    try {
-      if (Array.isArray(input)) {
-        // Sparse arrays and undefined must not turn into apparently measured nulls.
-        return '[' + Array.from({ length: input.length }, (_, index) => encode(input[index])).join(',') + ']'
-      }
-      return '{' + Object.keys(input).sort().map(key => JSON.stringify(key) + ':' + encode((input as Record<string, unknown>)[key])).join(',') + '}'
-    } finally { seen.delete(input) }
-  }
-  return encode(value)
-}
 function validDateContext(context: DateContext): boolean {
   if (!context || typeof context !== 'object') return false
   return context.kind === 'undated' || (context.kind === 'day' ? businessDate(context.businessDate) !== null

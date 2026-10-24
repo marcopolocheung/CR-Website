@@ -45,14 +45,14 @@ export function SaveFeedback({ state, message }: { state: SaveState; message?: M
   </div>
 }
 
-type Question = { message: Message; destructive?: boolean }
+type Question = { message: Message; destructive?: boolean; confirmLabel?: Message }
 export function useConfirmation() {
   const [question, setQuestion] = useState<Question | null>(null)
   const resolve = useRef<((answer: boolean) => void) | null>(null)
   const mounted = useRef(true)
-  const ask = useCallback((message: Message, destructive = false): Promise<boolean> => {
+  const ask = useCallback((message: Message, destructive = false, confirmLabel?: Message): Promise<boolean> => {
     if (!mounted.current || resolve.current) return Promise.resolve(false)
-    return new Promise(answer => { resolve.current = answer; setQuestion({ message, destructive }) })
+    return new Promise(answer => { resolve.current = answer; setQuestion({ message, destructive, confirmLabel }) })
   }, [])
   const decide = useCallback((answer: boolean) => {
     const pending = resolve.current
@@ -96,7 +96,7 @@ function ConfirmDialog({ question, onDecision }: { question: Question | null; on
       <p id={descriptionId} className="mt-3 text-sm text-gray-700">{t(question.message.key, question.message.params)}</p>
       <div className="mt-5 flex flex-wrap justify-end gap-2">
         <button ref={cancel} type="button" onClick={() => onDecision(false)} className="min-h-11 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700">{t('feedback.cancel')}</button>
-        <button type="button" onClick={() => onDecision(true)} className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${question.destructive ? 'bg-red-700 hover:bg-red-800' : 'bg-red-600 hover:bg-red-700'}`}>{t('feedback.confirm')}</button>
+        <button type="button" onClick={() => onDecision(true)} className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${question.destructive ? 'bg-red-700 hover:bg-red-800' : 'bg-red-600 hover:bg-red-700'}`}>{question.confirmLabel ? t(question.confirmLabel.key, question.confirmLabel.params) : t('feedback.confirm')}</button>
       </div>
     </>}
   </dialog>

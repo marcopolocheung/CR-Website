@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useNavigationProtection } from './NavigationProtection'
 import { useInternalLanguage } from './InternalLanguage'
 import type { Message } from '@/lib/internal-tools/i18n'
 import { parseCsvAndExport } from '@/lib/converter/parseCSV'
@@ -18,6 +19,7 @@ export default function HoursConverter() {
   const [endDate, setEndDate] = useState('')
   const [status, setStatus] = useState<Message | null>(null)
   const [csvFile, setCsvFile] = useState<File | null>(null)
+  useNavigationProtection({ dirty: !!(plant || startDate || endDate || csvFile), deviceSaved: false })
 
   const handleConvertAndDownload = () => {
     if (!csvFile) return setStatus({ key: 'imports.noFile' })

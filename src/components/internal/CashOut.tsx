@@ -8,6 +8,8 @@ import DraftChooser, { downloadDraftSource } from './DraftChooser'
 import { newDraft, saveDraft, type Draft, type DraftContext } from '@/lib/internal-tools/drafts'
 import { isCashoutDraftSheet, readUnassignedCashout, type CashoutDraftSheet } from '@/lib/internal-tools/cashout-draft'
 import { businessDate } from '@/lib/internal-tools/contracts'
+import { useNavigationProtection } from './NavigationProtection'
+import { SingleFlight } from '@/lib/internal-tools/recovery'
 import { errorKey, type Message } from '@/lib/internal-tools/i18n'
 import {
   DENOMINATIONS,
@@ -96,11 +98,10 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export default function CashOut({ token, onUnlock, onLocked }: { token: string; onUnlock: (token: string) => void; onLocked: () => void }) {
-  if (!token) return <CodeGate onUnlock={onUnlock} />
-  return <CashOutWorkspace token={token} onLocked={onLocked} />
+  return <CashOutWorkspace token={token} onUnlock={onUnlock} onLocked={onLocked} />
 }
 
-function CashOutWorkspace({ token, onLocked }: { token: string; onLocked: () => void }) {
+function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlock: (token: string) => void; onLocked: () => void }) {
   const { t } = useInternalLanguage()
   const [store, setStore] = useState<CashoutStore>('CR3')
   const [date, setDate] = useState(today)
@@ -117,9 +118,10 @@ function CashOutWorkspace({ token, onLocked }: { token: string; onLocked: () => 
     return parsed ? { task: 'cash-out', storeId: store, businessDate: parsed } : null
   }, [store, date])
   useEffect(() => {
+    if (!token) return
     try { setLegacy(localStorage.getItem('cr-cash-out')) }
     catch { setStorageFailed(true) }
-  }, [])
+  }, [token])
   const persist = useCallback((payload: Sheet): boolean => {
     const current = activeRef.current
     if (!current) return false
@@ -162,6 +164,8 @@ function CashOutWorkspace({ token, onLocked }: { token: string; onLocked: () => 
     else requestAnimationFrame(() => focusField('draft-preparer'))
   }
   return <div>
+    {!token && <CodeGate onUnlock={onUnlock} />}
+    <div hidden={!token}>
     <div className="mb-4 flex flex-wrap items-end gap-3">
       <div><label htmlFor="cashout-store" className="mb-1 block text-sm font-medium text-gray-700">{t('common.store')}</label>
         <select id="cashout-store" value={store} disabled={!!active} onChange={event => setStore(event.target.value as CashoutStore)} className={inputClass}>
@@ -199,6 +203,7 @@ function CashOutWorkspace({ token, onLocked }: { token: string; onLocked: () => 
       </div>}
     </>}
     {confirmation.dialog}
+    </div>
   </div>
 }
 
@@ -214,7 +219,11 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
   const [status, setStatus] = useState<Message | null>(null)
   const [busy, setBusy] = useState(false)
   const [saveState, setSaveState] = useState<SaveState>('unsaved')
+  const [deviceSaved,setDeviceSaved] = useState(false)
+  const saving = useRef(new SingleFlight<void>())
+  useNavigationProtection({ dirty: saveState !== 'server', deviceSaved })
   const confirmation = useConfirmation()
+  const tokenRef = useRef(token); tokenRef.current = token
   const currentEdit = useRef({ store, date, sheet })
   currentEdit.current = { store, date, sheet }
 
@@ -224,23 +233,23 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
       setStatus(null)
       try {
         const message = await task()
-        if (mounted.current && message) setStatus(message)
+        if (mounted.current && tokenRef.current === token && message) setStatus(message)
       } catch (caught) {
-        if (!mounted.current) return
+        if (!mounted.current || tokenRef.current !== token) return
         if (caught instanceof StoreAuthError) onLocked()
         else setStatus({ key: errorKey(caught) })
       } finally {
         if (mounted.current) setBusy(false)
       }
     },
-    [onLocked],
+    [onLocked, token],
   )
 
   const refreshHistory = useCallback(
-    () => run(async () => {
+    () => { if (!token) return Promise.resolve(); return run(async () => {
       const days = await fetchCashoutHistory(store, today(), token)
       if (mounted.current && currentEdit.current.store === store) setHistory(days)
-    }),
+    }) },
     [run, store, token],
   )
 
@@ -259,7 +268,8 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
       return { key: 'cash.loaded', params: { store, date: day } }
     })
 
-  const saveDay = () => run(async () => {
+  const saveDay = () => saving.current.run(() => run(async () => {
+    if (!token) return
     const stillCurrent = () => mounted.current && currentEdit.current.store === store && currentEdit.current.date === date && latestSheet.current === sheet
     setSaveState('sending')
     try {
@@ -276,10 +286,12 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
     }
     catch { return { key: stillCurrent() ? 'cash.savedHistoryUnavailable' : 'cash.earlierVersionSaved', params: { store, date } } }
     return { key: stillCurrent() ? 'cash.saved' : 'cash.earlierVersionSaved', params: { store, date } }
-  })
+  }))
 
   const saveOnDevice = useCallback((payload: Sheet) => {
-    if (persist(payload)) {
+    const saved = persist(payload)
+    setDeviceSaved(saved)
+    if (saved) {
       setSaveState('device')
       setStatus(previous => previous && ['cash.saved', 'cash.savedHistoryUnavailable', 'cash.earlierVersionSaved'].includes(previous.key) ? null : previous)
     } else { setSaveState('failed'); setStatus({ key: 'feedback.storageFailed' }) }

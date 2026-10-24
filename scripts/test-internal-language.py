@@ -122,6 +122,9 @@ def run():
         page.get_by_role('button', name='Español', exact=True).tap()
         dialogs = []
         def dismiss(dialog):
+            if dialog.type == 'beforeunload':
+                dialog.accept()
+                return
             dialogs.append(dialog.message)
             dialog.dismiss()
         page.on('dialog', dismiss)
