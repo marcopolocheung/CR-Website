@@ -47,7 +47,7 @@ def run():
         prepare = sales.locator('#sc-prepare')
         page.locator('#sc-first').fill('Original preparer')
         page.locator('#sc-date').fill('2026-10-20')
-        page.locator('#sc-day').select_option('TUE')
+        expect(page.locator('#sc-day')).to_have_value('TUE')
         page.locator('#sc-location').select_option(index=1)
         for key in ('general', 'lunch', 'dinner'):
             set_source(page, '#sc-file-' + key, source(key))
@@ -101,6 +101,7 @@ def run():
         prepare.tap()
         expect(page.locator('#sales-review-title')).to_be_focused()
         expect(download).to_be_disabled()
+        page.locator('#sales-context-reason').fill('Synthetic source context reviewed for this fixture')
         page.locator('#sales-reviewed').tap()
         expect(download).to_be_enabled()
         # Template failure retains every file and field and never claims a download.

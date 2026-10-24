@@ -2,12 +2,14 @@
 
 import { useEffect, useRef } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
+import { needsContextReview } from '@/lib/converter/sales-context'
+import { importStore } from '@/lib/converter/import-snapshot'
 import type { SalesReview as Review } from '@/lib/converter/sales-review'
 
-export default function SalesReview({ review, acknowledged, onAcknowledge }: { review: Review; acknowledged: boolean; onAcknowledge: (value: boolean) => void }) {
+export default function SalesReview({ review, acknowledged, onAcknowledge, onReason }: { onReason: (reason: string) => void; review: Review; acknowledged: boolean; onAcknowledge: (value: boolean) => void }) {
   const { t, locale } = useInternalLanguage()
   const heading = useRef<HTMLHeadingElement>(null)
-  useEffect(() => { heading.current?.focus() }, [review])
+  useEffect(() => { heading.current?.focus() }, [review.sources])
   const money = (value: number | null) => value === null ? t('salesReview.missingValue') : new Intl.NumberFormat(locale === 'es' ? 'es-US' : 'en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 20 }).format(value)
   return <section className="mt-6 border-t border-gray-200 pt-5" aria-labelledby="sales-review-title">
     <h3 ref={heading} id="sales-review-title" tabIndex={-1} className="text-lg font-semibold text-gray-900 focus-visible:outline-2 focus-visible:outline-red-700">{t('salesReview.title')}</h3>
@@ -20,6 +22,15 @@ export default function SalesReview({ review, acknowledged, onAcknowledge }: { r
       <span className="font-semibold">{t(`imports.${source.slot}`)}: </span><span className="break-all">{source.filename}</span>
       <p className="break-words">{t(source.slot === 'general' ? 'salesReview.generalDetected' : 'salesReview.categoryDetected')} · {source.sheets.join(' · ')}</p>
     </li>)}</ul>
+    <div className="mt-4 rounded-lg border border-amber-300 p-3 text-sm">
+      <p>{t('salesContext.rule')}</p>
+      {review.context?.sources.map(source => <p key={source.slot} className="break-words">{t(`imports.${source.slot as 'general' | 'lunch' | 'dinner'}`)}: {source.dates.join(', ') || t('salesContext.unknown')} · {source.stores.join(', ') || t('salesContext.unknown')}</p>)}
+      {needsContextReview(review.context, review.form.date, importStore(review.form.location)) && <div>
+        <label htmlFor="sales-context-reason" className="mt-3 block font-semibold">{t('salesContext.reason')}</label>
+        <textarea id="sales-context-reason" value={review.context?.reason ?? ''} maxLength={1000} onChange={e => onReason(e.target.value)} className="mt-1 min-h-20 w-full rounded border border-gray-400 p-2" />
+      </div>}
+      {review.context?.cashout && <p className="mt-2 break-all">{t('salesContext.cashout')}: {review.context.cashout.storeId} · {review.context.cashout.date} · {review.context.cashout.updatedAt} · {review.context.cashout.revision}</p>}
+    </div>
     <h4 className="mt-5 font-semibold">{t('salesReview.figures')}</h4>
     <p className="mt-1 text-sm text-gray-600">{t('salesReview.sourceNote')}</p>
     <div className="mt-2 max-w-full overflow-x-auto" tabIndex={0} role="region" aria-label={t('salesReview.figures')}>

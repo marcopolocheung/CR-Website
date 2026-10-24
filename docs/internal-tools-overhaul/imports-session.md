@@ -20,3 +20,10 @@ DEC-01's canonical record, midnight/DST examples and executable checks are in [b
 ## Boundaries
 
 Use synthetic fixtures and explicit loopback API overrides. No cloud resource creation, Worker deployment, production migration/data mutation, deferred auth/hosting work or automatic merging is authorized. Keep original user worktrees/untracked documentation untouched. Shared migration number 0004 remains unused; reserve before any schema work. CODE_AND_EXTERNAL work records local implementation separately from activation/live verification. The [tracker](tracker.md) and canonical briefs remain authoritative; [earlier handoff](session-handoff.md) is a historical pre-merge inventory, not current PR state.
+
+## Six-PR continuation
+
+1. DEC-01: [PR #143](https://github.com/marcopolocheung/CR-Website/pull/143), base `feat/overhaul-import-03`, head `feat/overhaul-dec-01`, commit `e88b245`.
+2. IMPORT-04 follows `feat/overhaul-dec-01`; source/context evidence is in [sales context](sales-context.md).
+
+The user approved scoped import defaults on 2026-10-24: managers explicitly review mappings, never match by name, preserve inactive identities, disable hour targets; retain reviewed import values/fingerprints without raw file uploads or automatic deletion. Wider identity, personnel and retention/recovery decisions remain pending. This approval applies only to the import slices and grants no external execution.

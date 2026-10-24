@@ -53,11 +53,12 @@ def run():
         page.on('dialog',lambda dialog:dialog.accept() if dialog.type == 'beforeunload' else dialog.dismiss())
         page.goto(BASE+'/internal/bookkeeping/');page.wait_for_load_state('networkidle')
         page.locator('#tab-sales').tap();sales_context(page)
-        page.locator('#sc-first').fill('Original preparer');page.locator('#sc-day').select_option('TUE')
+        page.locator('#sc-first').fill('Original preparer');expect(page.locator('#sc-day')).to_have_value('TUE')
         for slot in ('general','lunch','dinner'):
             set_source(page,'#sc-file-'+slot,upload(slot))
             expect(page.locator('#sc-file-'+slot+'-feedback')).to_contain_text('File checks passed')
-        page.locator('#sc-prepare').tap();page.locator('#sales-reviewed').check()
+        page.locator('#sc-prepare').tap();page.locator('#sales-context-reason').fill('Synthetic source context reviewed for this fixture')
+        page.locator('#sales-reviewed').check()
         sales=page.locator('#panel-sales');button=page.locator('#sc-download')
         first=download_hash(page,button)
         context.set_offline(True)
@@ -91,6 +92,7 @@ def run():
         assert page.locator('#sc-file-general').evaluate('(input)=>input.files.length')==0
         expect(page.locator('#sc-prepare')).to_be_disabled()
         expect(button).to_be_disabled()
+        page.locator('#sales-context-reason').fill('Synthetic source context reviewed for this fixture')
         page.locator('#sales-reviewed').check();context.set_offline(True)
         assert download_hash(page,button)==first
         sales.get_by_role('button',name='Save a copy on this device',exact=True).tap()

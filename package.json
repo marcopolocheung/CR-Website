@@ -16,7 +16,7 @@
     "worker:dev:local": "wrangler dev --local --config worker/wrangler.local.jsonc",
     "worker:types:local": "wrangler types worker/local-env.d.ts --config worker/wrangler.local.jsonc --env-interface LocalBindings --include-runtime false",
     "recovery:test": "node --import jiti/register --test src/lib/internal-tools/recovery.test.ts",
-    "imports:test": "node --import jiti/register --test src/lib/converter/validation.test.ts src/lib/converter/sales-review.test.ts src/lib/converter/import-snapshot.test.ts"
+    "imports:test": "node --import jiti/register --test src/lib/converter/validation.test.ts src/lib/converter/sales-review.test.ts src/lib/converter/import-snapshot.test.ts src/lib/converter/sales-context.test.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.1",

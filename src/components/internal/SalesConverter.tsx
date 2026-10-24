@@ -15,13 +15,13 @@ import { businessDate } from '@/lib/internal-tools/contracts'
 import { importStore, type ImportSnapshot } from '@/lib/converter/import-snapshot'
 import ImportRecovery from './ImportRecovery'
 import type { DraftContext } from '@/lib/internal-tools/drafts'
-import type { CashoutTotals } from '@/lib/cashout-store'
+import type { fetchCashoutSnapshot } from '@/lib/cashout-store'
 
 type FileKey = 'general' | 'lunch' | 'dinner'
 type FileMap = Record<FileKey, File | null>
 
 export const LOCATIONS = ['CHINA ROSE #3 - 7046 W MILITARY DR', 'CHINA ROSE #2 - 2535 SW MILITARY DR']
-const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+import { weekday, salesContext, needsContextReview, type CashoutLink } from '@/lib/converter/sales-context'
 const EMPTY_FORM = {
   firstName: '', lastName: '', day: '', date: '', location: '',
   amDeposit: '', pmDeposit: '', amOverShort: '', pmOverShort: '',
@@ -40,9 +40,10 @@ const dollars = (cents: number | null) => (cents === null ? '' : (cents / 100).t
 export default function SalesConverter({
   loadCashout,
 }: {
-  loadCashout: ((location: string, date: string) => Promise<CashoutTotals | null>) | null
+  loadCashout: ((location: string, date: string) => ReturnType<typeof fetchCashoutSnapshot>) | null
 }) {
   const { t: tr } = useInternalLanguage()
+  const [cashoutLink, setCashoutLink] = useState<CashoutLink | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [files, setFiles] = useState<FileMap>({ general: null, lunch: null, dinner: null })
   const [validation, setValidation] = useState<Record<FileKey, FileValidation>>({ general: UNCHECKED, lunch: UNCHECKED, dinner: UNCHECKED })
@@ -65,7 +66,8 @@ export default function SalesConverter({
   function invalidateReview() { editVersion.current++; setReview(null); setOutput(null); setDeviceSaved(false); setAcknowledged(false); setStatus(null) }
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     invalidateReview()
-    setForm({ ...form, [e.target.name]: e.target.value })
+    setCashoutLink(null)
+    setForm({ ...form, [e.target.name]: e.target.value, ...(e.target.name === 'date' ? { day: weekday(e.target.value) } : {}) })
   }
 
   async function fillFromCashout() {
@@ -79,10 +81,12 @@ export default function SalesConverter({
     const request = ++cashoutRequest.current
     setStatus({ key: 'imports.loadingCashout' })
     try {
-      const totals = await loadCashout(form.location, form.date)
+      const saved = await loadCashout(form.location, form.date)
       if (editVersion.current !== version || cashoutRequest.current !== request) return
-      if (!totals) return setStatus({ key: 'imports.noCashout', params: { date: form.date } })
+      if (!saved) { setCashoutLink(null); return setStatus({ key: 'imports.noCashout', params: { date: form.date } }) }
       invalidateReview()
+      const totals = saved.totals
+      setCashoutLink(saved.link)
       setForm(f => ({
         ...f,
         amDeposit: dollars(totals.amDeposit),
@@ -128,11 +132,12 @@ export default function SalesConverter({
       setValidation(Object.fromEntries(keys.map((key, i) => [key, { checking: false, valid: !!results[i].value, issues: results[i].issues }])) as Record<FileKey, FileValidation>)
       const firstBad = results.findIndex(result => !result.value)
       if (firstBad !== -1) { setStatus({ key: 'importValidation.blocked' }); focusField(`sc-file-${keys[firstBad]}`); return }
-      setReview(reviewSales({
+      const sources = {
         general: { name: files.general.name, workbook: results[0].value! },
         lunch: { name: files.lunch.name, workbook: results[1].value! },
         dinner: { name: files.dinner.name, workbook: results[2].value! },
-      }, form))
+      }
+      setReview({ ...reviewSales(sources, { ...form, day: weekday(form.date) }), context: salesContext(sources, cashoutLink) })
       setStatus({ key: 'salesReview.prepared' })
     } catch (err) {
       setStatus({ key: err instanceof SourceValidationError ? 'importValidation.blocked' : 'importValidation.exportFailed' })
@@ -140,7 +145,7 @@ export default function SalesConverter({
   }
 
   async function handleConvert() {
-    if (converting.current || !review || !acknowledged) return
+    if (converting.current || !review || !acknowledged || (needsContextReview(review.context, review.form.date, importStore(review.form.location)) && !review.context?.reason.trim())) return
     editVersion.current++ // Ignore an earlier cash-out fill arriving during this snapshot’s export.
     converting.current = true
     setBusy(true)
@@ -163,7 +168,7 @@ export default function SalesConverter({
     if (snapshot.kind !== 'sales') return
     invalidateReview()
     for (const key of ['general','lunch','dinner'] as const) generation.current[key]++
-    setForm({ ...snapshot.review.form }); setFiles({ general: null, lunch: null, dinner: null })
+    setCashoutLink(snapshot.review.context?.cashout ?? null); setForm({ ...snapshot.review.form, day: weekday(snapshot.review.form.date) }); setFiles({ general: null, lunch: null, dinner: null })
     setValidation({ general: UNCHECKED, lunch: UNCHECKED, dinner: UNCHECKED }); setFileReset(value => value + 1)
     setReview(snapshot.review); setOutput(snapshot.output); setAcknowledged(false); setResumed(true); setIssues([])
     setStatus({ key: 'importRetention.resumed' })
@@ -172,7 +177,7 @@ export default function SalesConverter({
     if (busy || (Object.values(form).some(Boolean) || Object.values(files).some(Boolean) || review) && !await confirmation.ask({ key: 'importRetention.startWarning' }, true)) return
     invalidateReview()
     for (const key of ['general','lunch','dinner'] as const) generation.current[key]++
-    setForm(EMPTY_FORM); setFiles({ general: null, lunch: null, dinner: null })
+    setCashoutLink(null); setForm(EMPTY_FORM); setFiles({ general: null, lunch: null, dinner: null })
     setValidation({ general: UNCHECKED, lunch: UNCHECKED, dinner: UNCHECKED }); setIssues([]); setResumed(false); setFileReset(value => value + 1)
     setTimeout(() => focusField('sc-first'), 0)
   }
@@ -200,10 +205,7 @@ export default function SalesConverter({
         </div>
         <div>
           <label htmlFor="sc-day" className={labelClass}>{tr('imports.day')}</label>
-          <select id="sc-day" name="day" value={form.day} onChange={handleInput} className={inputClass}>
-            <option value="" disabled>{tr('imports.selectDay')}</option>
-            {DAYS.map(d => <option key={d} value={d}>{tr(`weekday.${d.toLowerCase()}` as TranslationKey)}</option>)}
-          </select>
+          <input id="sc-day" name="day" value={form.day ? tr(`weekday.${form.day.toLowerCase()}` as TranslationKey) : ''} readOnly className={inputClass} />
         </div>
         <div>
           <label htmlFor="sc-date" className={labelClass}>{tr('common.date')}</label>
@@ -262,10 +264,10 @@ export default function SalesConverter({
         {tr('salesReview.prepare')}
       </button>
       {resumed && <p className="mt-3 text-sm text-gray-700">{tr('importRetention.resumed')}</p>}
-      {review && <SalesReview review={review} acknowledged={acknowledged} onAcknowledge={setAcknowledged} />}
+      {review && <SalesReview onReason={reason => { if (reason === review.context?.reason) return; setReview({ ...review, context: { ...(review.context ?? { policy: 'DEC-01-v1', sources: ['general','lunch','dinner'].map(slot => ({ slot, dates: [], stores: [], uncertain: true })), cashout: null }), reason } }); setOutput(null); setAcknowledged(false); setDeviceSaved(false) }} review={review} acknowledged={acknowledged} onAcknowledge={setAcknowledged} />}
       <button id="sc-download" type="button"
         onClick={handleConvert}
-        disabled={!review || !acknowledged || busy}
+        disabled={!review || !acknowledged || busy || (needsContextReview(review.context, review.form.date, importStore(review.form.location)) && !review.context?.reason.trim())}
         className="mt-4 min-h-11 px-6 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {tr('imports.download')}
