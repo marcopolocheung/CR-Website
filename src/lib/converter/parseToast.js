@@ -1,6 +1,11 @@
 import * as XLSX from 'xlsx';
+import { sourceNumber, SourceValidationError, validateSalesWorkbook } from './validation';
 
-export const toNumber = (v) => Number(String(v).replace(/[$,]/g, '')) || 0;
+export const toNumber = (value) => {
+  const parsed = sourceNumber(value);
+  if (parsed === null) throw new SourceValidationError([{ key: 'importValidation.badMetric' }]);
+  return parsed;
+};
 
 const getSheetDataFrom = (wb, sheetName) => {
   const sheet = wb.Sheets[sheetName];
@@ -21,6 +26,12 @@ const findCellSafe = (rows, match, col) => {
 };
 
 export function extractMetrics({ generalWb, lunchWb, dinnerWb }) {
+  const issues = [
+    ...validateSalesWorkbook(generalWb, 'general'),
+    ...validateSalesWorkbook(lunchWb, 'lunch'),
+    ...validateSalesWorkbook(dinnerWb, 'dinner'),
+  ];
+  if (issues.length) throw new SourceValidationError(issues);
   // gwb
   const revenueSummary  = getSheetDataFrom(generalWb, 'Revenue summary');
   const paymentsSummary = getSheetDataFrom(generalWb, 'Payments summary');

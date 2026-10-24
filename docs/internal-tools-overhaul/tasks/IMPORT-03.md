@@ -4,7 +4,7 @@ parent: IMPORT
 title: "Preserve inputs and repeat downloads"
 priority: P0
 delivery_class: CODE_ONLY
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [IMPORT-01]
 activation_dependencies: []
@@ -100,6 +100,6 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - Commits/artifacts: none; this brief is planning documentation.
 - Checks performed: source inspection only; implementation scenarios not run.
 - Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Listed prerequisites are pending.
+- Blockers: None for local implementation; IMPORT-01 is locally complete in the preceding stack.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.

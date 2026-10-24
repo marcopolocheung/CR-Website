@@ -4,12 +4,12 @@ parent: IMPORT
 title: "Validate source files with actionable errors"
 priority: P0
 delivery_class: CODE_ONLY
-status: ready
-owner: unassigned
-implementation_dependencies: []
+status: complete
+owner: Codex
+implementation_dependencies: [UX-01, UX-03, UX-06]
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
@@ -41,7 +41,7 @@ See [current-state inventory](../current-state.md) and [supporting research](../
 
 **Needed to implement:**
 
-None. This task can be claimed independently within the stated scope.
+- [UX-01](UX-01.md), [UX-03](UX-03.md), and [UX-06](UX-06.md) at implemented (or complete): the current converters reuse dictionaries, field-error controls and navigation protection. All are locally complete in the preceding stack.
 
 **Needed to activate:**
 
@@ -53,31 +53,31 @@ Affected areas: src/components/internal/SalesConverter.tsx; src/components/inter
 
 ## Implementation checklist
 
-- [ ] Check empty, malformed, wrong-report, missing-column, and bad-number inputs
-- [ ] Keep three labeled sales slots with filenames and Replace actions
-- [ ] Preserve good inputs when one slot fails and expose row-level CSV problems
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Check empty, malformed, wrong-report, missing-column, and bad-number inputs
+- [x] Keep three labeled sales slots with filenames and Replace actions
+- [x] Preserve good inputs when one slot fails and expose row-level CSV problems
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Check empty, malformed, wrong-report, missing-column, and bad-number inputs. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Keep three labeled sales slots with filenames and Replace actions. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Preserve good inputs when one slot fails and expose row-level CSV problems. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Check empty, malformed, wrong-report, missing-column, and bad-number inputs. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Keep three labeled sales slots with filenames and Replace actions. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Preserve good inputs when one slot fails and expose row-level CSV problems. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
 - `npm exec tsc -- --noEmit` for touched TypeScript.
 - `npm run build` for changed frontend/export behavior; `npm run seo:check` after a build when routing/static output changes.
-- Add focused fixture/behavior checks where this outcome introduces a new contract. No `imports:test`, `forms:test`, D1 migration runner, or Worker build script exists yet; exact new commands and fixtures are future deliverables and must be recorded in handoff.
+- Add focused fixture/behavior checks where this outcome introduces a new contract. This task adds `npm run imports:test` (14 focused source/export tests), `scripts/create-import-fixtures.ts`, and `scripts/test-import-validation.py`; the guide below records exact commands and results.
 - For affected UI, run `npm run dev` with a verified local/staging API override and exercise the scenarios above in both languages; browser/Playwright setup must be checked rather than assumed. Do not let local tests fall back to the production API.
 
 Expected result: every applicable acceptance scenario passes, preserved behavior remains readable, and failures leave an explicit recovery path. Existing commands above were checked in package.json; proposed commands must be implemented and labeled before execution. During this documentation package creation none of these application or external checks were run.
@@ -90,16 +90,23 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
 | Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: None established; verify access/context before work.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts: `src/lib/converter/validation.ts`, updated `parseToast.js`/`parseCSV.js`, `SalesConverter.tsx`/`HoursConverter.tsx`, `SourceFileInput.tsx`, both dictionaries, synthetic fixtures and `scripts/test-import-validation.py`. Acceptance details and reproducible commands: [source validation guide](../import-validation.md).
+- Checks: `npm run imports:test` 14/14; dictionary tests 3/3; TypeScript, static build and SEO passed. Targeted Chromium browser acceptance and existing language/feedback regressions all passed against the final code.
+- Scenario 1: empty/unreadable/wrong/missing-column/bad-number sources block export; sheet/row/column and CSV-record evidence plus explicit remedies verified with synthetic fixtures.
+- Scenario 2: three labeled sales slots, filenames and keyboard/touch Replace controls retained. Delayed old-file validation cannot replace the new result; duplicate submits start one generation.
+- Scenario 3: failed slot/export preserves other files and metadata; missing-ID/bad-hour rows are reported without partial export. Actual generated workbooks preserve sales mapping and source hours layout/totals.
+- Language/device/recovery: English/Spanish, keyboard/touch 390px layout, denied storage, offline hours generation, template failure/retry, focus, tab/language retention and print-locale return verified. There is no new protected import API or shared revision/second-editor state; credentials and staff identity mapping remain out of scope. Session-only retention and browser limitations are explicit in the guide.
+- Milestones: implementation done; local verification done; external/live not applicable. No deployment, resource operation, real-data mutation or staff approval occurred. Frontend publication remains REL-04.
+- Next: IMPORT-02 and IMPORT-03 are newly ready. IMPORT-05 still awaits DEC-01. No claim on the next task; stop after this PR per the user's instruction.
+- Rollback: revert scoped repository change; preserve original sources and device draft keys; separate publication if already live.
+
+## Claim and dependency coordination — 2026-10-24
+
+Codex completed the bounded source-validation claim. Shared package script/dictionary edits were coordinated in this single task; no Worker routes, migrations or payroll/date policies changed. Prerequisite metadata now reflects actual reuse of already completed UX-01/03/06. Owner is Codex for completed evidence; the next task remains unassigned.

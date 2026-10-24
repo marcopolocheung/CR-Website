@@ -1,28 +1,57 @@
 import Papa from "papaparse";
 import ExcelJS from "exceljs";
 
-export function parseCsvAndExport(file, onComplete, onError, meta = {}) {
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete: (results) => {
-      const grouped = groupByEmployeeExternalId(results.data);
-      const sorted = sortGroupedByDate(grouped);
-      const flattened = flattenGroupedData(sorted);
-      exportSingleSheetXlsx(flattened, meta); 
-      onComplete();
-    },
-    error: (err) => {
-      onError(err);
-    },
-  });
+import { HOURS_COLUMNS, SourceValidationError, validateHoursRows } from './validation';
+
+export function parseHoursText(text) {
+  const results = Papa.parse(text, { header: false, skipEmptyLines: false });
+  return validateHoursRows(results.data, results.errors);
+}
+
+/** @param {Pick<File, 'name' | 'size' | 'text'>} file
+ * @returns {Promise<import('./validation').SourceResult<import('./validation').HoursRow[]>>} */
+export async function readHoursFile(file) {
+  if (!file.size) return { value: null, issues: [{ key: 'importValidation.empty' }] };
+  if (!/\.csv$/i.test(file.name)) return { value: null, issues: [{ key: 'importValidation.hoursType' }] };
+  try { return parseHoursText(await file.text()); }
+  catch { return { value: null, issues: [{ key: 'importValidation.unreadable' }] }; }
+}
+
+export async function parseCsvAndExport(file, onComplete, onError, meta = {}) {
+  try {
+    const result = await readHoursFile(file);
+    if (!result.value) throw new SourceValidationError(result.issues);
+    await exportHoursRows(result.value, meta);
+    onComplete();
+  } catch (err) { onError(err); }
+}
+
+export async function exportHoursRows(rows, meta = {}) {
+  const workbook = buildHoursWorkbook(rows);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const formatDate = (date) => date.slice(2, 4) + '_' + date.slice(5, 7) + date.slice(8, 10);
+  const number = meta.location?.match(/#(\d+)/)?.[1] ?? 'UNKNOWN';
+  const a = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  a.download = `CR${number}_${formatDate(meta.startDate ?? '')}-${formatDate(meta.endDate ?? '')}_EMPLOYEE_HOUR_LOG_SUMMARY.xlsx`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function buildHoursWorkbook(rows) {
+  // A second boundary check prevents callers from accidentally bypassing validation.
+  const result = validateHoursRows([HOURS_COLUMNS, ...rows.map(row => HOURS_COLUMNS.map(column => row[column]))]);
+  if (!result.value) throw new SourceValidationError(result.issues);
+  const grouped = groupByEmployeeExternalId(result.value);
+  return createHoursWorkbook(flattenGroupedData(sortGroupedByDate(grouped)));
 }
 
 function groupByEmployeeExternalId(data) {
-  const grouped = {};
+  const grouped = Object.create(null);
   data.forEach((row) => {
     const id = row["Employee External Id"];
-    if (!id) return;
     if (!grouped[id]) grouped[id] = [];
     grouped[id].push(row);
   });
@@ -30,7 +59,7 @@ function groupByEmployeeExternalId(data) {
 }
 
 function sortGroupedByDate(grouped) {
-  const sorted = {};
+  const sorted = Object.create(null);
 
   Object.entries(grouped).forEach(([id, rows]) => {
     sorted[id] = rows.sort((a, b) => {
@@ -92,8 +121,7 @@ function flattenGroupedData(grouped) {
   return result;
 }
 
-async function exportSingleSheetXlsx(allRows, meta = {}) {
-  const { location = "", startDate = "", endDate = "" } = meta;
+function createHoursWorkbook(allRows) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("All Employees");
 
@@ -190,41 +218,5 @@ async function exportSingleSheetXlsx(allRows, meta = {}) {
   const endRowNumber = endRow.number;
   sheet.mergeCells(endRowNumber, 1, endRowNumber, 8);
 
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-  });
-  
-
-  function formatDate(dateStr) {
-
-    const date = new Date(dateStr);
-    
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    
-    const yy = year.toString().slice(-2); 
-    const mm = month.toString().padStart(2, '0');
-    const dd = day.toString().padStart(2, '0');
-    
-    return `${yy}_${mm}${dd}`;
-  }
-
-
-  function extractChinaRoseNumber(locationStr) {
-    const match = locationStr?.match(/#(\d+)/);
-    return match ? match[1] : "UNKNOWN";
-  }
-
-  const chinaRoseNumber = extractChinaRoseNumber(location);
-  const formattedStartDate = formatDate(startDate);
-  const formattedEndDate = formatDate(endDate);
-
-  const fileName = `CR${chinaRoseNumber}_${formattedStartDate}-${formattedEndDate}_EMPLOYEE_HOUR_LOG_SUMMARY.xlsx`;
-
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = fileName;
-  a.click();
+  return workbook;
 }
