@@ -4,7 +4,7 @@ parent: CASH
 title: "Add guided cashier entry"
 priority: P0
 delivery_class: CODE_ONLY
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [UX-03, UX-04]
 activation_dependencies: []
@@ -99,6 +99,6 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - Commits/artifacts: none; this brief is planning documentation.
 - Checks performed: source inspection only; implementation scenarios not run.
 - Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Listed prerequisites are pending.
+- Blockers: none for local implementation; UX-03 and UX-04 are complete.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.

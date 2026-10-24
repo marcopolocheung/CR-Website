@@ -62,8 +62,19 @@ export default function Bookkeeping() {
             id={`tab-${t.id}`}
             aria-selected={tab === t.id}
             aria-controls={`panel-${t.id}`}
+            tabIndex={tab === t.id ? 0 : -1}
+            onKeyDown={event => {
+              const index = TABS.findIndex(item => item.id === t.id)
+              const next = event.key === 'ArrowRight' ? (index + 1) % TABS.length
+                : event.key === 'ArrowLeft' ? (index + TABS.length - 1) % TABS.length
+                : event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : null
+              if (next === null) return
+              event.preventDefault()
+              select(TABS[next].id)
+              document.getElementById(`tab-${TABS[next].id}`)?.focus()
+            }}
             onClick={() => select(t.id)}
-            className={`min-h-11 px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+            className={`min-h-11 px-4 py-2 text-sm font-medium border-b-2 -mb-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${
               tab === t.id ? 'border-red-600 text-red-700' : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
