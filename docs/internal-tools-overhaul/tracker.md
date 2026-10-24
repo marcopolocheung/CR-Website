@@ -17,7 +17,6 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | INV-02 | Add progress, remaining filters, and search | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [INV-02](tasks/INV-02.md) |
 | FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [FORM-01](tasks/FORM-01.md) |
 | FORM-02 | Add recoverable drafts and navigation protection | P0 | `CODE_ONLY` | UX-05, UX-06 | — | ready | unassigned | P/P/NA/NA | [FORM-02](tasks/FORM-02.md) |
-| FORM-07 | Verify blank downloads and saved compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [FORM-07](tasks/FORM-07.md) |
 | DASH-01 | Define the outstanding-work summary contract | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DASH-01](tasks/DASH-01.md) |
 | REL-01 | Integrate internal-service checks into CI | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [REL-01](tasks/REL-01.md) |
 | REL-02 | Make Worker builds reproducible and resolve the mirror | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [REL-02](tasks/REL-02.md) |
@@ -101,6 +100,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| FORM-07 | Verify blank downloads and saved compatibility | P0 | `CODE_ONLY` | — | — | complete | Claude | D/D/NA/NA | [FORM-07](tasks/FORM-07.md) |
 | DEC-01 | Confirm business-date and shift-boundary rules | P0 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-01](tasks/DEC-01.md) |
 | UX-01 | Establish translations and local dictionaries | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [UX-01](tasks/UX-01.md) |
 | UX-03 | Standardize controls, feedback, and save indicators | P0 | `CODE_ONLY` | UX-01 | — | complete | Codex | D/D/NA/NA | [UX-03](tasks/UX-03.md) |
@@ -191,7 +191,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | FORM-04 | Add attachments and append-only amendments | P1 | `CODE_AND_EXTERNAL` | DATA-06, DATA-05, FORM-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [FORM-04](tasks/FORM-04.md) |
 | FORM-05 | Add follow-up dates, assignment, and resolution | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DATA-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [FORM-05](tasks/FORM-05.md) |
 | FORM-06 | Implement the selected next digital form | P2 | `CODE_AND_EXTERNAL` | DEC-06, FORM-02, FORM-03, DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [FORM-06](tasks/FORM-06.md) |
-| FORM-07 | Verify blank downloads and saved compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [FORM-07](tasks/FORM-07.md) |
+| FORM-07 | Verify blank downloads and saved compatibility | P0 | `CODE_ONLY` | — | — | complete | Claude | D/D/NA/NA | [FORM-07](tasks/FORM-07.md) |
 | DASH-01 | Define the outstanding-work summary contract | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DASH-01](tasks/DASH-01.md) |
 | DASH-02 | Add contextual exact-record links | P1 | `CODE_ONLY` | DASH-01, UX-02 | — | planned | unassigned | P/P/NA/NA | [DASH-02](tasks/DASH-02.md) |
 | DASH-03 | Surface closes, differences, and count progress | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, CASH-05, INV-01 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-03](tasks/DASH-03.md) |
