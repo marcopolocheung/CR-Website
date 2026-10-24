@@ -27,19 +27,19 @@ This view includes ready, planned, and decision-blocked baseline CODE_AND_EXTERN
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | DATA-04 | Implement employee directory and legacy mappings | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-04](tasks/DATA-04.md) |
-| DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | ready | unassigned | P/P/P/P | [DATA-05](tasks/DATA-05.md) |
+| DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | implemented | Codex | D/D/P/P | [DATA-05](tasks/DATA-05.md) |
 | DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
 | DATA-10 | Implement and verify backup/export/restore procedures | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-07, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-10](tasks/DATA-10.md) |
 | SCH-01 | Persist dated time off and temporary availability | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [SCH-01](tasks/SCH-01.md) |
 | SCH-02 | Add manager-entered requests and review | P1 | `CODE_AND_EXTERNAL` | SCH-01, UX-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [SCH-02](tasks/SCH-02.md) |
-| SCH-04 | Add publication revisions and readable comparisons | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [SCH-04](tasks/SCH-04.md) |
+| SCH-04 | Add publication revisions and readable comparisons | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [SCH-04](tasks/SCH-04.md) |
 | SCH-05 | Detect cross-station assignment conflicts | P1 | `CODE_AND_EXTERNAL` | DATA-04, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [SCH-05](tasks/SCH-05.md) |
 | CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | blocked | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
 | CASH-04 | Add incomplete, submitted, and reviewed states | P0 | `CODE_AND_EXTERNAL` | CASH-03, DATA-05, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-04](tasks/CASH-04.md) |
 | CASH-05 | Add discrepancy explanations and correction history | P1 | `CODE_AND_EXTERNAL` | CASH-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [CASH-05](tasks/CASH-05.md) |
 | CASH-06 | Record actual versus expected deposits | P1 | `CODE_AND_EXTERNAL` | CASH-04, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-06](tasks/CASH-06.md) |
 | CASH-08 | Improve history, filters, output, and recovery | P1 | `CODE_AND_EXTERNAL` | CASH-04, UX-07, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-08](tasks/CASH-08.md) |
-| INV-01 | Add explicit count sessions and line states | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [INV-01](tasks/INV-01.md) |
+| INV-01 | Add explicit count sessions and line states | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [INV-01](tasks/INV-01.md) |
 | INV-03 | Add units, packs, and clear target labels | P1 | `CODE_AND_EXTERNAL` | DATA-02, DEC-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [INV-03](tasks/INV-03.md) |
 | INV-05 | Generalize catalogs and counts for CR2/CR3 | P1 | `CODE_AND_EXTERNAL` | INV-01, INV-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [INV-05](tasks/INV-05.md) |
 | INV-06 | Persist supplier orders and issued snapshots | P1 | `CODE_AND_EXTERNAL` | INV-03, INV-05, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [INV-06](tasks/INV-06.md) |
@@ -105,6 +105,7 @@ Only direct decision blockers appear here. Dependent planned tasks inherit those
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
 | DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | complete | Codex | D/D/NA/NA | [DATA-02](tasks/DATA-02.md) |
+| DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | implemented | Codex | D/D/P/P | [DATA-05](tasks/DATA-05.md) |
 
 ## All tasks
 
@@ -130,7 +131,7 @@ This table is the complete ownership/status index, including ready decisions, pl
 | DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | complete | Codex | D/D/NA/NA | [DATA-02](tasks/DATA-02.md) |
 | DATA-03 | Provision and bind non-production D1/R2 | P0 | `EXTERNAL_ONLY` | DATA-02 | — | ready | unassigned | P/P/P/P | [DATA-03](tasks/DATA-03.md) |
 | DATA-04 | Implement employee directory and legacy mappings | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-04](tasks/DATA-04.md) |
-| DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | ready | unassigned | P/P/P/P | [DATA-05](tasks/DATA-05.md) |
+| DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | implemented | Codex | D/D/P/P | [DATA-05](tasks/DATA-05.md) |
 | DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
 | DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | DATA-08 | Rehearse migration and recovery in non-production | P0 | `EXTERNAL_ONLY` | DATA-03, DATA-07, DATA-02, DEC-03, REL-03 | — | blocked | unassigned | P/P/P/P | [DATA-08](tasks/DATA-08.md) |
@@ -139,7 +140,7 @@ This table is the complete ownership/status index, including ready decisions, pl
 | SCH-01 | Persist dated time off and temporary availability | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [SCH-01](tasks/SCH-01.md) |
 | SCH-02 | Add manager-entered requests and review | P1 | `CODE_AND_EXTERNAL` | SCH-01, UX-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [SCH-02](tasks/SCH-02.md) |
 | SCH-03 | Apply approved exceptions to generation and validation | P1 | `CODE_ONLY` | SCH-01 | — | planned | unassigned | P/P/NA/NA | [SCH-03](tasks/SCH-03.md) |
-| SCH-04 | Add publication revisions and readable comparisons | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [SCH-04](tasks/SCH-04.md) |
+| SCH-04 | Add publication revisions and readable comparisons | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [SCH-04](tasks/SCH-04.md) |
 | SCH-05 | Detect cross-station assignment conflicts | P1 | `CODE_AND_EXTERNAL` | DATA-04, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [SCH-05](tasks/SCH-05.md) |
 | SCH-06 | Add combined hours and agreed warnings | P1 | `CODE_ONLY` | DATA-04, SCH-05, DEC-04 | — | blocked | unassigned | P/P/NA/NA | [SCH-06](tasks/SCH-06.md) |
 | SCH-07 | Improve planning and staff views in both languages | P1 | `CODE_ONLY` | UX-02, UX-04 | — | planned | unassigned | P/P/NA/NA | [SCH-07](tasks/SCH-07.md) |
@@ -152,7 +153,7 @@ This table is the complete ownership/status index, including ready decisions, pl
 | CASH-06 | Record actual versus expected deposits | P1 | `CODE_AND_EXTERNAL` | CASH-04, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-06](tasks/CASH-06.md) |
 | CASH-07 | Use the employee directory for cashier selection | P1 | `CODE_ONLY` | DATA-04, UX-03 | — | planned | unassigned | P/P/NA/NA | [CASH-07](tasks/CASH-07.md) |
 | CASH-08 | Improve history, filters, output, and recovery | P1 | `CODE_AND_EXTERNAL` | CASH-04, UX-07, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-08](tasks/CASH-08.md) |
-| INV-01 | Add explicit count sessions and line states | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [INV-01](tasks/INV-01.md) |
+| INV-01 | Add explicit count sessions and line states | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [INV-01](tasks/INV-01.md) |
 | INV-02 | Add progress, remaining filters, and search | P0 | `CODE_ONLY` | UX-03 | — | planned | unassigned | P/P/NA/NA | [INV-02](tasks/INV-02.md) |
 | INV-03 | Add units, packs, and clear target labels | P1 | `CODE_AND_EXTERNAL` | DATA-02, DEC-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [INV-03](tasks/INV-03.md) |
 | INV-04 | Improve tablet entry and shelf-order navigation | P1 | `CODE_ONLY` | UX-04, INV-02 | — | planned | unassigned | P/P/NA/NA | [INV-04](tasks/INV-04.md) |
