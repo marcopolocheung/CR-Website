@@ -1,5 +1,7 @@
 'use client'
 
+import { reviewHours } from '@/lib/converter/hours-review'
+import HoursReview from './HoursReview'
 import { useMemo, useRef, useState } from 'react'
 import { useNavigationProtection } from './NavigationProtection'
 import { useInternalLanguage } from './InternalLanguage'
@@ -32,6 +34,7 @@ export default function HoursConverter() {
   const converting = useRef(false)
   const [busy, setBusy] = useState(false)
   const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [acknowledged, setAcknowledged] = useState(false)
   const [rows, setRows] = useState<HoursRow[] | null>(null)
   const [sourceName, setSourceName] = useState('')
   const [preparer, setPreparer] = useState('')
@@ -40,7 +43,7 @@ export default function HoursConverter() {
   const [resumed, setResumed] = useState(false)
   const [fileReset, setFileReset] = useState(0)
   const confirmation = useConfirmation()
-  function invalidateOutput() { setOutput(null); setDeviceSaved(false); setStatus(null) }
+  function invalidateOutput() { setAcknowledged(false); setOutput(null); setDeviceSaved(false); setStatus(null) }
   useNavigationProtection({ dirty: !!(plant || startDate || endDate || preparer || csvFile), deviceSaved })
 
   async function selectFile(file: File) {
@@ -49,10 +52,10 @@ export default function HoursConverter() {
     setCsvFile(file)
     setStatus(null)
     setValidation({ ...UNCHECKED, checking: true })
-    const result: SourceResult<HoursRow[]> = await readHoursFile(file)
+    const result: SourceResult<HoursRow[]> = await readHoursFile(file, true)
     if (generation.current !== version) return
     setRows(result.value)
-    setValidation({ checking: false, valid: !!result.value, issues: result.issues })
+    setValidation({ checking: false, valid: !!result.value && !result.issues.length, issues: result.issues })
   }
 
   async function handleConvertAndDownload() {
@@ -68,11 +71,9 @@ export default function HoursConverter() {
     setBusy(true)
     setStatus({ key: 'imports.parsing' })
     try {
-      const result: SourceResult<HoursRow[]> = output && rows ? { value: rows, issues: [] } : csvFile ? await readHoursFile(csvFile) : { value: rows, issues: [] }
-      setValidation({ checking: false, valid: !!result.value, issues: result.issues })
-      if (!result.value) { setStatus({ key: 'importValidation.blocked' }); focusField('hc-file'); return }
-      const generated = output ?? await generateHoursOutput(result.value, { location: plant, startDate, endDate })
-      setRows(result.value)
+      if (!preview || !acknowledged || preview.blocked || !preview.validPeriod || !preview.included.length) return
+      const included = preview.included.map(row => row.values)
+      const generated = output ?? await generateHoursOutput(included, { location: plant, startDate, endDate })
       if (!output) { setOutput(generated); setDeviceSaved(false) }
       await downloadWorkbookOutput(generated)
       setStatus({ key: 'imports.downloaded' })
@@ -81,6 +82,7 @@ export default function HoursConverter() {
     } finally { converting.current = false; setBusy(false) }
   }
 
+  const preview = useMemo(() => rows ? reviewHours(rows, startDate, endDate) : null, [rows, startDate, endDate])
   const context = useMemo<DraftContext | null>(() => {
     const storeId = importStore(plant), start = businessDate(startDate), end = businessDate(endDate)
     return storeId && start && end && start <= end ? { task: 'hours-import', storeId, period: { start, end } } : null
@@ -88,9 +90,9 @@ export default function HoursConverter() {
   const snapshot = useMemo<ImportSnapshot | null>(() => rows && context ? { version: 1, kind: 'hours', sourceName, rows, metadata: { location: plant, startDate, endDate, preparer }, output } : null, [rows, context, sourceName, plant, startDate, endDate, preparer, output])
   function restoreSnapshot(snapshot: ImportSnapshot) {
     if (snapshot.kind !== 'hours') return
-    generation.current++; setDeviceSaved(false)
+    generation.current++; setDeviceSaved(false); setAcknowledged(false)
     setPlant(snapshot.metadata.location); setStartDate(snapshot.metadata.startDate); setEndDate(snapshot.metadata.endDate); setPreparer(snapshot.metadata.preparer)
-    setRows(snapshot.rows); setSourceName(snapshot.sourceName); setOutput(snapshot.output); setCsvFile(null); setResumed(true)
+    setRows(snapshot.rows); setSourceName(snapshot.sourceName); setOutput(reviewHours(snapshot.rows, snapshot.metadata.startDate, snapshot.metadata.endDate).excluded.length ? null : snapshot.output); setCsvFile(null); setResumed(true)
     setValidation(UNCHECKED); setIssues([]); setFileReset(value => value + 1); setStatus({ key: 'importRetention.resumed' })
   }
   async function startNext() {
@@ -129,9 +131,10 @@ export default function HoursConverter() {
           onFile={file => { void selectFile(file) }} />
       </fieldset>
       {resumed && <p className="mt-3 break-words text-sm text-gray-700">{tr('importRetention.resumed')} {sourceName}</p>}
+      {preview && <HoursReview review={preview} acknowledged={acknowledged} onAcknowledge={setAcknowledged} />}
       <button id="hc-download" type="button"
         onClick={handleConvertAndDownload}
-        disabled={(!validation.valid && !rows) || validation.checking || busy}
+        disabled={!preview || !acknowledged || !preview.validPeriod || preview.blocked || !preview.included.length || validation.checking || busy}
         className="mt-5 min-h-11 px-6 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
       >
         {tr('imports.download')}

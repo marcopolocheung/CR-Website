@@ -46,10 +46,10 @@ export function isImportSnapshot(value: unknown): value is ImportSnapshot {
   if (value.kind !== 'hours' || !keys(value, ['version','kind','sourceName','rows','metadata','output']) || typeof value.sourceName !== 'string' || !Array.isArray(value.rows) || !object(value.metadata)) return false
   const meta = value.metadata
   if (!keys(meta, ['location','startDate','endDate','preparer']) || !['location','startDate','endDate','preparer'].every(key => typeof meta[key] === 'string') || !importStore(meta.location as string) || !businessDate(meta.startDate) || !businessDate(meta.endDate) || (meta.startDate as string) > (meta.endDate as string)) return false
-  if (!value.rows.every(row => object(row) && keys(row, [...HOURS_COLUMNS]) && HOURS_COLUMNS.every(key => typeof row[key] === 'string'))) return false
+  if (!value.rows.every(row => object(row) && keys(row, [...HOURS_COLUMNS, '__sourceRow']) && (row.__sourceRow === undefined || Number.isSafeInteger(row.__sourceRow) && (row.__sourceRow as number) >= 2) && HOURS_COLUMNS.every(key => typeof row[key] === 'string'))) return false
   const format = (value: string) => `${value.slice(2,4)}_${value.slice(5,7)}${value.slice(8,10)}`
   if (value.output && value.output.filename !== `${importStore(meta.location as string)}_${format(meta.startDate as string)}-${format(meta.endDate as string)}_EMPLOYEE_HOUR_LOG_SUMMARY.xlsx`) return false
-  return validateHoursRows([[...HOURS_COLUMNS], ...value.rows.map(row => HOURS_COLUMNS.map(column => row[column]))]).issues.length === 0
+  return validateHoursRows([[...HOURS_COLUMNS], ...value.rows.map(row => HOURS_COLUMNS.map(column => row[column]))], [], true).value !== null
 }
 export function snapshotContext(snapshot: ImportSnapshot): DraftContext {
   const context: DraftContext = snapshot.kind === 'sales'

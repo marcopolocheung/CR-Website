@@ -147,13 +147,14 @@ def run():
         expect(page.locator('#hc-file-feedback')).to_contain_text('format problem')
         set_source(page, '#hc-file', source('hours'))
         expect(page.locator('#hc-file-feedback')).to_contain_text('File checks passed')
-        # Date metadata is validated without filtering source records or changing payroll rules.
+        # Date boundaries filter whole source shifts with visible exclusions, without recalculating payroll.
         page.locator('#hc-end').fill('2026-09-30')
-        hdownload.tap()
-        expect(page.locator('#hc-end')).to_be_focused()
-        expect(hours.get_by_role('alert')).to_contain_text('do not filter')
+        expect(hdownload).to_be_disabled()
+        expect(page.locator('#hours-review-title')).to_be_visible()
+        expect(hours.get_by_role('region', name='Review employee hours').last).to_contain_text('Select a valid inclusive period')
         page.locator('#hc-end').fill('2026-10-31')
         # File-only conversion needs no network and remains usable with denied storage.
+        page.locator('#hours-reviewed').check()
         context.set_offline(True)
         with page.expect_download() as hours_saved:
             hdownload.tap()
