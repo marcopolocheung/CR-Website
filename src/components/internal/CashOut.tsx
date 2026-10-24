@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useInternalLanguage } from './InternalLanguage'
+import { errorKey, type Message } from '@/lib/internal-tools/i18n'
 import {
   DENOMINATIONS,
   FLOAT_CENTS,
@@ -34,27 +36,29 @@ const inputClass =
   'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500'
 
 function Money({ cents, signed }: { cents: number | null; signed?: boolean }) {
-  if (cents === null) return <span className="font-mono font-semibold text-gray-400" title="Enter the Toast or Z report figure">—</span>
+  const { t: tr } = useInternalLanguage()
+  if (cents === null) return <span className="font-mono font-semibold text-gray-400" title={tr('cash.missingFigure')}>—</span>
   const color = !signed || cents === 0 ? 'text-gray-900' : cents < 0 ? 'text-red-600' : 'text-green-700'
   return <span className={`font-mono font-semibold ${color}`}>{signed && cents > 0 ? '+' : ''}{formatCents(cents)}</span>
 }
 
 /** Manager code gate. Same token as the scheduler demo; kept in memory only, never stored. */
-export function CodeGate({ onUnlock, title = 'Cash out' }: { onUnlock: (token: string) => void; title?: string }) {
+export function CodeGate({ onUnlock, title }: { onUnlock: (token: string) => void; title?: string }) {
+  const { t: tr } = useInternalLanguage()
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<Message | null>(null)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     if (!code || busy) return
     setBusy(true)
-    setError('')
+    setError(null)
     try {
       await verifyWriteToken(code)
       onUnlock(code)
     } catch (caught) {
-      setError(caught instanceof StoreAuthError ? 'That code was not accepted.' : (caught as Error).message)
+      setError({ key: errorKey(caught) })
     } finally {
       setBusy(false)
     }
@@ -62,9 +66,9 @@ export function CodeGate({ onUnlock, title = 'Cash out' }: { onUnlock: (token: s
 
   return (
     <form onSubmit={submit} className="max-w-md my-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-2">{title}</h2>
-      <p className="text-sm text-gray-600 mb-4">Enter the manager code, the same one that unlocks the scheduler demo.</p>
-      <label htmlFor="cashout-code" className="block text-sm font-medium text-gray-700 mb-1">Manager code</label>
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">{title ?? tr('cash.title')}</h2>
+      <p className="text-sm text-gray-600 mb-4">{tr('cash.managerInstructions')}</p>
+      <label htmlFor="cashout-code" className="block text-sm font-medium text-gray-700 mb-1">{tr('cash.managerCode')}</label>
       <input
         id="cashout-code"
         type="password"
@@ -73,13 +77,13 @@ export function CodeGate({ onUnlock, title = 'Cash out' }: { onUnlock: (token: s
         onChange={e => setCode(e.target.value)}
         className={inputClass}
       />
-      {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-sm text-red-700">{tr(error.key, error.params)}</p>}
       <button
         type="submit"
         disabled={!code || busy}
-        className="mt-4 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+        className="min-h-11 mt-4 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
       >
-        {busy ? 'Checking…' : 'Unlock'}
+        {tr(busy ? 'cash.checking' : 'cash.unlock')}
       </button>
     </form>
   )
@@ -100,24 +104,25 @@ export default function CashOut({ token, onUnlock, onLocked }: { token: string; 
 }
 
 function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void }) {
+  const { t: tr } = useInternalLanguage()
   const [sheet, setSheet] = useState<Sheet>(emptySheet)
   const [loaded, setLoaded] = useState(false)
   const [store, setStore] = useState<CashoutStore>('CR3')
   const [date, setDate] = useState(today)
   const [history, setHistory] = useState<CashoutDay[]>([])
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState<Message | null>(null)
   const [busy, setBusy] = useState(false)
 
   const run = useCallback(
-    async (task: () => Promise<string | void>) => {
+    async (task: () => Promise<Message | void>) => {
       setBusy(true)
-      setStatus('')
+      setStatus(null)
       try {
         const message = await task()
         if (message) setStatus(message)
       } catch (caught) {
         if (caught instanceof StoreAuthError) onLocked()
-        else setStatus((caught as Error).message)
+        else setStatus({ key: errorKey(caught) })
       } finally {
         setBusy(false)
       }
@@ -137,18 +142,18 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
   const loadDay = (day: string) =>
     run(async () => {
       const saved = await fetchCashoutDay(store, day, token)
-      if (!saved) return `Nothing saved for ${store} on ${day}.`
-      if (!confirm(`Replace the sheet on screen with the saved ${store} sheet for ${day}?`)) return
+      if (!saved) return { key: 'cash.notSaved', params: { store, date: day } }
+      if (!confirm(tr('cash.replaceConfirm', { store, date: day }))) return
       setDate(day)
       setSheet(saved)
-      return `Loaded ${store} ${day}.`
+      return { key: 'cash.loaded', params: { store, date: day } }
     })
 
   const saveDay = () =>
     run(async () => {
       await saveCashoutDay(store, date, { sheet, totals: dayTotals(sheet.am, sheet.pm, sheet.zReport) }, token)
       setHistory(await fetchCashoutHistory(store, today(), token))
-      return `Saved ${store} ${date}.`
+      return { key: 'cash.saved', params: { store, date } }
     })
 
   useEffect(() => {
@@ -173,7 +178,7 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
   }
 
   const removeCashier = (shift: Shift, idx: number) => {
-    if (confirm('Remove this cashier?')) setSheet(s => ({ ...s, [shift]: s[shift].filter((_, i) => i !== idx) }))
+    if (confirm(tr('cash.removeConfirm'))) setSheet(s => ({ ...s, [shift]: s[shift].filter((_, i) => i !== idx) }))
   }
 
   const day = dayTotals(sheet.am, sheet.pm, sheet.zReport)
@@ -181,23 +186,23 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-900">Cash out</h2>
+        <h2 className="text-xl font-semibold text-gray-900">{tr('cash.title')}</h2>
         <div className="flex gap-2 print:hidden">
-          <button onClick={() => window.print()} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50">
-            Print
+          <button onClick={() => window.print()} className="min-h-11 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50">
+            {tr('common.print')}
           </button>
           <button
-            onClick={() => confirm('Clear the whole sheet? This cannot be undone.') && setSheet(emptySheet())}
-            className="px-4 py-2 rounded-lg border border-red-300 text-red-700 text-sm font-medium hover:bg-red-50"
+            onClick={() => confirm(tr('cash.clearConfirm')) && setSheet(emptySheet())}
+            className="min-h-11 px-4 py-2 rounded-lg border border-red-300 text-red-700 text-sm font-medium hover:bg-red-50"
           >
-            Clear sheet
+            {tr('cash.clear')}
           </button>
         </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-3 mb-8 print:mb-4">
         <div>
-          <label htmlFor="cashout-store" className="block text-sm font-medium text-gray-700 mb-1">Store</label>
+          <label htmlFor="cashout-store" className="block text-sm font-medium text-gray-700 mb-1">{tr('common.store')}</label>
           <select
             id="cashout-store"
             value={store}
@@ -208,26 +213,26 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
           </select>
         </div>
         <div>
-          <label htmlFor="cashout-date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+          <label htmlFor="cashout-date" className="block text-sm font-medium text-gray-700 mb-1">{tr('common.date')}</label>
           <input id="cashout-date" type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
         </div>
         <div className="flex gap-2 print:hidden">
           <button
             onClick={() => loadDay(date)}
             disabled={busy || !date}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+            className="min-h-11 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
           >
-            Load saved
+            {tr('cash.load')}
           </button>
           <button
             onClick={saveDay}
             disabled={busy || !date}
-            className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+            className="min-h-11 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
           >
-            Save day
+            {tr('cash.save')}
           </button>
         </div>
-        <p role="status" className="text-sm text-gray-700 print:hidden">{status}</p>
+        <p role="status" className="text-sm text-gray-700 print:hidden">{busy ? tr('common.loading') : status ? tr(status.key, status.params) : null}</p>
       </div>
 
       {(['am', 'pm'] as const).map(shift => {
@@ -235,12 +240,12 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
         return (
           <section key={shift} className="mb-10">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xl font-semibold text-gray-900">{shift.toUpperCase()} shift</h2>
+              <h2 className="text-xl font-semibold text-gray-900">{tr('cash.shift', { shift: shift.toUpperCase() })}</h2>
               <button
                 onClick={() => setSheet(s => ({ ...s, [shift]: [...s[shift], newCashier()] }))}
-                className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 print:hidden"
+                className="min-h-11 px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 print:hidden"
               >
-                + Add cashier
+                {tr('cash.addCashier')}
               </button>
             </div>
 
@@ -252,16 +257,16 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
                   <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 break-inside-avoid">
                     <div className="flex gap-2 mb-3">
                       <input
-                        aria-label="Cashier name"
-                        placeholder={`Cashier ${idx + 1}`}
+                        aria-label={tr('cash.cashierName')}
+                        placeholder={tr('cash.cashierPlaceholder', { number: idx + 1 })}
                         value={c.name}
                         onChange={e => updateCashier(shift, idx, { name: e.target.value })}
                         className={inputClass}
                       />
                       <button
                         onClick={() => removeCashier(shift, idx)}
-                        aria-label="Remove cashier"
-                        className="px-3 text-gray-400 hover:text-red-600 print:hidden"
+                        aria-label={tr('cash.removeCashier')}
+                        className="min-h-11 min-w-11 px-3 text-gray-400 hover:text-red-600 print:hidden"
                       >
                         ✕
                       </button>
@@ -295,7 +300,7 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
                     </table>
 
                     <label htmlFor={`${id}-toast`} className="block text-sm font-medium text-gray-700 mb-1">
-                      Toast cash payments
+                      {tr('cash.toast')}
                     </label>
                     <input
                       id={`${id}-toast`}
@@ -309,9 +314,9 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
                     />
 
                     <div className="border-t border-gray-200 pt-2">
-                      <Row label="Drawer total"><Money cents={t.drawer} /></Row>
-                      <Row label={`Turn-in (− ${formatCents(FLOAT_CENTS)})`}><Money cents={t.turnIn} /></Row>
-                      <Row label="Over / short"><Money cents={t.overShort} signed /></Row>
+                      <Row label={tr('cash.drawer')}><Money cents={t.drawer} /></Row>
+                      <Row label={tr('cash.turnIn', { amount: formatCents(FLOAT_CENTS) })}><Money cents={t.turnIn} /></Row>
+                      <Row label={tr('cash.overShort')}><Money cents={t.overShort} signed /></Row>
                     </div>
                   </div>
                 )
@@ -319,19 +324,19 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
             </div>
 
             <div className="mt-4 bg-gray-50 rounded-xl border border-gray-200 p-4 max-w-sm ml-auto">
-              <Row label={`${shift.toUpperCase()} deposit`}><Money cents={totals.deposit} /></Row>
-              <Row label={`${shift.toUpperCase()} over / short`}><Money cents={totals.overShort} signed /></Row>
+              <Row label={tr('cash.shiftDeposit', { shift: shift.toUpperCase() })}><Money cents={totals.deposit} /></Row>
+              <Row label={tr('cash.shiftOverShort', { shift: shift.toUpperCase() })}><Money cents={totals.overShort} signed /></Row>
             </div>
           </section>
         )
       })}
 
       <section className="bg-white rounded-xl border-2 border-gray-300 shadow-sm p-6 max-w-md ml-auto break-inside-avoid">
-        <h2 className="text-xl font-semibold text-gray-900 mb-3">Day total</h2>
-        <Row label="Actual deposit (AM + PM)"><Money cents={day.deposit} /></Row>
-        <Row label="Cashier over / short (AM + PM)"><Money cents={day.overShort} signed /></Row>
+        <h2 className="text-xl font-semibold text-gray-900 mb-3">{tr('cash.dayTotal')}</h2>
+        <Row label={tr('cash.actualDeposit')}><Money cents={day.deposit} /></Row>
+        <Row label={tr('cash.cashierDifference')}><Money cents={day.overShort} signed /></Row>
         <label htmlFor="z-report" className="block text-sm font-medium text-gray-700 mt-3 mb-1">
-          Z report expected cash
+          {tr('cash.zExpected')}
         </label>
         <input
           id="z-report"
@@ -343,19 +348,19 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
           onChange={e => setSheet(s => ({ ...s, zReport: e.target.value }))}
           className={`${inputClass} mb-3`}
         />
-        <Row label="Over / short vs Z report"><Money cents={day.zOverShort} signed /></Row>
+        <Row label={tr('cash.zDifference')}><Money cents={day.zOverShort} signed /></Row>
       </section>
 
       <section className="mt-10 print:hidden">
-        <h2 className="text-xl font-semibold text-gray-900 mb-3">Last 30 days · {STORE_LABELS[store]}</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-3">{tr('cash.history', { store: STORE_LABELS[store] })}</h2>
         {history.length === 0 ? (
-          <p className="text-sm text-gray-600">No saved days yet.</p>
+          <p className="text-sm text-gray-600">{tr('cash.empty')}</p>
         ) : (
           <div className="overflow-x-auto bg-white rounded-xl border border-gray-200">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
-                  {['Date', 'AM deposit', 'PM deposit', 'AM over/short', 'PM over/short', 'Day deposit', 'Day over/short', 'vs Z report'].map(h => (
+                  {[tr('common.date'), tr('cash.shiftDeposit', { shift: 'AM' }), tr('cash.shiftDeposit', { shift: 'PM' }), tr('cash.shiftOverShort', { shift: 'AM' }), tr('cash.shiftOverShort', { shift: 'PM' }), tr('cash.dayDeposit'), tr('cash.dayDifference'), tr('cash.vsZ')].map(h => (
                     <th key={h} scope="col" className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
                   ))}
                 </tr>

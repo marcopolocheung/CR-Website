@@ -4,16 +4,18 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { CodeGate } from './CashOut'
+import { useInternalLanguage } from './InternalLanguage'
+import { errorKey, type TranslationKey } from '@/lib/internal-tools/i18n'
 import { CASHOUT_STORES, fetchCashoutHistory, type CashoutDay, type CashoutStore } from '@/lib/cashout-store'
 import { dailyRows, datesEnding, summarize, type DayRow } from '@/lib/dashboard'
 import { StoreAuthError } from '@/lib/schedule-store'
 
 const PAGES = [
-  { href: '/internal/bookkeeping', title: 'Bookkeeping', blurb: 'Cash out, daily sales report, employee hours' },
-  { href: '/internal/inventory', title: 'Inventory', blurb: 'CR3 supply counts and order list' },
-  { href: '/scheduler-demo', title: 'Scheduler', blurb: 'Build and publish weekly schedules' },
-  { href: '/internal/forms', title: 'Forms & write-ups', blurb: 'Blank forms and saved write-ups' },
-]
+  { href: '/internal/bookkeeping', title: 'nav.bookkeeping', blurb: 'nav.bookkeepingDescription' },
+  { href: '/internal/inventory', title: 'nav.inventory', blurb: 'nav.inventoryDescription' },
+  { href: '/scheduler-demo', title: 'nav.scheduler', blurb: 'nav.schedulerDescription' },
+  { href: '/internal/forms', title: 'nav.forms', blurb: 'nav.formsDescription' },
+] as const
 
 const STORE_LABELS: Record<CashoutStore, string> = { CR3: 'CR3 · W Military', CR2: 'CR2 · SW Military' }
 // The Worker keeps 30 days, so only ranges up to 15 have a full previous period to compare against.
@@ -29,32 +31,35 @@ const compact = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'U
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const formatCents = (cents: number) => usd.format(cents / 100)
 const signed = (cents: number | null) => (cents === null ? '—' : (cents > 0 ? '+' : '') + formatCents(cents))
-const shortDate = (date: string, weekday?: 'short') => new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { weekday, month: 'short', day: 'numeric' })
+const shortDate = (date: string, weekday?: 'short', locale = 'en-US') => new Date(`${date}T00:00:00`).toLocaleDateString(locale, { weekday, month: 'short', day: 'numeric' })
 
 /** Internal home: links to every tool, then the cash numbers behind the manager code. */
 export default function Dashboard() {
+  const { t: tr } = useInternalLanguage()
   // Manager token lives in memory only, like cash out.
   const [token, setToken] = useState('')
   const lock = useCallback(() => setToken(''), [])
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">Dashboard</h1>
-      <nav aria-label="Internal tools" className="grid gap-3 sm:grid-cols-3 mb-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-4">{tr('nav.home')}</h1>
+      <nav aria-label={tr('nav.tools')} className="grid gap-3 sm:grid-cols-3 mb-8">
         {PAGES.map(p => (
           <Link key={p.href} href={p.href} className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm hover:border-red-300 hover:shadow">
-            <span className="font-semibold text-red-700">{p.title}</span>
-            <span className="block text-sm text-gray-600">{p.blurb}</span>
+            <span className="font-semibold text-red-700">{tr(p.title)}</span>
+            <span className="block text-sm text-gray-600">{tr(p.blurb)}</span>
           </Link>
         ))}
       </nav>
-      {token ? <CashBoard token={token} onLocked={lock} /> : <CodeGate onUnlock={setToken} title="Cash dashboard" />}
+      {token ? <CashBoard token={token} onLocked={lock} /> : <CodeGate onUnlock={setToken} title={tr('cash.dashboard')} />}
     </div>
   )
 }
 
 function CashBoard({ token, onLocked }: { token: string; onLocked: () => void }) {
+  const { locale, t: tr } = useInternalLanguage()
+  const dateLabel = (date: string, weekday?: 'short') => shortDate(date, weekday, locale)
   const [histories, setHistories] = useState<Record<CashoutStore, CashoutDay[]> | null>(null)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<TranslationKey | null>(null)
   const [store, setStore] = useState<CashoutStore | 'all'>('all')
   const [range, setRange] = useState<(typeof RANGES)[number]>(14)
   const [now] = useState(today)
@@ -66,15 +71,15 @@ function CashBoard({ token, onLocked }: { token: string; onLocked: () => void })
       .catch(caught => {
         if (!live) return
         if (caught instanceof StoreAuthError) onLocked()
-        else setError((caught as Error).message)
+        else setError(errorKey(caught))
       })
     return () => {
       live = false
     }
   }, [now, token, onLocked])
 
-  if (error) return <p className="text-sm text-red-700">{error}</p>
-  if (!histories) return <p className="text-sm text-gray-600">Loading cash-outs…</p>
+  if (error) return <p className="text-sm text-red-700">{tr(error)}</p>
+  if (!histories) return <p className="text-sm text-gray-600">{tr('dashboard.loading')}</p>
 
   const stores = store === 'all' ? [...CASHOUT_STORES] : [store]
   const dates = datesEnding(now, range * 2)
@@ -87,72 +92,72 @@ function CashBoard({ token, onLocked }: { token: string; onLocked: () => void })
   return (
     <section aria-labelledby="cash-heading">
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <h2 id="cash-heading" className="text-xl font-semibold text-gray-900 mr-auto">Cash</h2>
-        <Segmented label="Store" value={store} onChange={setStore} options={[['all', 'Both stores'], ...CASHOUT_STORES.map(s => [s, STORE_LABELS[s]] as const)]} />
-        <Segmented label="Range" value={range} onChange={setRange} options={RANGES.map(r => [r, `${r} days`] as const)} />
+        <h2 id="cash-heading" className="text-xl font-semibold text-gray-900 mr-auto">{tr('dashboard.cash')}</h2>
+        <Segmented label={tr('common.store')} value={store} onChange={setStore} options={[['all', tr('dashboard.bothStores')], ...CASHOUT_STORES.map(s => [s, STORE_LABELS[s]] as const)]} />
+        <Segmented label={tr('dashboard.range')} value={range} onChange={setRange} options={RANGES.map(r => [r, tr('dashboard.days', { number: r })] as const)} />
       </div>
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-6">
-        <Tile label="Deposits" value={formatCents(cur.deposit)} note={`last ${range} days`} />
+        <Tile label={tr('dashboard.deposits')} value={formatCents(cur.deposit)} note={tr('dashboard.lastDays', { number: range })} />
         <Tile
-          label="Average per day"
+          label={tr('dashboard.average')}
           value={cur.avgDeposit === null ? '—' : formatCents(cur.avgDeposit)}
           note={
             change === null ? (
-              'no earlier period to compare'
+              tr('dashboard.noComparison')
             ) : (
               <>
                 <span className={change >= 0 ? 'text-green-800 font-medium' : 'text-red-700 font-medium'}>
                   {change >= 0 ? '▲' : '▼'} {Math.abs(change * 100).toFixed(1)}%
                 </span>{' '}
-                vs previous {range} days
+                {tr('dashboard.previous', { number: range })}
               </>
             )
           }
         />
         <Tile
-          label="Net over / short"
+          label={tr('dashboard.netDifference')}
           value={signed(cur.overShort)}
-          note={cur.shortDays ? `${cur.shortDays} day${cur.shortDays === 1 ? '' : 's'} short` : 'no short days'}
+          note={cur.shortDays ? tr('dashboard.shortDays', { number: cur.shortDays }) : tr('dashboard.noShortDays')}
         />
         <Tile
-          label="Missing cash-outs"
+          label={tr('dashboard.missing')}
           value={String(cur.missing)}
           note={
             cur.missing ? (
               <Link href="/internal/bookkeeping#cash-out" className="text-red-700 underline">
-                Fill them in
+                {tr('dashboard.fillIn')}
               </Link>
             ) : (
-              'every day saved'
+              tr('dashboard.everyDay')
             )
           }
         />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 mb-6">
-        <Card title="Daily deposits" legend={[['AM', AM], ['PM', PM]]}>
+        <Card title={tr('dashboard.dailyDeposits')} legend={[['AM', AM], ['PM', PM]]}>
           <Columns
             rows={rows}
             segments={r => (r.saved ? [{ value: r.amDeposit, color: AM }, { value: r.pmDeposit, color: PM }] : [])}
-            tooltip={r => (r.saved ? [['AM', formatCents(r.amDeposit), AM], ['PM', formatCents(r.pmDeposit), PM], ['Day', formatCents(r.deposit)]] : [['No cash-out saved', '']])}
+            tooltip={r => (r.saved ? [['AM', formatCents(r.amDeposit), AM], ['PM', formatCents(r.pmDeposit), PM], [tr('dashboard.day'), formatCents(r.deposit)]] : [[tr('dashboard.noCashout'), '']])}
           />
         </Card>
-        <Card title="Over / short vs Toast" legend={[['Over', OVER], ['Short', SHORT]]}>
+        <Card title={tr('dashboard.vsToast')} legend={[[tr('dashboard.over'), OVER], [tr('dashboard.short'), SHORT]]}>
           <Columns
             rows={rows}
             segments={r => (r.overShort ? [{ value: r.overShort, color: r.overShort > 0 ? OVER : SHORT }] : [])}
-            tooltip={r => [[r.saved ? (r.overShort === null ? 'Toast figures not entered' : 'Over / short') : 'No cash-out saved', r.saved ? signed(r.overShort) : '']]}
+            tooltip={r => [[r.saved ? (r.overShort === null ? tr('dashboard.noToast') : tr('cash.overShort')) : tr('dashboard.noCashout'), r.saved ? signed(r.overShort) : '']]}
           />
         </Card>
       </div>
 
       <div className="overflow-x-auto bg-white rounded-xl border border-gray-200">
         <table className="w-full text-sm tabular-nums">
-          <caption className="text-left px-3 py-2 font-semibold text-gray-900">By day</caption>
+          <caption className="text-left px-3 py-2 font-semibold text-gray-900">{tr('dashboard.byDay')}</caption>
           <thead className="bg-gray-50 text-gray-600">
             <tr>
-              {['Date', 'AM deposit', 'PM deposit', 'Day deposit', 'Over / short', 'vs Z report'].map((h, i) => (
+              {[tr('common.date'), tr('cash.shiftDeposit', { shift: 'AM' }), tr('cash.shiftDeposit', { shift: 'PM' }), tr('cash.dayDeposit'), tr('cash.overShort'), tr('cash.vsZ')].map((h, i) => (
                 <th key={h} scope="col" className={`px-3 py-2 font-medium whitespace-nowrap ${i ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr>
@@ -161,8 +166,8 @@ function CashBoard({ token, onLocked }: { token: string; onLocked: () => void })
             {[...rows].reverse().map(r => (
               <tr key={r.date} className="border-t border-gray-100">
                 <th scope="row" className="px-3 py-2 text-left font-normal whitespace-nowrap">
-                  {shortDate(r.date, 'short')}
-                  {stores.length > 1 && r.saved > 0 && r.saved < stores.length && <span className="ml-2 text-xs text-gray-500">1 store</span>}
+                  {dateLabel(r.date, 'short')}
+                  {stores.length > 1 && r.saved > 0 && r.saved < stores.length && <span className="ml-2 text-xs text-gray-500">{tr('dashboard.oneStore')}</span>}
                 </th>
                 {r.saved ? (
                   <>
@@ -173,7 +178,7 @@ function CashBoard({ token, onLocked }: { token: string; onLocked: () => void })
                     <td className={`px-3 py-2 text-right ${r.zOverShort !== null && r.zOverShort < 0 ? 'text-red-700' : ''}`}>{signed(r.zOverShort)}</td>
                   </>
                 ) : (
-                  <td colSpan={5} className="px-3 py-2 text-gray-500">{r.date < now ? 'No cash-out saved' : 'Not counted yet'}</td>
+                  <td colSpan={5} className="px-3 py-2 text-gray-500">{r.date < now ? tr('dashboard.noCashout') : tr('dashboard.notCounted')}</td>
                 )}
               </tr>
             ))}
@@ -251,6 +256,8 @@ function Columns({
   segments: (r: DayRow) => { value: number; color: string }[]
   tooltip: (r: DayRow) => [string, string, string?][]
 }) {
+  const { locale, t: tr } = useInternalLanguage()
+  const dateLabel = (date: string) => shortDate(date, undefined, locale)
   const [active, setActive] = useState<number | null>(null)
   const sums = rows.map(r => segments(r).reduce((s, x) => s + x.value, 0))
   const step = niceStep(Math.max(0, ...sums) - Math.min(0, ...sums))
@@ -264,7 +271,7 @@ function Columns({
 
   return (
     <div className="relative overflow-x-auto" onMouseLeave={() => setActive(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[480px]" role="img" aria-label="Chart; the By day table below has every value">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[480px]" role="img" aria-label={tr('dashboard.chart')}>
         {ticks.map(t => (
           <g key={t}>
             <line x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} stroke={t === 0 ? '#c3c2b7' : '#e1e0d9'} />
@@ -281,7 +288,7 @@ function Columns({
             <g
               key={r.date}
               tabIndex={0}
-              aria-label={`${shortDate(r.date)}: ${tooltip(r).map(([k, v]) => `${k} ${v}`).join(', ')}`}
+              aria-label={`${dateLabel(r.date)}: ${tooltip(r).map(([k, v]) => `${k} ${v}`).join(', ')}`}
               onMouseEnter={() => setActive(i)}
               onFocus={() => setActive(i)}
               onBlur={() => setActive(null)}
@@ -302,7 +309,7 @@ function Columns({
               })}
               {i % labelEvery === (rows.length - 1) % labelEvery && (
                 <text x={cx} y={H - 6} textAnchor="middle" fontSize="11" fill="#898781">
-                  {shortDate(r.date)}
+                  {dateLabel(r.date)}
                 </text>
               )}
             </g>
@@ -314,7 +321,7 @@ function Columns({
           className="pointer-events-none absolute top-0 z-10 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-md whitespace-nowrap"
           style={{ left: `${((PAD.left + band * (active + 0.5)) / W) * 100}%`, transform: `translateX(${active > rows.length / 2 ? '-105%' : '5%'})` }}
         >
-          <p className="text-gray-500 mb-1">{shortDate(rows[active].date)}</p>
+          <p className="text-gray-500 mb-1">{dateLabel(rows[active].date)}</p>
           {tooltip(rows[active]).map(([k, v, color]) => (
             <p key={k} className="flex items-center gap-2">
               {color && <span className="h-0.5 w-3" style={{ background: color }} />}
