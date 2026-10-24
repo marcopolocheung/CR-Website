@@ -4,7 +4,7 @@ parent: SCH
 title: "Detect cross-station assignment conflicts"
 priority: P1
 delivery_class: CODE_AND_EXTERNAL
-status: blocked
+status: planned
 owner: unassigned
 implementation_dependencies: [DATA-04, DATA-05, DEC-01]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]

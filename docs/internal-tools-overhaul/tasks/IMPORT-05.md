@@ -4,7 +4,7 @@ parent: IMPORT
 title: "Add hours previews and explicit date ranges"
 priority: P0
 delivery_class: CODE_ONLY
-status: blocked
+status: ready
 owner: unassigned
 implementation_dependencies: [IMPORT-01, DEC-01]
 activation_dependencies: []
