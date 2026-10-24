@@ -6,7 +6,7 @@ priority: P1
 delivery_class: CODE_AND_EXTERNAL
 status: blocked
 owner: unassigned
-implementation_dependencies: [CASH-04, UX-07, DEC-03]
+implementation_dependencies: [DATA-05, UX-07, DEC-03]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]
 implementation: pending
 local_verification: pending
@@ -18,13 +18,13 @@ live_verification: pending
 
 ## Outcome and scope
 
-Provide contextual close history, revision-aware print/export, and policy-approved recovery.
+Provide saved bookkeeping notebook history, revision-aware print/export and retention-approved recovery under [DEC-02](../cashout-rules.md). Wire ordinary revision-checked saves and retained prior values using DATA-05; distinguish device-only work from acknowledged server saves. No submitted/reviewed status, special correction permission, mandatory explanation or actual cash-delivery tracking is required. CASH-04/05/06 are deferred and do not gate this task.
 
 Preserve denomination counts, integer cents, AM/PM presentation, Toast/Z comparisons, existing paper output, and sales workbook linkage. Do not invent cash-movement categories, shortage thresholds, payroll deductions, or starting-cash policy.
 
 ## Current behavior and verified sources
 
-CashOut persists only sheet contents under cr-cash-out, while store/date are separate component state. Browser calculations use integer cents and a fixed $100 float; validateCashoutBody checks submitted totals for shape only. Saved days have 30-day history, a 31-day TTL, and last-save-wins behavior.
+CASH-01/02 now provide independent store/date device drafts, guided counts and blank/zero/legacy-unknown entry status in this branch. Browser calculations use integer cents and always subtract $100 per cashier drawer. The existing Worker still validates client totals by shape, lists 30 days and saves to KV with a 31-day TTL and last-save-wins. The unused local cash-state scaffold reflects the earlier workflow plan; [DEC-02](../cashout-rules.md) defines current notebook scope without changing that schema or deployment.
 
 Verified in the local repository on 2026-10-24; this is source inspection, not a live-environment assertion. Entry points and symbols for rechecking:
 
@@ -39,7 +39,7 @@ See [current-state inventory](../current-state.md) and [supporting research](../
 
 **Needed to implement:**
 
-- [CASH-04](CASH-04.md) at `implemented` (or `complete`).
+- [DATA-05](DATA-05.md) at `implemented` (or `complete`) for atomic ordinary saves and revision history.
 - [UX-07](UX-07.md) at `implemented` (or `complete`).
 - [DEC-03](DEC-03.md) at `complete`.
 
@@ -56,14 +56,20 @@ Affected areas: src/components/internal/CashOut.tsx; src/lib/cashout.ts; src/lib
 
 ## Implementation checklist
 
-- [ ] Filter by store/date/status/cashier and reopen the exact record
+- [ ] Align the unused `cash_closes` workflow-state scaffold with the notebook through an additive coordinated migration before writing notebook records; no fabricated submission/review state or actual bank deposit requirement
+
+- [ ] Wire revision-checked ordinary notebook saves with atomic retained prior values, save time and explicit conflict/retry recovery through DATA-05; require no approval workflow or correction reason
+
+- [ ] Filter by store/date/cashier and reopen the exact saved record/revision
 - [ ] Show missing/expired history distinctly from a zero close
 - [ ] Verify exported totals and recovery against retained snapshots
 - [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Filter by store/date/status/cashier and reopen the exact record. Record fixture/input, expected result, actual result, and evidence.
+- [ ] Scenario 4: Concurrent ordinary edits cannot silently overwrite; uncertain retries do not duplicate versions and history failure rolls back the save. Preserve both editors without requiring submitted/reviewed state or a reason. Record input, expected/actual result and evidence.
+
+- [ ] Scenario 1: Filter by store/date/cashier and reopen the exact saved record/revision. Record fixture/input, expected result, actual result, and evidence.
 - [ ] Scenario 2: Show missing/expired history distinctly from a zero close. Record fixture/input, expected result, actual result, and evidence.
 - [ ] Scenario 3: Verify exported totals and recovery against retained snapshots. Record fixture/input, expected result, actual result, and evidence.
 - [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
@@ -73,7 +79,7 @@ Affected areas: src/components/internal/CashOut.tsx; src/lib/cashout.ts; src/lib
 
 - [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
 - [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/revision and save state, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
 - [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
@@ -106,6 +112,6 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Commits/artifacts: none; this brief is planning documentation.
 - Checks performed: source inspection only; implementation scenarios not run.
 - Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Business decision: DEC-03. Independent tasks remain available.
+- Blockers: DEC-03 retention and UX-07 (including DEC-07 output approval). DATA-05 local implementation is available. No deferred cash workflow is a prerequisite.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.

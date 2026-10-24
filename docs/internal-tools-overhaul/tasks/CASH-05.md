@@ -4,7 +4,7 @@ parent: CASH
 title: "Add discrepancy explanations and correction history"
 priority: P1
 delivery_class: CODE_AND_EXTERNAL
-status: planned
+status: deferred
 owner: unassigned
 implementation_dependencies: [CASH-04]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]
@@ -16,7 +16,13 @@ live_verification: pending
 
 # CASH-05 — Add discrepancy explanations and correction history
 
-## Outcome and scope
+## Current disposition — DEC-02
+
+Deferred by the project owner's 2026-10-24 [bookkeeping notebook decision](../cashout-rules.md). The current tool counts cash, always subtracts $100 per cashier drawer, compares Toast/Z and saves figures for later lookup. The operational feature below requires a future explicit request; its old checklists are retained as future scope, not current requirements. This deferral is not a completed implementation.
+
+Ordinary save/revision history and recovery remain baseline DATA-05/CASH-08 work and do not require a submission, review, mandatory explanation or physical-deposit workflow. Existing calculated `deposit` fields remain calculated turn-in, not evidence of a bank deposit. Existing access controls are unchanged.
+
+## Outcome and scope (future only)
 
 Persist explanations, review resolutions, and corrections without replacing the previous financial record.
 
@@ -24,7 +30,7 @@ Preserve denomination counts, integer cents, AM/PM presentation, Toast/Z compari
 
 ## Current behavior and verified sources
 
-CashOut persists only sheet contents under cr-cash-out, while store/date are separate component state. Browser calculations use integer cents and a fixed $100 float; validateCashoutBody checks submitted totals for shape only. Saved days have 30-day history, a 31-day TTL, and last-save-wins behavior.
+CASH-01/02 now provide independent store/date device drafts, guided counts and blank/zero/legacy-unknown entry status in this branch. Browser calculations use integer cents and always subtract $100 per cashier drawer. The existing Worker still validates client totals by shape, lists 30 days and saves to KV with a 31-day TTL and last-save-wins. The unused local cash-state scaffold reflects the earlier workflow plan; [DEC-02](../cashout-rules.md) defines current notebook scope without changing that schema or deployment.
 
 Verified in the local repository on 2026-10-24; this is source inspection, not a live-environment assertion. Entry points and symbols for rechecking:
 
@@ -104,6 +110,6 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Commits/artifacts: none; this brief is planning documentation.
 - Checks performed: source inspection only; implementation scenarios not run.
 - Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Listed prerequisites are pending.
+- Disposition: deferred by completed DEC-02; a future explicit request must reactivate this operational scope.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Next owner/action: unassigned; do not claim until a future explicit request reactivates this scope. Notebook saving/history remains independent.

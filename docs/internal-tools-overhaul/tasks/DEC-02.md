@@ -1,101 +1,71 @@
 ---
 id: DEC-02
 parent: DEC
-title: "Confirm starting-cash, adjustment, and discrepancy-review rules"
+title: "Confirm cash-out notebook scope and fixed $100 float"
 priority: P0
 delivery_class: DECISION
-status: ready
-owner: unassigned
+status: complete
+owner: Codex
 implementation_dependencies: []
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
 
-# DEC-02 — Confirm starting-cash, adjustment, and discrepancy-review rules
+# DEC-02 — Confirm cash-out notebook scope and fixed $100 float
 
-## Outcome and scope
+## Outcome and approval
 
-Record where the current $100 float applies, permitted adjustments, expected versus actual deposit, correction permissions, and review requirements.
+Record the user-approved bookkeeping notebook purpose, fixed $100 per cashier drawer and existing calculation semantics. The canonical answer, examples, boundaries and downstream effects are in [cash-out rules](../cashout-rules.md).
 
-Current policy remains in force until the approved affected implementation activates. This task does not grant authority to change financial procedure or personnel data.
+Approver: the project owner, identified as the user in this Codex conversation; no personal or GitHub identity is inferred. Approval date: 2026-10-24. Decision version: `DEC-02-notebook-v1`. The user explicitly said “always $100”, confirmed the existing example as the intended behavior and described the tool as a notebook “purely for bookkeeping and easy calculation”. The subsequent instruction authorized this decision PR.
+
+The earlier starting-cash/adjustment/review brief was too broad. This decision resolves that brief by retaining the existing arithmetic and deferring operational cash-control features. No additional cash policy answers are required for the baseline calculation/notebook scope.
 
 ## Current behavior and verified sources
 
-Policy inputs are embedded or incomplete: FLOAT_CENTS is 10000, dates are selected in individual screens, station rosters are separate, inventory uses SUP/Use text, and saved write-ups have signature text fields. Source files establish behavior, not approved business policy.
+- [cashout.ts](../../../src/lib/cashout.ts): integer cents, fixed 10000-cent float per drawer, AM/PM sums, blank Toast/Z comparisons remain null.
+- [CashOut.tsx](../../../src/components/internal/CashOut.tsx): guided entry and independent local drafts from CASH-01/02; save and print.
+- [cashout-store.ts](../../../src/lib/cashout-store.ts) and [Worker](../../../worker/src/index.ts): existing store/date API, 30-day history, 31-day TTL, shape-checked client totals and last-save-wins. The decision does not claim those storage limits are sufficient for the future notebook.
 
-Verified in the local repository on 2026-10-24; this is source inspection, not a live-environment assertion. Entry points and symbols for rechecking:
+## Dependencies and affected work
 
-- [src/lib/cashout.ts](<../../../src/lib/cashout.ts>)
-- [src/data/restaurants.ts](<../../../src/data/restaurants.ts>)
-- [src/lib/inventory.ts](<../../../src/lib/inventory.ts>)
-- [worker/src/index.ts](<../../../worker/src/index.ts>)
-- [src/app/(order-shell)/internal/forms/page.tsx](<../../../src/app/(order-shell)/internal/forms/page.tsx>)
+No prerequisite decision, deployment or staff session is needed to record this explicit approval. CASH-03 becomes ready, without changing its separate backend/frontend activation requirements. CASH-04/05/06 are deferred until a future operational feature request. CASH-08 depends on DATA-05 rather than CASH-04; save revision history remains baseline bookkeeping. DASH-03 depends on CASH-08 rather than CASH-05 and does not invent unreviewed/unresolved cash work.
 
-See [current-state inventory](../current-state.md) and [supporting research](../../internal-tools-research.md) for preserved capabilities and rationale.
+DEC-03 retention and DEC-07 terminology/output decisions remain separate. This decision does not alter employee mappings, public/private access, source workbook semantics or other domains' approval workflows.
 
-## Dependencies and coordination
+## Implementation and acceptance
 
-**Needed to implement:**
+- [x] Record the project owner's approval, date, exact fixed-float answer and bookkeeping purpose.
+- [x] Verify balanced, short, over, explicit-zero and unavailable Toast/Z examples against the current integer-cent functions. Distinguish per-drawer from per-day subtraction.
+- [x] Define calculated turn-in versus evidence of an actual bank deposit; preserve existing field/output compatibility.
+- [x] Defer submission/review/adjustment/physical-delivery features without deferring ordinary saving and revision history.
+- [x] Update affected briefs, contracts and tracker views; verify dependency references and cycles.
+- [x] Preserve existing bilingual entry, keyboard/touch, device drafts, print and sales linkage. This documentation adds no UI or translated stored values; terminology approval remains DEC-07.
+- [x] Record recovery/reversal: a future dated decision supersedes this one without deleting saved figures/source drafts; no code or data rollback is performed here.
+- [x] Separate decision/local evidence from implementation, publication and live guarantees.
 
-None. This task can be claimed independently within the stated scope.
+## Verification
 
-**Needed to activate:**
-
-None for local completion. Frontend publication, when applicable, is tracked separately by REL-04.
-
-Dependencies reference milestone gates: `implemented` requires implementation and local verification; `complete` includes required external/live work. A prerequisite CODE_ONLY task may satisfy an implementation gate by being complete. Production cutover selects service slices; do not wait for every future feature. See [contracts](../architecture-contracts.md), [bilingual/shared-device reference](../bilingual-ux.md), and [agent guide](../agent-guide.md).
-
-Affected areas: src/lib/cashout.ts; src/data/restaurants.ts; src/lib/inventory.ts. Shared edits to worker/src/index.ts, API adapters, shared dictionaries, schema migrations, navigation, and package/workflow files require a named coordinating owner and an agreed interface before editing. Reserve a migration number with DATA-02; coordinate dashboard.js changes through REL-02. Keep unrelated files out of the task.
-
-## Implementation checklist
-
-- [ ] Walk through one normal close and one short close
-- [ ] Record signed examples with integer-cent totals and null versus zero
-- [ ] Agree whether review is mandatory and who may correct a reviewed close
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
-
-## Acceptance checklist
-
-- [ ] Scenario 1: Walk through one normal close and one short close. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Record signed examples with integer-cent totals and null versus zero. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Agree whether review is mandatory and who may correct a reviewed close. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
-
-## English/Spanish, devices, output, and recovery
-
-- [ ] Keep persisted values, IDs, enums, and API errors language independent; expose translation keys or stable error codes for English/Spanish clients.
-- [ ] Review downstream keyboard/touch and shared-device effects with the consuming task owner; no backend-only output requires a pointer gesture.
-- [ ] Print/output: preserve source record context and historical snapshots consumed by print/export; no direct print UI is introduced in this task.
-- [ ] Recovery: record a failure/reversal example and preserve original records, manifests, and evidence; mark genuinely inapplicable failure cases with reasons.
-
-## Verification commands and expected results
-
-- No application build is required. Read the linked sources and check each approved example against the proposed contract; record unresolved subquestions and the affected IDs. Confirm implementation and activation dependency updates remain acyclic.
-
-Expected result: every applicable acceptance scenario passes, preserved behavior remains readable, and failures leave an explicit recovery path. Existing commands above were checked in package.json; proposed commands must be implemented and labeled before execution. During this documentation package creation none of these application or external checks were run.
-
-## External operations, access, evidence, and rollback
-
-No deployment is required. Access: the business/product owner and affected staff, plus approved sample records/templates. Review the documented options and examples, record the named approver/date and scoped answer, and link affected tasks. Evidence: signed-off decision record. Reversal: supersede the decision with a dated record and assess only affected tasks; do not silently rewrite prior policy. No live system claim follows from approval.
+- `npm run cashout:test`: 19/19 pass, including current arithmetic, blank/zero/unknown state and wire parity.
+- `node --input-type=module` with `createJiti` and inline assertions: the worked balanced/over/short/zero/blank cases, AM/PM/Z totals, two-drawer float and below-float case match the decision record.
+- `python3 /tmp/check-cr-dec02.py`: 84 briefs, 161 tracker rows, task/tracker titles/status/owner/dependencies/milestones, dependency graph cycles, resolved DEC-02 gates, deferred task views and 46 newly added local links pass. The checker is a transient local artifact; no application test/tool is added.
+- `npm run build`, `npm run seo:check`, `git diff --check`: pass as repository PR validation. No application source changed or new browser behavior is claimed.
 
 ## Milestones
 
-| Milestone | State | Evidence required |
+| Milestone | State | Evidence |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
-| External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
-| Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
+| Implementation | done | Owner-approved decision and scoped plan in cashout-rules.md. |
+| Local verification | done | Arithmetic and documentation consistency checks above. |
+| External activation | not_applicable | Documentation decision; no deployment. |
+| Live verification | not_applicable | No live feature or staff acceptance claim. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: None established; verify access/context before work.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Owner/worktree: Codex, `docs/overhaul-dec-02`, same `/home/wslunusn/CR-Website-cashout` worktree used for UX-04/CASH-02; base is `feat/overhaul-cash-02` / PR #148.
+- Artifacts: cashout-rules.md, affected task briefs/tracker and cash-related planning references. Application/schema/API/retention/access code is untouched.
+- Decision is complete; implementation milestones of CASH-03/08 and deferred tasks remain pending. No downstream task is claimed and no PR is merged.
+- Next owner/action: user may select CASH-03 for calculation parity or the remaining notebook/history work. CASH-08 still needs the separately recorded retention/output decisions; do not infer a duration from “long notebook”.
