@@ -11,6 +11,8 @@ import {
 import { seedEmployees, seedKitchenEmployeesCR03 } from './seed-crews'
 import { SCHEDULE_STRATEGIES, generateSchedule, preflightDiagnostics, summarizeSchedule } from './solver'
 import { isEmployeeQualified, validateSchedule } from './validator'
+import { REQUEST_POLICY, withApprovedRequests, type ScheduleRequest } from './requests'
+import { dragErrorMessage } from '../../components/scheduler/helpers'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeeklyStaffingTemplate } from './types'
 import { formatTime, formatTimeRange, minutes } from './time'
 import { dateForDay, dayOfMonth, formatDayLabel, formatWeekRange, shiftWeek, weekStartFor, weeksBetween } from './week'
@@ -868,4 +870,68 @@ test('higher priority staff are picked first for required and optional spots', (
   const bySlot = new Map(result.assignments.map((a) => [slots.find((s) => s.id === a.slotId)?.label, a.employeeId]))
   assert.equal(bySlot.get('Server'), 'c')
   assert.equal(bySlot.get('Extra'), 'b')
+})
+
+test('only approved dated requests change generation and manual validation; suspension stays separate', () => {
+  const server = (id: string, extra: Partial<Employee> = {}): Employee => ({
+    id, name: id, roles: ['server'], maxDaysPerWeek: 7, allowDoubles: true, incompatibleEmployeeIds: [], active: true,
+    recurringAvailability: Object.fromEntries(DAYS.map((day) => [day, [{ start: minutes(9), end: minutes(23) }]])), ...extra,
+  })
+  const request = (status: ScheduleRequest['status'], patch: Partial<ScheduleRequest> = {}): ScheduleRequest => ({
+    id: `request-${status}`, employee: { stationId: 'CR3-diningroom', sourceEmployeeId: 'ana', name: 'ana' },
+    kind: 'time-off', startDate: '2026-10-12', endDate: '2026-10-12', ranges: [], reason: '',
+    requestedAt: '2026-10-01T12:00:00.000Z', enteredAt: '2026-10-01T13:00:00.000Z', enteredBy: 'Manager',
+    policyVersion: REQUEST_POLICY, status, review: status === 'pending' ? null : { by: 'Manager', at: '2026-10-02T12:00:00.000Z', reason: '' }, ...patch,
+  })
+  const data = (...requests: ScheduleRequest[]) => ({ version: 1 as const, stationId: 'CR3-diningroom' as const, requests })
+  const template = Object.fromEntries(DAYS.map((day) => [day, []])) as unknown as WeeklyStaffingTemplate
+  template.Monday = [{ period: 'AM', role: 'server', label: 'Server', start: minutes(9), end: minutes(16), required: true }]
+  template.Wednesday = [{ period: 'AM', role: 'server', label: 'Server', start: minutes(9), end: minutes(16), required: true }]
+  const week = '2026-10-11' // Monday 10-12, Wednesday 10-14
+  const weekSlots = expandTemplate(template, week)
+  const monday = weekSlots.find((s) => s.day === 'Monday')!
+  const roster = [server('ana', { priority: 1 }), server('backup')]
+  const mondayPick = (employees: Employee[]) => {
+    const result = generateSchedule({ employees, template, weekStart: week })
+    assert.equal(result.status, 'FEASIBLE')
+    return result.assignments.find((a) => a.slotId === monday.id)?.employeeId
+  }
+  const manualProblems = (employees: Employee[]) =>
+    validateSchedule({ employees, slots: [monday], assignments: [assignment(monday, 'ana')] }).map((v) => v.code)
+
+  // Scenario 1: identical shift, only the approved request blocks it.
+  for (const status of ['pending', 'declined'] as const) {
+    const employees = withApprovedRequests(roster, data(request(status)), week)
+    assert.equal(mondayPick(employees), 'ana')
+    assert.deepEqual(manualProblems(employees), [])
+  }
+  const approved = withApprovedRequests(roster, data(request('approved')), week)
+  assert.equal(mondayPick(approved), 'backup')
+  assert.deepEqual(manualProblems(approved), ['unavailable_employee'])
+  assert.equal(roster[0].availabilityOverrides, undefined, 'saved staff list is never mutated')
+  assert.deepEqual(withApprovedRequests(roster, data(request('approved')), '2026-10-18'), roster, 'other weeks unaffected')
+
+  // Temporary availability replaces hours only on its dates, both narrowing and widening.
+  const narrowed = withApprovedRequests(roster, data(request('approved', { kind: 'availability', ranges: [{ start: minutes(9), end: minutes(12) }] })), week)
+  assert.deepEqual(manualProblems(narrowed), ['unavailable_employee'])
+  const unavailable = [server('ana', { recurringAvailability: {} })]
+  const widened = withApprovedRequests(unavailable, data(request('approved', { kind: 'availability', ranges: [{ start: minutes(8), end: minutes(17) }] })), week)
+  assert.deepEqual(manualProblems(unavailable), ['unavailable_employee'])
+  assert.deepEqual(manualProblems(widened), [])
+
+  // Scenario 2: actionable coverage warning and a message that names the request, not a suspension.
+  const alone = withApprovedRequests([server('ana')], data(request('approved')), week)
+  assert.ok(preflightDiagnostics(alone, weekSlots).some((d) => d.code === 'no_server_candidate' && d.day === 'Monday'))
+  const offMessage = dragErrorMessage(alone[0], monday, validateSchedule({ employees: alone, slots: [monday], assignments: [assignment(monday, 'ana')] }), week, weekSlots)
+  assert.match(offMessage, /approved time off on 2026-10-12/)
+  assert.doesNotMatch(offMessage, /suspended/)
+  const suspendedToo = withApprovedRequests([server('ana', { suspendedFrom: '2026-10-12' })], data(request('approved')), week)
+  assert.match(dragErrorMessage(suspendedToo[0], monday, [{ code: 'unavailable_employee', message: '' }], week, weekSlots), /suspended on 2026-10-12/)
+
+  // Scenario 3: a kept spot that conflicts with a new approval is reported, not silently dropped.
+  const kept = generateSchedule({ employees: approved, template, weekStart: week }, { existingAssignments: [assignment(monday, 'ana', true)] })
+  assert.equal(kept.status, 'INFEASIBLE')
+  assert.ok(kept.diagnostics.some((d) => d.code === 'invalid_locked_assignment' && d.slotId === monday.id))
+  assert.equal(generateSchedule({ employees: withApprovedRequests(roster, data(request('pending')), week), template, weekStart: week },
+    { existingAssignments: [assignment(monday, 'ana', true)] }).status, 'FEASIBLE')
 })

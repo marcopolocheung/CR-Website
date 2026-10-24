@@ -20,6 +20,10 @@ test('request store validates authoritative context and keeps the retry operatio
     for (status of [401, 403, 404, 409, 503]) {
       await assert.rejects(fetchRequests(station, 'synthetic-token'), RequestApiError)
     }
+    payload = { schemaVersion: 1, error: { code: 'unavailable' } }
+    await assert.rejects(fetchRequests(station, 'synthetic-token'), (error: RequestApiError) => error.code === 'unavailable')
+    payload = { schemaVersion: 1, error: { code: 'backend_unconfigured' } }
+    await assert.rejects(fetchRequests(station, 'synthetic-token'), (error: RequestApiError) => error.code === 'unconfigured')
     status = 200
     payload = { record: { ...record, stationId: 'CR2-kitchen' } }
     await assert.rejects(fetchRequests(station, 'synthetic-token'), RequestApiError)

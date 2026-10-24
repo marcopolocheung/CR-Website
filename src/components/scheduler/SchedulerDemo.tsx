@@ -35,6 +35,11 @@ import { fetchGoldenMonth, fetchGoldenWeek, saveErrorMessage, type GoldenWeekDoc
 import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForWeek, publishedWeekFingerprint, templateHashForSlots } from '@/lib/schedule-share'
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
 import { useManagerCode } from './DemoGate'
+import { DEFAULT_STATION, isStationId, type Locale } from '@/lib/internal-tools/contracts'
+import { LOCALE_STORAGE_KEY } from '@/lib/internal-tools/i18n'
+import RequestsPanel from './RequestsPanel'
+import { useScheduleRequests } from './useScheduleRequests'
+import { withApprovedRequests } from '@/lib/scheduler/requests'
 import PublishPanel from './PublishPanel'
 import SchedulerNavigation, { type SchedulerView } from './SchedulerNavigation'
 import { DragState, DropFeedback, EmployeeDraft, GenerationReport, HistorySnapshot, MovePreview, ScheduleVariant, ShiftKey, StaffSnapshot, UNDO_LIMIT, WeekAssignments, allDays, assignmentFingerprint, blankDraft, buildFixIssues, buildMovePreview, candidatesForSlot, changesSince, cloneAssignmentList, cloneEmployeeList, cloneTemplate, cloneWeeks, createEmployeeId, diagnosticLabel, emptyAssignments, formatReportTime, fullDay, gapAvailability, onboardingStorageKey, proposeMovedAssignments, readOnboardingDismissed, readStaffSnapshots, roleLabel, rolesInUse, scheduleVariants, snapshotStorageKey, statusForWeek, unassignableReason, uniqueMessages } from './helpers'
@@ -200,6 +205,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [liveMonthWeeks, setLiveMonthWeeks] = useState<Record<string, boolean>>({})
   const [copyingPrior, setCopyingPrior] = useState(false)
   const managerCode = useManagerCode()
+  const requestStation = isStationId(restaurantId) ? restaurantId : DEFAULT_STATION
+  const requestSource = useScheduleRequests(requestStation, managerCode)
+  const [requestLocale, setRequestLocale] = useState<Locale>('en')
+  const [requestDirty, setRequestDirty] = useState(false)
+  useEffect(() => { try { if (localStorage.getItem(LOCALE_STORAGE_KEY) === 'es') setRequestLocale('es') } catch { /* optional preference */ } }, [])
   const [savingSetup, setSavingSetup] = useState(false)
   const [setupError, setSetupError] = useState('')
   const [setupNotice, setSetupNotice] = useState('')
@@ -236,11 +246,17 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   const slots = useMemo(() => expandTemplate(template, weekStart || undefined), [template, weekStart])
+  // Scheduling checks see approved requests as dated overrides; the saved staff list never stores them.
+  const scheduleEmployees = useMemo(
+    () => withApprovedRequests(employees, requestSource.record?.data, weekStart),
+    [employees, requestSource.record, weekStart],
+  )
+  const requestsUnconfirmed = requestSource.phase === 'failed' || requestSource.phase === 'uncertain'
   const ruleProblems = useMemo(() => templateProblems(template), [template])
   // Readiness matches the solver: optional spots (not yet hired) never block the week.
   const readinessProblems = useMemo(
-    () => preflightDiagnostics(employees, slots.filter((slot) => slot.required)),
-    [employees, slots],
+    () => preflightDiagnostics(scheduleEmployees, slots.filter((slot) => slot.required)),
+    [scheduleEmployees, slots],
   )
   const firstGap = readinessProblems.find((problem) => problem.day && problem.period && problem.role)
   const gapSlot = useMemo(
@@ -253,14 +269,14 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const violations = useMemo(
     () =>
       validateSchedule({
-        employees,
+        employees: scheduleEmployees,
         slots,
         assignments: assignments.filter((assignment) => assignment.employeeId),
         requireCoverage: assignments.length > 0,
       }),
-    [assignments, employees, slots],
+    [assignments, scheduleEmployees, slots],
   )
-  const stats = useMemo(() => calculateScheduleStats(employees, slots, assignments), [assignments, employees, slots])
+  const stats = useMemo(() => calculateScheduleStats(scheduleEmployees, slots, assignments), [assignments, scheduleEmployees, slots])
   const assignmentMap = useMemo(
     () => new Map(assignments.map((assignment) => [assignment.slotId, assignment])),
     [assignments],
@@ -270,16 +286,16 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     const previews = new Map<string, MovePreview>()
     if (!activeMove) return previews
     for (const slot of slots) {
-      const preview = buildMovePreview({ move: activeMove, targetSlotId: slot.id, employees, slots, assignments, assignmentMap, weekStart })
+      const preview = buildMovePreview({ move: activeMove, targetSlotId: slot.id, employees: scheduleEmployees, slots, assignments, assignmentMap, weekStart })
       if (preview) previews.set(slot.id, preview)
     }
     return previews
-  }, [activeMove, assignmentMap, assignments, employees, slots, weekStart])
+  }, [activeMove, assignmentMap, assignments, scheduleEmployees, slots, weekStart])
   const movingEmployee = employees.find((employee) => employee.id === moveSource?.employeeId)
 
   const fixIssues = useMemo(
-    () => buildFixIssues(readinessProblems, violations, slots, employees, weekStart, assignments),
-    [assignments, employees, readinessProblems, slots, violations, weekStart],
+    () => buildFixIssues(readinessProblems, violations, slots, scheduleEmployees, weekStart, assignments),
+    [assignments, scheduleEmployees, readinessProblems, slots, violations, weekStart],
   )
   const visibleFixIssues = fixIssues.filter((issue) => !ignoredIssueIds.includes(issue.id))
   const nextIssue = visibleFixIssues[0]
@@ -290,29 +306,29 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return ids
   }, [nextIssue])
   const changes = useMemo(
-    () => changesSince(generatedAssignments, assignments, slots, employees, weekStart),
-    [assignments, employees, generatedAssignments, slots, weekStart],
+    () => changesSince(generatedAssignments, assignments, slots, scheduleEmployees, weekStart),
+    [assignments, scheduleEmployees, generatedAssignments, slots, weekStart],
   )
   const changedSlotIds = useMemo(() => new Set(changes.map((change) => change.slotId)), [changes])
   const fixCandidates = useMemo(
     () =>
       nextIssue?.slot
-        ? candidatesForSlot({ slot: nextIssue.slot, employees, slots, assignments })
+        ? candidatesForSlot({ slot: nextIssue.slot, employees: scheduleEmployees, slots, assignments })
         : [],
-    [assignments, employees, nextIssue, slots],
+    [assignments, scheduleEmployees, nextIssue, slots],
   )
   const fixExcluded = useMemo(() => {
     if (!nextIssue?.slot) return [] as { employee: Employee; reason: string }[]
     const candidateIds = new Set(fixCandidates.map((candidate) => candidate.id))
-    return employees
+    return scheduleEmployees
       .filter((employee) => !candidateIds.has(employee.id))
       .map((employee) => ({
         employee,
         reason:
-          unassignableReason({ slot: nextIssue.slot as StaffingSlot, employee, employees, slots, assignments }) ??
+          unassignableReason({ slot: nextIssue.slot as StaffingSlot, employee, employees: scheduleEmployees, slots, assignments }) ??
           'not available',
       }))
-  }, [assignments, employees, fixCandidates, nextIssue, slots])
+  }, [assignments, scheduleEmployees, fixCandidates, nextIssue, slots])
   const ignoredCount = fixIssues.filter((issue) => ignoredIssueIds.includes(issue.id)).length
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
   const keptCount = assignments.filter((assignment) => assignment.locked && assignment.employeeId).length
@@ -339,7 +355,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     (assignmentFingerprint(assignments) !== (publishedBaselines[weekStart] ?? '') ||
       Boolean(publishedDoc && publishedDoc.visible !== (weekVisibility === 'on')))
   const hasUnsavedWork =
-    currentWeekUnpublished || otherWeeksWithEdits.length > 0 || rosterDirty || templateDirty || staffDirty
+    currentWeekUnpublished || otherWeeksWithEdits.length > 0 || rosterDirty || templateDirty || staffDirty || requestDirty
   const selectedRoles = availableRoles.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && (selectedRoles.length > 0 || draft.newHire)
 
@@ -965,7 +981,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     }
     try {
       const result = generateSchedule(
-        { employees, template, weekStart },
+        { employees: scheduleEmployees, template, weekStart },
         {
           strategy: variant,
           referenceAssignments: previousAssignments,
@@ -989,10 +1005,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         return
       }
 
-      const summary = summarizeSchedule(employees, slots, result.assignments, previousAssignments)
+      const summary = summarizeSchedule(scheduleEmployees, slots, result.assignments, previousAssignments)
       const message = generationMessage(variant, summary, previousAssignments.length || result.assignments.length)
       setDiagnostics([
         message,
+        ...(requestsUnconfirmed ? ['Time off and availability requests could not be confirmed with the server, so this schedule may miss a recent approval. Reload requests, then make the schedule again.'] : []),
         ...uniqueMessages(result.diagnostics.map((diagnostic) => diagnosticLabel(diagnostic, weekStart))),
       ])
       const unchanged = assignmentFingerprint(result.assignments) === assignmentFingerprint(assignments)
@@ -1389,6 +1406,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       </header>
 
       <main className="mx-auto w-full max-w-none min-w-0 space-y-4 overflow-x-clip px-4 py-5">
+          <RequestsPanel key={requestStation} source={requestSource} employees={employees} weekStart={weekStart} token={managerCode}
+            locale={requestLocale} onLocaleChange={setRequestLocale} onDirtyChange={setRequestDirty} />
           {storeLoading && (
             <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">
               <h2 className="text-sm font-semibold text-zinc-900">Loading your saved schedule…</h2>
@@ -1744,7 +1763,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               slots={slots}
               weekStart={weekStart}
               hasSchedule={assignments.length > 0}
-              employees={employees}
+              employees={scheduleEmployees}
               assignments={assignments}
               assignmentMap={assignmentMap}
               violations={violations}

@@ -1,5 +1,7 @@
 import { businessDate, isStationId, recordId, utcTimestamp, type RecordEnvelope, type StationId } from '../internal-tools/contracts'
 import { canonicalJson } from '../internal-tools/json'
+import { DAYS, type Employee } from './types'
+import { dateForDay } from './week'
 
 export const REQUEST_POLICY = 'DEC-01-v1' as const
 export const MAX_REQUESTS = 200
@@ -80,4 +82,18 @@ export function requestTransitionIssue(previous: RequestData | null, next: Reque
   const old = changed[0], current = next.requests[before.indexOf(old)]
   if (old.status !== 'pending' || current.status === 'pending' || current.review?.by !== preparer) return 'review_provenance_required'
   return canonicalJson({ ...current, status: old.status, review: old.review }) === canonicalJson(old) ? null : 'preserve_original_request'
+}
+
+/** Approved requests become dated overrides for one week; pending/declined never affect scheduling. Suspension stays separate. */
+export function withApprovedRequests(employees: Employee[], data: RequestData | null | undefined, weekStart: string): Employee[] {
+  const approved = data?.requests.filter(item => item.status === 'approved') ?? []
+  if (!weekStart || approved.length === 0) return employees
+  const dates = DAYS.map(day => dateForDay(weekStart, day))
+  return employees.map(employee => {
+    const overrides = dates.flatMap(date => {
+      const request = approved.find(item => item.employee.sourceEmployeeId === employee.id && item.startDate <= date && date <= item.endDate)
+      return request ? [{ date, ranges: request.ranges.map(range => ({ ...range })) }] : []
+    })
+    return overrides.length ? { ...employee, availabilityOverrides: [...overrides, ...(employee.availabilityOverrides ?? [])] } : employee
+  })
 }

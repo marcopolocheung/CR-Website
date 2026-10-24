@@ -52,6 +52,10 @@ class FixtureStore:
             pass
         elif url.path in ('/api/auth/verify', '/api/staff/verify'):
             assert request.headers.get('authorization') == 'Bearer fixture-password'
+        elif url.path.startswith('/api/internal/schedule-requests/'):
+            assert request.method == 'GET'
+            assert request.headers.get('authorization') == 'Bearer fixture-password'
+            body = {'record': None}
         elif request.method == 'PUT':
             assert request.headers.get('authorization') == 'Bearer fixture-password'
             self.writes.append(key)

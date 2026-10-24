@@ -34,7 +34,7 @@ export function isSuspendedOn(employee: Employee, date?: string) {
 
 export function isEmployeeAvailableForSlot(employee: Employee, slot: StaffingSlot) {
   if (isSuspendedOn(employee, slot.date)) return false
-  return getEmployeeAvailability(employee, slot.day).some((range) =>
+  return getEmployeeAvailability(employee, slot.day, slot.date).some((range) =>
     rangeContains(range, { start: slot.start, end: slot.end }),
   )
 }
