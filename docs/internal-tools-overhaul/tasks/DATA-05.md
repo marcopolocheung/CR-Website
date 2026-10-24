@@ -4,12 +4,12 @@ parent: DATA
 title: "Implement atomic revisions and change history"
 priority: P0
 delivery_class: CODE_AND_EXTERNAL
-status: ready
-owner: unassigned
+status: implemented
+owner: Codex
 implementation_dependencies: [DATA-02]
 activation_dependencies: [DATA-03, REL-03, DATA-09]
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: pending
 live_verification: pending
 ---
@@ -54,25 +54,25 @@ Affected areas: worker/src/index.ts; worker/wrangler.toml; src/lib/schedule-stor
 
 ## Implementation checklist
 
-- [ ] Use one conditional mutation/transaction boundary for revision and history
-- [ ] Run concurrent same-base writes and prove exactly one succeeds
-- [ ] Return a recoverable conflict and ensure retries create no duplicate events
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Use one conditional mutation/transaction boundary for revision and history
+- [x] Run concurrent same-base writes and prove exactly one succeeds
+- [x] Return a recoverable conflict and ensure retries create no duplicate events
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Use one conditional mutation/transaction boundary for revision and history. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Run concurrent same-base writes and prove exactly one succeeds. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Return a recoverable conflict and ensure retries create no duplicate events. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Use one conditional mutation/transaction boundary for revision and history. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Run concurrent same-base writes and prove exactly one succeeds. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Return a recoverable conflict and ensure retries create no duplicate events. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Keep persisted values, IDs, enums, and API errors language independent; expose translation keys or stable error codes for English/Spanish clients.
-- [ ] Review downstream keyboard/touch and shared-device effects with the consuming task owner; no backend-only output requires a pointer gesture.
-- [ ] Print/output: preserve source record context and historical snapshots consumed by print/export; no direct print UI is introduced in this task.
-- [ ] Recovery: record a failure/reversal example and preserve original records, manifests, and evidence; mark genuinely inapplicable failure cases with reasons.
+- [x] Keep persisted values, IDs, enums, and API errors language independent; expose translation keys or stable error codes for English/Spanish clients.
+- [x] Review downstream keyboard/touch and shared-device effects with the consuming task owner; no backend-only output requires a pointer gesture.
+- [x] Print/output: preserve source record context and historical snapshots consumed by print/export; no direct print UI is introduced in this task.
+- [x] Recovery: record a failure/reversal example and preserve original records, manifests, and evidence; mark genuinely inapplicable failure cases with reasons.
 
 ## Verification commands and expected results
 
@@ -95,16 +95,20 @@ Evidence specific to this task: the three task scenarios above must pass against
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | pending | Environment, operation IDs, deployment/resource evidence, or staff-session execution. |
 | Live verification | pending | Observed target-environment behavior or staff acceptance with date and operator. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Listed prerequisites are pending.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts: [atomic record contract/activation runbook](../../../worker/ATOMIC_RECORDS.md), `worker/src/record-mutations.ts`, its local D1 tests, migration 0003 and expanded `data:test`. DATA-02 prerequisite is locally verified in PR #133; PR #132 supplies contract v1.
+- Scenario 1: one D1 batch conditionally claims the operation, inserts/updates the record at base+1 and appends history. Required history revision and foreign keys prevent a receipt-only commit. SQL triggers reject history/receipt update/delete. Original creation time and source snapshots remain intact.
+- Scenario 2: local concurrent same-base writers yield exactly one success and one 409 with revision 2; one new event/receipt. Six simultaneous identical creates yield one fresh result and five replays with one record/event. Separate store/record/caller/action scopes are tested.
+- Scenario 3: historical retries replay the original authoritative result even after later edits; reordered keys replay; changed content or actor rejects `operation_reused`. Domain/scalar validation leaves no writes. Injected history trigger failure rolls back the receipt AND business update; retrying the same operation after removing only the fixture trigger succeeds once. Source edits remain available to the caller on failure/conflict.
+- Checks (isolated local simulation, 2026-10-24): `npm run data:test`, 10/10 pass; `npm run data:migrate:local`, migration 0003 applied; `npm exec tsc -- --noEmit`, `npm run build`, `npm run seo:check`, `git diff --check` pass; scheduler/Worker 128/128 and cash-out/dashboard/inventory 13/13 pass. Native test harness loads TypeScript only through scoped jiti to avoid altering Wrangler's module loader.
+- I/L/E/V: done/done/pending/pending. Status implemented, not complete. No cloud operations, deployed service or live evidence. Existing KV routes/clients and their original guarantees remain untouched.
+- English/Spanish/device/print: stable codes and source snapshots, explicit actor provenance; no UI/gesture, local credential storage or print change. Consumers retain edits and supply localized recovery UI. No policy is approved by these fixtures.
+- Pending activation: provision/bind verified non-production D1/R2 under DATA-03, preserve SCHEDULES, apply 0001–0003 and rehearse restore; wire only authorized/domain-validated service slices; REL-03 deploys the reviewed pinned artifact after actual target/runtime checks; DATA-09 owns production slice cutover. Repeat concurrent/retry/rollback scenarios through deployed service with environment/operator/time/artifact/revision evidence. No generic mutation endpoint is exposed; domain relational projections must join their own guarded transaction before service activation.
+- Rollback: stop slice writes, export/preserve records/receipts/history and reconcile accepted new writes before restoring the compatible artifact; keep KV attached. Do not delete history/receipts or drop activated migrations. Exact procedure and remaining gates are in the atomic record guide.
+- Next owner/action: Codex continues UX-01 to unlock shared UI work. INV-01 and SCH-04 are now locally eligible; external/live gates remain separate. Next migration number is 0004.

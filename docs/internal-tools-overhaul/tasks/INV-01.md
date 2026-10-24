@@ -4,7 +4,7 @@ parent: INV
 title: "Add explicit count sessions and line states"
 priority: P0
 delivery_class: CODE_AND_EXTERNAL
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [DATA-02, DATA-05]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]
