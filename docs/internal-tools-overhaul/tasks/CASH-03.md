@@ -4,12 +4,12 @@ parent: CASH
 title: "Recalculate financial totals on the server"
 priority: P0
 delivery_class: CODE_AND_EXTERNAL
-status: ready
-owner: unassigned
+status: implemented
+owner: Claude
 implementation_dependencies: [DATA-01, DEC-02]
 activation_dependencies: [REL-03, REL-04]
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: pending
 live_verification: pending
 ---
@@ -53,10 +53,10 @@ Affected areas: src/components/internal/CashOut.tsx; src/lib/cashout.ts; src/lib
 
 ## Implementation checklist
 
-- [ ] Reject invalid counts and test null versus zero plus rounding boundaries
-- [ ] Ignore or reject tampered client totals while accepting compatible legacy requests
-- [ ] Compare browser/server results with approved fixed-$100 notebook examples (balanced/over/short, blank versus zero Toast/Z, multiple drawers)
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Reject invalid counts and test null versus zero plus rounding boundaries
+- [x] Ignore or reject tampered client totals while accepting compatible legacy requests
+- [x] Compare browser/server results with approved fixed-$100 notebook examples (balanced/over/short, blank versus zero Toast/Z, multiple drawers)
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
@@ -93,16 +93,20 @@ Evidence specific to this task: the three task scenarios above must pass against
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | pending | Environment, operation IDs, deployment/resource evidence, or staff-session execution. |
 | Live verification | pending | Observed target-environment behavior or staff acceptance with date and operator. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: none for local implementation; DATA-01 and DEC-02 are complete. Backend/frontend activation remains separate. This decision PR does not implement or claim CASH-03.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts: `worker/src/index.ts` (`cashoutTotals`, `validateCashoutBody`), regenerated `worker/dashboard.js`, new cases in `worker/src/index.test.ts`. Stacked on DEC-02 PR #150 (CASH-02 #148).
+- Approach: the Worker recomputes every total from the validated sheet and stores only its own figures. Client `totals` are ignored rather than rejected, so pages already open (which always send totals) keep saving, and a body without `totals` also works. The arithmetic mirrors `src/lib/cashout.ts` because the dashboard-paste deploy cannot import it; a parity test runs both on the DEC-02 examples. No wire, KV key, TTL, response or client change.
+- Scenario 1: non-integer, negative, null, over-100000 and wrong-length counts, `1e9`/three-decimal money and 21-cashier shifts are rejected (400). Blank Toast/Z gives `null`; entered `0` gives a real difference; `.5`, `-1.15`, `0.29`, `0.1` and a lone `-` match the browser's `toCents` rounding.
+- Scenario 2: tampered, malformed (`1.5`, string) and missing `totals` all store the same server result; a tampered PUT round-trips with server figures in KV.
+- Scenario 3: browser `dayTotals` and server `cashoutTotals` are deep-equal on balanced, +$0.25, −$5, float-only zero Toast, blank Toast, explicit zero Toast/Z, the AM/PM day example (deposit 20000, difference +25, Z 0), blank Z, two drawers keeping $100 each (40000) and a $50 drawer (−5000).
+- Checks (local, 2026-10-24): `npm run scheduler:test` 131/131 and `npm run cashout:test` 19/19 pass; changing the Worker float to 9999 fails 4 cash-out tests, then reverted. `npm exec tsc -- --noEmit` and `npm run build` pass. `dashboard.js` was in sync with the TypeScript build before the edit and was regenerated with the README command; its `cashoutTotals` export was smoke-run under Node.
+- English/Spanish/device/print: no UI, dictionary, output or gesture change. The page still shows its own live totals; they now equal what the server stores.
+- I/L/E/V: done/done/pending/pending. Status implemented, not complete. Nothing deployed.
+- Pending activation: REL-03 deploys the regenerated `dashboard.js` (paste or wrangler) to non-production then production and repeats Scenario 2 with a tampered PUT against each, recording environment/operator/time. REL-04 is listed but no frontend change is needed. Rollback: paste the previous `dashboard.js`; stored day documents keep the same shape either way.
+- Next owner/action: unassigned. CASH-08 remains blocked on UX-07/DEC-03; CASH-04/05/06 stay deferred.
