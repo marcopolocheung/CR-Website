@@ -7,6 +7,8 @@ type DraftScope = {
   stationId?: StationId
   shift?: string
   recordId?: string
+  /** Which form a 'form' draft holds; keeps a write-up and a complaint for the same day apart. */
+  formType?: string
 }
 export type DraftContext = DraftScope & ({ businessDate: BusinessDate; period?: never } | { businessDate?: never; period: { start: BusinessDate; end: BusinessDate } })
 export type Draft<T> = {
@@ -29,15 +31,18 @@ const ID = /^[A-Za-z0-9_-]{1,128}$/
 export function validDraftContext(value: unknown): value is DraftContext {
   if (!value || typeof value !== 'object') return false
   const c = value as DraftContext
-  return Object.keys(c).every(key => ['task','storeId','businessDate','period','stationId','shift','recordId'].includes(key)) && TASKS.includes(c.task) && isStoreId(c.storeId) && ((businessDate(c.businessDate) !== null && c.period === undefined) || (c.businessDate === undefined && !!c.period && typeof c.period === 'object' && Object.keys(c.period).every(key => ['start','end'].includes(key)) && businessDate(c.period.start) !== null && businessDate(c.period.end) !== null && c.period.start <= c.period.end))
+  return Object.keys(c).every(key => ['task','storeId','businessDate','period','stationId','shift','recordId','formType'].includes(key)) && TASKS.includes(c.task) && isStoreId(c.storeId) && ((businessDate(c.businessDate) !== null && c.period === undefined) || (c.businessDate === undefined && !!c.period && typeof c.period === 'object' && Object.keys(c.period).every(key => ['start','end'].includes(key)) && businessDate(c.period.start) !== null && businessDate(c.period.end) !== null && c.period.start <= c.period.end))
     && (c.stationId === undefined || (isStationId(c.stationId) && STATION_STORES[c.stationId] === c.storeId))
     && (c.shift === undefined || (typeof c.shift === 'string' && ID.test(c.shift)))
     && (c.recordId === undefined || (typeof c.recordId === 'string' && ID.test(c.recordId)))
+    && (c.formType === undefined || (c.task === 'form' && typeof c.formType === 'string' && ID.test(c.formType)))
 }
 /** Every context dimension participates; no label, locale or credential does. */
 export function draftContextKey(context: DraftContext): string {
   if (!validDraftContext(context)) throw new Error('invalid_context')
-  return encodeURIComponent(JSON.stringify([context.task, context.storeId, context.businessDate ?? null, context.period?.start ?? null, context.period?.end ?? null, context.stationId ?? null, context.shift ?? null, context.recordId ?? null]))
+  const parts = [context.task, context.storeId, context.businessDate ?? null, context.period?.start ?? null, context.period?.end ?? null, context.stationId ?? null, context.shift ?? null, context.recordId ?? null]
+  // Appended only when present so every existing draft key stays byte-identical.
+  return encodeURIComponent(JSON.stringify(context.formType === undefined ? parts : [...parts, context.formType]))
 }
 export function draftKey(draft: Pick<Draft<unknown>, 'context' | 'id'>): string {
   if (!ID.test(draft.id)) throw new Error('invalid_id')

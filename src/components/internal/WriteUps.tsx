@@ -17,10 +17,11 @@ import {
 import { NO_FILTER, SAVED_FORM_TYPES, filterSavedForms, isFiltered, type SavedFormFilter, type SavedFormRow } from '@/lib/forms'
 import { useInternalLanguage } from './InternalLanguage'
 import { EmptyState, focusField } from './Feedback'
+import FormDraftWorkspace, { type FormEditorProps } from './FormDraftWorkspace'
+import { isWriteUpDraft } from '@/lib/internal-tools/writeup-draft'
 
-const today = () => new Date().toLocaleDateString('en-CA')
-const emptyForm = (): WriteUpForm => ({
-  date: today(),
+const emptyForm = (date: string): WriteUpForm => ({
+  date,
   employee: '',
   manager: '',
   violations: [],
@@ -46,14 +47,18 @@ const secondary = `${button} border border-gray-300 text-gray-700 hover:bg-gray-
 export default function WriteUps() {
   // Manager token lives in memory only, like cash out.
   const [token, setToken] = useState('')
-  if (!token) {
-    return (
-      <div className="max-w-6xl mx-auto px-4">
-        <CodeGate onUnlock={setToken} title="Employee write-ups" />
-      </div>
-    )
-  }
-  return <WriteUpBook token={token} onLocked={() => setToken('')} />
+  const [unlocked, setUnlocked] = useState(false)
+  return (
+    <>
+      {!token && (
+        <div className="max-w-6xl mx-auto px-4">
+          <CodeGate onUnlock={code => { setToken(code); setUnlocked(true) }} title="Employee write-ups" />
+        </div>
+      )}
+      {/* After the first unlock the book stays mounted, so an expired code never discards an unsaved write-up. */}
+      {unlocked && <div hidden={!token}><WriteUpBook token={token} onLocked={() => setToken('')} /></div>}
+    </>
+  )
 }
 
 function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void }) {
@@ -96,8 +101,8 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
   )
 
   useEffect(() => {
-    refresh()
-  }, [refresh])
+    if (token) refresh()
+  }, [refresh, token])
 
   const open = (row: SavedFormRow) => run(async () => setView({ kind: 'saved', doc: await fetchWriteUp(row.id, token) }))
   const back = () => {
@@ -135,16 +140,23 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
 
       {view.kind === 'list' && <SavedFormsList list={list} failed={loadFailed} busy={busy} onOpen={open} onRetry={refresh} />}
       {view.kind === 'new' && (
-        <NewWriteUp
-          busy={busy}
-          onSave={form =>
-            run(async () => {
-              const id = await saveWriteUp(form, token)
-              setView({ kind: 'saved', doc: await fetchWriteUp(id, token) })
-              return 'Saved.'
-            })
-          }
-        />
+        <FormDraftWorkspace formType="write-up" title="formDrafts.writeUpTitle" createForm={emptyForm} validateForm={isWriteUpDraft}>
+          {editor => (
+            <NewWriteUp
+              key={editor.draft.id}
+              editor={editor}
+              busy={busy}
+              onSave={form =>
+                run(async () => {
+                  const id = await saveWriteUp(form, token)
+                  editor.markSaved(id)
+                  setView({ kind: 'saved', doc: await fetchWriteUp(id, token) })
+                  return 'Saved.'
+                })
+              }
+            />
+          )}
+        </FormDraftWorkspace>
       )}
       {view.kind === 'saved' && (
         <>
@@ -243,20 +255,36 @@ function SavedFormsList({ list, failed, busy, onOpen, onRetry }: { list: SavedFo
   )
 }
 
-function NewWriteUp({ busy, onSave }: { busy: boolean; onSave: (form: WriteUpForm) => void }) {
-  const [form, setForm] = useState<WriteUpForm>(emptyForm)
+function NewWriteUp({ editor, busy, onSave }: { editor: FormEditorProps<WriteUpForm>; busy: boolean; onSave: (form: WriteUpForm) => void }) {
+  const { t } = useInternalLanguage()
+  const [form, setForm] = useState<WriteUpForm>(() => editor.draft.payload.form)
+  const savedId = editor.draft.payload.savedId
+  const [acknowledged, setAcknowledged] = useState<string | null>(null)
+  const confirmResave = !!savedId && savedId !== acknowledged
+  // Each edit goes straight to the device draft; the date belongs to the draft's context and stays fixed.
+  const change = (patch: Partial<WriteUpForm>) => {
+    const next = { ...form, ...patch, date: editor.draft.context.businessDate! }
+    setForm(next)
+    editor.persist(next)
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (!busy) onSave(form)
+    if (!busy && !confirmResave) onSave(form)
   }
 
   return (
     <form onSubmit={submit}>
-      <PaperForm form={form} onChange={patch => setForm(f => ({ ...f, ...patch }))} />
+      {confirmResave && (
+        <div role="alert" className="max-w-[8.5in] mx-auto mb-4 rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950 print:hidden">
+          <p>! {t('formDrafts.alreadySaved')}</p>
+          <button type="button" onClick={() => setAcknowledged(savedId)} className={`${secondary} mt-2 bg-white`}>{t('formDrafts.saveAnother')}</button>
+        </div>
+      )}
+      <PaperForm form={form} onChange={change} lockDate />
       <div className="max-w-[8.5in] mx-auto mt-4 flex items-center justify-end gap-3 print:hidden">
-        <p className="text-sm text-gray-500">Once saved, the form can't be edited. Only its label can.</p>
-        <button type="submit" disabled={busy || !form.employee.trim() || !form.date} className={primary}>
+        <p className="text-sm text-gray-600">Once saved, the form can't be edited. Only its label can.</p>
+        <button type="submit" disabled={busy || confirmResave || !form.employee.trim() || !form.date} className={primary}>
           {busy ? 'Saving…' : 'Save write-up'}
         </button>
       </div>
@@ -351,7 +379,7 @@ function Area({ label, value, rows, onChange }: { label: string; value: string; 
 }
 
 /** Editable when `onChange` is given, otherwise a read-only copy of a saved write-up. */
-function PaperForm({ form, onChange }: { form: WriteUpForm; onChange?: Change }) {
+function PaperForm({ form, onChange, lockDate }: { form: WriteUpForm; onChange?: Change; lockDate?: boolean }) {
   const readOnly = !onChange
   const set = <K extends keyof WriteUpForm>(key: K) => (onChange ? (value: WriteUpForm[K]) => onChange({ [key]: value }) : undefined)
   const toggle = (key: 'violations' | 'actions', id: string) =>
@@ -365,7 +393,7 @@ function PaperForm({ form, onChange }: { form: WriteUpForm; onChange?: Change })
         <Box>
           <label className="flex items-center gap-3 text-base mb-6 print:mb-2">
             DATE
-            <input type="date" required value={form.date} disabled={readOnly} onChange={e => set('date')?.(e.target.value)} className={`${line} w-48`} />
+            <input type="date" required value={form.date} disabled={readOnly || lockDate} onChange={e => set('date')?.(e.target.value)} className={`${line} w-48`} />
           </label>
           <div className="grid grid-cols-2 gap-10 text-base">
             <label className="flex flex-col-reverse gap-1">

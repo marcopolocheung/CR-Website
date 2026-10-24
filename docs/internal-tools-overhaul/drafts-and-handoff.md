@@ -4,7 +4,7 @@
 
 ## Stored contract and context
 
-Version 1 stores ID, optional source ID, task, store, either business date or inclusive period, optional station/shift/record ID, entered preparer label, created/updated UTC time, nullable known server revision and typed JSON payload. Every context dimension is in the encoded key. Unsupported/extra context fields are rejected, so they cannot be silently ignored. Dates are validated without deriving a business day from event time. Legacy cash endpoints have no revision, so the known server revision stays null rather than implying a revision guarantee.
+Version 1 stores ID, optional source ID, task, store, either business date or inclusive period, optional station/shift/record ID, optional form type (form drafts only; FORM-02, appended to the key only when present so earlier keys are unchanged), entered preparer label, created/updated UTC time, nullable known server revision and typed JSON payload. Every context dimension is in the encoded key. Unsupported/extra context fields are rejected, so they cannot be silently ignored. Dates are validated without deriving a business day from event time. Legacy cash endpoints have no revision, so the known server revision stays null rather than implying a revision guarantee.
 
 Names, invalid-but-readable source money strings, original text and numeric zero stay unchanged. Persisted state is language independent. Preparer is an entered label, not an authenticated identity or signature. Cash-out excludes credential-bearing properties and projects only AM/PM cashier names/counts/Toast plus Z input; generic storage also rejects credential-bearing keys, cycles, nonfinite/lossy JSON and unsupported objects. Manager/staff tokens stay in existing in-memory gates.
 
