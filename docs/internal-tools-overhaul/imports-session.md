@@ -6,7 +6,7 @@ The latest instruction is **open the current IMPORT-03 PR and stop**. Do not sta
 
 - IMPORT-01 is merged (#140); its validation and workbook compatibility remain preserved.
 - IMPORT-02 implements extraction review/reconciliation. Canonical acceptance and commands are in [sales-review.md](sales-review.md) and [its brief](tasks/IMPORT-02.md). It is open as [PR #141](https://github.com/marcopolocheung/CR-Website/pull/141), base `main`, implementation commit `7d7bccf`; no merge/auto-merge.
-- IMPORT-03 is locally complete on `feat/overhaul-import-03`, based on and targeting `feat/overhaul-import-02` (#141). Evidence: [retained imports](retained-imports.md). Its actual PR link is recorded after opening. Stop here; no next task is claimed.
+- IMPORT-03 is open as [PR #142](https://github.com/marcopolocheung/CR-Website/pull/142), head `feat/overhaul-import-03`, base `feat/overhaul-import-02` (#141), implementation commit `5500abc`. Evidence: [retained imports](retained-imports.md). It remains unmerged with auto-merge off. Stop here; no next task is claimed.
 - When the user resumes work, implement the date-decision record and affected IMPORT-04/05 work. Identity, retention, history and schedule-comparison prerequisites remain explicit; do not mark all imports complete from only the early frontend tasks.
 
 ## User's date-policy delegation (not a staff observation)
