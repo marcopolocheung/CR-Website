@@ -14,7 +14,7 @@ export default function EmployeeMapping({store,rows,fingerprint,token,preparer,o
  const generation=useRef(0),working=useRef(false),operation=useRef<{content:string;id:string}|null>(null)
  const mapped=useMemo(()=>mapHours(rows,draft,store,fingerprint),[rows,draft,store,fingerprint])
  const options=useMemo(()=>mapped.filter((row,i,list)=>row.key&&list.findIndex(r=>r.key===row.key)===i),[mapped])
- useEffect(()=>{generation.current++;setLoaded(false);setRecord(null);setDraft(emptyDirectory());setStatus('');return()=>{generation.current++}},[store,token]) // credential/context change invalidates authority
+ useEffect(()=>{generation.current++;setBusy(false);setLoaded(false);setRecord(null);setDraft(emptyDirectory());setStatus('');return()=>{generation.current++}},[store,token]) // credential/context change invalidates authority
  async function load(){
   if(working.current||!token)return
   if(loaded&&canonicalJson(draft)!==canonicalJson(record?.data??emptyDirectory())&&!await confirmation.ask({key:'mapping.replace'},true))return

@@ -26,6 +26,7 @@ Use synthetic fixtures and explicit loopback API overrides. No cloud resource cr
 1. DEC-01: [PR #143](https://github.com/marcopolocheung/CR-Website/pull/143), base `feat/overhaul-import-03`, head `feat/overhaul-dec-01`, commit `e88b245`.
 2. IMPORT-04: [PR #144](https://github.com/marcopolocheung/CR-Website/pull/144), base `feat/overhaul-dec-01`, head `feat/overhaul-import-04`, commit `49f7a7e`. Evidence: [sales context](sales-context.md).
 3. IMPORT-05: [PR #146](https://github.com/marcopolocheung/CR-Website/pull/146), base `feat/overhaul-import-04`, head `feat/overhaul-import-05`, commit `2e94519`. Evidence: [hours preview](hours-preview.md).
-4. IMPORT-06 follows `feat/overhaul-import-05`; its scoped DEC-04-IMPORT/DATA-04-IMPORT prerequisites and evidence are in [import identity](import-identity.md). Wider parent work remains pending.
+4. IMPORT-06: [PR #147](https://github.com/marcopolocheung/CR-Website/pull/147), base `feat/overhaul-import-05`, head `feat/overhaul-import-06`, commit `07f15d2`. Scoped prerequisites/evidence: [import identity](import-identity.md); wider parents remain pending.
+5. IMPORT-07 follows `feat/overhaul-import-06`; DEC-03-IMPORT approval and evidence: [import history](import-history.md).
 
 The user approved scoped import defaults on 2026-10-24: managers explicitly review mappings, never match by name, preserve inactive identities, disable hour targets; retain reviewed import values/fingerprints without raw file uploads or automatic deletion. Wider identity, personnel and retention/recovery decisions remain pending. This approval applies only to the import slices and grants no external execution.

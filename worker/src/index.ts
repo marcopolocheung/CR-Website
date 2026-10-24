@@ -1,3 +1,4 @@
+import { historyPage, historyRecord, saveHistory } from './import-history'
 import { directoryRecord, saveDirectory } from './import-directory'
 interface KVNamespace {
   get(key: string): Promise<string | null>
@@ -1073,6 +1074,26 @@ export default {
       }
       if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
       return json({ ok: true }, 200, request, env)
+    }
+
+    const importHistoryMatch = path.match(/^\/api\/internal\/import-history\/(CR2|CR3)(?:\/([A-Za-z0-9_-]{1,128}))?$/)
+    if (importHistoryMatch && (request.method === 'GET' || request.method === 'POST')) {
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (!env.INTERNAL_DB) return json({schemaVersion:1,error:{code:'backend_unconfigured'}},503,request,env,noStore)
+      const store = importHistoryMatch[1] as 'CR2'|'CR3'
+      try {
+        if (request.method === 'GET') {
+          if (importHistoryMatch[2]) return json({record:await historyRecord(env.INTERNAL_DB,store,importHistoryMatch[2])},200,request,env,noStore)
+          const page = await historyPage(env.INTERNAL_DB,store,url.searchParams.get('kind')??'',url.searchParams.get('start')??'',url.searchParams.get('end')??'',url.searchParams.get('cursor')??'')
+          return json(page,200,request,env,noStore)
+        }
+        if (importHistoryMatch[2]) return json({error:'not_found'},404,request,env,noStore)
+        if (!(await checkWriteThrottle(env,clientIp(request)))) return json({error:'rate_limited'},429,request,env)
+        const result = await saveHistory(env.INTERNAL_DB,store,await readBody(request,1000000))
+        return json(result.ok?{record:result.record,replayed:result.replayed}:result.body,result.ok?200:result.status,request,env,noStore)
+      } catch { return json({schemaVersion:1,error:{code:'unavailable'}},503,request,env,noStore) }
     }
 
     const directoryMatch = path.match(/^\/api\/internal\/import-directory\/(CR2|CR3)$/)

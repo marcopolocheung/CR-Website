@@ -17,6 +17,7 @@ import { downloadWorkbookOutput, type WorkbookOutput } from '@/lib/converter/wor
 import { businessDate } from '@/lib/internal-tools/contracts'
 import { importStore, type ImportSnapshot } from '@/lib/converter/import-snapshot'
 import type { DraftContext } from '@/lib/internal-tools/drafts'
+import ImportHistory from './ImportHistory'
 import ImportRecovery from './ImportRecovery'
 import { LOCATIONS } from './SalesConverter'
 
@@ -158,6 +159,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
         {tr('imports.download')}
       </button>
       <button id="hc-next" type="button" disabled={busy} onClick={() => { void startNext() }} className="ml-2 mt-4 min-h-11 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">{tr('importRetention.startNext')}</button>
+      <ImportHistory token={token} context={context} snapshot={snapshot} preparer={preparer} accepted={acknowledged && !mappingBlocked} busy={busy} hasWork={!!rows} onRestore={restoreSnapshot} />
       <ImportRecovery context={context} preparer={preparer} snapshot={snapshot} hasWork={!!(plant || startDate || endDate || preparer || csvFile || rows)} busy={busy} onRestore={restoreSnapshot} onSaved={setDeviceSaved} />
       <p id="hc-status" role="status" className="mt-2 text-sm text-gray-600">{status ? tr(status.key, status.params) : null}</p>
     </div>
