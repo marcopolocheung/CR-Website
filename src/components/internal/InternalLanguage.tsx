@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { Locale } from '@/lib/internal-tools/contracts'
 import { LOCALE_STORAGE_KEY, translate, type TranslationKey } from '@/lib/internal-tools/i18n'
@@ -12,6 +12,17 @@ export function useInternalLanguage() { return useContext(Context) }
 export default function InternalLanguage({ children }: { children: React.ReactNode }) {
   const [locale, setLocale] = useState<Locale>('en')
   const [printing, setPrinting] = useState(false)
+  const shell = useRef<HTMLDivElement>(null)
+  const banner = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const element = banner.current
+    if (!element) return
+    const measure = () => shell.current?.style.setProperty('--internal-banner-height', `${element.offsetHeight}px`)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
   useEffect(() => {
     // Preserve the existing English paper output until DEC-07 approves output language.
     const before = () => flushSync(() => setPrinting(true))
@@ -31,8 +42,8 @@ export default function InternalLanguage({ children }: { children: React.ReactNo
   const value = useMemo<Language>(() => ({ locale: effectiveLocale, t: (key, params) => translate(effectiveLocale, key, params) }), [effectiveLocale])
   return (
     <Context.Provider value={value}>
-      <div lang={effectiveLocale}>
-        <div className="sticky top-0 z-20 border-b border-yellow-300 bg-yellow-100 px-4 py-2 text-yellow-900 print:hidden">
+      <div ref={shell} lang={effectiveLocale}>
+        <div ref={banner} data-internal-banner className="sticky top-0 z-20 border-b border-yellow-300 bg-yellow-100 px-4 py-2 text-yellow-900 print:hidden">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold">{value.t('shell.internal')}</p>
             <div role="group" aria-label={value.t('shell.language')} className="flex gap-1">

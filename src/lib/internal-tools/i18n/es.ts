@@ -1,5 +1,6 @@
 import type en from './en'
 const es: Record<keyof typeof en, string> = {
+  'entry.help': 'Tab / Mayús+Tab recorren los controles. Intro / Mayús+Intro recorren los campos. Intro nunca guarda. Escape cancela una confirmación.',
   "requests.title": "Solicitudes de permiso",
   "requests.waiting": "{count} pendientes",
   "requests.language": "Idioma de las solicitudes",

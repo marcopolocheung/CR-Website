@@ -1,4 +1,5 @@
 const en = {
+  'entry.help': 'Tab / Shift+Tab move through controls. Enter / Shift+Enter move through entry fields. Enter never saves. Escape cancels a confirmation.',
   "requests.title": "Time off requests",
   "requests.waiting": "{count} waiting",
   "requests.language": "Request language",
