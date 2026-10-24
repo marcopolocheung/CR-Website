@@ -28,6 +28,8 @@ const labelClass = 'block text-sm font-medium text-gray-700 mb-1'
 /** Validate Toast source rows before generating the familiar grouped hour log. */
 export default function HoursConverter({token = ''}: {token?: string}) {
   const { t: tr } = useInternalLanguage()
+  const [mappingDirty,setMappingDirty] = useState(false)
+  const contextChoice = useRef(0)
   const [fingerprint,setFingerprint] = useState('')
   const [mapping,setMapping] = useState<{revision:number;directory:ImportDirectory}|null>(null)
   const [plant, setPlant] = useState('')
@@ -53,7 +55,18 @@ export default function HoursConverter({token = ''}: {token?: string}) {
   function invalidateOutput() { exportVersion.current++; setAcknowledged(false); setOutput(null); setDeviceSaved(false); setStatus(null) }
   useNavigationProtection({ dirty: !!(plant || startDate || endDate || preparer || csvFile), deviceSaved })
 
+  async function changeContext(field:'plant'|'start'|'end',value:string) {
+    const choice = ++contextChoice.current
+    if (mappingDirty && !await confirmation.ask({key:'mapping.contextWarning'},true)) return
+    if (choice !== contextChoice.current) return
+    invalidateOutput(); setMappingDirty(false)
+    if (field === 'plant') { setMapping(null); setPlant(value) }
+    else if (field === 'start') setStartDate(value)
+    else setEndDate(value)
+  }
+
   async function selectFile(file: File) {
+    contextChoice.current++
     invalidateOutput(); setRows(null); setFingerprint(''); setMapping(null); setResumed(false); setSourceName(file.name)
     const version = ++generation.current
     setCsvFile(file)
@@ -107,6 +120,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
   }, [plant, startDate, endDate])
   const snapshot = useMemo<ImportSnapshot | null>(() => rows && context ? { version: 1, kind: 'hours', sourceName, rows, metadata: { location: plant, startDate, endDate, preparer, ...(fingerprint ? {fingerprint} : {}), ...(mapping ? {mapping} : {}) }, output } : null, [rows, context, sourceName, plant, startDate, endDate, preparer, output, fingerprint, mapping])
   function restoreSnapshot(snapshot: ImportSnapshot) {
+    contextChoice.current++
     if (snapshot.kind !== 'hours') return
     generation.current++; setDeviceSaved(false); setAcknowledged(false)
     setPlant(snapshot.metadata.location); setStartDate(snapshot.metadata.startDate); setEndDate(snapshot.metadata.endDate); setPreparer(snapshot.metadata.preparer)
@@ -115,7 +129,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
   }
   async function startNext() {
     if (busy || (plant || startDate || endDate || preparer || csvFile || rows) && !await confirmation.ask({ key: 'importRetention.startWarning' }, true)) return
-    generation.current++; invalidateOutput(); setRows(null); setFingerprint(''); setMapping(null); setSourceName(''); setPreparer(''); setPlant(''); setStartDate(''); setEndDate(''); setCsvFile(null)
+    contextChoice.current++; generation.current++; invalidateOutput(); setRows(null); setFingerprint(''); setMapping(null); setSourceName(''); setPreparer(''); setPlant(''); setStartDate(''); setEndDate(''); setCsvFile(null)
     setValidation(UNCHECKED); setIssues([]); setResumed(false); setFileReset(value => value + 1); setTimeout(() => focusField('hc-location'), 0)
   }
 
@@ -127,7 +141,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
       <fieldset disabled={busy} className="min-w-0 space-y-4">
         <div>
           <label htmlFor="hc-location" className={labelClass}>{tr('imports.location')}</label>
-          <select id="hc-location" aria-invalid={issues.some(issue => issue.fieldId === 'hc-location') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-location') ? 'hc-location-summary-error' : undefined} value={plant} onChange={e => { invalidateOutput(); setMapping(null); setPlant(e.target.value) }} className={inputClass}>
+          <select id="hc-location" aria-invalid={issues.some(issue => issue.fieldId === 'hc-location') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-location') ? 'hc-location-summary-error' : undefined} value={plant} onChange={e => { void changeContext('plant',e.target.value) }} className={inputClass}>
             <option value="">{tr('imports.selectLocation')}</option>
             {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
@@ -135,22 +149,22 @@ export default function HoursConverter({token = ''}: {token?: string}) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="hc-start" className={labelClass}>{tr('imports.startDate')}</label>
-            <input id="hc-start" aria-invalid={issues.some(issue => issue.fieldId === 'hc-start') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-start') ? 'hc-start-summary-error' : undefined} type="date" value={startDate} onChange={e => { invalidateOutput(); setStartDate(e.target.value) }} className={inputClass} />
+            <input id="hc-start" aria-invalid={issues.some(issue => issue.fieldId === 'hc-start') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-start') ? 'hc-start-summary-error' : undefined} type="date" value={startDate} onChange={e => { void changeContext('start',e.target.value) }} className={inputClass} />
           </div>
           <div>
             <label htmlFor="hc-end" className={labelClass}>{tr('imports.endDate')}</label>
-            <input id="hc-end" aria-invalid={issues.some(issue => issue.fieldId === 'hc-end') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-end') ? 'hc-end-summary-error' : undefined} type="date" value={endDate} onChange={e => { invalidateOutput(); setEndDate(e.target.value) }} className={inputClass} />
+            <input id="hc-end" aria-invalid={issues.some(issue => issue.fieldId === 'hc-end') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-end') ? 'hc-end-summary-error' : undefined} type="date" value={endDate} onChange={e => { void changeContext('end',e.target.value) }} className={inputClass} />
           </div>
         </div>
         <div><label htmlFor="hc-preparer" className={labelClass}>{tr('importRetention.preparer')}</label>
           <input id="hc-preparer" value={preparer} maxLength={120} onChange={e => { setDeviceSaved(false); setPreparer(e.target.value) }} className={inputClass} /></div>
         <SourceFileInput key={fileReset} id="hc-file" label="imports.hoursCsv" accept=".csv" file={csvFile} validation={validation}
-          beforeReplace={() => csvFile || rows ? confirmation.ask({ key: 'importRetention.replaceWarning' }, true) : Promise.resolve(true)}
+          beforeReplace={() => csvFile || rows ? confirmation.ask({ key: mappingDirty ? 'mapping.contextWarning' : 'importRetention.replaceWarning' }, true) : Promise.resolve(true)}
           onFile={file => { void selectFile(file) }} />
       </fieldset>
       {resumed && <p className="mt-3 break-words text-sm text-gray-700">{tr('importRetention.resumed')} {sourceName}</p>}
       {preview && <fieldset disabled={busy} className="min-w-0"><HoursReview review={preview} identities={identities} mappingBlocked={mappingBlocked} acknowledged={acknowledged} onAcknowledge={setAcknowledged} /></fieldset>}
-      {rows && context && <fieldset disabled={busy} className="min-w-0"><EmployeeMapping key={`${plant}:${startDate}:${endDate}:${fingerprint}`} store={context.storeId} rows={rows} fingerprint={fingerprint} token={token} preparer={preparer} onRecord={acceptDirectory} /></fieldset>}
+      {rows && context && <fieldset disabled={busy} className="min-w-0"><EmployeeMapping key={`${plant}:${startDate}:${endDate}:${fingerprint}`} store={context.storeId} rows={rows} fingerprint={fingerprint} token={token} preparer={preparer} onRecord={acceptDirectory} onDirty={setMappingDirty} /></fieldset>}
       <button id="hc-download" type="button"
         onClick={handleConvertAndDownload}
         disabled={!preview || !acknowledged || !preview.validPeriod || mappingBlocked || !preview.included.length || validation.checking || busy}

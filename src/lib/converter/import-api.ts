@@ -1,3 +1,4 @@
+import { validPublicationPage, type PublicationPage } from './published-hours'
 import { validHistoryData, snapshotPeriod, type HistoryData } from './import-history'
 import { requestJson } from '../cashout-store'
 import { validDirectory, type ImportDirectory } from './employee-mapping'
@@ -40,4 +41,11 @@ export async function putHistory(store:StoreId,token:string,id:string,data:Histo
  const saved=(body as {record?:ImportHistoryRecord}|null)?.record
  if(!saved||saved.storeId!==store||!validHistoryData(saved.data,store))throw new ImportApiError('invalid')
  return saved
+}
+
+export async function getPublishedHours(store:StoreId,start:string,end:string,token:string):Promise<PublicationPage>{
+ const {status,body}=await requestJson(`/api/internal/import-schedules/${store}?${new URLSearchParams({start,end})}`,token)
+ if(status!==200)throw importFailure(status)
+ if(!validPublicationPage(body,store,start,end))throw new ImportApiError('invalid')
+ return body
 }

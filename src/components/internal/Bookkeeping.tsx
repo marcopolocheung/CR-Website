@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import CashOut from './CashOut'
 import { useInternalLanguage } from './InternalLanguage'
 import SalesConverter from './SalesConverter'
+import ScheduledActualReport from './ScheduledActualReport'
 import HoursConverter from './HoursConverter'
 import { fetchCashoutSnapshot } from '@/lib/cashout-store'
 import { importStore } from '@/lib/converter/import-snapshot'
@@ -12,6 +13,7 @@ const TABS = [
   { id: 'cash-out', label: 'cash.title' },
   { id: 'sales', label: 'bookkeeping.sales' },
   { id: 'hours', label: 'bookkeeping.hours' },
+  { id: 'comparison', label: 'comparison.title' },
 ] as const
 type TabId = (typeof TABS)[number]['id']
 
@@ -77,6 +79,7 @@ export default function Bookkeeping() {
       <div role="tabpanel" id="panel-sales" aria-labelledby="tab-sales" hidden={tab !== 'sales'}>
         <SalesConverter token={token} loadCashout={token ? loadCashout : null} />
       </div>
+      <div role="tabpanel" id="panel-comparison" aria-labelledby="tab-comparison" hidden={tab !== 'comparison'}><ScheduledActualReport token={token} /></div>
       <div role="tabpanel" id="panel-hours" aria-labelledby="tab-hours" hidden={tab !== 'hours'}>
         <HoursConverter token={token} />
       </div>
