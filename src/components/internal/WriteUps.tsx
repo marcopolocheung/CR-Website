@@ -279,8 +279,12 @@ function Area({ label, value, rows, onChange }: { label: string; value: string; 
         maxLength={3000}
         disabled={!onChange}
         onChange={e => onChange?.(e.target.value)}
-        className="w-full resize-none bg-transparent font-normal text-base leading-10 print:leading-7 focus:outline-none focus:bg-yellow-50 disabled:text-black"
+        className="w-full resize-none bg-transparent font-normal text-base leading-10 focus:outline-none focus:bg-yellow-50 disabled:text-black print:hidden"
       />
+      {/* A textarea prints only its visible rows, so paper gets the full text instead. */}
+      <p data-print-text className="hidden whitespace-pre-wrap break-words font-normal text-base leading-7 print:block" style={{ minHeight: `${rows * 1.75}rem` }}>
+        {value}
+      </p>
     </Box>
   )
 }
