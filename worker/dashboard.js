@@ -9,7 +9,9 @@ const MAX_BODY_CHARS = 20000;
 const CASHOUT_TTL_SECONDS = 31 * 86400;
 const CASHOUT_HISTORY_DAYS = 30;
 const CASHOUT_STORES = ['CR3', 'CR2'];
-const CASHOUT_DENOMINATIONS = 11;
+// Mirrors src/lib/cashout.ts (dashboard.js cannot import it); index.test.ts checks they agree.
+const CASHOUT_FLOAT_CENTS = 10000;
+const CASHOUT_DENOMINATION_CENTS = [10000, 5000, 2000, 1000, 500, 100, 50, 25, 10, 5, 1];
 const MAX_CASHIERS_PER_SHIFT = 20;
 const MONEY_INPUT_RE = /^-?\d{0,7}(\.\d{0,2})?$/;
 const DOC_TTL_SECONDS = 31536000;
@@ -596,38 +598,53 @@ function validateCashier(raw) {
         return null;
     if (typeof c.toast !== 'string' || !MONEY_INPUT_RE.test(c.toast))
         return null;
-    if (!Array.isArray(c.counts) || c.counts.length !== CASHOUT_DENOMINATIONS)
+    if (!Array.isArray(c.counts) || c.counts.length !== CASHOUT_DENOMINATION_CENTS.length)
         return null;
     if (!c.counts.every((n) => Number.isInteger(n) && n >= 0 && n <= 100000))
         return null;
     return { name: c.name, counts: c.counts, toast: c.toast };
 }
-const isCents = (n) => Number.isInteger(n) && Math.abs(n) < 1e10;
-/** Totals are computed by the cash-out page; the Worker only checks their shape. */
+const moneyCents = (text) => {
+    const n = parseFloat(text);
+    return Number.isFinite(n) ? Math.round(n * 100) : 0;
+};
+const addOrNull = (a, b) => (a === null || b === null ? null : a + b);
+function shiftCashoutTotals(cashiers) {
+    return cashiers.reduce((t, c) => {
+        const turnIn = c.counts.reduce((sum, n, i) => sum + CASHOUT_DENOMINATION_CENTS[i] * n, 0) - CASHOUT_FLOAT_CENTS;
+        const overShort = c.toast.trim() === '' ? null : turnIn - moneyCents(c.toast);
+        return { deposit: t.deposit + turnIn, overShort: addOrNull(t.overShort, overShort) };
+    }, { deposit: 0, overShort: 0 });
+}
+/** Notebook totals from the sheet alone: $100 kept per drawer, blank Toast/Z leaves that difference null. */
+export function cashoutTotals(sheet) {
+    const am = shiftCashoutTotals(sheet.am);
+    const pm = shiftCashoutTotals(sheet.pm);
+    const deposit = am.deposit + pm.deposit;
+    return {
+        amDeposit: am.deposit,
+        pmDeposit: pm.deposit,
+        amOverShort: am.overShort,
+        pmOverShort: pm.overShort,
+        deposit,
+        overShort: addOrNull(am.overShort, pm.overShort),
+        zOverShort: sheet.zReport.trim() === '' ? null : deposit - moneyCents(sheet.zReport),
+    };
+}
+/** Validates the sheet and recomputes totals; any client-sent `totals` (older pages always send them) is ignored. */
 export function validateCashoutBody(raw) {
     if (!raw || typeof raw !== 'object')
         return null;
-    const body = raw;
-    const sheet = body.sheet;
-    const totals = body.totals;
-    if (!sheet || !totals)
+    const sheet = raw.sheet;
+    if (!sheet || typeof sheet !== 'object')
         return null;
     if (typeof sheet.zReport !== 'string' || !MONEY_INPUT_RE.test(sheet.zReport))
         return null;
     const shifts = [sheet.am, sheet.pm].map((shift) => Array.isArray(shift) && shift.length <= MAX_CASHIERS_PER_SHIFT ? shift.map(validateCashier) : null);
     if (shifts.some((shift) => !shift || shift.some((c) => !c)))
         return null;
-    const deposits = ['amDeposit', 'pmDeposit', 'deposit'];
-    // Over/short is null while its Toast or Z figure is still blank.
-    const overShorts = ['amOverShort', 'pmOverShort', 'overShort', 'zOverShort'];
-    if (!deposits.every((k) => isCents(totals[k])))
-        return null;
-    if (!overShorts.every((k) => totals[k] === null || isCents(totals[k])))
-        return null;
-    return {
-        sheet: { am: shifts[0], pm: shifts[1], zReport: sheet.zReport },
-        totals: Object.fromEntries([...deposits, ...overShorts].map((k) => [k, totals[k]])),
-    };
+    const valid = { am: shifts[0], pm: shifts[1], zReport: sheet.zReport };
+    return { sheet: valid, totals: cashoutTotals(valid) };
 }
 function cashoutKey(store, date) {
     return `cashout:${store}:${date}`;

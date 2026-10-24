@@ -36,7 +36,7 @@ Day example: AM drawer $300 / Toast $199.75 and PM drawer $100 / Toast $0 produc
 | Task | Current disposition |
 | --- | --- |
 | CASH-01 / CASH-02 | Existing local draft safety and guided entry remain complete. |
-| CASH-03 | Ready for future implementation: verify/recalculate the same notebook arithmetic on the server, with fixed $100 and existing source fields. No adjustment or workflow-policy gate remains. This PR does not implement it. |
+| CASH-03 | Implemented locally: the Worker recalculates the same notebook arithmetic with fixed $100 and ignores client totals. Deployment pending. |
 | CASH-04 | Deferred: incomplete/submitted/reviewed business workflow is outside the current purpose. |
 | CASH-05 | Deferred: mandatory discrepancy explanations/review resolutions are outside the current purpose. Technical save/revision history remains DATA-05/CASH-08 work. |
 | CASH-06 | Deferred: a separate actual bank deposit or cash-delivery record is outside the current purpose. |

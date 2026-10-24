@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import handler, {
   cashoutHistoryDates,
+  cashoutTotals,
   goldenMonthsForWeek,
   goldenWeeksForMonth,
   isValidId,
@@ -21,6 +22,7 @@ import handler, {
   validateInventoryListBody,
   validateWriteUpForm,
 } from './index'
+import { DENOMINATIONS, dayTotals } from '../../src/lib/cashout'
 
 function mockEnv(token = 'manager-token', staffPassword?: string) {
   const data = new Map<string, string>()
@@ -996,11 +998,64 @@ test('cash-out bodies are strictly validated', () => {
   const bad = (patch: (b: typeof cashoutBody) => unknown) => validateCashoutBody(patch(structuredClone(cashoutBody)))
   assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, am: [{ ...cashier, counts: [1, 2] }] } })), null)
   assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, am: [{ ...cashier, counts: cashier.counts.map(() => -1) }] } })), null)
+  assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, am: [{ ...cashier, counts: cashier.counts.map(() => 1.5) }] } })), null)
+  assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, am: [{ ...cashier, counts: cashier.counts.map(() => null) }] } })), null)
+  assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, am: [{ ...cashier, counts: cashier.counts.map(() => 100001) }] } })), null)
   assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, zReport: '1e9' } })), null)
-  assert.equal(bad((b) => ({ ...b, totals: { ...b.totals, deposit: 1.5 } })), null)
-  assert.equal(bad((b) => ({ ...b, totals: { ...b.totals, deposit: null } })), null)
-  assert.ok(bad((b) => ({ ...b, totals: { ...b.totals, pmOverShort: null, overShort: null } })))
+  assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, zReport: '1.005' } })), null)
   assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, pm: Array(21).fill(cashier) } })), null)
+  assert.equal(bad(() => ({})), null)
+})
+
+test('cash-out totals are recalculated on the server, ignoring what the client sent', () => {
+  const expected = { amDeposit: 51250, pmDeposit: 0, amOverShort: -750, pmOverShort: 0, deposit: 51250, overShort: -750, zOverShort: null }
+  // Older pages always send totals; tampered, malformed or missing totals all give the same stored result.
+  for (const totals of [cashoutBody.totals, { ...cashoutBody.totals, deposit: 99999999, overShort: 0 }, { deposit: 1.5 }, 'x', undefined]) {
+    assert.deepEqual(validateCashoutBody({ ...cashoutBody, totals })?.totals, expected)
+  }
+})
+
+test('cash-out PUT stores server totals even when the client tampers', async () => {
+  const env = mockEnv()
+  const tampered = { ...cashoutBody, totals: { ...cashoutBody.totals, deposit: 1, amDeposit: 1, overShort: 0 } }
+  assert.equal((await handler.fetch(authed('PUT', '/api/cashout/CR3/2026-10-10', tampered), env)).status, 200)
+  const day = await (await handler.fetch(authed('GET', '/api/cashout/CR3/2026-10-10'), env)).json()
+  assert.equal(day.totals.deposit, 51250)
+  assert.equal(day.totals.overShort, -750)
+})
+
+test('server cash-out totals match the browser on the DEC-02 notebook examples', () => {
+  const drawer = (cents: number) => {
+    const counts = DENOMINATIONS.map(() => 0)
+    for (const [i, d] of DENOMINATIONS.entries()) { counts[i] = Math.floor(cents / d); cents %= d }
+    return counts
+  }
+  const c = (drawerCents: number, toast: string) => ({ name: 'X', counts: drawer(drawerCents), toast })
+  const sheets = [
+    { am: [c(30000, '200')], pm: [], zReport: '' }, // balanced
+    { am: [c(30000, '199.75')], pm: [], zReport: '' }, // over $0.25
+    { am: [c(30000, '205')], pm: [], zReport: '' }, // short $5
+    { am: [c(10000, '0')], pm: [], zReport: '' }, // float only, explicit zero Toast
+    { am: [c(30000, '')], pm: [], zReport: '' }, // Toast blank -> null
+    { am: [c(30000, '0')], pm: [], zReport: '0' }, // explicit zero Toast and Z
+    { am: [c(30000, '199.75')], pm: [c(10000, '0')], zReport: '200' }, // day example
+    { am: [c(30000, '199.75')], pm: [c(10000, '0')], zReport: '' }, // blank Z -> null
+    { am: [c(30000, '200'), c(30000, '200')], pm: [], zReport: '400' }, // $100 kept per drawer
+    { am: [c(5000, '')], pm: [], zReport: '' }, // under-float drawer goes negative
+    { am: [c(12345, '0.29'), c(6789, '-1.15')], pm: [c(100, '.5'), c(0, '-')], zReport: '0.1' }, // rounding edges
+    { am: [], pm: [], zReport: '' },
+  ]
+  for (const sheet of sheets) {
+    assert.deepEqual(cashoutTotals(sheet), dayTotals(sheet.am, sheet.pm, sheet.zReport), JSON.stringify(sheet))
+  }
+  assert.deepEqual(cashoutTotals(sheets[6]), {
+    amDeposit: 20000, pmDeposit: 0, amOverShort: 25, pmOverShort: 0, deposit: 20000, overShort: 25, zOverShort: 0,
+  })
+  assert.equal(cashoutTotals(sheets[4]).amOverShort, null)
+  assert.equal(cashoutTotals(sheets[5]).amOverShort, 20000)
+  assert.equal(cashoutTotals(sheets[7]).zOverShort, null)
+  assert.equal(cashoutTotals(sheets[8]).deposit, 40000)
+  assert.equal(cashoutTotals(sheets[9]).amDeposit, -5000)
 })
 
 test('cash-out history spans 30 days, newest first, across a month edge', () => {

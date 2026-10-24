@@ -1,6 +1,6 @@
 # Internal-tools task tracker
 
-Cash scope: [DEC-02 is approved](cashout-rules.md) for a bookkeeping notebook with a fixed $100 per drawer. CASH-03 is ready; CASH-04/05/06 operational workflows are deferred. CASH-08 ordinary saves/history uses DATA-05 and is independent of those deferred workflows.
+Cash scope: [DEC-02 is approved](cashout-rules.md) for a bookkeeping notebook with a fixed $100 per drawer. CASH-03 is implemented locally (server recalculation, awaiting deploy); CASH-04/05/06 operational workflows are deferred. CASH-08 ordinary saves/history uses DATA-05 and is independent of those deferred workflows.
 
 Individual briefs are canonical. Update the brief and this summary together when claiming, changing a gate, or handing off. Current implementation and evidence are recorded in the canonical briefs; external/live work remains separately gated. P0 establishes safety/compatibility or early workflow foundations; P1 completes core workflows; P2 follows core adoption. Priority is not a dependency.
 
@@ -39,7 +39,7 @@ This view includes ready, planned, and decision-blocked baseline CODE_AND_EXTERN
 | SCH-02 | Add manager-entered requests and review | P1 | `CODE_AND_EXTERNAL` | SCH-01, UX-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [SCH-02](tasks/SCH-02.md) |
 | SCH-04 | Add publication revisions and readable comparisons | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [SCH-04](tasks/SCH-04.md) |
 | SCH-05 | Detect cross-station assignment conflicts | P1 | `CODE_AND_EXTERNAL` | DATA-04, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [SCH-05](tasks/SCH-05.md) |
-| CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | ready | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
+| CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | implemented | Claude | D/D/P/P | [CASH-03](tasks/CASH-03.md) |
 | CASH-08 | Improve history, filters, output, and recovery | P1 | `CODE_AND_EXTERNAL` | DATA-05, UX-07, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-08](tasks/CASH-08.md) |
 | INV-01 | Add explicit count sessions and line states | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [INV-01](tasks/INV-01.md) |
 | INV-03 | Add units, packs, and clear target labels | P1 | `CODE_AND_EXTERNAL` | DATA-02, DEC-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [INV-03](tasks/INV-03.md) |
@@ -158,7 +158,7 @@ This table is the complete ownership/status index, including ready decisions, pl
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
 | CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | UX-05 | — | complete | Codex | D/D/NA/NA | [CASH-01](tasks/CASH-01.md) |
 | CASH-02 | Add guided cashier entry | P0 | `CODE_ONLY` | UX-03, UX-04 | — | complete | Codex | D/D/NA/NA | [CASH-02](tasks/CASH-02.md) |
-| CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | ready | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
+| CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | implemented | Claude | D/D/P/P | [CASH-03](tasks/CASH-03.md) |
 | CASH-04 | Add incomplete, submitted, and reviewed states | P0 | `CODE_AND_EXTERNAL` | CASH-03, DATA-05, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | deferred | unassigned | P/P/P/P | [CASH-04](tasks/CASH-04.md) |
 | CASH-05 | Add discrepancy explanations and correction history | P1 | `CODE_AND_EXTERNAL` | CASH-04 | DATA-03, REL-03, DATA-09, REL-04 | deferred | unassigned | P/P/P/P | [CASH-05](tasks/CASH-05.md) |
 | CASH-06 | Record actual versus expected deposits | P1 | `CODE_AND_EXTERNAL` | CASH-04, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | deferred | unassigned | P/P/P/P | [CASH-06](tasks/CASH-06.md) |
