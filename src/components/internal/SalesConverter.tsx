@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigationProtection } from './NavigationProtection'
 import { useInternalLanguage } from './InternalLanguage'
 import { ErrorSummary, focusField, type FieldIssue } from './Feedback'
 import { errorKey, type Message, type TranslationKey } from '@/lib/internal-tools/i18n'
-import * as XLSX from 'xlsx'
+import { readSalesFile, sourceNumber, SourceValidationError } from '@/lib/converter/validation'
+import SourceFileInput, { UNCHECKED, type FileValidation } from './SourceFileInput'
 import { extractMetrics } from '@/lib/converter/parseToast'
 import { downloadFilledWorkbook } from '@/lib/converter/fillTemplate'
 import type { CashoutTotals } from '@/lib/cashout-store'
@@ -38,6 +39,10 @@ export default function SalesConverter({
   const { t: tr } = useInternalLanguage()
   const [form, setForm] = useState(EMPTY_FORM)
   const [files, setFiles] = useState<FileMap>({ general: null, lunch: null, dinner: null })
+  const [validation, setValidation] = useState<Record<FileKey, FileValidation>>({ general: UNCHECKED, lunch: UNCHECKED, dinner: UNCHECKED })
+  const generation = useRef({ general: 0, lunch: 0, dinner: 0 })
+  const converting = useRef(false)
+  const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<Message | null>(null)
   const [issues, setIssues] = useState<FieldIssue[]>([])
   useNavigationProtection({ dirty: Object.values(form).some(Boolean) || Object.values(files).some(Boolean), deviceSaved: false })
@@ -69,30 +74,44 @@ export default function SalesConverter({
     }
   }
 
-  async function handleConvert() {
-    if (!files.general || !files.lunch || !files.dinner)
-      return alert(tr('imports.uploadAll'))
-
-    try {
-      const [generalWb, lunchWb, dinnerWb] = await Promise.all(
-        [files.general, files.lunch, files.dinner].map(file =>
-          file.arrayBuffer().then(buf => XLSX.read(buf, { type: 'array' })),
-        ),
-      )
-
-      const cellMap = extractMetrics({ generalWb, lunchWb, dinnerWb })
-      await downloadFilledWorkbook(cellMap, form)
-
-      setFiles({ general: null, lunch: null, dinner: null })
-      setForm(EMPTY_FORM)
-      setStatus(null)
-    } catch (err) {
-      console.error(err)
-      alert(tr('imports.failed'))
-    }
+  async function selectFile(key: FileKey, file: File) {
+    const version = ++generation.current[key]
+    setFiles(current => ({ ...current, [key]: file }))
+    setStatus(null)
+    setValidation(current => ({ ...current, [key]: { ...UNCHECKED, checking: true } }))
+    const result = await readSalesFile(file, key)
+    if (generation.current[key] !== version) return
+    setValidation(current => ({ ...current, [key]: { checking: false, valid: !!result.value, issues: result.issues } }))
   }
 
-  const ready = files.general && files.lunch && files.dinner
+  async function handleConvert() {
+    if (converting.current || !files.general || !files.lunch || !files.dinner) return
+    const invalid: FieldIssue[] = []
+    for (const name of ['amDeposit', 'pmDeposit', 'amOverShort', 'pmOverShort'] as const) {
+      if (form[name].trim() && sourceNumber(form[name]) === null) invalid.push({ fieldId: `sc-${name}`, message: { key: name.endsWith('Deposit') ? 'importValidation.manualDeposit' : 'importValidation.manualDifference', params: { shift: name.startsWith('am') ? 'AM' : 'PM' } } })
+    }
+    setIssues(invalid)
+    if (invalid.length) { setStatus(null); focusField(invalid[0].fieldId); return }
+    converting.current = true
+    setBusy(true)
+    setStatus({ key: 'imports.parsing' })
+    try {
+      const keys = ['general', 'lunch', 'dinner'] as const
+      const results = await Promise.all(keys.map(key => readSalesFile(files[key]!, key)))
+      setValidation(Object.fromEntries(keys.map((key, i) => [key, { checking: false, valid: !!results[i].value, issues: results[i].issues }])) as Record<FileKey, FileValidation>)
+      const firstBad = results.findIndex(result => !result.value)
+      if (firstBad !== -1) { setStatus({ key: 'importValidation.blocked' }); focusField(`sc-file-${keys[firstBad]}`); return }
+      const cellMap = extractMetrics({ generalWb: results[0].value!, lunchWb: results[1].value!, dinnerWb: results[2].value! })
+      const outputForm = { ...form }
+      for (const name of ['amDeposit', 'pmDeposit', 'amOverShort', 'pmOverShort'] as const) outputForm[name] = form[name].trim() ? String(sourceNumber(form[name])) : ''
+      await downloadFilledWorkbook(cellMap, outputForm)
+      setStatus({ key: 'imports.downloaded' })
+    } catch (err) {
+      setStatus({ key: err instanceof SourceValidationError ? 'importValidation.blocked' : 'importValidation.exportFailed' })
+    } finally { converting.current = false; setBusy(false) }
+  }
+
+  const ready = Object.values(validation).every(value => value.valid && !value.checking)
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 max-w-3xl">
@@ -102,6 +121,7 @@ export default function SalesConverter({
       </p>
 
       <ErrorSummary issues={issues} />
+      <fieldset disabled={busy} className="min-w-0">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label htmlFor="sc-first" className={labelClass}>{tr('imports.firstName')}</label>
@@ -133,19 +153,8 @@ export default function SalesConverter({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
         {(['general', 'lunch', 'dinner'] as FileKey[]).map(key => (
-          <div key={key}>
-            <label htmlFor={`sc-file-${key}`} className={labelClass}>{tr(`imports.${key}`)}</label>
-            <input
-              id={`sc-file-${key}`}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={e => {
-                const file = e.target.files?.[0]
-                if (file) setFiles(f => ({ ...f, [key]: file }))
-              }}
-              className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-gray-200"
-            />
-          </div>
+          <SourceFileInput key={key} id={`sc-file-${key}`} label={`imports.${key}`} accept=".xlsx,.xls,.csv"
+            file={files[key]} validation={validation[key]} disabled={busy} onFile={file => { void selectFile(key, file) }} />
         ))}
       </div>
 
@@ -154,6 +163,7 @@ export default function SalesConverter({
         {loadCashout ? (
           <button
             type="button"
+            disabled={busy}
             onClick={fillFromCashout}
             className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
           >
@@ -172,16 +182,17 @@ export default function SalesConverter({
         ] as const).map(([name, label]) => (
           <div key={name}>
             <label htmlFor={`sc-${name}`} className={labelClass}>{label}</label>
-            <input id={`sc-${name}`} name={name} inputMode="decimal" value={form[name]} onChange={handleInput} className={inputClass} />
+            <input id={`sc-${name}`} aria-invalid={issues.some(issue => issue.fieldId === `sc-${name}`) || undefined} aria-describedby={issues.some(issue => issue.fieldId === `sc-${name}`) ? `sc-${name}-summary-error` : undefined} name={name} inputMode="decimal" value={form[name]} onChange={handleInput} className={inputClass} />
           </div>
         ))}
       </div>
+      </fieldset>
       <p role="status" className="mt-2 text-sm text-gray-700 min-h-5">{status ? tr(status.key, status.params) : null}</p>
 
       <button
         onClick={handleConvert}
-        disabled={!ready}
-        className="mt-4 px-6 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={!ready || busy}
+        className="mt-4 min-h-11 px-6 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {tr('imports.download')}
       </button>
