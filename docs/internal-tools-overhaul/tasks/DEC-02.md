@@ -65,6 +65,8 @@ DEC-03 retention and DEC-07 terminology/output decisions remain separate. This d
 
 ## Handoff evidence
 
+- Delivery: decision commit `4e012fc`, PR [#150](https://github.com/marcopolocheung/CR-Website/pull/150) against `feat/overhaul-cash-02` / #148. Open and non-draft; no merge or auto-merge enabled.
+
 - Owner/worktree: Codex, `docs/overhaul-dec-02`, same `/home/wslunusn/CR-Website-cashout` worktree used for UX-04/CASH-02; base is `feat/overhaul-cash-02` / PR #148.
 - Artifacts: cashout-rules.md, affected task briefs/tracker and cash-related planning references. Application/schema/API/retention/access code is untouched.
 - Decision is complete; implementation milestones of CASH-03/08 and deferred tasks remain pending. No downstream task is claimed and no PR is merged.
