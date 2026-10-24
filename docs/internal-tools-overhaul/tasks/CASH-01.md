@@ -4,12 +4,12 @@ parent: CASH
 title: "Correct store/date-specific draft restoration"
 priority: P0
 delivery_class: CODE_ONLY
-status: ready
-owner: unassigned
-implementation_dependencies: []
+status: complete
+owner: Codex
+implementation_dependencies: [UX-05]
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
@@ -39,7 +39,7 @@ See [current-state inventory](../current-state.md) and [supporting research](../
 
 **Needed to implement:**
 
-None. This task can be claimed independently within the stated scope.
+This implementation reuses [UX-05](UX-05.md) at `implemented` (or `complete`), already locally verified in PR #137. The original brief was independently implementable; reuse records the actual shared draft API dependency and adds no business-policy gate.
 
 **Needed to activate:**
 
@@ -51,25 +51,25 @@ Affected areas: src/components/internal/CashOut.tsx; src/lib/cashout.ts; src/lib
 
 ## Implementation checklist
 
-- [ ] Treat the unscoped legacy draft as unassigned until the user chooses its context
-- [ ] Test CR2 and CR3 with two dates, reloads, and rapid switches
-- [ ] Guard late fetch responses and storage denial without silently clearing entries
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Treat the unscoped legacy draft as unassigned until the user chooses its context
+- [x] Test CR2 and CR3 with two dates, reloads, and rapid switches
+- [x] Guard late fetch responses and storage denial without silently clearing entries
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Treat the unscoped legacy draft as unassigned until the user chooses its context. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Test CR2 and CR3 with two dates, reloads, and rapid switches. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Guard late fetch responses and storage denial without silently clearing entries. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Treat the unscoped legacy draft as unassigned until the user chooses its context. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Test CR2 and CR3 with two dates, reloads, and rapid switches. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Guard late fetch responses and storage denial without silently clearing entries. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
@@ -88,16 +88,18 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
 | Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: None established; verify access/context before work.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts: [context/restoration guide](../cashout-context.md), legacy reader/tests, explicit assignment in cash-out workspace, chooser context snapshot guards, mounted-editor response guards, parity-tested keys and `scripts/test-cashout-context.py`. This implementation reuses locally complete UX-05 (#137); that actual API dependency is reflected in metadata/tracker.
+- Scenario 1: the original raw sheet remains unassigned until exact store/date/preparer confirmation. Keyboard cancellation created no draft; Spanish touch confirmation copied exact AM/PM names/counts/Toast/Z to selected CR2/2026-10-20. Original bytes remain untouched; no backend PUT occurred. Malformed sources remain downloadable without coercion. Changed source bytes are rechecked around confirmation rather than blindly applying an obsolete view.
+- Scenario 2: actual local browser wrote and reloaded all four CR2/CR3 × 2026-10-20/2026-10-21 contexts, restoring each name/count/Toast/Z value through explicit resume. Twelve rapid selections showed only the final context's rows. Active context cannot be reassigned; new contexts start empty unless a source is explicitly chosen.
+- Scenario 3: held old-editor 200 load did not open a dialog or replace the new draft; held 401 did not lock the new editor. Denied writes retained current values and blocked context teardown. Malformed original download preserved raw text. Original unscoped key was never changed by application code.
+- Checks (isolated local worktree, 2026-10-24): `npm run cashout:test`, 16/16 pass; contracts/dictionaries/drafts 15/15 pass; CASH-01 Python Playwright PASS and all three prior language/feedback/draft browser regressions PASS. Explicit loopback API override/synthetic requests only; production requests rejected. `npm exec tsc -- --noEmit`, `npm run build`, `npm run seo:check`, `git diff --check` pass.
+- I/L/E/V: done/done/not_applicable/not_applicable. No publication, Worker deployment, remote migration, production write, staff test or live verification. Financial policies/calculations and current API wire shapes are unchanged; English print/workbook compatibility is covered by the language regression.
+- Recovery: original/new draft keys and local recovery downloads remain available; no automatic deletion, guessed context or token persistence. Rollback reverts scoped UI/reader changes while preserving those keys. Existing server last-save-wins guarantees remain explicit.
+- Next owner/action: Codex continues UX-06 for shared navigation/retry/conflict protection; retain the established draft/context invariants and separate backend capability activation.

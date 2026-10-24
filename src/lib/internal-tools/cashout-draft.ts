@@ -12,3 +12,9 @@ export function isCashoutDraftSheet(value: unknown): value is CashoutDraftSheet 
   }
   return Array.isArray(sheet.am) && Array.isArray(sheet.pm) && sheet.am.every(cashier) && sheet.pm.every(cashier) && typeof sheet.zReport === 'string'
 }
+
+/** The old key contains a sheet only. Context must come from an explicit user choice. */
+export function readUnassignedCashout(raw: string): CashoutDraftSheet | null {
+  try { const value: unknown = JSON.parse(raw); return isCashoutDraftSheet(value) ? value : null }
+  catch { return null }
+}

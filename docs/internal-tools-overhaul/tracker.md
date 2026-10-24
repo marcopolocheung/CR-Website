@@ -15,7 +15,6 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | UX-06 | Handle unsaved changes, retries, and edit conflicts | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-06](tasks/UX-06.md) |
 | DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
-| CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [CASH-01](tasks/CASH-01.md) |
 | INV-02 | Add progress, remaining filters, and search | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [INV-02](tasks/INV-02.md) |
 | IMPORT-01 | Validate source files with actionable errors | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [IMPORT-01](tasks/IMPORT-01.md) |
 | FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [FORM-01](tasks/FORM-01.md) |
@@ -113,6 +112,7 @@ Only direct decision blockers appear here. Dependent planned tasks inherit those
 | DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
 | DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | complete | Codex | D/D/NA/NA | [DATA-02](tasks/DATA-02.md) |
 | DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | implemented | Codex | D/D/P/P | [DATA-05](tasks/DATA-05.md) |
+| CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | UX-05 | — | complete | Codex | D/D/NA/NA | [CASH-01](tasks/CASH-01.md) |
 
 ## All tasks
 
@@ -152,7 +152,7 @@ This table is the complete ownership/status index, including ready decisions, pl
 | SCH-06 | Add combined hours and agreed warnings | P1 | `CODE_ONLY` | DATA-04, SCH-05, DEC-04 | — | blocked | unassigned | P/P/NA/NA | [SCH-06](tasks/SCH-06.md) |
 | SCH-07 | Improve planning and staff views in both languages | P1 | `CODE_ONLY` | UX-02, UX-04 | — | planned | unassigned | P/P/NA/NA | [SCH-07](tasks/SCH-07.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
-| CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [CASH-01](tasks/CASH-01.md) |
+| CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | UX-05 | — | complete | Codex | D/D/NA/NA | [CASH-01](tasks/CASH-01.md) |
 | CASH-02 | Add guided cashier entry | P0 | `CODE_ONLY` | UX-03, UX-04 | — | planned | unassigned | P/P/NA/NA | [CASH-02](tasks/CASH-02.md) |
 | CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | blocked | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
 | CASH-04 | Add incomplete, submitted, and reviewed states | P0 | `CODE_AND_EXTERNAL` | CASH-03, DATA-05, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-04](tasks/CASH-04.md) |

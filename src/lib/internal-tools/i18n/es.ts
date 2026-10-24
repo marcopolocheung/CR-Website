@@ -169,10 +169,14 @@ const es: Record<keyof typeof en, string> = {
   "drafts.change": "Elegir otro borrador",
   "drafts.handoff": "Guardar borrador y bloquear",
   "drafts.downloadCurrent": "Descargar esta copia de trabajo",
-  "drafts.legacy": "Un borrador anterior de cierre de caja no tiene tienda ni fecha. Permanece sin asignar; descargue el original antes de elegir un contexto nuevo.",
+  "drafts.legacy": "Un borrador anterior de cierre de caja no tiene tienda ni fecha. Elija su contexto de forma explícita; el original no se modificará.",
   "drafts.active": "Borrador de trabajo · {store} · {date} · {preparer}",
   "drafts.station": "Estación: {station}",
   "drafts.shift": "Turno: {shift}",
   "drafts.record": "Registro: {record}",
+  "cash.assignLegacy": "Usar el borrador anterior para la tienda y fecha elegidas",
+  "cash.legacyConfirm": "¿Usar la hoja anterior sin asignar para {store} del {date}? El original no se modificará.",
+  "cash.legacyInvalid": "No se pudo asignar este borrador anterior. Descargue el original para recuperar los valores; no se ha reemplazado nada.",
+  'cash.legacyChanged': "El borrador anterior cambió en otra ventana. Revise el original actual antes de asignarlo.",
 }
 export default es

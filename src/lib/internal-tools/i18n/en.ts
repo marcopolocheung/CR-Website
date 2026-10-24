@@ -168,10 +168,14 @@ const en = {
   "drafts.change": "Choose another draft",
   "drafts.handoff": "Save draft and lock",
   "drafts.downloadCurrent": "Download this working copy",
-  "drafts.legacy": "An older cash-out draft has no store or date. It stays unassigned; download its original before choosing a new context.",
+  "drafts.legacy": "An older cash-out draft has no store or date. Choose its context explicitly; the original source will remain unchanged.",
   "drafts.active": "Working draft · {store} · {date} · {preparer}",
   "drafts.station": "Station: {station}",
   "drafts.shift": "Shift: {shift}",
   "drafts.record": "Record: {record}",
+  "cash.assignLegacy": "Use older draft for selected store/date",
+  "cash.legacyConfirm": "Use the older unassigned sheet for {store} on {date}? The original source will remain unchanged.",
+  "cash.legacyInvalid": "This older draft could not be assigned. Download its original to recover the values; nothing has been replaced.",
+  'cash.legacyChanged': "The older draft changed in another window. Review its current source before assigning it.",
 } as const
 export default en
