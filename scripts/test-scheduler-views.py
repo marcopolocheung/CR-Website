@@ -87,8 +87,12 @@ class FixtureStore:
         })
 
 
-def open_scheduler(browser, url, station, width=1440):
+def open_scheduler(browser, url, station, width=1440, layout='classic'):
     context = browser.new_context(viewport={'width': width, 'height': 1000})
+    if layout:
+        context.add_init_script(
+            f"try {{ localStorage.setItem('chinarose.scheduler.layout', {json.dumps(layout)}) }} catch (e) {{}}"
+        )
     store = FixtureStore()
     context.route('**/*', store.route)
     page = context.new_page()
@@ -232,6 +236,79 @@ def check_mobile_kitchen(browser, url, artifacts):
     context.close()
 
 
+def check_new_layout(browser, url, artifacts):
+    context, page, store, errors = open_scheduler(browser, url, 'CR3-diningroom', layout=None)
+    schedule = page.locator('#scheduler-panel-schedule')
+    # New layout is the default, with plain tab labels and the switch off.
+    expect(page.get_by_role('heading', name='Weekly schedule', exact=True)).to_be_visible()
+    expect(page.get_by_role('tab', name='Staff & rules', exact=True)).to_be_visible()
+    expect(page.get_by_role('tab', name='Employee settings', exact=True)).not_to_be_visible()
+    expect(page.get_by_role('switch', name='Use the classic layout')).to_have_attribute('aria-checked', 'false')
+    # One dark button on an empty week; rare actions live in More.
+    primary = page.locator('#scheduler-panel-schedule button.bg-zinc-900:visible')
+    expect(primary).to_have_count(1)
+    expect(primary).to_have_text('Make schedule')
+    more = schedule.locator('summary', has_text='More').first
+    more.click()
+    expect(schedule.get_by_role('button', name='Copy last week', exact=True).first).to_be_visible()
+    expect(schedule.get_by_role('button', name='Clear week', exact=True)).to_be_disabled()
+    expect(schedule.get_by_role('button', name='Print', exact=True)).to_be_visible()
+    more.click()
+    page.screenshot(path=str(artifacts / 'schedule-new-empty-desktop.png'), full_page=True)
+    # Build the week, then leave one required spot empty to make a problem.
+    schedule.get_by_role('button', name='Make schedule', exact=True).first.click()
+    chips = schedule.get_by_role('button', name='Move Sample Employee out of', exact=False)
+    expect(chips).to_have_count(7)
+    expect(schedule.get_by_role('button', name='✓ All spots filled', exact=True)).to_be_visible()
+    primary = page.locator('#scheduler-panel-schedule button.bg-zinc-900:visible')
+    expect(primary).to_have_count(1)
+    expect(primary).to_have_text('Publish to staff')
+    schedule.get_by_role('button', name='Morning', exact=True).first.click()
+    page.locator('#Sunday-AM-detail select').first.select_option('')
+    expect(chips).to_have_count(6)
+    expect(schedule.get_by_role('button', name='1 to fix', exact=True)).to_be_visible()
+    expect(page.locator('#schedule-fix')).to_contain_text('Fix 1 of 1')
+    # The problem pill takes focus to the fix panel.
+    schedule.get_by_role('button', name='1 to fix', exact=True).click()
+    expect(page.locator('#schedule-fix')).to_be_focused()
+    # Flipping the switch keeps the unsaved assignment and undo history.
+    page.get_by_role('switch', name='Use the classic layout').click()
+    expect(page.get_by_role('heading', name='Weekly staff schedule', exact=True)).to_be_visible()
+    expect(chips).to_have_count(6)
+    expect(page.get_by_role('button', name='Undo', exact=True).first).to_be_enabled()
+    page.get_by_role('switch', name='Use the classic layout').click()
+    expect(page.get_by_role('heading', name='Weekly schedule', exact=True)).to_be_visible()
+    expect(chips).to_have_count(6)
+    # Publishing still goes through the existing panel.
+    schedule.get_by_role('button', name='Publish to staff', exact=True).click()
+    page.get_by_role('button', name='Publish', exact=True).click()
+    expect(page.get_by_text('Published. Staff now see this week.', exact=True)).to_be_visible()
+    page.get_by_role('button', name='Close', exact=True).first.click()
+    expect(schedule.get_by_role('button', name='Published ✓', exact=True)).to_be_disabled()
+    # Staff & rules is reachable; screenshots for both widths.
+    page.get_by_role('tab', name='Staff & rules', exact=True).click()
+    expect(page.get_by_role('heading', name='Staff & rules', exact=True)).to_be_visible()
+    page.screenshot(path=str(artifacts / 'staff-rules-desktop.png'), full_page=True)
+    page.get_by_role('tab', name='Schedule', exact=True).click()
+    page.screenshot(path=str(artifacts / 'schedule-new-desktop.png'), full_page=True)
+    page.set_viewport_size({'width': 375, 'height': 900})
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'New layout overflow at 375px'
+    page.screenshot(path=str(artifacts / 'schedule-new-mobile.png'), full_page=True)
+    # The per-device choice survives a reload.
+    page.set_viewport_size({'width': 1440, 'height': 1000})
+    page.get_by_role('switch', name='Use the classic layout').click()
+    assert page.evaluate("localStorage.getItem('chinarose.scheduler.layout')") == 'classic'
+    page.on('dialog', lambda dialog: dialog.accept())
+    page.reload()
+    page.wait_for_load_state('networkidle')
+    page.get_by_label('Manager code', exact=True).fill('fixture-password')
+    page.get_by_role('button', name='Open the scheduler', exact=True).click()
+    expect(page.get_by_role('heading', name='Weekly staff schedule', exact=True)).to_be_visible()
+    expect(page.get_by_role('switch', name='Use the classic layout')).to_have_attribute('aria-checked', 'true')
+    assert not errors, errors
+    context.close()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--url', default='http://127.0.0.1:3010')
@@ -245,5 +322,6 @@ if __name__ == '__main__':
         browser = playwright.chromium.launch(headless=True)
         check_dining(browser, args.url.rstrip('/'), artifacts)
         check_mobile_kitchen(browser, args.url.rstrip('/'), artifacts)
+        check_new_layout(browser, args.url.rstrip('/'), artifacts)
         browser.close()
     print(f'Scheduler view checks passed. Screenshots: {artifacts}')
