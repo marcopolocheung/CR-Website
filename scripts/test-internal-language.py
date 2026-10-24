@@ -63,21 +63,23 @@ def run():
         page.get_by_role('button', name='Acceder', exact=True).tap()
         expect(page.locator('#cashout-store')).to_be_visible()
         page.wait_for_load_state('networkidle')
-        expect(page.get_by_text('Aún no hay días guardados.', exact=True)).to_be_visible()
         page.locator('#cashout-store').select_option('CR2')
         page.locator('#cashout-date').fill('2026-10-20')
+        page.locator('#draft-preparer').fill('Original preparer label')
+        page.get_by_role('button', name='Empezar un borrador nuevo', exact=True).click()
+        expect(page.get_by_text('Aún no hay días guardados.', exact=True)).to_be_visible()
         page.get_by_label('Nombre del cajero', exact=True).first.fill('Nombre original')
         page.locator('#am-0-10000').fill('3')
         page.locator('#am-0-toast').fill('123.45')
         page.locator('#z-report').fill('900.00')
-        snapshot = page.evaluate("localStorage.getItem('cr-cash-out')")
+        snapshot = page.evaluate("JSON.stringify(Object.entries(localStorage).filter(([key]) => key.startsWith('cr-internal-draft:')))")
         count_before_switch = len(requests)
         page.get_by_role('button', name='English', exact=True).tap()
         expect(page.locator('#cashout-store')).to_have_value('CR2')
         expect(page.locator('#cashout-date')).to_have_value('2026-10-20')
         expect(page.get_by_label('Cashier name', exact=True).first).to_have_value('Nombre original')
         expect(page.locator('#am-0-toast')).to_have_value('123.45')
-        assert page.evaluate("localStorage.getItem('cr-cash-out')") == snapshot
+        assert page.evaluate("JSON.stringify(Object.entries(localStorage).filter(([key]) => key.startsWith('cr-internal-draft:')))") == snapshot
         assert len(requests) == count_before_switch, 'Language switch must not refetch/remount the cash sheet'
         mode['hold'] = True
         page.get_by_role('button', name='Save day', exact=True).click()

@@ -49,8 +49,9 @@ type Question = { message: Message; destructive?: boolean }
 export function useConfirmation() {
   const [question, setQuestion] = useState<Question | null>(null)
   const resolve = useRef<((answer: boolean) => void) | null>(null)
+  const mounted = useRef(true)
   const ask = useCallback((message: Message, destructive = false): Promise<boolean> => {
-    if (resolve.current) return Promise.resolve(false)
+    if (!mounted.current || resolve.current) return Promise.resolve(false)
     return new Promise(answer => { resolve.current = answer; setQuestion({ message, destructive }) })
   }, [])
   const decide = useCallback((answer: boolean) => {
@@ -59,7 +60,10 @@ export function useConfirmation() {
     setQuestion(null)
     pending?.(answer)
   }, [])
-  useEffect(() => () => { resolve.current?.(false); resolve.current = null }, [])
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false; resolve.current?.(false); resolve.current = null }
+  }, [])
   return { ask, dialog: <ConfirmDialog question={question} onDecision={decide} /> }
 }
 function ConfirmDialog({ question, onDecision }: { question: Question | null; onDecision: (answer: boolean) => void }) {
