@@ -96,6 +96,8 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 ## Handoff evidence
 
+- Delivery: implementation commit `e6c6a8e`, PR [#148](https://github.com/marcopolocheung/CR-Website/pull/148), base `feat/overhaul-ux-04` / PR #145. Both PRs are open; no merge or auto-merge was enabled. This documentation update records delivery on the same branch.
+
 - Scope/owner: Codex, 2026-10-24; `feat/overhaul-cash-02` follows UX-04 commit `e2a9214` / PR [#145](https://github.com/marcopolocheung/CR-Website/pull/145) in the same `/home/wslunusn/CR-Website-cashout` worktree. Artifacts and evidence: [guided-entry guide](../cashout-guided-entry.md), CountKeypad.tsx, cashout-draft helpers/tests, CashOut.tsx, expanded-summary viewport limit in EntryWorkspace.tsx, dictionaries and `scripts/test-cashout-entry.py`. No Worker, schema, API, financial-policy or dependency changes.
 - Scenario 1: synthetic cashier/count entry remains in one workspace using Tab/Enter or an optional inline touch keypad. Previous/next, digits/delete/clear, close/Escape, context/total visibility, long Spanish names and 44px targets PASS. A short 430px landscape viewport keeps the expanded keypad scrollable and Close reachable. Add/remove restore useful focus.
 - Scenario 2: initial blank, deliberately entered zero and historical unknown remain distinct. Explicit resume after reload restores zero, nonzero and blank fields. A second resumed editor preserves its independent values. Invalid raw text is retained and blocks a server write without truncation; denied storage retains the raw current input and prevents context teardown. Legacy source bytes remain untouched.

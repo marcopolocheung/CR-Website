@@ -25,3 +25,9 @@ All checks use `/home/wslunusn/CR-Website-cashout`, the sole new worktree for UX
 - `scripts/test-entry-workspace.py`, `scripts/test-cashout-context.py`, `scripts/test-internal-feedback.py`, `scripts/test-internal-drafts.py`, `scripts/test-internal-language.py`: PASS against the same local server. Existing store/date isolation, legacy bytes, late responses, save feedback, language/print recovery and mounted inputs remain covered.
 
 No production mutation, deployment or publication occurred. Native tablet software keyboards and staff usability remain REL-05/06; headless Chromium viewport/touch coverage does not substitute for those sessions. Local CODE_ONLY milestones are complete. DEC-02 is the next cash-workflow gate: starting cash, permitted adjustments, required submission/review fields, actual deposit and correction permissions must be approved before CASH-03/04/05/06 can finish.
+
+## Delivery and next action
+
+UX-04 implementation `e2a9214` is PR [#145](https://github.com/marcopolocheung/CR-Website/pull/145) against main. CASH-02 implementation `e6c6a8e` is PR [#148](https://github.com/marcopolocheung/CR-Website/pull/148) against `feat/overhaul-ux-04`. Both were opened non-draft, left unmerged and have no auto-merge enabled. The sole new worktree remains `/home/wslunusn/CR-Website-cashout` on `feat/overhaul-cash-02`; the original workspace and other existing worktrees were not edited. Task ownership returns to the user for the next decision; no next task has started.
+
+DEC-02 needs named approval and worked normal/short-close examples covering where the $100 float applies, permitted adjustments, expected/actual deposit, required close fields and review, and who can correct a reviewed close with what history. The decision remains pending. Resolve only approved portions rather than inventing defaults.
