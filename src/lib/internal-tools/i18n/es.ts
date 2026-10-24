@@ -1,5 +1,9 @@
 import type en from './en'
 const es: Record<keyof typeof en, string> = {
+  "salesContext.rule": "El día de la semana sigue la fecha seleccionada. Las fechas y sucursales deben coincidir o requieren un motivo revisado antes de descargar.",
+  "salesContext.unknown": "No indicado o no reconocido en esta fuente",
+  "salesContext.reason": "Motivo de excepción revisado (obligatorio si falta contexto o no coincide)",
+  "salesContext.cashout": "Fuente guardada del cierre (huella del contenido, no revisión atómica del servidor)",
   'shell.internal': 'Solo para uso interno — no distribuir a clientes',
   'shell.language': 'Language / Idioma',
   'nav.tools': 'Herramientas internas',

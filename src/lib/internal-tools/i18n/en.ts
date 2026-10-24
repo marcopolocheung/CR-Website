@@ -1,4 +1,8 @@
 const en = {
+  "salesContext.rule": "Weekday follows the selected business date. Source dates and stores must match, or require a reviewed reason before download.",
+  "salesContext.unknown": "Not provided or not recognized in this source",
+  "salesContext.reason": "Reviewed override reason (required for missing or mismatched source context)",
+  "salesContext.cashout": "Saved cash-out source (content fingerprint, not an atomic server revision)",
   'shell.internal': 'Internal use only — not for customer distribution',
   'shell.language': 'Language / Idioma',
   'nav.tools': 'Internal tools',

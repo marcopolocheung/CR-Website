@@ -5,8 +5,8 @@ import CashOut from './CashOut'
 import { useInternalLanguage } from './InternalLanguage'
 import SalesConverter from './SalesConverter'
 import HoursConverter from './HoursConverter'
-import { fetchCashoutDay, type CashoutStore } from '@/lib/cashout-store'
-import { dayTotals } from '@/lib/cashout'
+import { fetchCashoutSnapshot } from '@/lib/cashout-store'
+import { importStore } from '@/lib/converter/import-snapshot'
 
 const TABS = [
   { id: 'cash-out', label: 'cash.title' },
@@ -15,8 +15,7 @@ const TABS = [
 ] as const
 type TabId = (typeof TABS)[number]['id']
 
-const storeForLocation = (location: string): CashoutStore | null =>
-  location.includes('CHINA ROSE #3') ? 'CR3' : location.includes('CHINA ROSE #2') ? 'CR2' : null
+const storeForLocation = importStore
 
 /** Cash out, daily sales report, and employee hours on one page. Only cash out needs the manager code. */
 export default function Bookkeeping() {
@@ -45,8 +44,7 @@ export default function Bookkeeping() {
     async (location: string, date: string) => {
       const store = storeForLocation(location)
       if (!store) throw new Error(tr('bookkeeping.pickStore'))
-      const sheet = await fetchCashoutDay(store, date, token)
-      return sheet ? dayTotals(sheet.am, sheet.pm, sheet.zReport) : null
+      return fetchCashoutSnapshot(store, date, token)
     },
     [token, tr],
   )

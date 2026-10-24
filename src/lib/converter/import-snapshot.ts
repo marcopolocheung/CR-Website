@@ -1,3 +1,4 @@
+import { validSalesContext } from './sales-context'
 import { businessDate, type StoreId } from '../internal-tools/contracts'
 import { draftContextKey, type DraftContext } from '../internal-tools/drafts'
 import { HOURS_COLUMNS, validateHoursRows, type HoursRow } from './validation'
@@ -22,7 +23,8 @@ export function importStore(location: string): StoreId | null {
   return null
 }
 function validReview(value: unknown): value is SalesReview {
-  if (!object(value) || !keys(value, ['sources', 'figures', 'checks', 'metrics', 'form', 'unmapped', 'unmappedCategories'])) return false
+  if (!object(value) || !keys(value, ['sources', 'figures', 'checks', 'metrics', 'form', 'unmapped', 'unmappedCategories', 'context'])) return false
+  if (value.context !== undefined && !validSalesContext(value.context)) return false
   const { form, metrics, sources, figures, checks, unmapped, unmappedCategories } = value
   if (!object(form) || !keys(form, FORM_KEYS) || !FORM_KEYS.every(key => typeof form[key] === 'string') || !importStore(form.location as string) || !businessDate(form.date)) return false
   if (!object(metrics) || !keys(metrics, SOURCE_CELLS) || !SOURCE_CELLS.every(key => typeof metrics[key] === 'number' && Number.isFinite(metrics[key]))) return false
