@@ -1,0 +1,45 @@
+# IMPORT-08: scheduled versus actual evidence
+
+This is a read-only comparison of explicitly selected reviewed hours imports and observed published assignments, by shared employee identity, store and inclusive period. It neither publishes schedules nor recalculates payroll. IMPORT-06/07 supply reviewed directory/history records; SCH-06-IMPORT is an independently deliverable read-only adapter under SCH-06. The full SCH-05 publication conflict transaction, SCH-06 broader scheduler integration and SCH-04 publication history remain pending. Completing this import slice does not activate or complete them.
+
+## Published source boundary
+
+`GET /api/internal/import-schedules/{CR2|CR3}?start=...&end=...` is manager-only and reads existing KV without business writes. It returns every station/week intersecting a bounded inclusive period, with missing, hidden, malformed and incompatible layouts explicit. Each observed published document carries its saved revision/time and SHA-256 fingerprint; source person keys bind that exact fingerprint and source position. A shared UUID is **never** derived from a name or array position: a manager explicitly reviews the source-person-to-existing-UUID mapping, with source/station/effective context and directory revision. Same-name people remain separate.
+
+Existing published weeks retain names and slot indices. Their legacy layout hash includes slot IDs but **does not pin start/end times**. The reader validates the layout using existing week/global/built-in compatibility rules and captures a separate fingerprint of the actual rule values used. All such scheduled values are labelled **estimates from compatible rules**, not immutable historical published times. Missing/unpublished/incompatible sources yield unknown estimates rather than invented zeros. No roster is automatically matched by name. Snapshot mappings are corrected by explicit review; earlier actual-hour mappings stay pinned to their reviewed import version.
+
+## Comparison and reconciliation
+
+- Source total, regular and overtime hours remain separate and unchanged. Every included/excluded/unmatched source row stays traceable to import ID/revision and physical row. Bad punches/dates/rows remain source exceptions, not payroll corrections.
+- The source chooser initially selects unsuperseded leaves, while retaining earlier versions visibly. Users may change selections. Selecting conflicting same-byte versions quarantines all conflicting imports until one is chosen. Different-byte files repeating an identified clock-in/out row are also quarantined; no attendance double-count is silently accepted. Exact period mismatch is excluded explicitly. Skipped IDs/reasons are retained in report evidence.
+- Actual rows use their **historically reviewed** mapping snapshot; current schedule mapping edits do not reinterpret them. Nonambiguous legacy rows without shared mappings remain in unmatched hour totals, not silently dropped. Missing data is null/unavailable; an explicit mapped OFF publication is zero observed scheduled minutes.
+- Per-store source totals reconcile included + excluded when numeric values exist; included hours reconcile mapped + unmatched. Combined totals reconcile per-store known values; a missing store import makes combined actual unavailable. Shared UUIDs appear once in the combined employee view, with store breakdown and source assignment references.
+- Scheduled estimates sum observed source assignments. Cross-station/store and overnight overlaps are flagged and retained; the report does not adjudicate them, infer payroll adjustments or enforce schedule publication. Hour targets remain disabled under the scoped user-approved defaults.
+- Additional history pages can be loaded explicitly; partial source coverage, missing station weeks, unresolved mappings, excluded rows and duplicate selections are visible limitations. A declared import period does not prove complete attendance coverage. Only selected reviewed files contribute.
+
+## Interface, output and recovery
+
+A new bookkeeping comparison tab uses the existing in-memory manager gate. Load reviewed imports/directory/publications; select sources; explicitly review published identity mappings if desired; then compare. Source values and read-only results stay in the current browser session. Only an explicit mapping save mutates the directory through its existing atomic API. No report save is claimed. A comparison evidence JSON download contains source/revision/mapping/rule snapshots, reconciliations and limitations, without credentials or original file bytes.
+
+Failed/unconfigured/unauthorized loads preserve prior sources, requested fields and the earlier report with its own date/context. Locking manager access hides loaded private sources and the report while preserving requested fields in memory. Changing the requested context marks earlier loaded sources stale and disables comparison until reloaded. Reload asks before replacing working mappings; working JSON copies and navigation protection preserve unsaved mapping choices. Mapping failures/conflicts preserve choices and use stable operation IDs on unchanged retry. A comparison uses observed revisions, not a continuously live view.
+
+English/Spanish labels wrap on 390px touch screens; tables scroll inside labelled keyboard-focusable regions. Print follows the existing internal-tools English-print behavior, retains store/period/generated time/source references and separates source hours from schedule estimates. Print controls/mapping editors are hidden; report tables fit Letter width, repeat headers and avoid splitting rows. No original sales/hours Excel template was changed by this report.
+
+## Acceptance evidence
+
+All inputs are synthetic; browser API traffic uses explicit loopback overrides and blocks production Worker URLs.
+
+- `npm run imports:test`: **52 passed**, covering reviewed dates, source validation/reconciliation, retained outputs, identity/history, combined/per-store actual totals, unmatched hours, shared employee counted once, null versus mapped OFF zero, duplicate versions, repeated attendance with different byte fingerprints, excluded rows/partial periods, overnight and cross-store overlap, and legacy layout hashes not pinning times.
+- `npm run imports:worker:test`: **5 passed** with isolated local D1/KV. Includes atomic directory/history conflict/replay and immutable lineage, manager-only publication reads, missing/hidden weeks, exact revision/rule evidence, invalid ranges and byte-for-byte KV preservation on reads.
+- `npm run scheduler:test`: **128 passed**, preserving existing scheduler/Worker behavior.
+- `npm run build`, `npm run seo:check`, `npm exec tsc -- --noEmit`: passed; **3 dictionary tests passed**.
+- Wrangler 4.86.0 local packaging dry-run passed with existing local bindings. No Worker deployment or remote migration occurred; production config and compatibility date are unchanged. Migrations 0001–0003 suffice; 0004 remains unused.
+- `test-import-comparison.py`: passed. Explicit snapshot identity review; two stores with 48 observed actual hours = 34 mapped + 14 unmatched; one shared UUID across stores; source regular/overtime separate; overlaps and revision snapshots in downloaded JSON. Spanish 390px/touch/keyboard, English-print/Spanish restoration, failed reload preserving prior report and changed requested fields, and private report hiding after manager handoff/lock pass. Letter PDF pagination/text and word bounds checked using PyMuPDF; source controls are absent and report/combined identity content present.
+- `test-import-history.py`, `test-import-mapping.py`, `test-import-retention.py`: passed after comparison integration, preserving history/reprocessing, conflict retry and identical cached device output recovery. Final mapping acceptance also cancels a date-context change and verifies the working choices survive. Working directory choices remain in memory when locked; context replacement warns before discarding them.
+- `python3 scripts/check-overhaul-tracker.py`: canonical rows, ready gates and combined implementation/activation dependency graph checked; original 84 briefs plus four explicitly scoped child slices = 88 briefs.
+
+## Activation and rollback
+
+IMPORT-08 is implemented and locally verified; external activation and live verification remain pending on DATA-03, REL-03, DATA-09 and REL-04. Frontend publication is separate. No live payroll/staff observation, cloud provisioning, remote migration, resource ID, automatic merge or production service activation is implied.
+
+Rollback reverts this additive reader/report UI and retains the original KV, D1 records/operation receipts/history, explicit directory mappings and device sources. Reconcile any accepted mapping writes before reverting; report JSON remains an observed evidence artifact. Wider personnel, retention/recovery and publication-control prerequisites remain tracked under their unchanged parent briefs. Review the six open PRs in order; no merge or further task is authorized by this handoff.

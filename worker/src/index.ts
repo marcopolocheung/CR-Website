@@ -1,3 +1,9 @@
+import { requestRecord, saveRequests, readRequestMutation } from './schedule-requests'
+import { isStationId } from '../../src/lib/internal-tools/contracts'
+import { publishedHours, weeksInPeriod } from '../../src/lib/converter/published-hours'
+import type { WeeklyStaffingTemplate } from '../../src/lib/scheduler/types'
+import { historyPage, historyRecord, saveHistory } from './import-history'
+import { directoryRecord, saveDirectory } from './import-directory'
 interface KVNamespace {
   get(key: string): Promise<string | null>
   put(key: string, value: string, options?: { expirationTtl?: number; metadata?: unknown }): Promise<void>
@@ -10,6 +16,8 @@ interface KVNamespace {
 
 interface Env {
   SCHEDULES: KVNamespace
+  /** Optional additive service binding; absence preserves legacy capabilities. */
+  INTERNAL_DB?: LocalBindings['INTERNAL_DB']
   ALLOWED_ORIGIN?: string
   /** Manager write token for the golden schedule. Never shipped to browsers; the manager types it per save. */
   SCHEDULE_WRITE_TOKEN?: string
@@ -1091,6 +1099,76 @@ export default {
       }
       if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
       return json({ ok: true }, 200, request, env)
+    }
+
+    const requestsMatch = path.match(/^\/api\/internal\/schedule-requests\/([^/]+)$/)
+    if (requestsMatch && (request.method === 'GET' || request.method === 'PUT')) {
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      const station = requestsMatch[1]
+      if (!isStationId(station)) return json({ schemaVersion: 1, error: { code: 'validation_failed' } }, 400, request, env, noStore)
+      if (!env.INTERNAL_DB) return json({ schemaVersion: 1, error: { code: 'backend_unconfigured' } }, 503, request, env, noStore)
+      try {
+        if (request.method === 'GET') return json({ record: await requestRecord(env.INTERNAL_DB, station) }, 200, request, env, noStore)
+        if (!(await checkWriteThrottle(env, clientIp(request)))) return json({ error: 'rate_limited' }, 429, request, env, noStore)
+        const result = await saveRequests(env.INTERNAL_DB, station, await readRequestMutation(request))
+        return json(result.ok ? { record: result.record, replayed: result.replayed } : result.body, result.ok ? 200 : result.status, request, env, noStore)
+      } catch { return json({ schemaVersion: 1, error: { code: 'unavailable' } }, 503, request, env, noStore) }
+    }
+
+    const importSchedulesMatch = path.match(/^\/api\/internal\/import-schedules\/(CR2|CR3)$/)
+    if (importSchedulesMatch && request.method === 'GET') {
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const store = importSchedulesMatch[1], start = url.searchParams.get('start') ?? '', end = url.searchParams.get('end') ?? ''
+      let weeks: string[]
+      try { weeks = weeksInPeriod(start,end) } catch { return json({error:'invalid_period'},400,request,env) }
+      try {
+        const stations = RESTAURANTS.filter(station => station.startsWith(store+'-'))
+        const publications = await Promise.all(stations.flatMap(station => weeks.map(async week => {
+          const [raw,weekRaw,globalRaw] = await Promise.all([readGoldenDoc(env,station,week),env.SCHEDULES.get(templateKeyForWeek(station,week)),readTemplateRaw(env,station)])
+          const weekDoc = weekRaw ? normalizeTemplateDoc(safeParse(weekRaw)) : null
+          const globalDoc = globalRaw ? normalizeTemplateDoc(safeParse(globalRaw)) : null
+          return publishedHours(station,week,raw?(safeParse(raw)??{}):null,(weekDoc?.template ?? null) as WeeklyStaffingTemplate|null,(globalDoc?.template ?? null) as WeeklyStaffingTemplate|null)
+        })))
+        return json({version:1,storeId:store,start,end,publications},200,request,env,{'Cache-Control':'no-store'})
+      } catch { return json({schemaVersion:1,error:{code:'unavailable'}},503,request,env,{'Cache-Control':'no-store'}) }
+    }
+
+    const importHistoryMatch = path.match(/^\/api\/internal\/import-history\/(CR2|CR3)(?:\/([A-Za-z0-9_-]{1,128}))?$/)
+    if (importHistoryMatch && (request.method === 'GET' || request.method === 'POST')) {
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (!env.INTERNAL_DB) return json({schemaVersion:1,error:{code:'backend_unconfigured'}},503,request,env,noStore)
+      const store = importHistoryMatch[1] as 'CR2'|'CR3'
+      try {
+        if (request.method === 'GET') {
+          if (importHistoryMatch[2]) return json({record:await historyRecord(env.INTERNAL_DB,store,importHistoryMatch[2])},200,request,env,noStore)
+          const page = await historyPage(env.INTERNAL_DB,store,url.searchParams.get('kind')??'',url.searchParams.get('start')??'',url.searchParams.get('end')??'',url.searchParams.get('cursor')??'')
+          return json(page,200,request,env,noStore)
+        }
+        if (importHistoryMatch[2]) return json({error:'not_found'},404,request,env,noStore)
+        if (!(await checkWriteThrottle(env,clientIp(request)))) return json({error:'rate_limited'},429,request,env)
+        const result = await saveHistory(env.INTERNAL_DB,store,await readBody(request,1000000))
+        return json(result.ok?{record:result.record,replayed:result.replayed}:result.body,result.ok?200:result.status,request,env,noStore)
+      } catch { return json({schemaVersion:1,error:{code:'unavailable'}},503,request,env,noStore) }
+    }
+
+    const directoryMatch = path.match(/^\/api\/internal\/import-directory\/(CR2|CR3)$/)
+    if (directoryMatch && (request.method === 'GET' || request.method === 'PUT')) {
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (!env.INTERNAL_DB) return json({ schemaVersion: 1, error: { code: 'backend_unconfigured' } }, 503, request, env, noStore)
+      const store = directoryMatch[1] as 'CR2' | 'CR3'
+      try {
+        if (request.method === 'GET') return json({ record: await directoryRecord(env.INTERNAL_DB, store) }, 200, request, env, noStore)
+        if (!(await checkWriteThrottle(env, clientIp(request)))) return json({ error: 'rate_limited' }, 429, request, env)
+        const result = await saveDirectory(env.INTERNAL_DB, store, await readBody(request, 300000))
+        return json(result.ok ? { record: result.record, replayed: result.replayed } : result.body, result.ok ? 200 : result.status, request, env, noStore)
+      } catch { return json({ schemaVersion: 1, error: { code: 'unavailable' } }, 503, request, env, noStore) }
     }
 
     // Cash-out days: manager token for reads and writes — these are cash figures.

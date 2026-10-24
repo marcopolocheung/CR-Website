@@ -4,12 +4,12 @@ parent: SCH
 title: "Persist dated time off and temporary availability"
 priority: P1
 delivery_class: CODE_AND_EXTERNAL
-status: blocked
-owner: unassigned
+status: implemented
+owner: Codex
 implementation_dependencies: [DATA-02, DATA-05, DEC-01]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: pending
 live_verification: pending
 ---
@@ -58,18 +58,18 @@ Affected areas: src/components/scheduler/SchedulerDemo.tsx; src/components/sched
 
 ## Implementation checklist
 
-- [ ] Model pending, approved, and declined exceptions with date ranges and provenance
-- [ ] Support station-scoped legacy employee references until reviewed shared mappings exist
-- [ ] Test overnight boundaries, overlapping requests, and preserved recurring rules
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Model pending, approved, and declined exceptions with date ranges and provenance
+- [x] Support station-scoped legacy employee references until reviewed shared mappings exist
+- [x] Test overnight boundaries, overlapping requests, and preserved recurring rules
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Model pending, approved, and declined exceptions with date ranges and provenance. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Support station-scoped legacy employee references until reviewed shared mappings exist. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Test overnight boundaries, overlapping requests, and preserved recurring rules. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Model pending, approved, and declined exceptions with date ranges and provenance. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Support station-scoped legacy employee references until reviewed shared mappings exist. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Test overnight boundaries, overlapping requests, and preserved recurring rules. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
@@ -97,16 +97,15 @@ Evidence specific to this task: the three task scenarios above must pass against
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | pending | Environment, operation IDs, deployment/resource evidence, or staff-session execution. |
 | Live verification | pending | Observed target-environment behavior or staff acceptance with date and operator. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Business decision: DEC-01. Independent tasks remain available.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts/evidence: [schedule-requests.md](../schedule-requests.md), domain/client adapters in `src/lib/scheduler/requests.ts` and `request-store.ts`, additive `worker/src/schedule-requests.ts` and route, synthetic domain/client/local-D1 suites.
+- Local checks: 5 request tests, 4 Worker integration tests, 128 existing scheduler tests; build, types and SEO pass. See the evidence document for exact scope and commands.
+- Implementation and local verification done. External/live pending; no deployment or schema change.
+- No new visible UI, gesture or print output; language-independent records are consumed by SCH-02/03.
+- Shared-file coordinator/next owner: Codex; SCH-02/03 may now proceed using this API. Preserve KV and accepted request/history records on rollback.

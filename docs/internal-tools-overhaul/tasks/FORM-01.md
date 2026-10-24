@@ -4,12 +4,12 @@ parent: FORM
 title: "Add searchable employee/date/type lists"
 priority: P1
 delivery_class: CODE_ONLY
-status: ready
-owner: unassigned
+status: complete
+owner: Claude
 implementation_dependencies: [UX-03]
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
@@ -51,25 +51,25 @@ Affected areas: src/components/internal/WriteUps.tsx; src/lib/writeup-store.ts; 
 
 ## Implementation checklist
 
-- [ ] Filter employee/date/type and preserve current manager labels and ordering
-- [ ] Distinguish no matches, no records, and failed loading
-- [ ] Open the exact saved form with keyboard and tablet controls
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Filter employee/date/type and preserve current manager labels and ordering
+- [x] Distinguish no matches, no records, and failed loading
+- [x] Open the exact saved form with keyboard and tablet controls
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Filter employee/date/type and preserve current manager labels and ordering. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Distinguish no matches, no records, and failed loading. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Open the exact saved form with keyboard and tablet controls. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Filter employee/date/type and preserve current manager labels and ordering. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Distinguish no matches, no records, and failed loading. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Open the exact saved form with keyboard and tablet controls. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
@@ -88,16 +88,20 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
 | Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Listed prerequisites are pending.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts: `SavedFormRow`/`filterSavedForms` adapter in `src/lib/forms.ts` with unit cases in `forms.test.ts`; `SavedFormsList` in `WriteUps.tsx` replacing the plain table; `forms.*` keys in both dictionaries; `scripts/test-forms-list.py`. Stacked on FORM-07 (#155).
+- Record-type adapter: each saved form type maps to one row shape (`type`, `id`, `date`, `employee`, `label`) so later forms join the same list and filters. Only `write-up` exists in this PR.
+- Scenario 1: search matches employee and label words in any order, ignoring case and accents ("ana lopez" finds "Ana López"). Type and from/to date filters combine. Rows keep the server order (newest date, then employee) and the current manager labels. Synthetic browser fixture of 4 records checks each filter and the "Showing n of m" count.
+- Scenario 2: three different messages. No records: "No forms saved yet." Filters with no hits: "No saved forms match these filters." plus Clear filters, which refocuses search. Failed load: an alert with Try again. A failed refresh keeps the previous list visible instead of emptying it, and a failed first load never shows "No forms saved yet."
+- Scenario 3: each Open button is 44px tall and named for its record ("Open Write-up for Ana López, 2026-01-05"), so the two Ana López records stay distinct. Touch tap and keyboard Enter each open the exact record. At 375px the type and label stack under date/employee with no sideways scrolling.
+- English/Spanish: list controls, states and counts use stable keys in both languages, checked by the dictionary parity test and a Spanish empty-state check at 375px. Employee names, labels and the paper form are never translated. Print is unaffected (the list is `print:hidden` as before).
+- Checks (local, 2026-10-24): `npm run forms:test` 3/3; i18n 3/3; `test-forms-list.py` and `test-forms-compat.py` PASS against Next dev with a loopback API override, synthetic responses and production requests rejected; `npm exec tsc -- --noEmit`, `npm run build`, `npm run seo:check`.
+- I/L/E/V: done/done/not_applicable/not_applicable. No Worker change; the existing list route already returns every field filtered here.
+- Rollback: revert the commit; nothing is stored.
+- Next owner/action: FORM-02 (device drafts and navigation protection) stacks on this branch.

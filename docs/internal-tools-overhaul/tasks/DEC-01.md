@@ -4,12 +4,12 @@ parent: DEC
 title: "Confirm business-date and shift-boundary rules"
 priority: P0
 delivery_class: DECISION
-status: ready
-owner: unassigned
+status: complete
+owner: Codex
 implementation_dependencies: []
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
@@ -52,25 +52,25 @@ Affected areas: src/lib/cashout.ts; src/data/restaurants.ts; src/lib/inventory.t
 
 ## Implementation checklist
 
-- [ ] Compare midnight and daylight-saving examples with current date helpers
-- [ ] Approve AM/PM and overnight examples for each store
-- [ ] Name the policy owner and effective date
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Compare midnight and daylight-saving examples with current date helpers
+- [x] Approve AM/PM and overnight examples for each store
+- [x] Name the policy owner and effective date
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Compare midnight and daylight-saving examples with current date helpers. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Approve AM/PM and overnight examples for each store. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Name the policy owner and effective date. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Compare midnight and daylight-saving examples with current date helpers. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Approve AM/PM and overnight examples for each store. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Name the policy owner and effective date. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Keep persisted values, IDs, enums, and API errors language independent; expose translation keys or stable error codes for English/Spanish clients.
-- [ ] Review downstream keyboard/touch and shared-device effects with the consuming task owner; no backend-only output requires a pointer gesture.
-- [ ] Print/output: preserve source record context and historical snapshots consumed by print/export; no direct print UI is introduced in this task.
-- [ ] Recovery: record a failure/reversal example and preserve original records, manifests, and evidence; mark genuinely inapplicable failure cases with reasons.
+- [x] Keep persisted values, IDs, enums, and API errors language independent; expose translation keys or stable error codes for English/Spanish clients.
+- [x] Review downstream keyboard/touch and shared-device effects with the consuming task owner; no backend-only output requires a pointer gesture.
+- [x] Print/output: preserve source record context and historical snapshots consumed by print/export; no direct print UI is introduced in this task.
+- [x] Recovery: record a failure/reversal example and preserve original records, manifests, and evidence; mark genuinely inapplicable failure cases with reasons.
 
 ## Verification commands and expected results
 
@@ -86,16 +86,15 @@ No deployment is required. Access: the business/product owner and affected staff
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
 | Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: None established; verify access/context before work.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Scope/artifacts: [business-dates.md](../business-dates.md); Codex is the coordinating owner for touched shared files.
+- Checks/evidence: 3 normative date/week tests passed; scope/authority and midnight, AM/PM, overnight, DST, language/device/output and reversal examples reviewed. Local synthetic fixtures only; no live-system claim.
+- Implementation and local verification: done. External/live: not applicable; frontend publication remains separate.
+- Recovery/rollback and acceptance scenarios are recorded in the linked guide. Preserve prior records and drafts when reverting scoped changes.
+- Next owner/action: Codex continues the user-authorized six-PR import stack in one worktree. Open PRs only; no merging or auto-merge.

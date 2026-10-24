@@ -1,19 +1,20 @@
 import Papa from "papaparse";
 import ExcelJS from "exceljs";
+import { workbookOutput, downloadWorkbookOutput } from './workbook-output';
 
 import { HOURS_COLUMNS, SourceValidationError, validateHoursRows } from './validation';
 
-export function parseHoursText(text) {
+export function parseHoursText(text, review = false) {
   const results = Papa.parse(text, { header: false, skipEmptyLines: false });
-  return validateHoursRows(results.data, results.errors);
+  return validateHoursRows(results.data, results.errors, review);
 }
 
 /** @param {Pick<File, 'name' | 'size' | 'text'>} file
  * @returns {Promise<import('./validation').SourceResult<import('./validation').HoursRow[]>>} */
-export async function readHoursFile(file) {
+export async function readHoursFile(file, review = false) {
   if (!file.size) return { value: null, issues: [{ key: 'importValidation.empty' }] };
   if (!/\.csv$/i.test(file.name)) return { value: null, issues: [{ key: 'importValidation.hoursType' }] };
-  try { return parseHoursText(await file.text()); }
+  try { return parseHoursText(await file.text(), review); }
   catch { return { value: null, issues: [{ key: 'importValidation.unreadable' }] }; }
 }
 
@@ -26,18 +27,17 @@ export async function parseCsvAndExport(file, onComplete, onError, meta = {}) {
   } catch (err) { onError(err); }
 }
 
-export async function exportHoursRows(rows, meta = {}) {
+export async function generateHoursOutput(rows, meta = {}) {
   const workbook = buildHoursWorkbook(rows);
   const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const formatDate = (date) => date.slice(2, 4) + '_' + date.slice(5, 7) + date.slice(8, 10);
   const number = meta.location?.match(/#(\d+)/)?.[1] ?? 'UNKNOWN';
-  const a = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  a.href = url;
-  a.download = `CR${number}_${formatDate(meta.startDate ?? '')}-${formatDate(meta.endDate ?? '')}_EMPLOYEE_HOUR_LOG_SUMMARY.xlsx`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const filename = `CR${number}_${formatDate(meta.startDate ?? '')}-${formatDate(meta.endDate ?? '')}_EMPLOYEE_HOUR_LOG_SUMMARY.xlsx`;
+  return workbookOutput(filename, buffer);
+}
+
+export async function exportHoursRows(rows, meta = {}) {
+  return downloadWorkbookOutput(await generateHoursOutput(rows, meta));
 }
 
 export function buildHoursWorkbook(rows) {

@@ -4,19 +4,20 @@ import { useCallback, useEffect, useState } from 'react'
 import CashOut from './CashOut'
 import { useInternalLanguage } from './InternalLanguage'
 import SalesConverter from './SalesConverter'
+import ScheduledActualReport from './ScheduledActualReport'
 import HoursConverter from './HoursConverter'
-import { fetchCashoutDay, type CashoutStore } from '@/lib/cashout-store'
-import { dayTotals } from '@/lib/cashout'
+import { fetchCashoutSnapshot } from '@/lib/cashout-store'
+import { importStore } from '@/lib/converter/import-snapshot'
 
 const TABS = [
   { id: 'cash-out', label: 'cash.title' },
   { id: 'sales', label: 'bookkeeping.sales' },
   { id: 'hours', label: 'bookkeeping.hours' },
+  { id: 'comparison', label: 'comparison.title' },
 ] as const
 type TabId = (typeof TABS)[number]['id']
 
-const storeForLocation = (location: string): CashoutStore | null =>
-  location.includes('CHINA ROSE #3') ? 'CR3' : location.includes('CHINA ROSE #2') ? 'CR2' : null
+const storeForLocation = importStore
 
 /** Cash out, daily sales report, and employee hours on one page. Only cash out needs the manager code. */
 export default function Bookkeeping() {
@@ -45,8 +46,7 @@ export default function Bookkeeping() {
     async (location: string, date: string) => {
       const store = storeForLocation(location)
       if (!store) throw new Error(tr('bookkeeping.pickStore'))
-      const sheet = await fetchCashoutDay(store, date, token)
-      return sheet ? dayTotals(sheet.am, sheet.pm, sheet.zReport) : null
+      return fetchCashoutSnapshot(store, date, token)
     },
     [token, tr],
   )
@@ -88,10 +88,11 @@ export default function Bookkeeping() {
         <CashOut token={token} onUnlock={setToken} onLocked={lock} />
       </div>
       <div role="tabpanel" id="panel-sales" aria-labelledby="tab-sales" hidden={tab !== 'sales'}>
-        <SalesConverter loadCashout={token ? loadCashout : null} />
+        <SalesConverter token={token} loadCashout={token ? loadCashout : null} />
       </div>
+      <div role="tabpanel" id="panel-comparison" aria-labelledby="tab-comparison" hidden={tab !== 'comparison'}><ScheduledActualReport token={token} /></div>
       <div role="tabpanel" id="panel-hours" aria-labelledby="tab-hours" hidden={tab !== 'hours'}>
-        <HoursConverter />
+        <HoursConverter token={token} />
       </div>
     </div>
   )

@@ -4,12 +4,12 @@ parent: IMPORT
 title: "Unify date/store handling and cash-out linkage"
 priority: P1
 delivery_class: CODE_ONLY
-status: blocked
-owner: unassigned
+status: complete
+owner: Codex
 implementation_dependencies: [IMPORT-02, DEC-01]
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
@@ -54,25 +54,25 @@ Affected areas: src/components/internal/SalesConverter.tsx; src/components/inter
 
 ## Implementation checklist
 
-- [ ] Reject mismatched source dates or ask for a visible reviewed override
-- [ ] Link the exact saved cash-out revision and distinguish unavailable from zero
-- [ ] Preserve current workbook cell layout and existing unlocked cash-out fill behavior
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Reject mismatched source dates or ask for a visible reviewed override
+- [x] Link the exact saved cash-out revision and distinguish unavailable from zero
+- [x] Preserve current workbook cell layout and existing unlocked cash-out fill behavior
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Reject mismatched source dates or ask for a visible reviewed override. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Link the exact saved cash-out revision and distinguish unavailable from zero. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Preserve current workbook cell layout and existing unlocked cash-out fill behavior. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Reject mismatched source dates or ask for a visible reviewed override. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Link the exact saved cash-out revision and distinguish unavailable from zero. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Preserve current workbook cell layout and existing unlocked cash-out fill behavior. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
@@ -91,16 +91,15 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
 | Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Business decision: DEC-01. Independent tasks remain available.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Scope/artifacts: [sales-context.md](../sales-context.md); Codex is the coordinating owner for touched shared files.
+- Checks/evidence: 35 import tests, 3 dictionary tests, types, static build, SEO and three bilingual recovery/review/validation browser flows passed. Local synthetic fixtures only; no live-system claim.
+- Implementation and local verification: done. External/live: not applicable; frontend publication remains separate.
+- Recovery/rollback and acceptance scenarios are recorded in the linked guide. Preserve prior records and drafts when reverting scoped changes.
+- Next owner/action: Codex continues the user-authorized six-PR import stack in one worktree. Open PRs only; no merging or auto-merge.
