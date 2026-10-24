@@ -9,7 +9,7 @@ export class SourceValidationError extends Error {
 }
 const problem = (key: TranslationKey, params?: SourceIssue['params']): SourceIssue => ({ key, params })
 export const HOURS_COLUMNS = ['Employee External Id', 'Employee', 'Job Title', 'In Date', 'Out Date', 'Total Hours', 'Regular Hours', 'Overtime Hours'] as const
-export type HoursRow = Record<(typeof HOURS_COLUMNS)[number], string>
+export type HoursRow = Record<(typeof HOURS_COLUMNS)[number], string> & { __sourceRow?: number }
 
 /** Preserve the supported USD syntax; never turn blank/malformed cells into zero. */
 export function sourceNumber(value: unknown, money = true): number | null {
@@ -137,7 +137,7 @@ function validSourceDate(value: string): boolean {
 }
 
 /** Row numbers are CSV record numbers, counting the header and empty records. */
-export function validateHoursRows(records: unknown[][], parserErrors: { code: string; row?: number }[] = []): SourceResult<HoursRow[]> {
+export function validateHoursRows(records: unknown[][], parserErrors: { code: string; row?: number }[] = [], review = false): SourceResult<HoursRow[]> {
   const issues: SourceIssue[] = parserErrors.map(error => problem('importValidation.csv', { row: (error.row ?? 0) + 1, code: error.code }))
   const nonempty = records.some(row => row.some(value => String(value ?? '').trim()))
   if (!nonempty) return { value: null, issues: [problem('importValidation.empty')] }
@@ -148,12 +148,13 @@ export function validateHoursRows(records: unknown[][], parserErrors: { code: st
     if (count !== 1) issues.push(problem(count ? 'importValidation.csvDuplicateColumn' : 'importValidation.csvColumn', { column }))
   }
   if (issues.length) return { value: null, issues }
+  let malformed = false
   const rows: HoursRow[] = []
   records.slice(1).forEach((cells, index) => {
     if (cells.every(value => !String(value ?? '').trim())) return
     const row = index + 2
-    if (cells.length !== headers.length) issues.push(problem('importValidation.csvWidth', { row }))
-    const record = Object.fromEntries(HOURS_COLUMNS.map(column => [column, String(cells[headers.indexOf(column)] ?? '')])) as HoursRow
+    if (cells.length !== headers.length) { malformed = true; issues.push(problem('importValidation.csvWidth', { row })) }
+    const record: HoursRow = Object.fromEntries(HOURS_COLUMNS.map(column => [column, String(cells[headers.indexOf(column)] ?? '')])) as Record<(typeof HOURS_COLUMNS)[number], string>
     for (const column of ['Employee External Id', 'Employee'] as const) {
       if (!record[column].trim()) issues.push(problem('importValidation.csvRequired', { row, column }))
     }
@@ -163,8 +164,9 @@ export function validateHoursRows(records: unknown[][], parserErrors: { code: st
     for (const column of ['In Date', 'Out Date'] as const) {
       if (!validSourceDate(record[column])) issues.push(problem('importValidation.csvDate', { row, column }))
     }
+    if (review) record.__sourceRow = row
     rows.push(record)
   })
   if (!rows.length) issues.push(problem('importValidation.noRows'))
-  return { value: issues.length ? null : rows, issues }
+  return { value: malformed || !rows.length || (!review && issues.length) ? null : rows, issues }
 }

@@ -24,6 +24,7 @@ Use synthetic fixtures and explicit loopback API overrides. No cloud resource cr
 ## Six-PR continuation
 
 1. DEC-01: [PR #143](https://github.com/marcopolocheung/CR-Website/pull/143), base `feat/overhaul-import-03`, head `feat/overhaul-dec-01`, commit `e88b245`.
-2. IMPORT-04 follows `feat/overhaul-dec-01`; source/context evidence is in [sales context](sales-context.md).
+2. IMPORT-04: [PR #144](https://github.com/marcopolocheung/CR-Website/pull/144), base `feat/overhaul-dec-01`, head `feat/overhaul-import-04`, commit `49f7a7e`. Evidence: [sales context](sales-context.md).
+3. IMPORT-05 follows `feat/overhaul-import-04`; evidence: [hours preview](hours-preview.md).
 
 The user approved scoped import defaults on 2026-10-24: managers explicitly review mappings, never match by name, preserve inactive identities, disable hour targets; retain reviewed import values/fingerprints without raw file uploads or automatic deletion. Wider identity, personnel and retention/recovery decisions remain pending. This approval applies only to the import slices and grants no external execution.

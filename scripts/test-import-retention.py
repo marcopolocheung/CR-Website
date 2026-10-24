@@ -115,8 +115,10 @@ def run():
         set_source(page,'#hc-file',upload('hours','original-hours.csv'))
         expect(page.locator('#hc-file-feedback')).to_contain_text('File checks passed')
         hours=page.locator('#panel-hours');hbutton=page.locator('#hc-download')
+        page.locator('#hours-reviewed').check()
         hour_hash=download_hash(page,hbutton)
         context.set_offline(True)
+        page.locator('#hours-reviewed').check()
         assert download_hash(page,hbutton)==hour_hash
         hours.get_by_role('button',name='Save a copy on this device',exact=True).tap()
         expect(hours.get_by_role('status').filter(has_text='saved on this device')).to_be_visible()
@@ -137,6 +139,7 @@ def run():
         expect(page.locator('#hc-preparer')).to_have_value('Hours preparer')
         assert next(item for item in drafts(page,'hours') if item['key']==old_hours['key'])['raw']==old_hours['raw']
         assert len(drafts(page,'hours'))==2
+        other.locator('#hours-reviewed').check()
         assert download_hash(other,other.locator('#hc-download'))==hour_hash
         other.close()
         page.get_by_role('button',name='Español',exact=True).tap()
@@ -146,6 +149,7 @@ def run():
         hours_context(page)
         hours.get_by_role('button',name='Continuar en una copia',exact=True).first.tap();confirm(page,True)
         context.set_offline(True)
+        page.locator('#hours-reviewed').check()
         assert download_hash(page,hbutton)==hour_hash
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         context.set_offline(False)

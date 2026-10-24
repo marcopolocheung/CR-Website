@@ -4,17 +4,17 @@ import { workbookOutput, downloadWorkbookOutput } from './workbook-output';
 
 import { HOURS_COLUMNS, SourceValidationError, validateHoursRows } from './validation';
 
-export function parseHoursText(text) {
+export function parseHoursText(text, review = false) {
   const results = Papa.parse(text, { header: false, skipEmptyLines: false });
-  return validateHoursRows(results.data, results.errors);
+  return validateHoursRows(results.data, results.errors, review);
 }
 
 /** @param {Pick<File, 'name' | 'size' | 'text'>} file
  * @returns {Promise<import('./validation').SourceResult<import('./validation').HoursRow[]>>} */
-export async function readHoursFile(file) {
+export async function readHoursFile(file, review = false) {
   if (!file.size) return { value: null, issues: [{ key: 'importValidation.empty' }] };
   if (!/\.csv$/i.test(file.name)) return { value: null, issues: [{ key: 'importValidation.hoursType' }] };
-  try { return parseHoursText(await file.text()); }
+  try { return parseHoursText(await file.text(), review); }
   catch { return { value: null, issues: [{ key: 'importValidation.unreadable' }] }; }
 }
 

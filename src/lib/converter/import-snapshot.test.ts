@@ -6,6 +6,7 @@ import { isImportSnapshot, snapshotContext, snapshotMatchesContext, type ImportS
 import { workbookOutput, workbookBytes, isWorkbookOutput } from './workbook-output'
 import { listDrafts, newDraft, readDraft, saveDraft, draftKey } from '../internal-tools/drafts'
 import { businessDate } from '../internal-tools/contracts'
+import { reviewHours } from './hours-review'
 import { validateHoursRows } from './validation'
 
 const form: SalesForm = { firstName: 'Synthetic', lastName: 'Preparer', day: 'TUE', date: '2026-10-20', location: 'CHINA ROSE #3 - 7046 W MILITARY DR', amDeposit: '0', pmDeposit: '', amOverShort: '', pmOverShort: '' }
@@ -46,7 +47,8 @@ test('malformed, unsupported, credential-bearing and mismatched figure/context p
   const invalidHours = hours()
   if (invalidHours.kind !== 'hours') throw new Error('fixture')
   invalidHours.rows[0]['Employee External Id'] = ''
-  assert.equal(isImportSnapshot(invalidHours), false)
+  assert.equal(isImportSnapshot(invalidHours), true) // retain an unresolved row for review
+  assert.equal(reviewHours(invalidHours.rows, invalidHours.metadata.startDate, invalidHours.metadata.endDate).blocked, true)
 })
 
 test('task/store/day/period recovery keys remain isolated even if the stored payload has a conflicting context', () => {
