@@ -2,6 +2,11 @@
 
 The demo at `/scheduler-demo` is a static Next.js App Router page with the correctness-critical scheduling logic kept outside presentation code.
 
+The manager workspace separates **Schedule** from **Employee settings**, with a
+shared week selector and edits preserved while switching views. See
+[focused scheduler views](scheduler-views.md) for the UX research, interaction
+decisions, and browser regression checks.
+
 ## Modules
 
 - `src/lib/scheduler/types.ts`: domain types for employees, availability, staffing slots, assignments, diagnostics, and validation violations.

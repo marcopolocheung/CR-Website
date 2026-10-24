@@ -129,10 +129,10 @@ export function TemplateEditor({
 }) {
   if (readOnly) {
     return (
-      <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
-        <h2 className="font-semibold">Shift rules (locked)</h2>
+      <section className="border-t border-zinc-100 p-4 print:hidden">
+        <h3 className="font-semibold">Shift rules (locked)</h3>
         <p className="mt-0.5 text-sm text-zinc-600">
-          The spots below are locked for this station — enter the staff password on the Staff tab to change this week’s rules. You build
+          The spots below are locked for this station — enter the staff password in Employee settings above to change this week’s rules. You build
           the week by putting the crew into them and moving people around.
         </p>
         <div className="mt-3 space-y-3">
@@ -180,10 +180,10 @@ export function TemplateEditor({
   }
 
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
+    <section className="border-t border-zinc-100 p-4 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="font-semibold">Shift rules</h2>
+          <h3 className="font-semibold">Shift rules</h3>
           <p className="mt-0.5 text-sm text-zinc-600">Who the restaurant needs on each shift for this week. Add, remove, or change any spot.</p>
           <p className="mt-0.5 text-xs text-zinc-500">
             Extra 12-7 / 4-7 help goes here as an added spot with exact times (e.g. Mid 12:00 PM - 4:00 PM,

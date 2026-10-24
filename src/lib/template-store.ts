@@ -58,7 +58,7 @@ export async function saveTemplate(
     body: JSON.stringify({ template, baseRev }),
   })
   if (status === 401) throw new StoreAuthError()
-  if (status === 400) throw new StoreRejectedError('The server refused these shift rules. Fix the spots marked in red on the Shift rules tab.')
+  if (status === 400) throw new StoreRejectedError('The server refused these shift rules. Open Shift rules in Employee settings and fix the spots marked in red.')
   if (status === 503) {
     throw new StoreUnavailableError(
       'Saving is not set up on the server yet. Ask whoever manages the website to finish setup.',
