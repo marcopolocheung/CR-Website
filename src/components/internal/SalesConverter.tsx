@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { useInternalLanguage } from './InternalLanguage'
+import { errorKey, type Message, type TranslationKey } from '@/lib/internal-tools/i18n'
 import * as XLSX from 'xlsx'
 import { extractMetrics } from '@/lib/converter/parseToast'
 import { downloadFilledWorkbook } from '@/lib/converter/fillTemplate'
@@ -31,20 +33,21 @@ export default function SalesConverter({
 }: {
   loadCashout: ((location: string, date: string) => Promise<CashoutTotals | null>) | null
 }) {
+  const { t: tr } = useInternalLanguage()
   const [form, setForm] = useState(EMPTY_FORM)
   const [files, setFiles] = useState<FileMap>({ general: null, lunch: null, dinner: null })
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState<Message | null>(null)
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm({ ...form, [e.target.name]: e.target.value })
 
   async function fillFromCashout() {
     if (!loadCashout) return
-    if (!form.location || !form.date) return setStatus('Pick the location and date first.')
-    setStatus('Loading cash-out…')
+    if (!form.location || !form.date) return setStatus({ key: 'imports.pickContext' })
+    setStatus({ key: 'imports.loadingCashout' })
     try {
       const totals = await loadCashout(form.location, form.date)
-      if (!totals) return setStatus(`No cash-out saved for ${form.date}.`)
+      if (!totals) return setStatus({ key: 'imports.noCashout', params: { date: form.date } })
       setForm(f => ({
         ...f,
         amDeposit: dollars(totals.amDeposit),
@@ -52,15 +55,15 @@ export default function SalesConverter({
         amOverShort: dollars(totals.amOverShort),
         pmOverShort: dollars(totals.pmOverShort),
       }))
-      setStatus(`Filled from the cash-out for ${form.date}.`)
+      setStatus({ key: 'imports.filledCashout', params: { date: form.date } })
     } catch (err) {
-      setStatus((err as Error).message)
+      setStatus({ key: errorKey(err) })
     }
   }
 
   async function handleConvert() {
     if (!files.general || !files.lunch || !files.dinner)
-      return alert('Please upload all three files (general, lunch, dinner)')
+      return alert(tr('imports.uploadAll'))
 
     try {
       const [generalWb, lunchWb, dinnerWb] = await Promise.all(
@@ -74,10 +77,10 @@ export default function SalesConverter({
 
       setFiles({ general: null, lunch: null, dinner: null })
       setForm(EMPTY_FORM)
-      setStatus('')
+      setStatus(null)
     } catch (err) {
       console.error(err)
-      alert('Something went wrong — see console')
+      alert(tr('imports.failed'))
     }
   }
 
@@ -85,36 +88,35 @@ export default function SalesConverter({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 max-w-3xl">
-      <h2 className="text-xl font-semibold text-gray-900">Daily sales report</h2>
+      <h2 className="text-xl font-semibold text-gray-900">{tr('bookkeeping.sales')}</h2>
       <p className="text-sm text-gray-600 mt-1 mb-5">
-        Upload <strong>only Excel (.xlsx) files</strong> exported from toasttab.com. Remember to enable editing in Excel to see
-        every change.
+        {tr('imports.salesInstructions')}
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="sc-first" className={labelClass}>First name</label>
+          <label htmlFor="sc-first" className={labelClass}>{tr('imports.firstName')}</label>
           <input id="sc-first" name="firstName" value={form.firstName} onChange={handleInput} autoComplete="given-name" className={inputClass} />
         </div>
         <div>
-          <label htmlFor="sc-last" className={labelClass}>Last name</label>
+          <label htmlFor="sc-last" className={labelClass}>{tr('imports.lastName')}</label>
           <input id="sc-last" name="lastName" value={form.lastName} onChange={handleInput} autoComplete="family-name" className={inputClass} />
         </div>
         <div>
-          <label htmlFor="sc-day" className={labelClass}>Day of week</label>
+          <label htmlFor="sc-day" className={labelClass}>{tr('imports.day')}</label>
           <select id="sc-day" name="day" value={form.day} onChange={handleInput} className={inputClass}>
-            <option value="" disabled>Select day</option>
-            {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+            <option value="" disabled>{tr('imports.selectDay')}</option>
+            {DAYS.map(d => <option key={d} value={d}>{tr(`weekday.${d.toLowerCase()}` as TranslationKey)}</option>)}
           </select>
         </div>
         <div>
-          <label htmlFor="sc-date" className={labelClass}>Date</label>
+          <label htmlFor="sc-date" className={labelClass}>{tr('common.date')}</label>
           <input id="sc-date" name="date" type="date" value={form.date} onChange={handleInput} className={inputClass} />
         </div>
         <div className="sm:col-span-2">
-          <label htmlFor="sc-location" className={labelClass}>Location</label>
+          <label htmlFor="sc-location" className={labelClass}>{tr('imports.location')}</label>
           <select id="sc-location" name="location" value={form.location} onChange={handleInput} className={inputClass}>
-            <option value="" disabled>Select China Rose location</option>
+            <option value="" disabled>{tr('imports.selectLocation')}</option>
             {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
         </div>
@@ -123,7 +125,7 @@ export default function SalesConverter({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
         {(['general', 'lunch', 'dinner'] as FileKey[]).map(key => (
           <div key={key}>
-            <label htmlFor={`sc-file-${key}`} className={labelClass}>{key[0].toUpperCase() + key.slice(1)} report</label>
+            <label htmlFor={`sc-file-${key}`} className={labelClass}>{tr(`imports.${key}`)}</label>
             <input
               id={`sc-file-${key}`}
               type="file"
@@ -139,25 +141,25 @@ export default function SalesConverter({
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-gray-900">Deposits</h3>
+        <h3 className="text-sm font-semibold text-gray-900">{tr('dashboard.deposits')}</h3>
         {loadCashout ? (
           <button
             type="button"
             onClick={fillFromCashout}
             className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
           >
-            Fill from cash-out
+            {tr('imports.fillCashout')}
           </button>
         ) : (
-          <span className="text-xs text-gray-500">Unlock the Cash out tab to fill these from a saved day.</span>
+          <span className="text-xs text-gray-500">{tr('imports.unlockCashout')}</span>
         )}
       </div>
       <div className="grid grid-cols-2 gap-4 mt-2">
         {([
-          ['amDeposit', 'AM deposit'],
-          ['amOverShort', 'AM over (short)'],
-          ['pmDeposit', 'PM deposit'],
-          ['pmOverShort', 'PM over (short)'],
+          ['amDeposit', tr('cash.shiftDeposit', { shift: 'AM' })],
+          ['amOverShort', tr('cash.shiftOverShort', { shift: 'AM' })],
+          ['pmDeposit', tr('cash.shiftDeposit', { shift: 'PM' })],
+          ['pmOverShort', tr('cash.shiftOverShort', { shift: 'PM' })],
         ] as const).map(([name, label]) => (
           <div key={name}>
             <label htmlFor={`sc-${name}`} className={labelClass}>{label}</label>
@@ -165,14 +167,14 @@ export default function SalesConverter({
           </div>
         ))}
       </div>
-      <p role="status" className="mt-2 text-sm text-gray-700 min-h-5">{status}</p>
+      <p role="status" className="mt-2 text-sm text-gray-700 min-h-5">{status ? tr(status.key, status.params) : null}</p>
 
       <button
         onClick={handleConvert}
         disabled={!ready}
         className="mt-4 px-6 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Convert &amp; download
+        {tr('imports.download')}
       </button>
     </div>
   )
