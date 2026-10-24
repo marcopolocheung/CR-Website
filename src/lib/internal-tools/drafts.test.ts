@@ -24,6 +24,15 @@ test('complete context dimensions isolate drafts; store/date/task/station/shift/
   for (const c of variants) assert.equal(listDrafts(storage,c,isCashoutDraftSheet).sources.length,1)
   assert.throws(() => draftContextKey({ ...context, stationId: 'CR2-kitchen' }))
 })
+test('form type separates form drafts and leaves existing keys unchanged', () => {
+  const form: DraftContext = { task: 'form', storeId: 'CR3', businessDate: businessDate('2026-10-24')! }
+  // Exact pre-formType encoding, so older drafts are still found.
+  assert.equal(draftContextKey(form), encodeURIComponent(JSON.stringify(['form', 'CR3', '2026-10-24', null, null, null, null, null])))
+  const keys = [form, { ...form, formType: 'write-up' }, { ...form, formType: 'customer-complaint' }].map(draftContextKey)
+  assert.equal(new Set(keys).size, 3)
+  assert.throws(() => draftContextKey({ ...context, formType: 'write-up' }), 'formType only applies to form drafts')
+  assert.throws(() => draftContextKey({ ...form, formType: 'bad type!' }))
+})
 test('resuming forks into a new independent ID and preserves original source, preparer and values', () => {
   const storage = new MemoryStorage()
   const original = make('original')

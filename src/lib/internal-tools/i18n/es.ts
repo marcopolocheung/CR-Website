@@ -454,5 +454,10 @@ const es: Record<keyof typeof en, string> = {
   "forms.noMatches": "Ningún formulario guardado coincide con estos filtros.",
   "forms.loadFailed": "No se pudieron cargar los formularios guardados. Se conservan sus filtros.",
   "forms.retry": "Intentar de nuevo",
+  "formDrafts.writeUpTitle": "Nueva amonestación: elija la tienda, la fecha y su nombre",
+  "formDrafts.intro": "Su trabajo se guarda en este dispositivo mientras escribe, así que no se pierde al recargar o cerrar la pestaña. Solo queda en el servidor cuando presiona Guardar.",
+  "formDrafts.saved": "Guardado en el servidor. Esta copia permanece en el dispositivo como referencia.",
+  "formDrafts.alreadySaved": "Este borrador ya se guardó como amonestación. Guardarlo de nuevo crea una segunda amonestación aparte.",
+  "formDrafts.saveAnother": "Editar como amonestación nueva",
 }
 export default es
