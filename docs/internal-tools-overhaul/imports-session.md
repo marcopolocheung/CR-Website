@@ -1,13 +1,13 @@
 # Imports-first service session — 2026-10-24
 
-The user requested all import work before cash-out, including necessary shared prerequisites rather than unrelated task hopping. The latest explicit reminder is: “only need to open, no need to merge.” Create one reviewable PR per bounded task, maintain one ordered stack, leave all new PRs unmerged with auto-merge off. The earlier #132–#140 stack was merged under a separate explicit instruction; the new stack starts at origin/main `9084bee`. Do not treat that earlier merge instruction as permission to merge future PRs.
+The latest instruction is **open the current IMPORT-03 PR and stop**. Do not start another task after it. The user previously requested all import work before cash-out, including necessary shared prerequisites rather than unrelated task hopping. The latest explicit reminder is: “only need to open, no need to merge.” Create one reviewable PR per bounded task, maintain one ordered stack, leave all new PRs unmerged with auto-merge off. The earlier #132–#140 stack was merged under a separate explicit instruction; the new stack starts at origin/main `9084bee`. Do not treat that earlier merge instruction as permission to merge future PRs.
 
 ## Work and evidence
 
 - IMPORT-01 is merged (#140); its validation and workbook compatibility remain preserved.
 - IMPORT-02 implements extraction review/reconciliation. Canonical acceptance and commands are in [sales-review.md](sales-review.md) and [its brief](tasks/IMPORT-02.md). It is open as [PR #141](https://github.com/marcopolocheung/CR-Website/pull/141), base `main`, implementation commit `7d7bccf`; no merge/auto-merge.
-- Next is IMPORT-03, on a branch from the IMPORT-02 PR head and targeting that branch. Claim only that task; implement retained reviewed output/repeat downloads, explicit Start next report/replacement warning and accurate recovery/storage states.
-- Then implement the date-decision record and affected IMPORT-04/05 work. Identity, retention, history and schedule-comparison prerequisites remain explicit; do not mark all imports complete from only the early frontend tasks.
+- IMPORT-03 is open as [PR #142](https://github.com/marcopolocheung/CR-Website/pull/142), head `feat/overhaul-import-03`, base `feat/overhaul-import-02` (#141), implementation commit `5500abc`. Evidence: [retained imports](retained-imports.md). It remains unmerged with auto-merge off. Stop here; no next task is claimed.
+- When the user resumes work, implement the date-decision record and affected IMPORT-04/05 work. Identity, retention, history and schedule-comparison prerequisites remain explicit; do not mark all imports complete from only the early frontend tasks.
 
 ## User's date-policy delegation (not a staff observation)
 

@@ -10,6 +10,7 @@ import sys
 import tempfile
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
+from import_browser_helpers import set_source, confirm_replacement
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:3017'
 if urlparse(BASE).hostname not in ('localhost', '127.0.0.1'):
@@ -49,10 +50,10 @@ def run():
         page.locator('#sc-day').select_option('TUE')
         page.locator('#sc-location').select_option(index=1)
         for key in ('general', 'lunch', 'dinner'):
-            page.locator('#sc-file-' + key).set_input_files(source(key))
+            set_source(page, '#sc-file-' + key, source(key))
             expect(page.locator('#sc-file-' + key + '-feedback')).to_contain_text('File checks passed')
         expect(prepare).to_be_enabled()
-        page.locator('#sc-file-general').set_input_files(source('bad', 'bad-general.xlsx'))
+        set_source(page, '#sc-file-general', source('bad', 'bad-general.xlsx'))
         expect(page.locator('#sc-file-general')).to_have_attribute('aria-invalid', 'true')
         expect(page.locator('#sc-file-general-feedback')).to_contain_text('row 2')
         expect(page.locator('#sc-file-general-feedback')).to_contain_text('Revenue summary')
@@ -69,12 +70,13 @@ def run():
         with page.expect_file_chooser() as chosen:
             page.keyboard.press('Enter')
         chosen.value.set_files(source('general'))
+        confirm_replacement(page)
         expect(page.locator('#sc-file-general-feedback')).to_contain_text('pasó las comprobaciones')
         # Empty and unreadable source reports block only their own slot.
-        page.locator('#sc-file-dinner').set_input_files({'name': 'empty.xlsx', 'mimeType': 'application/octet-stream', 'buffer': b''})
+        set_source(page, '#sc-file-dinner', {'name': 'empty.xlsx', 'mimeType': 'application/octet-stream', 'buffer': b''})
         expect(page.locator('#sc-file-dinner-feedback')).to_contain_text('está vacío')
         expect(download).to_be_disabled()
-        page.locator('#sc-file-dinner').set_input_files(source('dinner'))
+        set_source(page, '#sc-file-dinner', source('dinner'))
         expect(prepare).to_be_enabled()
         # A delayed old file read must not overwrite the replacement's result.
         page.evaluate("""() => {
@@ -84,9 +86,9 @@ def run():
             return original.call(this);
           };
         }""")
-        page.locator('#sc-file-general').set_input_files(source('bad', 'slow-old.xlsx'))
+        set_source(page, '#sc-file-general', source('bad', 'slow-old.xlsx'))
         expect(page.locator('#sc-file-general-feedback')).to_contain_text('Comprobando')
-        page.locator('#sc-file-general').set_input_files(source('general', 'new-general.xlsx'))
+        set_source(page, '#sc-file-general', source('general', 'new-general.xlsx'))
         expect(page.locator('#sc-file-general-feedback')).to_contain_text('pasó las comprobaciones')
         page.evaluate('window.releaseOldFile()')
         expect(page.locator('#sc-file-general-feedback')).to_contain_text('pasó las comprobaciones')
@@ -122,11 +124,11 @@ def run():
         # Hours errors preserve metadata, filename, and source values across tabs/locales.
         page.locator('#tab-hours').tap()
         hours = page.locator('#panel-hours')
-        hdownload = hours.locator('button').last
+        hdownload = hours.locator('#hc-download')
         page.locator('#hc-location').select_option(index=2)
         page.locator('#hc-start').fill('2026-10-01')
         page.locator('#hc-end').fill('2026-10-31')
-        page.locator('#hc-file').set_input_files(source('badHours', 'bad-hours.csv'))
+        set_source(page, '#hc-file', source('badHours', 'bad-hours.csv'))
         expect(page.locator('#hc-file-feedback')).to_contain_text('Registro CSV 2')
         expect(page.locator('#hc-file-feedback')).to_contain_text('Registro CSV 3')
         expect(page.locator('#hc-file-feedback')).to_contain_text('Employee External Id')
@@ -138,11 +140,11 @@ def run():
         expect(page.locator('#sc-first')).to_have_value('Original preparer')
         page.locator('#tab-hours').tap()
         assert page.locator('#hc-file').evaluate('(el) => el.files[0].name') == 'bad-hours.csv'
-        page.locator('#hc-file').set_input_files({'name': 'wrong.csv', 'mimeType': 'text/csv', 'buffer': b'date,sales\n2026-10-20,5'})
+        set_source(page, '#hc-file', {'name': 'wrong.csv', 'mimeType': 'text/csv', 'buffer': b'date,sales\n2026-10-20,5'})
         expect(page.locator('#hc-file-feedback')).to_contain_text('not the expected')
-        page.locator('#hc-file').set_input_files({'name': 'malformed.csv', 'mimeType': 'text/csv', 'buffer': b'Employee External Id,Employee,Job Title,In Date,Out Date,Total Hours,Regular Hours,Overtime Hours\n"unfinished'})
+        set_source(page, '#hc-file', {'name': 'malformed.csv', 'mimeType': 'text/csv', 'buffer': b'Employee External Id,Employee,Job Title,In Date,Out Date,Total Hours,Regular Hours,Overtime Hours\n"unfinished'})
         expect(page.locator('#hc-file-feedback')).to_contain_text('format problem')
-        page.locator('#hc-file').set_input_files(source('hours'))
+        set_source(page, '#hc-file', source('hours'))
         expect(page.locator('#hc-file-feedback')).to_contain_text('File checks passed')
         # Date metadata is validated without filtering source records or changing payroll rules.
         page.locator('#hc-end').fill('2026-09-30')

@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { workbookOutput, downloadWorkbookOutput } from './workbook-output';
 
 let templateArrayBuffer = null;
 async function getTemplate() {
@@ -43,15 +44,10 @@ export async function createFilledWorkbook(cellMap, formData, templateBuffer) {
   return wb;
 }
 
-export async function downloadFilledWorkbook(cellMap, formData) {
+export async function generateSalesOutput(cellMap, formData) {
   try {
     const wb = await createFilledWorkbook(cellMap, formData, await getTemplate());
     const buffer = await wb.xlsx.writeBuffer();
-
-    const blob = new Blob(
-      [buffer],
-      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-    );
 
     let locationNumber = 'XX';
     if (formData?.location) {
@@ -82,15 +78,13 @@ export async function downloadFilledWorkbook(cellMap, formData) {
     const filename = `${datePart}_CR${locationNumber}_Daily_Sales_Report.xlsx`;
 
 
-    const a = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = filename;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-
+    return workbookOutput(filename, buffer);
   } catch (error) {
     console.error('Error in downloadFilledWorkbook:', error);
     throw error;
   }
+}
+
+export async function downloadFilledWorkbook(cellMap, formData) {
+  return downloadWorkbookOutput(await generateSalesOutput(cellMap, formData));
 }

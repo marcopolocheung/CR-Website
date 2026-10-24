@@ -6,6 +6,7 @@ import subprocess
 import sys
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
+from import_browser_helpers import set_source, confirm_replacement
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:3017'
 if urlparse(BASE).hostname not in ('localhost', '127.0.0.1'):
@@ -47,7 +48,7 @@ def run():
         page.wait_for_load_state('networkidle')
         page.locator('#tab-sales').tap()
         for slot in ('general', 'lunch', 'dinner'):
-            page.locator('#sc-file-' + slot).set_input_files(source('review-' + slot, slot + '-original.xlsx'))
+            set_source(page, '#sc-file-' + slot, source('review-' + slot, slot + '-original.xlsx'))
             expect(page.locator('#sc-file-' + slot + '-feedback')).to_contain_text('File checks passed')
         prepare, download = page.locator('#sc-prepare'), page.locator('#sc-download')
         prepare.tap()
@@ -90,7 +91,7 @@ def run():
         prepare.tap()
         expect(page.locator('#sales-reviewed')).not_to_be_checked()
         page.locator('#sales-reviewed').tap()
-        page.locator('#sc-file-general').set_input_files(source('general', 'general-original.xlsx'))
+        set_source(page, '#sc-file-general', source('general', 'general-original.xlsx'))
         expect(page.locator('#sales-review-title')).to_have_count(0)
         expect(download).to_be_disabled()
         expect(page.locator('#sc-file-general-feedback')).to_contain_text('File checks passed')
