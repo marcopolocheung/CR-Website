@@ -4,7 +4,7 @@ parent: DATA
 title: "Add D1 migrations, local configuration, and fixtures"
 priority: P0
 delivery_class: CODE_ONLY
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [DATA-01]
 activation_dependencies: []

@@ -4,7 +4,7 @@ parent: DATA
 title: "Prepare KV export and reconciliation tooling"
 priority: P0
 delivery_class: CODE_ONLY
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [DATA-01]
 activation_dependencies: []
