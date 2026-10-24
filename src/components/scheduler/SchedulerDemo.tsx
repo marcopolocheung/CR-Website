@@ -35,6 +35,10 @@ import { fetchGoldenMonth, fetchGoldenWeek, saveErrorMessage, type GoldenWeekDoc
 import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForWeek, publishedWeekFingerprint, templateHashForSlots } from '@/lib/schedule-share'
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
 import { useManagerCode } from './DemoGate'
+import { DEFAULT_STATION, isStationId, type Locale } from '@/lib/internal-tools/contracts'
+import { LOCALE_STORAGE_KEY } from '@/lib/internal-tools/i18n'
+import RequestsPanel from './RequestsPanel'
+import { useScheduleRequests } from './useScheduleRequests'
 import PublishPanel from './PublishPanel'
 import SchedulerNavigation, { type SchedulerView } from './SchedulerNavigation'
 import { DragState, DropFeedback, EmployeeDraft, GenerationReport, HistorySnapshot, MovePreview, ScheduleVariant, ShiftKey, StaffSnapshot, UNDO_LIMIT, WeekAssignments, allDays, assignmentFingerprint, blankDraft, buildFixIssues, buildMovePreview, candidatesForSlot, changesSince, cloneAssignmentList, cloneEmployeeList, cloneTemplate, cloneWeeks, createEmployeeId, diagnosticLabel, emptyAssignments, formatReportTime, fullDay, gapAvailability, onboardingStorageKey, proposeMovedAssignments, readOnboardingDismissed, readStaffSnapshots, roleLabel, rolesInUse, scheduleVariants, snapshotStorageKey, statusForWeek, unassignableReason, uniqueMessages } from './helpers'
@@ -200,6 +204,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [liveMonthWeeks, setLiveMonthWeeks] = useState<Record<string, boolean>>({})
   const [copyingPrior, setCopyingPrior] = useState(false)
   const managerCode = useManagerCode()
+  const requestStation = isStationId(restaurantId) ? restaurantId : DEFAULT_STATION
+  const requestSource = useScheduleRequests(requestStation, managerCode)
+  const [requestLocale, setRequestLocale] = useState<Locale>('en')
+  const [requestDirty, setRequestDirty] = useState(false)
+  useEffect(() => { try { if (localStorage.getItem(LOCALE_STORAGE_KEY) === 'es') setRequestLocale('es') } catch { /* optional preference */ } }, [])
   const [savingSetup, setSavingSetup] = useState(false)
   const [setupError, setSetupError] = useState('')
   const [setupNotice, setSetupNotice] = useState('')
@@ -339,7 +348,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     (assignmentFingerprint(assignments) !== (publishedBaselines[weekStart] ?? '') ||
       Boolean(publishedDoc && publishedDoc.visible !== (weekVisibility === 'on')))
   const hasUnsavedWork =
-    currentWeekUnpublished || otherWeeksWithEdits.length > 0 || rosterDirty || templateDirty || staffDirty
+    currentWeekUnpublished || otherWeeksWithEdits.length > 0 || rosterDirty || templateDirty || staffDirty || requestDirty
   const selectedRoles = availableRoles.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && (selectedRoles.length > 0 || draft.newHire)
 
@@ -1389,6 +1398,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       </header>
 
       <main className="mx-auto w-full max-w-none min-w-0 space-y-4 overflow-x-clip px-4 py-5">
+          <RequestsPanel key={requestStation} source={requestSource} employees={employees} weekStart={weekStart} token={managerCode}
+            locale={requestLocale} onLocaleChange={setRequestLocale} onDirtyChange={setRequestDirty} />
           {storeLoading && (
             <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">
               <h2 className="text-sm font-semibold text-zinc-900">Loading your saved schedule…</h2>
