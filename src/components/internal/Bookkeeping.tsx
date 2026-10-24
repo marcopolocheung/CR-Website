@@ -78,7 +78,7 @@ export default function Bookkeeping() {
         <SalesConverter loadCashout={token ? loadCashout : null} />
       </div>
       <div role="tabpanel" id="panel-hours" aria-labelledby="tab-hours" hidden={tab !== 'hours'}>
-        <HoursConverter />
+        <HoursConverter token={token} />
       </div>
     </div>
   )

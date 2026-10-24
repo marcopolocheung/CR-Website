@@ -47,7 +47,7 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | INV-08 | Include outstanding orders in suggestions | P1 | `CODE_AND_EXTERNAL` | INV-07 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [INV-08](tasks/INV-08.md) |
 | INV-09 | Add agreed waste and transfer records | P2 | `CODE_AND_EXTERNAL` | INV-07, DEC-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [INV-09](tasks/INV-09.md) |
 | INV-10 | Verify historical counts after catalog changes | P0 | `CODE_AND_EXTERNAL` | INV-01, INV-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [INV-10](tasks/INV-10.md) |
-| IMPORT-06 | Map employee IDs and show unmatched rows | P1 | `CODE_AND_EXTERNAL` | IMPORT-05, DATA-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [IMPORT-06](tasks/IMPORT-06.md) |
+| IMPORT-06 | Map employee IDs and show unmatched rows | P1 | `CODE_AND_EXTERNAL` | IMPORT-05, DATA-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [IMPORT-06](tasks/IMPORT-06.md) |
 | IMPORT-07 | Add import history and duplicate handling | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, IMPORT-02, IMPORT-05, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [IMPORT-07](tasks/IMPORT-07.md) |
 | IMPORT-08 | Add scheduled-versus-actual reporting | P2 | `CODE_AND_EXTERNAL` | IMPORT-06, IMPORT-07, SCH-06 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [IMPORT-08](tasks/IMPORT-08.md) |
 | FORM-04 | Add attachments and append-only amendments | P1 | `CODE_AND_EXTERNAL` | DATA-06, DATA-05, FORM-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [FORM-04](tasks/FORM-04.md) |
@@ -55,6 +55,7 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | FORM-06 | Implement the selected next digital form | P2 | `CODE_AND_EXTERNAL` | DEC-06, FORM-02, FORM-03, DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [FORM-06](tasks/FORM-06.md) |
 | DASH-03 | Surface closes, differences, and count progress | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, CASH-05, INV-01 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-03](tasks/DASH-03.md) |
 | DASH-04 | Surface deliveries, schedule changes, and follow-ups | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, INV-07, SCH-04, FORM-05 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-04](tasks/DASH-04.md) |
+| DATA-04-IMPORT | Persist reviewed import directory snapshots | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [DATA-04-IMPORT](tasks/DATA-04-IMPORT.md) |
 
 ## External operations ready to perform
 
@@ -115,6 +116,9 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | IMPORT-03 | Preserve inputs and repeat downloads | P0 | `CODE_ONLY` | IMPORT-01, IMPORT-02 | — | complete | Codex | D/D/NA/NA | [IMPORT-03](tasks/IMPORT-03.md) |
 | IMPORT-04 | Unify date/store handling and cash-out linkage | P1 | `CODE_ONLY` | IMPORT-02, DEC-01 | — | complete | Codex | D/D/NA/NA | [IMPORT-04](tasks/IMPORT-04.md) |
 | IMPORT-05 | Add hours previews and explicit date ranges | P0 | `CODE_ONLY` | IMPORT-01, DEC-01 | — | complete | Codex | D/D/NA/NA | [IMPORT-05](tasks/IMPORT-05.md) |
+| IMPORT-06 | Map employee IDs and show unmatched rows | P1 | `CODE_AND_EXTERNAL` | IMPORT-05, DATA-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [IMPORT-06](tasks/IMPORT-06.md) |
+| DEC-04-IMPORT | Approve explicit identity mappings for imports | P1 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-04-IMPORT](tasks/DEC-04-IMPORT.md) |
+| DATA-04-IMPORT | Persist reviewed import directory snapshots | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [DATA-04-IMPORT](tasks/DATA-04-IMPORT.md) |
 
 ## All tasks
 
@@ -175,7 +179,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | IMPORT-03 | Preserve inputs and repeat downloads | P0 | `CODE_ONLY` | IMPORT-01, IMPORT-02 | — | complete | Codex | D/D/NA/NA | [IMPORT-03](tasks/IMPORT-03.md) |
 | IMPORT-04 | Unify date/store handling and cash-out linkage | P1 | `CODE_ONLY` | IMPORT-02, DEC-01 | — | complete | Codex | D/D/NA/NA | [IMPORT-04](tasks/IMPORT-04.md) |
 | IMPORT-05 | Add hours previews and explicit date ranges | P0 | `CODE_ONLY` | IMPORT-01, DEC-01 | — | complete | Codex | D/D/NA/NA | [IMPORT-05](tasks/IMPORT-05.md) |
-| IMPORT-06 | Map employee IDs and show unmatched rows | P1 | `CODE_AND_EXTERNAL` | IMPORT-05, DATA-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [IMPORT-06](tasks/IMPORT-06.md) |
+| IMPORT-06 | Map employee IDs and show unmatched rows | P1 | `CODE_AND_EXTERNAL` | IMPORT-05, DATA-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [IMPORT-06](tasks/IMPORT-06.md) |
 | IMPORT-07 | Add import history and duplicate handling | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, IMPORT-02, IMPORT-05, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [IMPORT-07](tasks/IMPORT-07.md) |
 | IMPORT-08 | Add scheduled-versus-actual reporting | P2 | `CODE_AND_EXTERNAL` | IMPORT-06, IMPORT-07, SCH-06 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [IMPORT-08](tasks/IMPORT-08.md) |
 | FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [FORM-01](tasks/FORM-01.md) |
@@ -204,3 +208,5 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | LATER-05 | Personal calendars and notifications | P2 | `CODE_AND_EXTERNAL` | DATA-04, SCH-04 | — | deferred | unassigned | P/P/P/P | [LATER-05](tasks/LATER-05.md) |
 | LATER-06 | Advanced scheduling optimization | P2 | `CODE_AND_EXTERNAL` | SCH-03, SCH-05, SCH-06 | — | deferred | unassigned | P/P/P/P | [LATER-06](tasks/LATER-06.md) |
 | LATER-07 | Ordering and QR prototype disposition | P2 | `DECISION` | — | — | deferred | unassigned | P/P/NA/NA | [LATER-07](tasks/LATER-07.md) |
+| DEC-04-IMPORT | Approve explicit identity mappings for imports | P1 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-04-IMPORT](tasks/DEC-04-IMPORT.md) |
+| DATA-04-IMPORT | Persist reviewed import directory snapshots | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [DATA-04-IMPORT](tasks/DATA-04-IMPORT.md) |

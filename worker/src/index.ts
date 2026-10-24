@@ -1,3 +1,4 @@
+import { directoryRecord, saveDirectory } from './import-directory'
 interface KVNamespace {
   get(key: string): Promise<string | null>
   put(key: string, value: string, options?: { expirationTtl?: number; metadata?: unknown }): Promise<void>
@@ -10,6 +11,8 @@ interface KVNamespace {
 
 interface Env {
   SCHEDULES: KVNamespace
+  /** Optional additive service binding; absence preserves legacy capabilities. */
+  INTERNAL_DB?: LocalBindings['INTERNAL_DB']
   ALLOWED_ORIGIN?: string
   /** Manager write token for the golden schedule. Never shipped to browsers; the manager types it per save. */
   SCHEDULE_WRITE_TOKEN?: string
@@ -1070,6 +1073,21 @@ export default {
       }
       if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
       return json({ ok: true }, 200, request, env)
+    }
+
+    const directoryMatch = path.match(/^\/api\/internal\/import-directory\/(CR2|CR3)$/)
+    if (directoryMatch && (request.method === 'GET' || request.method === 'PUT')) {
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (!env.INTERNAL_DB) return json({ schemaVersion: 1, error: { code: 'backend_unconfigured' } }, 503, request, env, noStore)
+      const store = directoryMatch[1] as 'CR2' | 'CR3'
+      try {
+        if (request.method === 'GET') return json({ record: await directoryRecord(env.INTERNAL_DB, store) }, 200, request, env, noStore)
+        if (!(await checkWriteThrottle(env, clientIp(request)))) return json({ error: 'rate_limited' }, 429, request, env)
+        const result = await saveDirectory(env.INTERNAL_DB, store, await readBody(request, 300000))
+        return json(result.ok ? { record: result.record, replayed: result.replayed } : result.body, result.ok ? 200 : result.status, request, env, noStore)
+      } catch { return json({ schemaVersion: 1, error: { code: 'unavailable' } }, 503, request, env, noStore) }
     }
 
     // Cash-out days: manager token for reads and writes — these are cash figures.
