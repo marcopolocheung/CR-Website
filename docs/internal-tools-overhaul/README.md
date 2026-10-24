@@ -1,5 +1,7 @@
 # Internal-tools overhaul: agent-ready work package
 
+Current cash scope is the owner-approved [DEC-02 bookkeeping notebook](cashout-rules.md): always retain $100 per cashier drawer, calculate Toast/Z differences and save figures for later lookup. CASH-04/05/06 operational workflows are deferred; ordinary saving/history remains baseline. Earlier research and handoff snapshots do not override this decision.
+
 This package assigns future work for China Rose's English/Spanish internal product on shared computers and tablets. The deliverable here is documentation. No application change, resource creation, data migration, deployment, staff test, or live verification was performed. All 84 tasks remain ready, planned, blocked, or deferred, with pending applicable milestones.
 
 Start with the [tracker](tracker.md), claim one [task brief](tasks/DATA-01.md), and follow the [agent working guide](agent-guide.md). Individual briefs are canonical; update the tracker at the same time. One numbered outcome has one file; no further splits are currently needed. Prefixes preserve the parent workstream. Future splits must retain a parent reference and explicit independently deliverable scope.

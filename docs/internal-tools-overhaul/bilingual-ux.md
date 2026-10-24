@@ -6,7 +6,7 @@ The product supports English and Spanish on shared computers and tablets. Docume
 
 Keep store, business date/week, relevant station/shift, and English / Español control visible while scrolling. Use explicit Store versus Station labels. A remembered device selection is a convenience, not confirmation of the next person's context. Show Resume this draft and Start new with task/store/date/preparer/time before applying a saved draft. Readable exact-record links should restore context after validation, including when entering from the dashboard.
 
-Use one clear main action per stage: Finish count, Review close, Publish schedule, or Download report. Keep repetitive denomination/count entry fast in a table or roomy list; do not force a page per denomination/item. Separate catalog/rule/template editing from routine entry. Preserve branding and the existing recognizable paper reports.
+Use one clear main action per stage: Finish count, Save cash out, Publish schedule, or Download report. Cash uses the [DEC-02 bookkeeping notebook scope](cashout-rules.md); review states and physical deposits are deferred. Keep repetitive denomination/count entry fast in a table or roomy list; do not force a page per denomination/item. Separate catalog/rule/template editing from routine entry. Preserve branding and the existing recognizable paper reports.
 
 ## Dictionaries and language independence
 
@@ -17,8 +17,8 @@ Use stable namespaced keys and local dictionaries. Include navigation, instructi
 | Cash-out | Cierre de caja | Closing task, not a payroll deduction |
 | Count inventory | Contar inventario | Routine count entry |
 | Schedule | Horario | Staff schedule |
-| Starting cash | Fondo inicial | DEC-02-approved retained starting amount |
-| Expected cash | Efectivo esperado | Computed expected figure, distinct from actual deposit |
+| Starting cash | Fondo inicial | Always $100 per cashier drawer under DEC-02 |
+| Expected cash | Efectivo esperado | Entered Toast/Z expectation or computed turn-in, with its basis explicit; no actual bank deposit claim |
 | Difference | Diferencia | Signed comparison with explicit basis |
 | Items remaining | Artículos pendientes | Unfinished line count, not zero stock |
 | Review changes | Revisar cambios | Compare before committing/publishing |

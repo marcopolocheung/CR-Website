@@ -1,12 +1,12 @@
 ---
 id: DASH-03
 parent: DASH
-title: "Surface closes, differences, and count progress"
+title: "Surface recorded cash differences and count progress"
 priority: P1
 delivery_class: CODE_AND_EXTERNAL
 status: planned
 owner: unassigned
-implementation_dependencies: [DASH-01, DASH-02, CASH-05, INV-01]
+implementation_dependencies: [DASH-01, DASH-02, CASH-08, INV-01]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]
 implementation: pending
 local_verification: pending
@@ -14,11 +14,11 @@ external_activation: pending
 live_verification: pending
 ---
 
-# DASH-03 — Surface closes, differences, and count progress
+# DASH-03 — Surface recorded cash differences and count progress
 
 ## Outcome and scope
 
-Build queue summaries for incomplete closes, unresolved differences, and count sessions.
+Show recorded notebook cash differences with exact saved-record links alongside inventory count progress. Under [DEC-02](../cashout-rules.md), cash figures are bookkeeping observations, not an unresolved-review queue. Do not infer that a missing record is an unsubmitted close, that a difference requires resolution, or that saved cash was physically deposited.
 
 Preserve manager-gated cash summaries and public/private boundaries. Derive outstanding work from service records; do not create an unrelated manually maintained checklist or expose private records publicly.
 
@@ -40,7 +40,7 @@ See [current-state inventory](../current-state.md) and [supporting research](../
 
 - [DASH-01](DASH-01.md) at `implemented` (or `complete`).
 - [DASH-02](DASH-02.md) at `implemented` (or `complete`).
-- [CASH-05](CASH-05.md) at `implemented` (or `complete`).
+- [CASH-08](CASH-08.md) at `implemented` (or `complete`) for saved notebook records/revisions; deferred CASH-05 is not a prerequisite.
 - [INV-01](INV-01.md) at `implemented` (or `complete`).
 
 **Needed to activate:**
@@ -56,15 +56,15 @@ Affected areas: src/components/internal/Dashboard.tsx; src/lib/dashboard.ts; src
 
 ## Implementation checklist
 
-- [ ] Derive work from persisted states and include exact record links
-- [ ] Separate absent records from completed zero-difference closes
+- [ ] Derive cash figures from saved notebook records and inventory work from persisted count states; include exact record links
+- [ ] Separate absent notebook records from saved records with a measured zero difference
 - [ ] Compare card totals with service lists for both stores
 - [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Derive work from persisted states and include exact record links. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Separate absent records from completed zero-difference closes. Record fixture/input, expected result, actual result, and evidence.
+- [ ] Scenario 1: Derive cash figures from saved notebook records and inventory work from persisted count states; include exact record links. Record fixture/input, expected result, actual result, and evidence.
+- [ ] Scenario 2: Separate absent notebook records from saved records with a measured zero difference. Record fixture/input, expected result, actual result, and evidence.
 - [ ] Scenario 3: Compare card totals with service lists for both stores. Record fixture/input, expected result, actual result, and evidence.
 - [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
 - [ ] Record local results separately from staging activation and production/live results.
