@@ -4,7 +4,7 @@ parent: IMPORT
 title: "Unify date/store handling and cash-out linkage"
 priority: P1
 delivery_class: CODE_ONLY
-status: blocked
+status: ready
 owner: unassigned
 implementation_dependencies: [IMPORT-02, DEC-01]
 activation_dependencies: []
