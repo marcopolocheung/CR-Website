@@ -471,6 +471,19 @@ export function readOnboardingDismissed() {
   }
 }
 
+export const layoutStorageKey = 'chinarose.scheduler.layout'
+
+export type SchedulerLayout = 'new' | 'classic'
+
+/** The new layout is the default; only an explicit choice of Classic opts out. */
+export function readLayoutPreference(): SchedulerLayout {
+  try {
+    return window.localStorage.getItem(layoutStorageKey) === 'classic' ? 'classic' : 'new'
+  } catch {
+    return 'new'
+  }
+}
+
 export function statusForWeek(
   weekStatus: Record<string, WeekStatus>,
   weekStart: string,

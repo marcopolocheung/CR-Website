@@ -14,6 +14,15 @@ function localTime() {
   const now = new Date()
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 }
+/** Plain dates for managers: "Mon, Oct 20" or "Mon, Oct 20, 4:36 PM". */
+function formatWhen(value: string) {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value)
+  const date = new Date(dateOnly ? `${value}T00:00:00` : value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString(undefined, dateOnly
+    ? { weekday: 'short', month: 'short', day: 'numeric' }
+    : { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
 type Attempt = { previous: RequestRecord | null; data: RequestData; preparer: string; operation: string; kind: 'entry' | 'review'; id: string }
 export default function RequestsPanel({ source, employees, weekStart, token, locale, onLocaleChange, onDirtyChange }: {
   source: ScheduleRequestsSource; employees: Employee[]; weekStart: string; token: string; locale: Locale; onLocaleChange: (locale: Locale) => void; onDirtyChange: (dirty: boolean) => void
@@ -86,10 +95,10 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
   const active = source.phase === 'ready' && !busy && !attempt
   return <section id="schedule-requests" className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm print:hidden" aria-label={t('requests.title')}>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <button type="button" className={button} aria-expanded={open} aria-controls="schedule-requests-panel" onClick={() => setOpen(value => !value)}>{t('requests.title')} · {requests.filter(item => item.status === 'pending').length}</button>
+      <button type="button" className={button} aria-expanded={open} aria-controls="schedule-requests-panel" onClick={() => setOpen(value => !value)}>{t('requests.title')} · {t('requests.waiting', { count: requests.filter(item => item.status === 'pending').length })}</button>
       <div role="group" aria-label={t('requests.language')} className="flex gap-2">{(['en', 'es'] as const).map(language => <button key={language} type="button" className={button} lang={language} aria-pressed={locale === language} onClick={() => { onLocaleChange(language); try { localStorage.setItem(LOCALE_STORAGE_KEY, language) } catch { /* optional preference */ } }}>{language === 'en' ? 'English' : 'Español'}</button>)}</div>
     </div>
-    <p className="mt-2 text-sm text-zinc-700" role="status">{t(source.phase === 'ready' ? 'requests.loaded' : source.phase === 'loading' ? 'requests.loading' : source.phase === 'unconfigured' ? 'requests.unconfigured' : source.phase === 'uncertain' ? 'requests.uncertain' : 'requests.failed', { station: source.station, revision: source.record?.revision ?? 0 })}</p>
+    <p className="mt-2 text-sm text-zinc-700" role="status">{t(source.phase === 'ready' ? 'requests.loaded' : source.phase === 'loading' ? 'requests.loading' : source.phase === 'unconfigured' ? 'requests.unconfigured' : source.phase === 'uncertain' ? 'requests.uncertain' : 'requests.failed')}</p>
     {error && <p className="mt-2 font-medium text-red-800" role="alert">{t(error)}</p>}
     {notice && <p className="mt-2 text-sm text-green-900" role="status">{t(notice)}</p>}
     <div id="schedule-requests-panel" hidden={!open} className="mt-4 space-y-5" lang={locale}>
@@ -102,7 +111,7 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
       <form onSubmit={submit}>
         <h2 className="font-semibold">{t('requests.new')}</h2>
         <fieldset disabled={!active || requests.length >= MAX_REQUESTS} className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label>{t('requests.employee')}<select className={field} aria-label={t('requests.employee')} value={employeeId} onChange={event => { setEmployeeId(event.target.value); setNotice(null) }} required><option value="">{t('requests.choose')}</option>{employees.filter(item => item.active).map(item => <option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}</select></label>
+          <label>{t('requests.employee')}<select className={field} aria-label={t('requests.employee')} value={employeeId} onChange={event => { setEmployeeId(event.target.value); setNotice(null) }} required><option value="">{t('requests.choose')}</option>{employees.filter(item => item.active).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
           <label>{t('requests.kind')}<select className={field} aria-label={t('requests.kind')} value={kind} onChange={event => setKind(event.target.value as typeof kind)}><option value="time-off">{t('requests.timeOff')}</option><option value="availability">{t('requests.availability')}</option></select></label>
           <label>{t('requests.enteredBy')}<input className={field} value={preparer} maxLength={120} onChange={event => setPreparer(event.target.value)} required autoComplete="off" /></label>
           <label>{t('requests.start')}<input className={field} type="date" value={start} onChange={event => setStart(event.target.value)} required /></label>
@@ -110,7 +119,7 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
           <label>{t('requests.received')}<input className={field} type="datetime-local" aria-label={t('requests.received')} value={received} onChange={event => setReceived(event.target.value)} required /><span className="text-xs">{t('requests.deviceTime')}</span></label>
           {kind === 'availability' && <><label>{t('requests.from')}<input className={field} type="time" value={from} onChange={event => setFrom(event.target.value)} required /></label><label>{t('requests.until')}<input className={field} type="time" value={until} onChange={event => setUntil(event.target.value)} required /></label><label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={nextDay} onChange={event => setNextDay(event.target.checked)} />{t('requests.nextDay')}</label></>}
           <label className="sm:col-span-2">{t('requests.reason')}<textarea className={field} aria-label={t('requests.reason')} value={reason} maxLength={1000} onChange={event => { setReason(event.target.value); setNotice(null) }} /></label>
-          <div className="flex items-end"><button className={`${button} bg-zinc-900 text-white hover:bg-zinc-700`} type="submit" disabled={!preparer.trim() || !employeeId}>{t(busy ? 'requests.saving' : 'requests.savePending')}</button></div>
+          <div className="flex items-end"><button className={button} type="submit" disabled={!preparer.trim() || !employeeId}>{t(busy ? 'requests.saving' : 'requests.savePending')}</button></div>
         </fieldset>
         {requests.length >= MAX_REQUESTS && <p role="alert">{t('requests.capacity')}</p>}
       </form>
@@ -119,12 +128,12 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
         <h2 className="font-semibold">{t(`requests.${status}`)}</h2>
         {!requests.some(item => item.status === status) && <p className="mt-1 text-sm text-zinc-600">{t('requests.empty')}</p>}
         <ul className="mt-2 space-y-3">{requests.filter(item => item.status === status).map(item => <li key={item.id} className="rounded border border-zinc-300 p-3">
-          <h3 className="font-semibold">{item.employee.name} · {item.startDate} – {item.endDate} · {t(item.kind === 'time-off' ? 'requests.timeOff' : 'requests.availability')}</h3>
+          <h3 className="font-semibold">{item.employee.name} · {formatWhen(item.startDate)} – {formatWhen(item.endDate)} · {t(item.kind === 'time-off' ? 'requests.timeOff' : 'requests.availability')}</h3>
           <p className="break-words whitespace-pre-wrap">{item.reason}</p>
           {item.ranges.length > 0 && <p>{item.ranges.map(range => `${String(Math.floor(range.start / 60)).padStart(2, '0')}:${String(range.start % 60).padStart(2, '0')} – ${String(Math.floor((range.end % 1440) / 60)).padStart(2, '0')}:${String(range.end % 60).padStart(2, '0')}${range.end >= 1440 ? ' (+1)' : ''}`).join(', ')}</p>}
-          <p className="mt-1 break-words text-xs text-zinc-600">{item.employee.stationId} · {item.employee.sourceEmployeeId} · {t('requests.received')}: {item.requestedAt} · {t('requests.enteredBy')}: {item.enteredBy} · {item.enteredAt}</p>
+          <p className="mt-1 break-words text-xs text-zinc-600">{t('requests.received')}: {formatWhen(item.requestedAt)} · {t('requests.enteredBy')}: {item.enteredBy} · {formatWhen(item.enteredAt)}</p>
           {requests.some(other => other.id !== item.id && other.status !== 'declined' && requestsOverlap(item, other)) && <p className="mt-1 text-sm text-amber-900">{t('requests.overlapHint')}</p>}
-          {item.review ? <p className="mt-2 break-words whitespace-pre-wrap text-sm">{t('requests.reviewer')}: {item.review.by} · {item.review.at} · {item.review.reason}</p> : <div className="mt-3 space-y-2"><label className="block">{t('requests.reviewReason')}<textarea className={field} aria-label={t('requests.reviewReason')} value={reviewReasons[item.id] ?? ''} maxLength={1000} disabled={!active} onChange={event => setReviewReasons(current => ({ ...current, [item.id]: event.target.value }))} /></label><div className="flex flex-wrap gap-2"><button type="button" className={button} disabled={!active || !reviewer.trim()} onClick={() => review(item, 'approved')}>{t('requests.approve')}</button><button type="button" className={button} disabled={!active || !reviewer.trim()} onClick={() => review(item, 'declined')}>{t('requests.decline')}</button></div></div>}
+          {item.review ? <p className="mt-2 break-words whitespace-pre-wrap text-sm">{t('requests.reviewer')}: {item.review.by} · {formatWhen(item.review.at)} · {item.review.reason}</p> : <div className="mt-3 space-y-2"><label className="block">{t('requests.reviewReason')}<textarea className={field} aria-label={t('requests.reviewReason')} value={reviewReasons[item.id] ?? ''} maxLength={1000} disabled={!active} onChange={event => setReviewReasons(current => ({ ...current, [item.id]: event.target.value }))} /></label><div className="flex flex-wrap gap-2"><button type="button" className={button} disabled={!active || !reviewer.trim()} onClick={() => review(item, 'approved')}>{t('requests.approve')}</button><button type="button" className={button} disabled={!active || !reviewer.trim()} onClick={() => review(item, 'declined')}>{t('requests.decline')}</button></div></div>}
         </li>)}</ul>
       </section>)}
     </div>

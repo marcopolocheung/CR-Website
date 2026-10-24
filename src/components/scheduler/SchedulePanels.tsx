@@ -56,6 +56,7 @@ export function GuidedFixPanel({
   onIgnore,
   onShowIgnored,
   canAddEmployee = true,
+  emphasizeChoose = true,
 }: {
   nextIssue?: FixIssue
   weekStart: string
@@ -72,6 +73,8 @@ export function GuidedFixPanel({
   onIgnore: () => void
   onShowIgnored: () => void
   canAddEmployee?: boolean
+  /** The new layout keeps the action bar's dark button the only primary; the panel stays secondary. */
+  emphasizeChoose?: boolean
 }) {
   if (!nextIssue) {
     return (
@@ -127,7 +130,7 @@ export function GuidedFixPanel({
           <p className={`mt-1 text-sm ${isBlocker ? 'text-red-900' : 'text-amber-900'}`}>{nextIssue.detail}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button tone="primary" onClick={onChooseEmployee} icon="target" disabled={!nextIssue.slot}>
+          <Button tone={emphasizeChoose ? 'primary' : 'plain'} onClick={onChooseEmployee} icon="target" disabled={!nextIssue.slot}>
             Choose employee
           </Button>
           {canAddEmployee && (
@@ -292,14 +295,22 @@ export function MonthStrip({
   )
 }
 
-export function GenerationReportBanner({ report, onDismiss }: { report: GenerationReport; onDismiss: () => void }) {
+export function GenerationReportBanner({
+  report,
+  onDismiss,
+  details = [],
+}: {
+  report: GenerationReport
+  onDismiss: () => void
+  details?: string[]
+}) {
   const failed = report.status === 'failed'
   return (
     <div
       key={report.id}
       role={failed ? 'alert' : 'status'}
       aria-live="polite"
-      className={`mt-3 flex flex-col gap-2 rounded border p-3 sm:flex-row sm:items-center sm:justify-between print:hidden ${
+      className={`mt-3 rounded border p-3 print:hidden ${
         failed
           ? 'border-red-300 bg-red-50'
           : report.status === 'success'
@@ -307,22 +318,34 @@ export function GenerationReportBanner({ report, onDismiss }: { report: Generati
             : 'border-zinc-300 bg-zinc-50'
       }`}
     >
-      <p
-        className={`flex items-center gap-2 text-sm font-semibold ${
-          failed ? 'text-red-950' : report.status === 'success' ? 'text-green-950' : 'text-zinc-800'
-        }`}
-      >
-        <Icon name={failed ? 'warning' : report.status === 'success' ? 'check' : 'spark'} />
-        {failed ? `Couldn’t make the schedule (${report.at}). ` : `Schedule ${report.status === 'success' ? 'updated' : 'checked'} at ${report.at}. `}
-        <span className="font-normal">{report.detail}</span>
-      </p>
-      <button
-        type="button"
-        className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-        onClick={onDismiss}
-      >
-        Dismiss
-      </button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p
+          className={`flex items-center gap-2 text-sm font-semibold ${
+            failed ? 'text-red-950' : report.status === 'success' ? 'text-green-950' : 'text-zinc-800'
+          }`}
+        >
+          <Icon name={failed ? 'warning' : report.status === 'success' ? 'check' : 'spark'} />
+          {failed ? `Couldn’t make the schedule (${report.at}). ` : `Schedule ${report.status === 'success' ? 'updated' : 'checked'} at ${report.at}. `}
+          <span className="font-normal">{report.detail}</span>
+        </p>
+        <button
+          type="button"
+          className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+          onClick={onDismiss}
+        >
+          Dismiss
+        </button>
+      </div>
+      {details.length > 0 && (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs font-semibold text-zinc-700 hover:text-zinc-900">Details</summary>
+          <ul className="mt-1 space-y-1 text-xs text-zinc-700">
+            {details.map((message, index) => (
+              <li key={`${message}-${index}`}>{message}</li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   )
 }
