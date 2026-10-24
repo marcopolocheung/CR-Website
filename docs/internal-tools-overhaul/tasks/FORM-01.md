@@ -4,7 +4,7 @@ parent: FORM
 title: "Add searchable employee/date/type lists"
 priority: P1
 delivery_class: CODE_ONLY
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [UX-03]
 activation_dependencies: []

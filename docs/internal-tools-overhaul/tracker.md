@@ -11,11 +11,15 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UX-02 | Create navigation and visible working context | P0 | `CODE_ONLY` | UX-01 | — | ready | unassigned | P/P/NA/NA | [UX-02](tasks/UX-02.md) |
-| UX-03 | Standardize controls, feedback, and save indicators | P0 | `CODE_ONLY` | UX-01 | — | ready | unassigned | P/P/NA/NA | [UX-03](tasks/UX-03.md) |
+| UX-04 | Establish keyboard and tablet interaction patterns | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-04](tasks/UX-04.md) |
+| UX-05 | Implement labeled drafts and shared-device handoff | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-05](tasks/UX-05.md) |
+| UX-06 | Handle unsaved changes, retries, and edit conflicts | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-06](tasks/UX-06.md) |
 | DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
 | CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [CASH-01](tasks/CASH-01.md) |
+| INV-02 | Add progress, remaining filters, and search | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [INV-02](tasks/INV-02.md) |
 | IMPORT-01 | Validate source files with actionable errors | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [IMPORT-01](tasks/IMPORT-01.md) |
+| FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [FORM-01](tasks/FORM-01.md) |
 | FORM-07 | Verify blank downloads and saved compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [FORM-07](tasks/FORM-07.md) |
 | DASH-01 | Define the outstanding-work summary contract | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DASH-01](tasks/DASH-01.md) |
 | REL-01 | Integrate internal-service checks into CI | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [REL-01](tasks/REL-01.md) |
@@ -105,6 +109,7 @@ Only direct decision blockers appear here. Dependent planned tasks inherit those
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UX-01 | Establish translations and local dictionaries | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [UX-01](tasks/UX-01.md) |
+| UX-03 | Standardize controls, feedback, and save indicators | P0 | `CODE_ONLY` | UX-01 | — | complete | Codex | D/D/NA/NA | [UX-03](tasks/UX-03.md) |
 | DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
 | DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | complete | Codex | D/D/NA/NA | [DATA-02](tasks/DATA-02.md) |
 | DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | implemented | Codex | D/D/P/P | [DATA-05](tasks/DATA-05.md) |
@@ -124,10 +129,10 @@ This table is the complete ownership/status index, including ready decisions, pl
 | DEC-07 | Review Spanish terminology, money, dates, and print language | P1 | `DECISION` | — | — | ready | unassigned | P/P/NA/NA | [DEC-07](tasks/DEC-07.md) |
 | UX-01 | Establish translations and local dictionaries | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [UX-01](tasks/UX-01.md) |
 | UX-02 | Create navigation and visible working context | P0 | `CODE_ONLY` | UX-01 | — | ready | unassigned | P/P/NA/NA | [UX-02](tasks/UX-02.md) |
-| UX-03 | Standardize controls, feedback, and save indicators | P0 | `CODE_ONLY` | UX-01 | — | ready | unassigned | P/P/NA/NA | [UX-03](tasks/UX-03.md) |
-| UX-04 | Establish keyboard and tablet interaction patterns | P1 | `CODE_ONLY` | UX-03 | — | planned | unassigned | P/P/NA/NA | [UX-04](tasks/UX-04.md) |
-| UX-05 | Implement labeled drafts and shared-device handoff | P0 | `CODE_ONLY` | UX-03 | — | planned | unassigned | P/P/NA/NA | [UX-05](tasks/UX-05.md) |
-| UX-06 | Handle unsaved changes, retries, and edit conflicts | P0 | `CODE_ONLY` | UX-03 | — | planned | unassigned | P/P/NA/NA | [UX-06](tasks/UX-06.md) |
+| UX-03 | Standardize controls, feedback, and save indicators | P0 | `CODE_ONLY` | UX-01 | — | complete | Codex | D/D/NA/NA | [UX-03](tasks/UX-03.md) |
+| UX-04 | Establish keyboard and tablet interaction patterns | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-04](tasks/UX-04.md) |
+| UX-05 | Implement labeled drafts and shared-device handoff | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-05](tasks/UX-05.md) |
+| UX-06 | Handle unsaved changes, retries, and edit conflicts | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [UX-06](tasks/UX-06.md) |
 | UX-07 | Standardize print layouts and bilingual output | P1 | `CODE_ONLY` | UX-01, DEC-07 | — | blocked | unassigned | P/P/NA/NA | [UX-07](tasks/UX-07.md) |
 | DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
 | DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | complete | Codex | D/D/NA/NA | [DATA-02](tasks/DATA-02.md) |
@@ -156,7 +161,7 @@ This table is the complete ownership/status index, including ready decisions, pl
 | CASH-07 | Use the employee directory for cashier selection | P1 | `CODE_ONLY` | DATA-04, UX-03 | — | planned | unassigned | P/P/NA/NA | [CASH-07](tasks/CASH-07.md) |
 | CASH-08 | Improve history, filters, output, and recovery | P1 | `CODE_AND_EXTERNAL` | CASH-04, UX-07, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-08](tasks/CASH-08.md) |
 | INV-01 | Add explicit count sessions and line states | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [INV-01](tasks/INV-01.md) |
-| INV-02 | Add progress, remaining filters, and search | P0 | `CODE_ONLY` | UX-03 | — | planned | unassigned | P/P/NA/NA | [INV-02](tasks/INV-02.md) |
+| INV-02 | Add progress, remaining filters, and search | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [INV-02](tasks/INV-02.md) |
 | INV-03 | Add units, packs, and clear target labels | P1 | `CODE_AND_EXTERNAL` | DATA-02, DEC-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [INV-03](tasks/INV-03.md) |
 | INV-04 | Improve tablet entry and shelf-order navigation | P1 | `CODE_ONLY` | UX-04, INV-02 | — | planned | unassigned | P/P/NA/NA | [INV-04](tasks/INV-04.md) |
 | INV-05 | Generalize catalogs and counts for CR2/CR3 | P1 | `CODE_AND_EXTERNAL` | INV-01, INV-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [INV-05](tasks/INV-05.md) |
@@ -173,7 +178,7 @@ This table is the complete ownership/status index, including ready decisions, pl
 | IMPORT-06 | Map employee IDs and show unmatched rows | P1 | `CODE_AND_EXTERNAL` | IMPORT-05, DATA-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [IMPORT-06](tasks/IMPORT-06.md) |
 | IMPORT-07 | Add import history and duplicate handling | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, IMPORT-02, IMPORT-05, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [IMPORT-07](tasks/IMPORT-07.md) |
 | IMPORT-08 | Add scheduled-versus-actual reporting | P2 | `CODE_AND_EXTERNAL` | IMPORT-06, IMPORT-07, SCH-06 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [IMPORT-08](tasks/IMPORT-08.md) |
-| FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | planned | unassigned | P/P/NA/NA | [FORM-01](tasks/FORM-01.md) |
+| FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [FORM-01](tasks/FORM-01.md) |
 | FORM-02 | Add recoverable drafts and navigation protection | P0 | `CODE_ONLY` | UX-05, UX-06 | — | planned | unassigned | P/P/NA/NA | [FORM-02](tasks/FORM-02.md) |
 | FORM-03 | Separate bilingual entry from print layout | P1 | `CODE_ONLY` | UX-03, UX-07 | — | planned | unassigned | P/P/NA/NA | [FORM-03](tasks/FORM-03.md) |
 | FORM-04 | Add attachments and append-only amendments | P1 | `CODE_AND_EXTERNAL` | DATA-06, DATA-05, FORM-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [FORM-04](tasks/FORM-04.md) |

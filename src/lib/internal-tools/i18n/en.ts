@@ -133,5 +133,16 @@ const en = {
   "weekday.fri": "FRI",
   "weekday.sat": "SAT",
   "weekday.sun": "SUN",
+  "feedback.fixFields": "Check these fields:",
+  "feedback.failed": "Could not save",
+  "feedback.confirmTitle": "Confirm action",
+  "feedback.cancel": "Cancel",
+  "feedback.confirm": "Confirm",
+  "feedback.storageFailed": "Could not save on this device. Keep this page open or copy your work.",
+  "imports.pickLocation": "Choose a location.",
+  "imports.pickDate": "Choose a date.",
+  "cash.savedHistoryUnavailable": "Saved to server: {store} {date}. History could not refresh; keep your work and try loading history again.",
+  'cash.draftContextNote': "Sheet values are saved on this device. Confirm the store and date when resuming.",
+  'cash.earlierVersionSaved': "An earlier version of {store} {date} was saved to the server. Your newer edits still need saving.",
 } as const
 export default en

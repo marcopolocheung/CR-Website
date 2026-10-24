@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
+import { ErrorSummary, focusField, type FieldIssue } from './Feedback'
 import { errorKey, type Message, type TranslationKey } from '@/lib/internal-tools/i18n'
 import * as XLSX from 'xlsx'
 import { extractMetrics } from '@/lib/converter/parseToast'
@@ -37,13 +38,18 @@ export default function SalesConverter({
   const [form, setForm] = useState(EMPTY_FORM)
   const [files, setFiles] = useState<FileMap>({ general: null, lunch: null, dinner: null })
   const [status, setStatus] = useState<Message | null>(null)
+  const [issues, setIssues] = useState<FieldIssue[]>([])
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm({ ...form, [e.target.name]: e.target.value })
 
   async function fillFromCashout() {
     if (!loadCashout) return
-    if (!form.location || !form.date) return setStatus({ key: 'imports.pickContext' })
+    const missing: FieldIssue[] = []
+    if (!form.location) missing.push({ fieldId: 'sc-location', message: { key: 'imports.pickLocation' } })
+    if (!form.date) missing.push({ fieldId: 'sc-date', message: { key: 'imports.pickDate' } })
+    setIssues(missing)
+    if (missing.length) { setStatus(null); focusField(missing[0].fieldId); return }
     setStatus({ key: 'imports.loadingCashout' })
     try {
       const totals = await loadCashout(form.location, form.date)
@@ -93,6 +99,7 @@ export default function SalesConverter({
         {tr('imports.salesInstructions')}
       </p>
 
+      <ErrorSummary issues={issues} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label htmlFor="sc-first" className={labelClass}>{tr('imports.firstName')}</label>
@@ -111,11 +118,11 @@ export default function SalesConverter({
         </div>
         <div>
           <label htmlFor="sc-date" className={labelClass}>{tr('common.date')}</label>
-          <input id="sc-date" name="date" type="date" value={form.date} onChange={handleInput} className={inputClass} />
+          <input id="sc-date" aria-describedby={issues.some(issue => issue.fieldId === 'sc-date') ? 'sc-date-summary-error' : undefined} aria-invalid={issues.some(issue => issue.fieldId === 'sc-date') || undefined} name="date" type="date" value={form.date} onChange={handleInput} className={inputClass} />
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="sc-location" className={labelClass}>{tr('imports.location')}</label>
-          <select id="sc-location" name="location" value={form.location} onChange={handleInput} className={inputClass}>
+          <select id="sc-location" aria-describedby={issues.some(issue => issue.fieldId === 'sc-location') ? 'sc-location-summary-error' : undefined} aria-invalid={issues.some(issue => issue.fieldId === 'sc-location') || undefined} name="location" value={form.location} onChange={handleInput} className={inputClass}>
             <option value="" disabled>{tr('imports.selectLocation')}</option>
             {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
