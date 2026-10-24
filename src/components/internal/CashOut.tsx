@@ -34,7 +34,7 @@ import { StoreAuthError, verifyWriteToken } from '@/lib/schedule-store'
 type Shift = 'am' | 'pm'
 type Sheet = CashoutDraftSheet
 
-const STORE_LABELS: Record<CashoutStore, string> = { CR3: 'CR3 · W Military', CR2: 'CR2 · SW Military' }
+export const STORE_LABELS: Record<CashoutStore, string> = { CR3: 'CR3 · W Military', CR2: 'CR2 · SW Military' }
 const today = () => new Date().toLocaleDateString('en-CA')
 const newCashier = (): CashoutDraftCashier => ({ name: '', counts: DENOMINATIONS.map(() => 0), countInputs: DENOMINATIONS.map(() => ''), toast: '' })
 const emptySheet = (): Sheet => ({ am: [newCashier()], pm: [newCashier()], zReport: '' })

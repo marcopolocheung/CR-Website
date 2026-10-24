@@ -1,3 +1,5 @@
+import { canonicalJson } from './internal-tools/json'
+import type { CashoutLink } from './converter/sales-context'
 import { getScheduleApiBase, StoreAuthError, StoreUnavailableError } from './schedule-store'
 import type { Cashier, dayTotals } from './cashout'
 
@@ -74,4 +76,16 @@ export async function requestJson(
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** Exact legacy saved document identity; the digest is not an atomic server revision. */
+export async function fetchCashoutSnapshot(store: CashoutStore, date: string, token: string): Promise<{ totals: CashoutTotals; link: CashoutLink } | null> {
+  const { status, body } = await requestJson(`/api/cashout/${store}/${date}`, token)
+  if (status === 404) return null
+  if (status !== 200) throw errorFor(status)
+  const doc = body as {store?: string; date?: string; updatedAt?: string; totals?: CashoutTotals; sheet?: CashoutSheet} | null
+  if (!doc || doc.store !== store || doc.date !== date || !doc.updatedAt || !Number.isFinite(Date.parse(doc.updatedAt)) || !doc.sheet || !doc.totals || !['amDeposit','pmDeposit','amOverShort','pmOverShort'].every(key => { const value = doc.totals![key as keyof CashoutTotals]; return value === null || Number.isSafeInteger(value) })) throw new StoreUnavailableError('Saved cash-out context is unavailable.')
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalJson(doc)))
+  const revision = 'sha256:' + Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2,'0')).join('')
+  return { totals: doc.totals, link: { storeId: store, date, updatedAt: doc.updatedAt, revision } }
 }

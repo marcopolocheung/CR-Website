@@ -4,12 +4,12 @@ parent: IMPORT
 title: "Add scheduled-versus-actual reporting"
 priority: P2
 delivery_class: CODE_AND_EXTERNAL
-status: planned
-owner: unassigned
-implementation_dependencies: [IMPORT-06, IMPORT-07, SCH-06]
+status: implemented
+owner: Codex
+implementation_dependencies: [IMPORT-06, IMPORT-07, SCH-06-IMPORT]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: pending
 live_verification: pending
 ---
@@ -43,7 +43,7 @@ See [current-state inventory](../current-state.md) and [supporting research](../
 
 - [IMPORT-06](IMPORT-06.md) at `implemented` (or `complete`).
 - [IMPORT-07](IMPORT-07.md) at `implemented` (or `complete`).
-- [SCH-06](SCH-06.md) at `implemented` (or `complete`).
+- [SCH-06-IMPORT](SCH-06-IMPORT.md) at `complete`: independently deliverable read-only published snapshot/combined-estimate adapter. Full SCH-06 and SCH-05 publication/conflict controls remain pending; this report neither publishes nor authorizes payroll corrections.
 
 **Needed to activate:**
 
@@ -58,25 +58,25 @@ Affected areas: src/components/internal/SalesConverter.tsx; src/components/inter
 
 ## Implementation checklist
 
-- [ ] Show missing mappings, source coverage, and unpublished schedules as limitations
-- [ ] Keep imported regular/overtime values and scheduled estimates separately labeled
-- [ ] Reconcile combined and per-store totals without treating variances as payroll corrections
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Show missing mappings, source coverage, and unpublished schedules as limitations
+- [x] Keep imported regular/overtime values and scheduled estimates separately labeled
+- [x] Reconcile combined and per-store totals without treating variances as payroll corrections
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Show missing mappings, source coverage, and unpublished schedules as limitations. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Keep imported regular/overtime values and scheduled estimates separately labeled. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Reconcile combined and per-store totals without treating variances as payroll corrections. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Show missing mappings, source coverage, and unpublished schedules as limitations. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Keep imported regular/overtime values and scheduled estimates separately labeled. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Reconcile combined and per-store totals without treating variances as payroll corrections. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
@@ -98,16 +98,15 @@ Evidence specific to this task: the three task scenarios above must pass against
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | pending | Environment, operation IDs, deployment/resource evidence, or staff-session execution. |
 | Live verification | pending | Observed target-environment behavior or staff acceptance with date and operator. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Listed prerequisites are pending.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Scope/artifacts: [scheduled-actual.md](../scheduled-actual.md); Codex is the coordinating owner for touched shared files.
+- Checks/evidence: 52 import tests; 5 local Worker tests; 128 scheduler tests; build/types/SEO/dictionaries; local packaging; comparison/PDF, history, mapping and retention browser flows passed. Local synthetic fixtures only; no live-system claim.
+- Implementation and local verification: done. External/live: pending; activation dependencies remain required.
+- Recovery/rollback and acceptance scenarios are recorded in the linked guide. Preserve prior records and drafts when reverting scoped changes.
+- Next owner/action: Codex continues the user-authorized six-PR import stack in one worktree. Open PRs only; no merging or auto-merge.

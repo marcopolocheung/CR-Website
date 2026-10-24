@@ -471,6 +471,19 @@ export function readOnboardingDismissed() {
   }
 }
 
+export const layoutStorageKey = 'chinarose.scheduler.layout'
+
+export type SchedulerLayout = 'new' | 'classic'
+
+/** The new layout is the default; only an explicit choice of Classic opts out. */
+export function readLayoutPreference(): SchedulerLayout {
+  try {
+    return window.localStorage.getItem(layoutStorageKey) === 'classic' ? 'classic' : 'new'
+  } catch {
+    return 'new'
+  }
+}
+
 export function statusForWeek(
   weekStatus: Record<string, WeekStatus>,
   weekStart: string,
@@ -518,8 +531,11 @@ export function formatOverlapDuration(totalMinutes: number) {
   return `${hours} hour${hours === 1 ? '' : 's'} ${mins} minutes`
 }
 
-export function availabilityText(employee: Employee, day: DayOfWeek) {
-  const ranges = getEmployeeAvailability(employee, day)
+export function availabilityText(employee: Employee, day: DayOfWeek, date?: string) {
+  const ranges = getEmployeeAvailability(employee, day, date)
+  if (date && employee.availabilityOverrides?.some((item) => item.date === date)) {
+    return ranges.length === 0 ? `has approved time off on ${date}` : `approved hours on ${date} are ${ranges.map((range) => formatTimeRange(range)).join(', ')}`
+  }
   if (ranges.length === 0) return `has no ${day} availability at all`
   return `${day} availability is ${ranges.map((range) => formatTimeRange(range)).join(', ')}`
 }
@@ -574,7 +590,7 @@ export function dragErrorMessage(employee: Employee, slot: StaffingSlot, violati
 
   if (first.code === 'unqualified_employee') return notTrainedText(employee, slot)
   if (first.code === 'unavailable_employee' && isSuspendedOn(employee, slot.date)) return `${employee.name} is suspended ${suspensionText(employee)}.`
-  if (first.code === 'unavailable_employee') return `${employee.name} is not free ${day} ${periodLabels[slot.period]} (${formatTimeRange(slot)}). ${employee.name} ${availabilityText(employee, slot.day)}.`
+  if (first.code === 'unavailable_employee') return `${employee.name} is not free ${day} ${periodLabels[slot.period]} (${formatTimeRange(slot)}). ${employee.name} ${availabilityText(employee, slot.day, slot.date)}.`
   if (first.code === 'inactive_employee') return `${employee.name} is off the list (inactive).`
   if (first.code === 'overlapping_assignment') {
     const conflict = slots.find((candidate) => candidate.id === first.relatedSlotId)
@@ -697,7 +713,7 @@ export function reviewLabel(
   if (violation.code === 'unavailable_employee') {
     if (!slot || !employee) return `${name} cannot work ${shift}.`
     if (isSuspendedOn(employee, slot.date)) return `${name} is suspended ${suspensionText(employee)}.`
-    return `${name} is not free ${shift} (${formatTimeRange(slot)}). ${name} ${availabilityText(employee, slot.day)}.`
+    return `${name} is not free ${shift} (${formatTimeRange(slot)}). ${name} ${availabilityText(employee, slot.day, slot.date)}.`
   }
   if (violation.code === 'inactive_employee') return `${name} is off the list (inactive).`
   if (violation.code === 'overlapping_assignment') {
