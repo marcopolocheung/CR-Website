@@ -11,11 +11,13 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UX-01 | Establish translations and local dictionaries | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [UX-01](tasks/UX-01.md) |
-| DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
+| DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-02](tasks/DATA-02.md) |
+| DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
 | CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [CASH-01](tasks/CASH-01.md) |
 | IMPORT-01 | Validate source files with actionable errors | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [IMPORT-01](tasks/IMPORT-01.md) |
 | FORM-07 | Verify blank downloads and saved compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [FORM-07](tasks/FORM-07.md) |
+| DASH-01 | Define the outstanding-work summary contract | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DASH-01](tasks/DASH-01.md) |
 | REL-01 | Integrate internal-service checks into CI | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [REL-01](tasks/REL-01.md) |
 | REL-02 | Make Worker builds reproducible and resolve the mirror | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [REL-02](tasks/REL-02.md) |
 
@@ -100,7 +102,9 @@ Only direct decision blockers appear here. Dependent planned tasks inherit those
 
 ## Completed work with verification evidence
 
-None. Authoring this package does not complete any task below. Add entries only after required milestone evidence is present in the canonical brief.
+| ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
 
 ## All tasks
 
