@@ -15,7 +15,6 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
 | INV-02 | Add progress, remaining filters, and search | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [INV-02](tasks/INV-02.md) |
-| FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [FORM-01](tasks/FORM-01.md) |
 | FORM-02 | Add recoverable drafts and navigation protection | P0 | `CODE_ONLY` | UX-05, UX-06 | — | ready | unassigned | P/P/NA/NA | [FORM-02](tasks/FORM-02.md) |
 | DASH-01 | Define the outstanding-work summary contract | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DASH-01](tasks/DASH-01.md) |
 | REL-01 | Integrate internal-service checks into CI | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [REL-01](tasks/REL-01.md) |
@@ -100,6 +99,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | complete | Claude | D/D/NA/NA | [FORM-01](tasks/FORM-01.md) |
 | FORM-07 | Verify blank downloads and saved compatibility | P0 | `CODE_ONLY` | — | — | complete | Claude | D/D/NA/NA | [FORM-07](tasks/FORM-07.md) |
 | DEC-01 | Confirm business-date and shift-boundary rules | P0 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-01](tasks/DEC-01.md) |
 | UX-01 | Establish translations and local dictionaries | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [UX-01](tasks/UX-01.md) |
@@ -185,7 +185,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | IMPORT-06 | Map employee IDs and show unmatched rows | P1 | `CODE_AND_EXTERNAL` | IMPORT-05, DATA-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [IMPORT-06](tasks/IMPORT-06.md) |
 | IMPORT-07 | Add import history and duplicate handling | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, IMPORT-02, IMPORT-05, DEC-03-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [IMPORT-07](tasks/IMPORT-07.md) |
 | IMPORT-08 | Add scheduled-versus-actual reporting | P2 | `CODE_AND_EXTERNAL` | IMPORT-06, IMPORT-07, SCH-06-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [IMPORT-08](tasks/IMPORT-08.md) |
-| FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [FORM-01](tasks/FORM-01.md) |
+| FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | complete | Claude | D/D/NA/NA | [FORM-01](tasks/FORM-01.md) |
 | FORM-02 | Add recoverable drafts and navigation protection | P0 | `CODE_ONLY` | UX-05, UX-06 | — | ready | unassigned | P/P/NA/NA | [FORM-02](tasks/FORM-02.md) |
 | FORM-03 | Separate bilingual entry from print layout | P1 | `CODE_ONLY` | UX-03, UX-07 | — | planned | unassigned | P/P/NA/NA | [FORM-03](tasks/FORM-03.md) |
 | FORM-04 | Add attachments and append-only amendments | P1 | `CODE_AND_EXTERNAL` | DATA-06, DATA-05, FORM-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [FORM-04](tasks/FORM-04.md) |

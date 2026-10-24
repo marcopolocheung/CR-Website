@@ -14,3 +14,26 @@ export const BLANK_FORMS = [
 ] as const
 
 export const blankFormHref = (basePath: string, file: string) => `${basePath}/internal/forms/${file}`
+
+/** Every saved form type shares one list row shape so the forms list can search them together. */
+export const SAVED_FORM_TYPES = ['write-up'] as const
+export type SavedFormType = (typeof SAVED_FORM_TYPES)[number]
+export type SavedFormRow = { type: SavedFormType; id: string; date: string; employee: string; label: string }
+export type SavedFormFilter = { query: string; type: SavedFormType | ''; from: string; to: string }
+export const NO_FILTER: SavedFormFilter = { query: '', type: '', from: '', to: '' }
+
+const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
+
+/** Keeps the server's order (newest date first, then employee); dates compare as ISO strings. */
+export function filterSavedForms(rows: SavedFormRow[], { query, type, from, to }: SavedFormFilter): SavedFormRow[] {
+  const words = fold(query).split(/\s+/).filter(Boolean)
+  return rows.filter(row => {
+    if (type && row.type !== type) return false
+    if (from && row.date < from) return false
+    if (to && row.date > to) return false
+    const text = fold(`${row.employee} ${row.label}`)
+    return words.every(word => text.includes(word))
+  })
+}
+
+export const isFiltered = (filter: SavedFormFilter) => Object.values(filter).some(Boolean)

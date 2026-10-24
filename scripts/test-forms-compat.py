@@ -64,7 +64,7 @@ with sync_playwright() as p:
     page.locator('#cashout-code').fill(TOKEN)
     page.get_by_role('button', name='Unlock', exact=True).click()
     expect(page.get_by_role('cell', name='Ana Lopez', exact=True)).to_be_visible()
-    page.get_by_role('button', name='Open', exact=True).click()
+    page.get_by_role('button', name='Open Write-up for Ana Lopez, 2026-01-05', exact=True).click()
     expect(page.get_by_label('Incident Descriptions', exact=True)).to_have_value(LONG)
     for field in ['Incident Descriptions', 'Employee Signature', 'Manager Signature']:
         expect(page.get_by_label(field, exact=True)).to_be_disabled()
