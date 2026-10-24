@@ -4,7 +4,7 @@ parent: CASH
 title: "Recalculate financial totals on the server"
 priority: P0
 delivery_class: CODE_AND_EXTERNAL
-status: blocked
+status: ready
 owner: unassigned
 implementation_dependencies: [DATA-01, DEC-02]
 activation_dependencies: [REL-03, REL-04]
@@ -18,13 +18,13 @@ live_verification: pending
 
 ## Outcome and scope
 
-Compute authoritative integer-cent totals from validated source fields in the Worker.
+Compute the existing bookkeeping notebook totals from validated source fields in the Worker, always retaining $100 per cashier drawer. [DEC-02](../cashout-rules.md) is approved: there are no new adjustment formulas, submission/review states, mandatory discrepancy explanations or physical-deposit records in this task.
 
 Preserve denomination counts, integer cents, AM/PM presentation, Toast/Z comparisons, existing paper output, and sales workbook linkage. Do not invent cash-movement categories, shortage thresholds, payroll deductions, or starting-cash policy.
 
 ## Current behavior and verified sources
 
-CashOut persists only sheet contents under cr-cash-out, while store/date are separate component state. Browser calculations use integer cents and a fixed $100 float; validateCashoutBody checks submitted totals for shape only. Saved days have 30-day history, a 31-day TTL, and last-save-wins behavior.
+CASH-01/02 now provide independent store/date device drafts, guided counts and blank/zero/legacy-unknown entry status in this branch. Browser calculations use integer cents and always subtract $100 per cashier drawer. The existing Worker still validates client totals by shape, lists 30 days and saves to KV with a 31-day TTL and last-save-wins. The unused local cash-state scaffold reflects the earlier workflow plan; [DEC-02](../cashout-rules.md) defines current notebook scope without changing that schema or deployment.
 
 Verified in the local repository on 2026-10-24; this is source inspection, not a live-environment assertion. Entry points and symbols for rechecking:
 
@@ -55,14 +55,14 @@ Affected areas: src/components/internal/CashOut.tsx; src/lib/cashout.ts; src/lib
 
 - [ ] Reject invalid counts and test null versus zero plus rounding boundaries
 - [ ] Ignore or reject tampered client totals while accepting compatible legacy requests
-- [ ] Compare browser/server results with approved $100-float and adjustment examples
+- [ ] Compare browser/server results with approved fixed-$100 notebook examples (balanced/over/short, blank versus zero Toast/Z, multiple drawers)
 - [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
 - [ ] Scenario 1: Reject invalid counts and test null versus zero plus rounding boundaries. Record fixture/input, expected result, actual result, and evidence.
 - [ ] Scenario 2: Ignore or reject tampered client totals while accepting compatible legacy requests. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Compare browser/server results with approved $100-float and adjustment examples. Record fixture/input, expected result, actual result, and evidence.
+- [ ] Scenario 3: Compare browser/server results with approved fixed-$100 notebook examples (balanced/over/short, blank versus zero Toast/Z, multiple drawers). Record fixture/input, expected result, actual result, and evidence.
 - [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
 - [ ] Record local results separately from staging activation and production/live results.
 
@@ -103,6 +103,6 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Commits/artifacts: none; this brief is planning documentation.
 - Checks performed: source inspection only; implementation scenarios not run.
 - Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Business decision: DEC-02. Independent tasks remain available.
+- Blockers: none for local implementation; DATA-01 and DEC-02 are complete. Backend/frontend activation remains separate. This decision PR does not implement or claim CASH-03.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.

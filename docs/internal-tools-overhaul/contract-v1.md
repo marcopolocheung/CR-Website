@@ -20,19 +20,21 @@ Record context distinguishes a business day, inclusive period (service validator
 
 Mutation identity is `(authorized caller scope, store, family, record ID, action, operationId)`. A retry must reuse identical canonical request content; success replays its authoritative original result. Different content rejects `operation_reused`; stale base revision rejects `revision_conflict` without altering data or history. Validation, conditional update, revision increment and audit event must share one D1 transaction (DATA-05). None of these guarantees applies retroactively to KV. An entered preparer label is distinguished from authenticated actor identity.
 
-## Explicit policy gaps
+## Policy decisions and remaining gaps
 
-| Field group | Owner | Until approval |
+| Field group | Owner | Disposition |
 | --- | --- | --- |
 | Store timezone, rollover, week boundary, overnight ownership | DEC-01 | No timestamp-to-business-date conversion |
-| Starting cash, financial adjustments, reviews/corrections | DEC-02 | Versioned policy gate unresolved; no new calculation or transition |
+| Cash notebook scope and retained starting cash | [DEC-02](cashout-rules.md) | Approved: always $100 per cashier drawer; preserve notebook calculations. CASH-03 is ready. Cash operational workflows are deferred, not missing approval for the baseline. |
 | Retention, attachment formats/limits | DEC-03 | No automatic disposal or upload enabling |
 | Rehires, memberships, temporary cashiers, hour targets | DEC-04 | Unmapped employee reference with original source ID/scope/name |
 | Stock units, packs, quantity representation, waste/transfers | DEC-05 | Raw quantity and explicit unresolved unit; no decimal/rational conversion selected |
 | Signature/review workflow and next form | DEC-06 | No approval inferred from entered names or printed lines |
 | Money entry, final terminology, print language | DEC-07 | No separator reinterpretation or approved terminology claim |
 
-`PolicyGate` carries the decision ID, and an approved gate requires version, approver and UTC approval time. These are representation requirements, not proof of an approval; the decision brief remains authoritative. No approved fixture is supplied. `CountResponse` keeps uncounted, measured-zero, measured, Enough and skipped distinct. Attachment references expose parent/revision/status without R2 keys or secrets. Import identity retains fingerprint, store/date or period, source slot and parser/mapping version.
+`PolicyGate` carries the decision ID, and an approved gate requires version, approver and UTC approval time. These are representation requirements, not proof of an approval; the decision brief remains authoritative. No executable approved-gate fixture is supplied by DATA-01. DEC-02 now has a dated owner-approved decision record; this documentation does not fabricate an exact UTC approval instant or emit a runtime gate. Shared workflow enums/types remain reserved and do not require cash submission/review states. `CountResponse` keeps uncounted, measured-zero, measured, Enough and skipped distinct. Attachment references expose parent/revision/status without R2 keys or secrets. Import identity retains fingerprint, store/date or period, source slot and parser/mapping version.
+
+The local migration 0002 cash-state constraint still represents the prior plan. CASH-08 owns additive alignment before notebook writes use it; DEC-02 approval does not silently migrate that schema or require users to submit/review a bookkeeping record.
 
 ## Local acceptance and recovery
 

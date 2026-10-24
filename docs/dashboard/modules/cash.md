@@ -1,5 +1,7 @@
 # Cash
 
+**Historical design research.** Current scope is the owner-approved [DEC-02 bookkeeping notebook](../../internal-tools-overhaul/cashout-rules.md): fixed $100 per drawer, existing calculations and saved history. Proposals below for blind counting, mandatory notes/review, configurable thresholds and physical deposit handling are not current requirements. CASH-01/02 draft and entry fixes are already locally complete; use the current task tracker for implementation status.
+
 Cash out: `src/components/internal/CashOut.tsx`, `src/lib/cashout.ts`, `src/lib/cashout-store.ts`. History charts: `Dashboard.tsx`. Worker: `/api/cashout/{store}/{date}`.
 
 ## Job

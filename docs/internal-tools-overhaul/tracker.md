@@ -1,5 +1,7 @@
 # Internal-tools task tracker
 
+Cash scope: [DEC-02 is approved](cashout-rules.md) for a bookkeeping notebook with a fixed $100 per drawer. CASH-03 is ready; CASH-04/05/06 operational workflows are deferred. CASH-08 ordinary saves/history uses DATA-05 and is independent of those deferred workflows.
+
 Individual briefs are canonical. Update the brief and this summary together when claiming, changing a gate, or handing off. Current implementation and evidence are recorded in the canonical briefs; external/live work remains separately gated. P0 establishes safety/compatibility or early workflow foundations; P1 completes core workflows; P2 follows core adoption. Priority is not a dependency.
 
 Milestones: I = implementation, L = local verification, E = external activation, V = live verification. P = pending; NA = not applicable; use done only with linked evidence in the brief. A CODE_ONLY completion does not claim frontend publication; REL-04 owns shared publication.
@@ -29,12 +31,9 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | SCH-01 | Persist dated time off and temporary availability | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [SCH-01](tasks/SCH-01.md) |
 | SCH-02 | Add manager-entered requests and review | P1 | `CODE_AND_EXTERNAL` | SCH-01, UX-03 | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [SCH-02](tasks/SCH-02.md) |
 | SCH-04 | Add publication revisions and readable comparisons | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [SCH-04](tasks/SCH-04.md) |
-| SCH-05 | Detect cross-station assignment conflicts | P1 | `CODE_AND_EXTERNAL` | DATA-04, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [SCH-05](tasks/SCH-05.md) |
-| CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | blocked | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
-| CASH-04 | Add incomplete, submitted, and reviewed states | P0 | `CODE_AND_EXTERNAL` | CASH-03, DATA-05, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-04](tasks/CASH-04.md) |
-| CASH-05 | Add discrepancy explanations and correction history | P1 | `CODE_AND_EXTERNAL` | CASH-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [CASH-05](tasks/CASH-05.md) |
-| CASH-06 | Record actual versus expected deposits | P1 | `CODE_AND_EXTERNAL` | CASH-04, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-06](tasks/CASH-06.md) |
-| CASH-08 | Improve history, filters, output, and recovery | P1 | `CODE_AND_EXTERNAL` | CASH-04, UX-07, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-08](tasks/CASH-08.md) |
+| SCH-05 | Detect cross-station assignment conflicts | P1 | `CODE_AND_EXTERNAL` | DATA-04, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [SCH-05](tasks/SCH-05.md) |
+| CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | ready | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
+| CASH-08 | Improve history, filters, output, and recovery | P1 | `CODE_AND_EXTERNAL` | DATA-05, UX-07, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-08](tasks/CASH-08.md) |
 | INV-01 | Add explicit count sessions and line states | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [INV-01](tasks/INV-01.md) |
 | INV-03 | Add units, packs, and clear target labels | P1 | `CODE_AND_EXTERNAL` | DATA-02, DEC-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [INV-03](tasks/INV-03.md) |
 | INV-05 | Generalize catalogs and counts for CR2/CR3 | P1 | `CODE_AND_EXTERNAL` | INV-01, INV-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [INV-05](tasks/INV-05.md) |
@@ -49,7 +48,7 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | FORM-04 | Add attachments and append-only amendments | P1 | `CODE_AND_EXTERNAL` | DATA-06, DATA-05, FORM-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [FORM-04](tasks/FORM-04.md) |
 | FORM-05 | Add follow-up dates, assignment, and resolution | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DATA-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [FORM-05](tasks/FORM-05.md) |
 | FORM-06 | Implement the selected next digital form | P2 | `CODE_AND_EXTERNAL` | DEC-06, FORM-02, FORM-03, DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [FORM-06](tasks/FORM-06.md) |
-| DASH-03 | Surface closes, differences, and count progress | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, CASH-05, INV-01 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-03](tasks/DASH-03.md) |
+| DASH-03 | Surface recorded cash differences and count progress | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, CASH-08, INV-01 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-03](tasks/DASH-03.md) |
 | DASH-04 | Surface deliveries, schedule changes, and follow-ups | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, INV-07, SCH-04, FORM-05 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-04](tasks/DASH-04.md) |
 | DATA-04-IMPORT | Persist reviewed import directory snapshots | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [DATA-04-IMPORT](tasks/DATA-04-IMPORT.md) |
 
@@ -72,10 +71,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | DATA-09 | Execute production resource setup and verified cutover | P0 | `EXTERNAL_ONLY` | DATA-08, DEC-03 | — | blocked | unassigned | P/P/P/P | [DATA-09](tasks/DATA-09.md) |
 | DATA-10 | Implement and verify backup/export/restore procedures | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-07, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-10](tasks/DATA-10.md) |
 | SCH-06 | Add combined hours and agreed warnings | P1 | `CODE_ONLY` | DATA-04, SCH-05, DEC-04 | — | blocked | unassigned | P/P/NA/NA | [SCH-06](tasks/SCH-06.md) |
-| CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | blocked | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
-| CASH-04 | Add incomplete, submitted, and reviewed states | P0 | `CODE_AND_EXTERNAL` | CASH-03, DATA-05, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-04](tasks/CASH-04.md) |
-| CASH-06 | Record actual versus expected deposits | P1 | `CODE_AND_EXTERNAL` | CASH-04, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-06](tasks/CASH-06.md) |
-| CASH-08 | Improve history, filters, output, and recovery | P1 | `CODE_AND_EXTERNAL` | CASH-04, UX-07, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-08](tasks/CASH-08.md) |
+| CASH-08 | Improve history, filters, output, and recovery | P1 | `CODE_AND_EXTERNAL` | DATA-05, UX-07, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-08](tasks/CASH-08.md) |
 | INV-03 | Add units, packs, and clear target labels | P1 | `CODE_AND_EXTERNAL` | DATA-02, DEC-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [INV-03](tasks/INV-03.md) |
 | INV-09 | Add agreed waste and transfer records | P2 | `CODE_AND_EXTERNAL` | INV-07, DEC-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [INV-09](tasks/INV-09.md) |
 | FORM-06 | Implement the selected next digital form | P2 | `CODE_AND_EXTERNAL` | DEC-06, FORM-02, FORM-03, DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [FORM-06](tasks/FORM-06.md) |
@@ -85,6 +81,9 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CASH-04 | Add incomplete, submitted, and reviewed states | P0 | `CODE_AND_EXTERNAL` | CASH-03, DATA-05, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | deferred | unassigned | P/P/P/P | [CASH-04](tasks/CASH-04.md) |
+| CASH-05 | Add discrepancy explanations and correction history | P1 | `CODE_AND_EXTERNAL` | CASH-04 | DATA-03, REL-03, DATA-09, REL-04 | deferred | unassigned | P/P/P/P | [CASH-05](tasks/CASH-05.md) |
+| CASH-06 | Record actual versus expected deposits | P1 | `CODE_AND_EXTERNAL` | CASH-04, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | deferred | unassigned | P/P/P/P | [CASH-06](tasks/CASH-06.md) |
 | LATER-01 | Authentication redesign | P2 | `CODE_AND_EXTERNAL` | — | — | deferred | unassigned | P/P/P/P | [LATER-01](tasks/LATER-01.md) |
 | LATER-02 | Frontend hosting migration coordination | P2 | `CODE_AND_EXTERNAL` | — | — | deferred | unassigned | P/P/P/P | [LATER-02](tasks/LATER-02.md) |
 | LATER-03 | Optional Toast API integration | P2 | `CODE_AND_EXTERNAL` | IMPORT-07 | — | deferred | unassigned | P/P/P/P | [LATER-03](tasks/LATER-03.md) |
@@ -97,6 +96,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DEC-02 | Confirm cash-out notebook scope and fixed $100 float | P0 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-02](tasks/DEC-02.md) |
 | CASH-02 | Add guided cashier entry | P0 | `CODE_ONLY` | UX-03, UX-04 | — | complete | Codex | D/D/NA/NA | [CASH-02](tasks/CASH-02.md) |
 | UX-04 | Establish keyboard and tablet interaction patterns | P1 | `CODE_ONLY` | UX-03 | — | complete | Codex | D/D/NA/NA | [UX-04](tasks/UX-04.md) |
 | FORM-02 | Add recoverable drafts and navigation protection | P0 | `CODE_ONLY` | UX-05, UX-06 | — | complete | Claude | D/D/NA/NA | [FORM-02](tasks/FORM-02.md) |
@@ -129,7 +129,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | DEC-01 | Confirm business-date and shift-boundary rules | P0 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-01](tasks/DEC-01.md) |
-| DEC-02 | Confirm starting-cash, adjustment, and discrepancy-review rules | P0 | `DECISION` | — | — | ready | unassigned | P/P/NA/NA | [DEC-02](tasks/DEC-02.md) |
+| DEC-02 | Confirm cash-out notebook scope and fixed $100 float | P0 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-02](tasks/DEC-02.md) |
 | DEC-03 | Define retention, archival, export, and recovery requirements | P0 | `DECISION` | — | — | ready | unassigned | P/P/NA/NA | [DEC-03](tasks/DEC-03.md) |
 | DEC-04 | Define shared employee identity and station membership | P0 | `DECISION` | — | — | ready | unassigned | P/P/NA/NA | [DEC-04](tasks/DEC-04.md) |
 | DEC-05 | Confirm inventory units, packs, suppliers, and targets | P0 | `DECISION` | — | — | ready | unassigned | P/P/NA/NA | [DEC-05](tasks/DEC-05.md) |
@@ -162,12 +162,12 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
 | CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | UX-05 | — | complete | Codex | D/D/NA/NA | [CASH-01](tasks/CASH-01.md) |
 | CASH-02 | Add guided cashier entry | P0 | `CODE_ONLY` | UX-03, UX-04 | — | complete | Codex | D/D/NA/NA | [CASH-02](tasks/CASH-02.md) |
-| CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | blocked | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
-| CASH-04 | Add incomplete, submitted, and reviewed states | P0 | `CODE_AND_EXTERNAL` | CASH-03, DATA-05, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-04](tasks/CASH-04.md) |
-| CASH-05 | Add discrepancy explanations and correction history | P1 | `CODE_AND_EXTERNAL` | CASH-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [CASH-05](tasks/CASH-05.md) |
-| CASH-06 | Record actual versus expected deposits | P1 | `CODE_AND_EXTERNAL` | CASH-04, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-06](tasks/CASH-06.md) |
+| CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | ready | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
+| CASH-04 | Add incomplete, submitted, and reviewed states | P0 | `CODE_AND_EXTERNAL` | CASH-03, DATA-05, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | deferred | unassigned | P/P/P/P | [CASH-04](tasks/CASH-04.md) |
+| CASH-05 | Add discrepancy explanations and correction history | P1 | `CODE_AND_EXTERNAL` | CASH-04 | DATA-03, REL-03, DATA-09, REL-04 | deferred | unassigned | P/P/P/P | [CASH-05](tasks/CASH-05.md) |
+| CASH-06 | Record actual versus expected deposits | P1 | `CODE_AND_EXTERNAL` | CASH-04, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | deferred | unassigned | P/P/P/P | [CASH-06](tasks/CASH-06.md) |
 | CASH-07 | Use the employee directory for cashier selection | P1 | `CODE_ONLY` | DATA-04, UX-03 | — | planned | unassigned | P/P/NA/NA | [CASH-07](tasks/CASH-07.md) |
-| CASH-08 | Improve history, filters, output, and recovery | P1 | `CODE_AND_EXTERNAL` | CASH-04, UX-07, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-08](tasks/CASH-08.md) |
+| CASH-08 | Improve history, filters, output, and recovery | P1 | `CODE_AND_EXTERNAL` | DATA-05, UX-07, DEC-03 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-08](tasks/CASH-08.md) |
 | INV-01 | Add explicit count sessions and line states | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [INV-01](tasks/INV-01.md) |
 | INV-02 | Add progress, remaining filters, and search | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [INV-02](tasks/INV-02.md) |
 | INV-03 | Add units, packs, and clear target labels | P1 | `CODE_AND_EXTERNAL` | DATA-02, DEC-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [INV-03](tasks/INV-03.md) |
@@ -195,7 +195,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | FORM-07 | Verify blank downloads and saved compatibility | P0 | `CODE_ONLY` | — | — | complete | Claude | D/D/NA/NA | [FORM-07](tasks/FORM-07.md) |
 | DASH-01 | Define the outstanding-work summary contract | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DASH-01](tasks/DASH-01.md) |
 | DASH-02 | Add contextual exact-record links | P1 | `CODE_ONLY` | DASH-01, UX-02 | — | planned | unassigned | P/P/NA/NA | [DASH-02](tasks/DASH-02.md) |
-| DASH-03 | Surface closes, differences, and count progress | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, CASH-05, INV-01 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-03](tasks/DASH-03.md) |
+| DASH-03 | Surface recorded cash differences and count progress | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, CASH-08, INV-01 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-03](tasks/DASH-03.md) |
 | DASH-04 | Surface deliveries, schedule changes, and follow-ups | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, INV-07, SCH-04, FORM-05 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-04](tasks/DASH-04.md) |
 | DASH-05 | Distinguish missing, failed, and empty data | P0 | `CODE_ONLY` | DASH-01, UX-03 | — | planned | unassigned | P/P/NA/NA | [DASH-05](tasks/DASH-05.md) |
 | REL-01 | Integrate internal-service checks into CI | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [REL-01](tasks/REL-01.md) |

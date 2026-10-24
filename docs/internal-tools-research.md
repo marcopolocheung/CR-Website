@@ -1,5 +1,7 @@
 **China Rose internal tools: workflow and reuse research**
 
+Cash scope clarification: the owner-approved [DEC-02 notebook decision](internal-tools-overhaul/cashout-rules.md) takes precedence over general cash-control suggestions in this research. Fixed $100 per drawer, calculations and saved lookup history are the current purpose; cash operational workflows are deferred.
+
 Research date: October 24, 2026. Scope: scheduler, cash-out, inventory, sales and hours converters, forms/write-ups, dashboard, and the internal QR utility.
 
 The intended product is China Rose's own application, used mainly on a shared computer or tablet, in English and Spanish. Commercial products below are workflow references, not subscription recommendations. Authentication and the hosting migration are separate workstreams.
