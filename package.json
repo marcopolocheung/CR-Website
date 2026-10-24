@@ -10,7 +10,11 @@
     "scheduler:verify": "node scripts/verify-schedule-store.mjs",
     "scheduler:seed-kitchens": "node scripts/seed-kitchen-stations.mjs",
     "seo:check": "node scripts/seo-check.mjs",
-    "cashout:test": "node --import jiti/register --test src/lib/cashout.test.ts src/lib/dashboard.test.ts src/lib/inventory.test.ts"
+    "cashout:test": "node --import jiti/register --test src/lib/cashout.test.ts src/lib/dashboard.test.ts src/lib/inventory.test.ts",
+    "data:test": "node --test worker/local-data.test.mjs",
+    "data:migrate:local": "wrangler d1 migrations apply chinarose-internal-local --local --config worker/wrangler.local.jsonc",
+    "worker:dev:local": "wrangler dev --local --config worker/wrangler.local.jsonc",
+    "worker:types:local": "wrangler types worker/local-env.d.ts --config worker/wrangler.local.jsonc --env-interface LocalBindings --include-runtime false"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.1",
@@ -28,5 +32,9 @@
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
     "xlsx": "0.18.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260426.1",
+    "wrangler": "4.86.0"
   }
 }

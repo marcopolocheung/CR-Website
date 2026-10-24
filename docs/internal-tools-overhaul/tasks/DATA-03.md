@@ -4,7 +4,7 @@ parent: DATA
 title: "Provision and bind non-production D1/R2"
 priority: P0
 delivery_class: EXTERNAL_ONLY
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [DATA-02]
 activation_dependencies: []

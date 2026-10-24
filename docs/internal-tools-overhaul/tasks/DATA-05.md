@@ -4,7 +4,7 @@ parent: DATA
 title: "Implement atomic revisions and change history"
 priority: P0
 delivery_class: CODE_AND_EXTERNAL
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [DATA-02]
 activation_dependencies: [DATA-03, REL-03, DATA-09]
