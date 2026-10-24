@@ -4,12 +4,12 @@ parent: DATA
 title: "Add D1 migrations, local configuration, and fixtures"
 priority: P0
 delivery_class: CODE_ONLY
-status: ready
-owner: unassigned
+status: complete
+owner: Codex
 implementation_dependencies: [DATA-01]
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
@@ -52,25 +52,25 @@ Affected areas: worker/src/index.ts; worker/wrangler.toml; src/lib/schedule-stor
 
 ## Implementation checklist
 
-- [ ] Model relational record families, foreign keys, revision constraints, and legacy lineage
-- [ ] Apply migrations to an empty local database and upgrade a prior fixture snapshot
-- [ ] Keep unknown policy values nullable or disabled and require no remote resources
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Model relational record families, foreign keys, revision constraints, and legacy lineage
+- [x] Apply migrations to an empty local database and upgrade a prior fixture snapshot
+- [x] Keep unknown policy values nullable or disabled and require no remote resources
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Model relational record families, foreign keys, revision constraints, and legacy lineage. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Apply migrations to an empty local database and upgrade a prior fixture snapshot. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Keep unknown policy values nullable or disabled and require no remote resources. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Model relational record families, foreign keys, revision constraints, and legacy lineage. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Apply migrations to an empty local database and upgrade a prior fixture snapshot. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Keep unknown policy values nullable or disabled and require no remote resources. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Keep persisted values, IDs, enums, and API errors language independent; expose translation keys or stable error codes for English/Spanish clients.
-- [ ] Review downstream keyboard/touch and shared-device effects with the consuming task owner; no backend-only output requires a pointer gesture.
-- [ ] Print/output: preserve source record context and historical snapshots consumed by print/export; no direct print UI is introduced in this task.
-- [ ] Recovery: record a failure/reversal example and preserve original records, manifests, and evidence; mark genuinely inapplicable failure cases with reasons.
+- [x] Keep persisted values, IDs, enums, and API errors language independent; expose translation keys or stable error codes for English/Spanish clients.
+- [x] Review downstream keyboard/touch and shared-device effects with the consuming task owner; no backend-only output requires a pointer gesture.
+- [x] Print/output: preserve source record context and historical snapshots consumed by print/export; no direct print UI is introduced in this task.
+- [x] Recovery: record a failure/reversal example and preserve original records, manifests, and evidence; mark genuinely inapplicable failure cases with reasons.
 
 ## Verification commands and expected results
 
@@ -91,16 +91,19 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
 | Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Listed prerequisites are pending.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts: [local development/schema guide](../../../worker/LOCAL_DATA.md), migrations 0001/0002, local-only config and generated binding types, two fixture snapshots, `worker/local-data.test.mjs`, pinned Wrangler/runtime types and package scripts. DATA-01 prerequisite is verified in PR #132.
+- Scenario 1: local D1 contains all record families and relationships; tests reject invalid revisions, orphan employees, cross-store stations/catalogs, unsafe/fractional cents and missing policy approvals. Foreign-key checks return no violations.
+- Scenario 2: `npm run data:test`, 2/2 integration tests pass, covering empty migration plus prior 0001 fixture upgraded to 0002 without changing original records, Spanish names, zero/null values or lineage. Local KV metadata/value and private R2 bytes round-trip. `npm run data:migrate:local` applies both migrations; repeat reports no migrations to apply.
+- Scenario 3: fixtures seed no approved policy. Unit encoding stays null/disabled; submitted close and reviewed employee mapping are rejected without required context. Failed batched update/constraint rolls back the earlier amount change; original source remains available.
+- Other checks (isolated worktree, 2026-10-24): generated binding `wrangler types ... --check` passes; `npm exec tsc -- --noEmit`, `npm run build`, `npm run seo:check`, `git diff --check` pass; scheduler/Worker 128/128 and cash-out/dashboard/inventory 13/13 tests pass. Worker runtime names are scoped to avoid changing frontend Response types. Initial SQL exec-loader and type-global issues were fixed and checks rerun.
+- I/L/E/V: done/done/not_applicable/not_applicable. Only isolated local simulated storage was written. No resource provisioning, production migration, Worker deployment, frontend publication or live check occurred. Production config/legacy routes/mirror remain unchanged.
+- Device/translation/print: schema-only, no UI/gesture or shared-device persistence change; snapshots preserve original narrative/labels and raw units for consuming tasks. No credentials are seeded or retained.
+- Remaining steps: future DATA-03/08/09 and REL-03 must verify actual account/bindings, target runtime and migration/restore evidence separately. Wrangler 4.86.0 supports local Node 20; local simulator may cap the requested compatibility date and does not establish deployed runtime parity. No cloud action is authorized by this task. Local recovery preserves wanted state before a fresh simulation; failed migrations/transactions roll back. Details in local guide.
+- Next owner/action: Codex continues DATA-05. Migrations 0001/0002 reserved; next available number 0003. DATA-05 and external-only DATA-03 become eligible at implementation gates; DATA-03 remains outside this session's authorized external scope.

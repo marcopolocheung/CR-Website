@@ -1,0 +1,14 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  // Simulation only. These names identify local resources, not Cloudflare IDs.
+  "name": "chinarose-internal-local",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": false,
+  "kv_namespaces": [{ "binding": "SCHEDULES", "id": "local-schedules", "remote": false }],
+  "d1_databases": [{
+    "binding": "INTERNAL_DB", "database_name": "chinarose-internal-local",
+    "database_id": "local-internal-db", "migrations_dir": "migrations", "remote": false
+  }],
+  "r2_buckets": [{ "binding": "ATTACHMENTS", "bucket_name": "chinarose-attachments-local", "remote": false }]
+}

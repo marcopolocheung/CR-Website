@@ -11,7 +11,6 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UX-01 | Establish translations and local dictionaries | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [UX-01](tasks/UX-01.md) |
-| DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-02](tasks/DATA-02.md) |
 | DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
 | CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [CASH-01](tasks/CASH-01.md) |
@@ -28,7 +27,7 @@ This view includes ready, planned, and decision-blocked baseline CODE_AND_EXTERN
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | DATA-04 | Implement employee directory and legacy mappings | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-04](tasks/DATA-04.md) |
-| DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | planned | unassigned | P/P/P/P | [DATA-05](tasks/DATA-05.md) |
+| DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | ready | unassigned | P/P/P/P | [DATA-05](tasks/DATA-05.md) |
 | DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
 | DATA-10 | Implement and verify backup/export/restore procedures | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-07, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-10](tasks/DATA-10.md) |
 | SCH-01 | Persist dated time off and temporary availability | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [SCH-01](tasks/SCH-01.md) |
@@ -105,6 +104,7 @@ Only direct decision blockers appear here. Dependent planned tasks inherit those
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
+| DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | complete | Codex | D/D/NA/NA | [DATA-02](tasks/DATA-02.md) |
 
 ## All tasks
 
@@ -127,10 +127,10 @@ This table is the complete ownership/status index, including ready decisions, pl
 | UX-06 | Handle unsaved changes, retries, and edit conflicts | P0 | `CODE_ONLY` | UX-03 | — | planned | unassigned | P/P/NA/NA | [UX-06](tasks/UX-06.md) |
 | UX-07 | Standardize print layouts and bilingual output | P1 | `CODE_ONLY` | UX-01, DEC-07 | — | blocked | unassigned | P/P/NA/NA | [UX-07](tasks/UX-07.md) |
 | DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
-| DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-02](tasks/DATA-02.md) |
-| DATA-03 | Provision and bind non-production D1/R2 | P0 | `EXTERNAL_ONLY` | DATA-02 | — | planned | unassigned | P/P/P/P | [DATA-03](tasks/DATA-03.md) |
+| DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | complete | Codex | D/D/NA/NA | [DATA-02](tasks/DATA-02.md) |
+| DATA-03 | Provision and bind non-production D1/R2 | P0 | `EXTERNAL_ONLY` | DATA-02 | — | ready | unassigned | P/P/P/P | [DATA-03](tasks/DATA-03.md) |
 | DATA-04 | Implement employee directory and legacy mappings | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-04](tasks/DATA-04.md) |
-| DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | planned | unassigned | P/P/P/P | [DATA-05](tasks/DATA-05.md) |
+| DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | ready | unassigned | P/P/P/P | [DATA-05](tasks/DATA-05.md) |
 | DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
 | DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | DATA-08 | Rehearse migration and recovery in non-production | P0 | `EXTERNAL_ONLY` | DATA-03, DATA-07, DATA-02, DEC-03, REL-03 | — | blocked | unassigned | P/P/P/P | [DATA-08](tasks/DATA-08.md) |
