@@ -49,6 +49,7 @@ import { TemplateEditor } from './RulesEditor'
 import { WeeklyScheduleBoard } from './ScheduleBoard'
 import { GenerationReportBanner, GuidedFixPanel, HoursSummary, MonthStrip, OnboardingBanner } from './SchedulePanels'
 import ScheduleWorkspace, { type ScheduleWorkspaceProps } from './ScheduleWorkspace'
+import StaffWorkspace, { type StaffWorkspaceProps } from './StaffWorkspace'
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
   const restaurantName = restaurantId && isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
   // Schedule-only stations (CR3 Kitchen) ship default rules; their crew lives on the Worker.
@@ -1476,6 +1477,78 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     onActivateSlot: activateSlot,
   }
 
+  const staffWorkspace: StaffWorkspaceProps = {
+    employees,
+    filteredEmployees,
+    statsById: staffStatsById,
+    roles: availableRoles,
+    readOnly: scheduleOnly && !staffUnlocked,
+    scheduleOnly,
+    staffUnlocked,
+    activeEmployeeCount,
+    staffQuery,
+    onStaffQueryChange: setStaffQuery,
+    draft,
+    employeePanelOpen,
+    gapSlot,
+    weekStart,
+    canAddEmployee,
+    onDraftChange: setDraft,
+    onAddEmployee: addEmployee,
+    onAddCustomRole: addCustomRoleToDraft,
+    onToggleEmployeePanel: () => setEmployeePanelOpen((open) => !open),
+    onUpdateEmployee: updateEmployee,
+    onRemoveEmployee: removeEmployee,
+    rosterLoadError,
+    staffLoadError,
+    staffUpdatedAt,
+    rosterUpdatedAt,
+    rosterDirty,
+    staffDirty,
+    passwordInput,
+    onPasswordInputChange: setPasswordInput,
+    checkingPassword,
+    onUnlock: () => void unlockCrewEditing(),
+    onLock: () => setStaffPassword(''),
+    staffCanUndo,
+    savingSetup,
+    onUndoCrewSave: () => void undoCrewSave(),
+    isDefaultRoster,
+    onRestoreDefaultRoster: restoreDefaultRoster,
+    confirmingClearStaff,
+    onAskClearStaff: () => setConfirmingClearStaff(true),
+    onClearStaff: clearStaff,
+    onCancelClearStaff: () => setConfirmingClearStaff(false),
+    staffSnapshots,
+    snapshotName,
+    onSnapshotNameChange: setSnapshotName,
+    onSaveSnapshot: saveStaffSnapshot,
+    onRestoreSnapshot: restoreStaffSnapshot,
+    onDeleteSnapshot: deleteStaffSnapshot,
+    setupParts,
+    storeLoading,
+    ruleProblemCount: ruleProblems.length,
+    historyLength: history.length,
+    onSave: () => void saveSetupNow(),
+    onUndo: undoLastChange,
+    onBack: () => {
+      setTab('schedule')
+      document.getElementById('scheduler-tab-schedule')?.focus()
+    },
+    template,
+    ruleProblems,
+    templateDirty,
+    templateLoadError,
+    templateUpdatedAt,
+    isDefaultTemplate,
+    restaurantId,
+    onTemplateChange: (next) => {
+      remember('changed schedule rules')
+      setTemplate(next)
+    },
+    onUseDefaultTemplate: restoreDefaultTemplate,
+  }
+
   return (
     <div className="bg-zinc-100 text-zinc-950">
       <header className="border-b border-zinc-200 bg-white">
@@ -1962,9 +2035,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           </section>
 
           <section id="scheduler-panel-settings" role="tabpanel" aria-labelledby="scheduler-tab-settings" tabIndex={0} hidden={tab !== 'settings'} className="space-y-4 print:hidden">
+          {layout === 'classic' ? (
+          <>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold">{layout === 'new' ? 'Staff & rules' : 'Employee settings'}</h2>
+                <h2 className="text-xl font-semibold">Employee settings</h2>
                 <p className="mt-1 text-sm text-zinc-600">Set who can work, their availability, and their weekly limits.</p>
                 <p className="mt-1 text-sm text-zinc-600">
                   {scheduleOnly ? 'Crew changes apply to every week. Shift rules apply to the selected week.' : 'Employee settings and shift rules apply to the selected week only.'}
@@ -2238,6 +2313,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               updatedAt={templateUpdatedAt}
             />
           </details>
+          </>
+          ) : (
+            <StaffWorkspace {...staffWorkspace} />
+          )}
           </section>
       </main>
     </div>
