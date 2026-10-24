@@ -11,7 +11,6 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UX-02 | Create navigation and visible working context | P0 | `CODE_ONLY` | UX-01 | — | ready | unassigned | P/P/NA/NA | [UX-02](tasks/UX-02.md) |
-| CASH-02 | Add guided cashier entry | P0 | `CODE_ONLY` | UX-03, UX-04 | — | ready | unassigned | P/P/NA/NA | [CASH-02](tasks/CASH-02.md) |
 | DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
 | INV-02 | Add progress, remaining filters, and search | P0 | `CODE_ONLY` | UX-03 | — | ready | unassigned | P/P/NA/NA | [INV-02](tasks/INV-02.md) |
@@ -98,6 +97,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CASH-02 | Add guided cashier entry | P0 | `CODE_ONLY` | UX-03, UX-04 | — | complete | Codex | D/D/NA/NA | [CASH-02](tasks/CASH-02.md) |
 | UX-04 | Establish keyboard and tablet interaction patterns | P1 | `CODE_ONLY` | UX-03 | — | complete | Codex | D/D/NA/NA | [UX-04](tasks/UX-04.md) |
 | FORM-02 | Add recoverable drafts and navigation protection | P0 | `CODE_ONLY` | UX-05, UX-06 | — | complete | Claude | D/D/NA/NA | [FORM-02](tasks/FORM-02.md) |
 | FORM-01 | Add searchable employee/date/type lists | P1 | `CODE_ONLY` | UX-03 | — | complete | Claude | D/D/NA/NA | [FORM-01](tasks/FORM-01.md) |
@@ -161,7 +161,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | SCH-07 | Improve planning and staff views in both languages | P1 | `CODE_ONLY` | UX-02, UX-04 | — | planned | unassigned | P/P/NA/NA | [SCH-07](tasks/SCH-07.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
 | CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | UX-05 | — | complete | Codex | D/D/NA/NA | [CASH-01](tasks/CASH-01.md) |
-| CASH-02 | Add guided cashier entry | P0 | `CODE_ONLY` | UX-03, UX-04 | — | ready | unassigned | P/P/NA/NA | [CASH-02](tasks/CASH-02.md) |
+| CASH-02 | Add guided cashier entry | P0 | `CODE_ONLY` | UX-03, UX-04 | — | complete | Codex | D/D/NA/NA | [CASH-02](tasks/CASH-02.md) |
 | CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | blocked | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
 | CASH-04 | Add incomplete, submitted, and reviewed states | P0 | `CODE_AND_EXTERNAL` | CASH-03, DATA-05, DEC-02 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [CASH-04](tasks/CASH-04.md) |
 | CASH-05 | Add discrepancy explanations and correction history | P1 | `CODE_AND_EXTERNAL` | CASH-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [CASH-05](tasks/CASH-05.md) |
