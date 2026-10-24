@@ -36,6 +36,7 @@ import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForWeek, publis
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
 import { useManagerCode } from './DemoGate'
 import PublishPanel from './PublishPanel'
+import SchedulerNavigation, { type SchedulerView } from './SchedulerNavigation'
 import { DragState, DropFeedback, EmployeeDraft, GenerationReport, HistorySnapshot, MovePreview, ScheduleVariant, ShiftKey, StaffSnapshot, UNDO_LIMIT, WeekAssignments, allDays, assignmentFingerprint, blankDraft, buildFixIssues, buildMovePreview, candidatesForSlot, changesSince, cloneAssignmentList, cloneEmployeeList, cloneTemplate, cloneWeeks, createEmployeeId, diagnosticLabel, emptyAssignments, formatReportTime, fullDay, gapAvailability, onboardingStorageKey, proposeMovedAssignments, readOnboardingDismissed, readStaffSnapshots, roleLabel, rolesInUse, scheduleVariants, snapshotStorageKey, statusForWeek, unassignableReason, uniqueMessages } from './helpers'
 import { Button, Disclosure, Icon, IconButton, PublishStateBadge } from './ui'
 import { EmployeeCard, EmployeeForm } from './StaffEditor'
@@ -47,7 +48,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // Schedule-only stations (CR3 Kitchen) ship default rules; their crew lives on the Worker.
   // The crew (`/api/staff`) is one per station, shared by every week, with the
   // last saved change undoable; the rules are per-week like other stations.
-  // Both stay read-only until the staff password is entered on the Staff tab.
+  // Both stay read-only until the staff password is entered in Employee settings.
   const scheduleOnly = isScheduleOnlyRestaurant(restaurantId)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
@@ -164,7 +165,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [staffQuery, setStaffQuery] = useState('')
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
-  const [tab, setTab] = useState<'schedule' | 'staff' | 'rules'>('schedule')
+  const [tab, setTab] = useState<SchedulerView>('schedule')
+  const rulesDisclosure = useRef<HTMLDetailsElement>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [lastReport, setLastReport] = useState<GenerationReport | null>(null)
   const reportId = useRef(0)
@@ -867,6 +869,19 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setOpenShiftKey(`${slot.day}-${slot.period}`)
   }
 
+  function openEmployeeSettings(showRules = false) {
+    setTab('settings')
+    if (showRules && rulesDisclosure.current) {
+      rulesDisclosure.current.open = true
+      requestAnimationFrame(() => {
+        rulesDisclosure.current?.querySelector('summary')?.focus()
+        rulesDisclosure.current?.scrollIntoView({ block: 'start' })
+      })
+    } else {
+      document.getElementById('scheduler-tab-settings')?.focus()
+    }
+  }
+
   function addEmployeeForSlot(slot?: StaffingSlot) {
     if (slot) {
       setDraft(blankDraft(slot.role, gapAvailability(slot), availableRoles))
@@ -876,7 +891,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     } else {
       setDraft(blankDraft(defaultRoleForRestaurant(restaurantId), allDays([fullDay]), availableRoles))
     }
-    setTab('staff')
+    openEmployeeSettings()
     setEmployeePanelOpen(true)
   }
 
@@ -1338,7 +1353,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   return (
     <div className="bg-zinc-100 text-zinc-950">
       <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex w-full max-w-none flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="px-4 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
               {restaurantName ? `${restaurantName} · Scheduler` : 'Scheduler'}
@@ -1355,6 +1370,137 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               </p>
             )}
           </div>
+        </div>
+        <div className="space-y-3 px-4 pb-4">
+          <SchedulerNavigation view={tab} settingsDirty={setupParts.length > 0} onChange={setTab} />
+          <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+            <div className="flex min-w-0 items-center gap-1" aria-label="Selected week">
+              <IconButton icon="chevronLeft" label="Previous week" onClick={() => goToWeek(shiftWeek(weekStart, -1))} disabled={!weekStart} />
+              <p className="min-w-0 px-2 text-center text-base font-semibold" aria-live="polite">
+                {weekStart ? formatWeekRange(weekStart) : 'Loading week…'}
+              </p>
+              <IconButton icon="chevronRight" label="Next week" onClick={() => goToWeek(shiftWeek(weekStart, 1))} disabled={!weekStart} />
+            </div>
+            {weekStart && weekStart !== currentWeekStart() && (
+              <Button onClick={() => goToWeek(currentWeekStart())} icon="reset">This week</Button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-none min-w-0 space-y-4 overflow-x-clip px-4 py-5">
+          {storeLoading && (
+            <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">
+              <h2 className="text-sm font-semibold text-zinc-900">Loading your saved schedule…</h2>
+              <p className="mt-1 text-sm text-zinc-600">
+                Showing the starting setup until your saved staff list, rules, and published week load. Saving waits
+                until they do, so nothing on the server gets overwritten.
+              </p>
+            </section>
+          )}
+
+          {!storeLoading && storeOffline && (
+            <section className="rounded-lg border border-amber-500 bg-amber-50 p-4 shadow-sm print:hidden" role="alert">
+              <h2 className="text-sm font-semibold text-amber-950">Could not reach the server</h2>
+              <p className="mt-1 text-sm text-amber-900">
+                What you see below is the starting setup, not your saved data — your staff, rules, and published
+                weeks are still safe on the server. Do not save over them. Check your connection, then try again.
+              </p>
+              <button
+                type="button"
+                className="mt-3 inline-flex items-center gap-2 rounded border border-amber-700 bg-white px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                onClick={() => window.location.reload()}
+              >
+                Try again
+              </button>
+            </section>
+          )}
+
+          {tab === 'settings' && isNewStation && (
+            <section className="rounded-lg border border-sky-300 bg-sky-50 p-4 shadow-sm print:hidden">
+              <h2 className="text-sm font-semibold text-sky-950">New station — add your staff to begin</h2>
+              <p className="mt-1 text-sm text-sky-900">
+                Nothing is saved for{restaurantName ? ` ${restaurantName}` : ' this station'} yet. The shifts below are the usual
+                China Rose setup. Add each person below, then press Save changes.
+              </p>
+            </section>
+          )}
+
+          {tab === 'schedule' && sharing && weekStart && ruleProblems.length === 0 && (
+            <PublishPanel
+              weekStart={weekStart}
+              weekLabel={formatWeekRange(weekStart)}
+              slots={slots}
+              employees={employees}
+              assignments={assignments}
+              visible={weekVisibility === 'on'}
+              onVisibilityChange={(status) => setWeekVisibility(weekStart, status)}
+              onClose={() => setSharing(false)}
+              restaurantId={restaurantId}
+              restaurantName={restaurantName ?? undefined}
+              unsavedSetup={setupParts}
+              onSaveSetup={() => saveSetup({ alsoRules: true })}
+              onPublished={(doc) => {
+                setPublishedWeeks((current) => ({ ...current, [weekStart]: doc }))
+                setPublishedBaselines((current) => ({ ...current, [weekStart]: assignmentFingerprint(assignments) }))
+                setLiveMonthWeeks((current) => ({ ...current, [weekStart]: doc.visible }))
+                setLayoutMismatchWeeks((current) => ({ ...current, [weekStart]: false }))
+              }}
+            />
+          )}
+
+          {(setupParts.length > 0 || setupError || setupNotice) && (
+            <section
+              className={`flex flex-col gap-2 rounded-lg border p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between print:hidden ${
+                setupError ? 'border-red-300 bg-red-50' : setupParts.length > 0 ? 'border-amber-400 bg-amber-50' : 'border-green-300 bg-green-50'
+              }`}
+              role="status"
+            >
+              <p className="text-sm text-zinc-900">
+                {setupError ? (
+                  <span className="font-medium text-red-900">{setupError}</span>
+                ) : setupParts.length > 0 ? (
+                  <>
+                    <span className="font-semibold">Unsaved {setupParts.join(' and ')}.</span> They stay when you switch views. Save before leaving the page.
+                  </>
+                ) : (
+                  <span className="font-medium text-green-900">{setupNotice}</span>
+                )}
+              </p>
+              {setupParts.length > 0 && tab === 'schedule' && (
+                <Button
+                  tone="primary"
+                  onClick={() => openEmployeeSettings(ruleProblems.length > 0)}
+                  icon="target"
+                >
+                  Review employee settings
+                </Button>
+              )}
+            </section>
+          )}
+
+          {diagnostics.length > 0 && (
+            <div aria-live="polite" className="print:hidden">
+              <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
+                <ul className="space-y-1 text-sm text-zinc-700">
+                  {diagnostics.map((message, index) => (
+                    <li key={`${message}-${index}`}>{message}</li>
+                  ))}
+                </ul>
+              </Disclosure>
+            </div>
+          )}
+
+          <section
+            id="scheduler-panel-schedule"
+            role="tabpanel"
+            aria-labelledby="scheduler-tab-schedule"
+            tabIndex={0}
+            className={`space-y-4 ${tab !== 'schedule' ? 'hidden print:block' : ''}`}
+          >
+          <div className="print:hidden">
+            <h2 className="text-xl font-semibold">Schedule</h2>
+            <p className="mt-1 mb-3 text-sm text-zinc-600">Build the week, check each shift, then publish it to staff.</p>
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Button
               tone="primary"
@@ -1365,23 +1511,6 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               title={activeEmployeeCount === 0 ? 'Add someone to the staff list first.' : 'Build the week from the staff list.'}
             >
               {isGenerating ? 'Making schedule…' : 'Make schedule'}
-            </Button>
-            <select
-              className="rounded border border-zinc-300 bg-white px-2 py-2 text-sm text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-              aria-label="How to build the week"
-              value={selectedVariant}
-              onChange={(event) => setSelectedVariant(event.target.value as ScheduleVariant)}
-              disabled={isGenerating}
-              title={`${scheduleVariants.find((variant) => variant.id === selectedVariant)?.description} Anyone marked Keep stays put.`}
-            >
-              {scheduleVariants.map((variant) => (
-                <option key={variant.id} value={variant.id}>
-                  {variant.label}
-                </option>
-              ))}
-            </select>
-            <Button onClick={fixNextIssue} icon="target" disabled={!nextIssue} badge={visibleFixIssues.length}>
-              Fix next issue
             </Button>
             <Button
               onClick={() => setSharing((open) => !open)}
@@ -1414,6 +1543,23 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             <span aria-hidden="true" className="mx-1 hidden h-8 w-px bg-zinc-200 sm:block" />
             <Disclosure summary="More actions" tone="quiet">
               <div className="flex flex-wrap items-center gap-2">
+                <label className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  How to build the week
+            <select
+              className="rounded border border-zinc-300 bg-white px-2 py-2 text-sm text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+              aria-label="How to build the week"
+              value={selectedVariant}
+              onChange={(event) => setSelectedVariant(event.target.value as ScheduleVariant)}
+              disabled={isGenerating}
+              title={`${scheduleVariants.find((variant) => variant.id === selectedVariant)?.description} Anyone marked Keep stays put.`}
+            >
+              {scheduleVariants.map((variant) => (
+                <option key={variant.id} value={variant.id}>
+                  {variant.label}
+                </option>
+              ))}
+            </select>
+                </label>
                 <Button
                   onClick={() => {
                     flushSync(() => setTab('schedule'))
@@ -1451,147 +1597,19 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               </div>
             </Disclosure>
           </div>
-        </div>
-        {activeEmployeeCount === 0 && (
-          <p className="mx-auto w-full max-w-none px-4 pb-3 text-sm text-zinc-600">
-            Add someone to the staff list before making a schedule.
-          </p>
-        )}
-        <nav className="mx-auto flex w-full max-w-none gap-1 px-4 print:hidden" aria-label="Scheduler sections">
-          {(
-            [
-              ['schedule', 'Schedule'],
-              ['staff', `Staff (${activeEmployeeCount})`],
-              ['rules', ruleProblems.length > 0 ? `Shift rules (${ruleProblems.length} to fix)` : 'Shift rules'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={tab === id}
-              className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 ${
-                tab === id ? 'border-zinc-900 text-zinc-950' : 'border-transparent text-zinc-600 hover:text-zinc-900'
-              }`}
-              onClick={() => setTab(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-      </header>
-
-      <main className="mx-auto w-full max-w-none min-w-0 space-y-4 overflow-x-clip px-4 py-5">
-          {storeLoading && (
-            <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">
-              <h2 className="text-sm font-semibold text-zinc-900">Loading your saved schedule…</h2>
-              <p className="mt-1 text-sm text-zinc-600">
-                Showing the starting setup until your saved staff list, rules, and published week load. Saving waits
-                until they do, so nothing on the server gets overwritten.
-              </p>
-            </section>
-          )}
-
-          {!storeLoading && storeOffline && (
-            <section className="rounded-lg border border-amber-500 bg-amber-50 p-4 shadow-sm print:hidden" role="alert">
-              <h2 className="text-sm font-semibold text-amber-950">Could not reach the server</h2>
-              <p className="mt-1 text-sm text-amber-900">
-                What you see below is the starting setup, not your saved data — your staff, rules, and published
-                weeks are still safe on the server. Do not save over them. Check your connection, then try again.
-              </p>
-              <button
-                type="button"
-                className="mt-3 inline-flex items-center gap-2 rounded border border-amber-700 bg-white px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                onClick={() => window.location.reload()}
-              >
-                Try again
-              </button>
-            </section>
-          )}
-
-          {!scheduleOnly && !onboardingDismissed && assignments.length === 0 && (
-            <OnboardingBanner activeEmployeeCount={activeEmployeeCount} onDismiss={dismissOnboarding} />
-          )}
-
-          {isNewStation && (
-            <section className="rounded-lg border border-sky-300 bg-sky-50 p-4 shadow-sm print:hidden">
-              <h2 className="text-sm font-semibold text-sky-950">New station — add your staff to begin</h2>
-              <p className="mt-1 text-sm text-sky-900">
-                Nothing is saved for{restaurantName ? ` ${restaurantName}` : ' this station'} yet. The shifts below are the usual
-                China Rose setup. Add each person on the Staff tab, then press Save changes.
-              </p>
-            </section>
-          )}
-
-          {sharing && weekStart && ruleProblems.length === 0 && (
-            <PublishPanel
-              weekStart={weekStart}
-              weekLabel={formatWeekRange(weekStart)}
-              slots={slots}
-              employees={employees}
-              assignments={assignments}
-              visible={weekVisibility === 'on'}
-              onVisibilityChange={(status) => setWeekVisibility(weekStart, status)}
-              onClose={() => setSharing(false)}
-              restaurantId={restaurantId}
-              restaurantName={restaurantName ?? undefined}
-              unsavedSetup={setupParts}
-              onSaveSetup={() => saveSetup({ alsoRules: true })}
-              onPublished={(doc) => {
-                setPublishedWeeks((current) => ({ ...current, [weekStart]: doc }))
-                setPublishedBaselines((current) => ({ ...current, [weekStart]: assignmentFingerprint(assignments) }))
-                setLiveMonthWeeks((current) => ({ ...current, [weekStart]: doc.visible }))
-                setLayoutMismatchWeeks((current) => ({ ...current, [weekStart]: false }))
-              }}
-            />
-          )}
-
-          {(setupParts.length > 0 || setupError || setupNotice) && (
-            <section
-              className={`flex flex-col gap-2 rounded-lg border p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between print:hidden ${
-                setupError ? 'border-red-300 bg-red-50' : setupParts.length > 0 ? 'border-amber-400 bg-amber-50' : 'border-green-300 bg-green-50'
-              }`}
-              role="status"
-            >
-              <p className="text-sm text-zinc-900">
-                {setupError ? (
-                  <span className="font-medium text-red-900">{setupError}</span>
-                ) : setupParts.length > 0 ? (
-                  <>
-                    <span className="font-semibold">Unsaved {setupParts.join(' and ')}.</span> They reset if you leave. Publishing also saves them.
-                  </>
-                ) : (
-                  <span className="font-medium text-green-900">{setupNotice}</span>
-                )}
-              </p>
-              {setupParts.length > 0 && (
-                <Button
-                  tone="primary"
-                  onClick={() => void saveSetupNow()}
-                  icon="check"
-                  loading={savingSetup}
-                  disabled={storeLoading || ruleProblems.length > 0}
-                  title={ruleProblems.length > 0 ? 'Fix the shift rules marked in red first.' : undefined}
-                >
-                  Save changes
-                </Button>
-              )}
-            </section>
-          )}
-
-          {diagnostics.length > 0 && (
-            <div aria-live="polite" className="print:hidden">
-              <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
-                <ul className="space-y-1 text-sm text-zinc-700">
-                  {diagnostics.map((message, index) => (
-                    <li key={`${message}-${index}`}>{message}</li>
-                  ))}
-                </ul>
-              </Disclosure>
+          </div>
+          {ruleProblems.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-300 bg-red-50 p-3 print:hidden" role="alert">
+              <p className="text-sm text-red-900">Fix {ruleProblems.length} shift rule problem{ruleProblems.length === 1 ? '' : 's'} before publishing.</p>
+              <Button onClick={() => openEmployeeSettings(true)} icon="target">Review shift rules</Button>
             </div>
           )}
-
-          {tab === 'schedule' && (
-          <>
+          {activeEmployeeCount === 0 && !storeLoading && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-4 print:hidden">
+              <p className="text-sm text-zinc-700">Add employees in Employee settings before making a schedule.</p>
+              <Button onClick={() => openEmployeeSettings()} icon="plus">Open employee settings</Button>
+            </div>
+          )}
           <GuidedFixPanel
             nextIssue={nextIssue}
             weekStart={weekStart}
@@ -1611,6 +1629,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           />
 
           <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="print:hidden">
+            <Disclosure summary="Month view and week visibility" tone="quiet">
             <MonthStrip
               monthKey={monthKey}
               weekStart={weekStart}
@@ -1624,33 +1644,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               currentState={currentPublishState}
               editedWeeks={otherWeeksWithEdits}
             />
-            <div className="mt-4 flex flex-col gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-1">
-                <IconButton
-                  icon="chevronLeft"
-                  label="Previous week"
-                  onClick={() => goToWeek(shiftWeek(weekStart, -1))}
-                  disabled={!weekStart}
-                />
-                <h2 className="min-w-0 flex-1 truncate px-2 text-center text-lg font-semibold">
-                  {weekStart ? formatWeekRange(weekStart) : '—'}
-                </h2>
-                <IconButton
-                  icon="chevronRight"
-                  label="Next week"
-                  onClick={() => goToWeek(shiftWeek(weekStart, 1))}
-                  disabled={!weekStart}
-                />
-                {weekStart && weekStart !== currentWeekStart() && (
-                  <button
-                    type="button"
-                    className="ml-2 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                    onClick={() => goToWeek(currentWeekStart())}
-                  >
-                    This week
-                  </button>
-                )}
-              </div>
+            </Disclosure>
+            </div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-lg font-semibold">{weekStart ? formatWeekRange(weekStart) : 'Weekly schedule'}</h3>
               <div className="flex flex-wrap items-center gap-2 print:hidden">
                     <button
                   type="button"
@@ -1703,8 +1700,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               <div className="mt-3 rounded border border-amber-500 bg-amber-50 p-3 text-sm text-amber-950" role="alert">
                 <p className="font-semibold">This week is published, but with different shift rules — so it is not shown here.</p>
                 <p className="mt-1">
-                  Staff still see the published version. Making and publishing a schedule here replaces it. Check the Shift
-                  rules tab first.
+                  Staff still see the published version. Making and publishing a schedule here replaces it.
+                  <button type="button" className="ml-1 rounded font-semibold underline focus-visible:outline focus-visible:outline-2" onClick={() => openEmployeeSettings(true)}>Review shift rules</button> first.
                 </p>
               </div>
             )}
@@ -1798,33 +1795,39 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             </Disclosure>
 
           </div>
-          </>
+          {!scheduleOnly && !onboardingDismissed && assignments.length === 0 && (
+            <Disclosure summary="How to make a schedule" tone="quiet">
+              <OnboardingBanner activeEmployeeCount={activeEmployeeCount} onDismiss={dismissOnboarding} />
+            </Disclosure>
           )}
+          </section>
 
-          {tab === 'rules' && (
-            <TemplateEditor
-              template={template}
-              roles={availableRoles}
-              readOnly={scheduleOnly && !staffUnlocked}
-              problems={ruleProblems}
-              onChange={(next) => {
-                remember('changed schedule rules')
-                setTemplate(next)
-              }}
-              onUseDefault={restoreDefaultTemplate}
-              isDefaultTemplate={isDefaultTemplate}
-              dirty={templateDirty}
-              loadError={templateLoadError}
-              restaurantId={restaurantId}
-              updatedAt={templateUpdatedAt}
-            />
-          )}
-
-          {tab === 'staff' && (
+          <section id="scheduler-panel-settings" role="tabpanel" aria-labelledby="scheduler-tab-settings" tabIndex={0} hidden={tab !== 'settings'} className="space-y-4 print:hidden">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold">Employee settings</h2>
+                <p className="mt-1 text-sm text-zinc-600">Set who can work, their availability, and their weekly limits.</p>
+                <p className="mt-1 text-sm text-zinc-600">
+                  {scheduleOnly ? 'Crew changes apply to every week. Shift rules apply to the selected week.' : 'Employee settings and shift rules apply to the selected week only.'}
+                  {' '}Switch views anytime; your edits stay here until you leave the page.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button tone="primary" onClick={() => void saveSetupNow()} icon="check" loading={savingSetup} disabled={setupParts.length === 0 || storeLoading || ruleProblems.length > 0} title={ruleProblems.length > 0 ? 'Fix the shift rules below before saving.' : undefined}>Save changes</Button>
+                <Button onClick={undoLastChange} icon="undo" disabled={history.length === 0}>Undo</Button>
+                <Button onClick={() => { setTab('schedule'); document.getElementById('scheduler-tab-schedule')?.focus() }} icon="chevronRight">Back to schedule</Button>
+              </div>
+            </div>
+            {ruleProblems.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-300 bg-red-50 p-3" role="alert">
+                <p className="text-sm text-red-900">Fix {ruleProblems.length} shift rule problem{ruleProblems.length === 1 ? '' : 's'} before saving.</p>
+                <Button onClick={() => openEmployeeSettings(true)} icon="target">Review shift rules</Button>
+              </div>
+            )}
           <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-semibold">Staff{weekStart ? ` — week of ${formatWeekRange(weekStart)}` : ''}</h2>
+                <h3 className="font-semibold">Employees</h3>
                 <p className="mt-0.5 text-sm text-zinc-600">
                   {activeEmployeeCount} working, {employees.length - activeEmployeeCount} off the list
                 </p>
@@ -1836,12 +1839,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               </div>
               {(!scheduleOnly || staffUnlocked) && (
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <IconButton
-                    icon={employeePanelOpen ? 'close' : 'plus'}
-                    label={employeePanelOpen ? 'Close employee form' : 'Add employee'}
-                    tone="accent"
-                    onClick={() => setEmployeePanelOpen((open) => !open)}
-                  />
+                  <Button icon={employeePanelOpen ? 'close' : 'plus'} onClick={() => setEmployeePanelOpen((open) => !open)}>
+                    {employeePanelOpen ? 'Close employee form' : 'Add employee'}
+                  </Button>
                 </div>
               )}
             </div>
@@ -1918,7 +1918,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             )}
 
             {!scheduleOnly && (
-            <>
+            <div className="mt-3">
+            <Disclosure summary="Staff list tools" tone="quiet">
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-zinc-600">Mistake? Go back to the station’s saved staff list.</p>
               <button
@@ -2021,7 +2022,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 )}
               </Disclosure>
             </div>
-            </>
+            </Disclosure>
+            </div>
             )}
 
             <div className="mt-3 border-t border-zinc-100 pt-3">
@@ -2055,7 +2057,29 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               </div>
             </div>
           </section>
-          )}
+          <details ref={rulesDisclosure} className="rounded-lg border border-zinc-200 bg-white shadow-sm">
+            <summary className="cursor-pointer px-4 py-3 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">
+              Shift rules{ruleProblems.length > 0 ? ` (${ruleProblems.length} to fix)` : ''}
+            </summary>
+            <p className="px-4 pb-3 text-sm text-zinc-600">Change the positions and times needed for the selected week.</p>
+            <TemplateEditor
+              template={template}
+              roles={availableRoles}
+              readOnly={scheduleOnly && !staffUnlocked}
+              problems={ruleProblems}
+              onChange={(next) => {
+                remember('changed schedule rules')
+                setTemplate(next)
+              }}
+              onUseDefault={restoreDefaultTemplate}
+              isDefaultTemplate={isDefaultTemplate}
+              dirty={templateDirty}
+              loadError={templateLoadError}
+              restaurantId={restaurantId}
+              updatedAt={templateUpdatedAt}
+            />
+          </details>
+          </section>
       </main>
     </div>
   )

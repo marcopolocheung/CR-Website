@@ -31,9 +31,9 @@ export function OnboardingBanner({
         <IconButton icon="close" label="Dismiss getting-started tips" onClick={onDismiss} />
       </div>
       <div className="mt-3 space-y-2">
-        <ChecklistItem complete={activeEmployeeCount > 0} label="Add everyone working this week to the Staff list" />
+        <ChecklistItem complete={activeEmployeeCount > 0} label="Add everyone working this week in Employee settings" />
         <ChecklistItem complete={false} label={'Press "Make schedule" to build the week'} />
-        <ChecklistItem complete={false} label={'Use "Fix next issue" to settle anything that needs a decision'} />
+        <ChecklistItem complete={false} label="Review any issues shown above the schedule" />
         <ChecklistItem complete={false} label={'Press "Publish to staff" when it looks right'} />
       </div>
     </section>
