@@ -56,7 +56,9 @@ const MAX_BODY_CHARS = 20000
 const CASHOUT_TTL_SECONDS = 31 * 86400
 const CASHOUT_HISTORY_DAYS = 30
 const CASHOUT_STORES = ['CR3', 'CR2'] as const
-const CASHOUT_DENOMINATIONS = 11
+// Mirrors src/lib/cashout.ts (dashboard.js cannot import it); index.test.ts checks they agree.
+const CASHOUT_FLOAT_CENTS = 10000
+const CASHOUT_DENOMINATION_CENTS = [10000, 5000, 2000, 1000, 500, 100, 50, 25, 10, 5, 1]
 const MAX_CASHIERS_PER_SHIFT = 20
 const MONEY_INPUT_RE = /^-?\d{0,7}(\.\d{0,2})?$/
 const DOC_TTL_SECONDS = 31536000
@@ -720,34 +722,53 @@ function validateCashier(raw: unknown): CashoutCashier | null {
   const c = raw as Record<string, unknown>
   if (typeof c.name !== 'string' || c.name.length > 60) return null
   if (typeof c.toast !== 'string' || !MONEY_INPUT_RE.test(c.toast)) return null
-  if (!Array.isArray(c.counts) || c.counts.length !== CASHOUT_DENOMINATIONS) return null
+  if (!Array.isArray(c.counts) || c.counts.length !== CASHOUT_DENOMINATION_CENTS.length) return null
   if (!c.counts.every((n) => Number.isInteger(n) && n >= 0 && n <= 100000)) return null
   return { name: c.name, counts: c.counts as number[], toast: c.toast }
 }
 
-const isCents = (n: unknown): n is number => Number.isInteger(n) && Math.abs(n as number) < 1e10
+const moneyCents = (text: string) => {
+  const n = parseFloat(text)
+  return Number.isFinite(n) ? Math.round(n * 100) : 0
+}
+const addOrNull = (a: number | null, b: number | null) => (a === null || b === null ? null : a + b)
 
-/** Totals are computed by the cash-out page; the Worker only checks their shape. */
+function shiftCashoutTotals(cashiers: CashoutCashier[]) {
+  return cashiers.reduce<{ deposit: number; overShort: number | null }>((t, c) => {
+    const turnIn = c.counts.reduce((sum, n, i) => sum + CASHOUT_DENOMINATION_CENTS[i] * n, 0) - CASHOUT_FLOAT_CENTS
+    const overShort = c.toast.trim() === '' ? null : turnIn - moneyCents(c.toast)
+    return { deposit: t.deposit + turnIn, overShort: addOrNull(t.overShort, overShort) }
+  }, { deposit: 0, overShort: 0 })
+}
+
+/** Notebook totals from the sheet alone: $100 kept per drawer, blank Toast/Z leaves that difference null. */
+export function cashoutTotals(sheet: CashoutDay['sheet']): CashoutTotals {
+  const am = shiftCashoutTotals(sheet.am)
+  const pm = shiftCashoutTotals(sheet.pm)
+  const deposit = am.deposit + pm.deposit
+  return {
+    amDeposit: am.deposit,
+    pmDeposit: pm.deposit,
+    amOverShort: am.overShort,
+    pmOverShort: pm.overShort,
+    deposit,
+    overShort: addOrNull(am.overShort, pm.overShort),
+    zOverShort: sheet.zReport.trim() === '' ? null : deposit - moneyCents(sheet.zReport),
+  }
+}
+
+/** Validates the sheet and recomputes totals; any client-sent `totals` (older pages always send them) is ignored. */
 export function validateCashoutBody(raw: unknown): Pick<CashoutDay, 'sheet' | 'totals'> | null {
   if (!raw || typeof raw !== 'object') return null
-  const body = raw as Record<string, unknown>
-  const sheet = body.sheet as Record<string, unknown> | undefined
-  const totals = body.totals as Record<string, unknown> | undefined
-  if (!sheet || !totals) return null
+  const sheet = (raw as Record<string, unknown>).sheet as Record<string, unknown> | undefined
+  if (!sheet || typeof sheet !== 'object') return null
   if (typeof sheet.zReport !== 'string' || !MONEY_INPUT_RE.test(sheet.zReport)) return null
   const shifts = [sheet.am, sheet.pm].map((shift) =>
     Array.isArray(shift) && shift.length <= MAX_CASHIERS_PER_SHIFT ? shift.map(validateCashier) : null,
   )
   if (shifts.some((shift) => !shift || shift.some((c) => !c))) return null
-  const deposits = ['amDeposit', 'pmDeposit', 'deposit'] as const
-  // Over/short is null while its Toast or Z figure is still blank.
-  const overShorts = ['amOverShort', 'pmOverShort', 'overShort', 'zOverShort'] as const
-  if (!deposits.every((k) => isCents(totals[k]))) return null
-  if (!overShorts.every((k) => totals[k] === null || isCents(totals[k]))) return null
-  return {
-    sheet: { am: shifts[0] as CashoutCashier[], pm: shifts[1] as CashoutCashier[], zReport: sheet.zReport },
-    totals: Object.fromEntries([...deposits, ...overShorts].map((k) => [k, totals[k]])) as CashoutTotals,
-  }
+  const valid = { am: shifts[0] as CashoutCashier[], pm: shifts[1] as CashoutCashier[], zReport: sheet.zReport }
+  return { sheet: valid, totals: cashoutTotals(valid) }
 }
 
 function cashoutKey(store: string, date: string) {
