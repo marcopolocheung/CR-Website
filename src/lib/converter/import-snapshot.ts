@@ -1,3 +1,4 @@
+import { validDirectory, type ImportDirectory } from './employee-mapping'
 import { validSalesContext } from './sales-context'
 import { businessDate, type StoreId } from '../internal-tools/contracts'
 import { draftContextKey, type DraftContext } from '../internal-tools/drafts'
@@ -6,7 +7,7 @@ import type { SalesReview } from './sales-review'
 import { isWorkbookOutput, type WorkbookOutput } from './workbook-output'
 import en from '../internal-tools/i18n/en'
 
-export type HoursMetadata = { location: string; startDate: string; endDate: string; preparer: string }
+export type HoursMetadata = { location: string; startDate: string; endDate: string; preparer: string; fingerprint?: string; mapping?: { revision: number; directory: ImportDirectory } }
 export type ImportSnapshot = { version: 1; kind: 'sales'; review: SalesReview; output: WorkbookOutput | null }
   | { version: 1; kind: 'hours'; sourceName: string; rows: HoursRow[]; metadata: HoursMetadata; output: WorkbookOutput | null }
 const FORM_KEYS = ['firstName', 'lastName', 'day', 'date', 'location', 'amDeposit', 'pmDeposit', 'amOverShort', 'pmOverShort']
@@ -45,7 +46,9 @@ export function isImportSnapshot(value: unknown): value is ImportSnapshot {
   }
   if (value.kind !== 'hours' || !keys(value, ['version','kind','sourceName','rows','metadata','output']) || typeof value.sourceName !== 'string' || !Array.isArray(value.rows) || !object(value.metadata)) return false
   const meta = value.metadata
-  if (!keys(meta, ['location','startDate','endDate','preparer']) || !['location','startDate','endDate','preparer'].every(key => typeof meta[key] === 'string') || !importStore(meta.location as string) || !businessDate(meta.startDate) || !businessDate(meta.endDate) || (meta.startDate as string) > (meta.endDate as string)) return false
+  if (!keys(meta, ['location','startDate','endDate','preparer','fingerprint','mapping']) || !['location','startDate','endDate','preparer'].every(key => typeof meta[key] === 'string') || !importStore(meta.location as string) || !businessDate(meta.startDate) || !businessDate(meta.endDate) || (meta.startDate as string) > (meta.endDate as string)) return false
+  if (meta.fingerprint !== undefined && (typeof meta.fingerprint !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(meta.fingerprint))) return false
+  if (meta.mapping !== undefined && (!object(meta.mapping) || !keys(meta.mapping,['revision','directory']) || !Number.isSafeInteger(meta.mapping.revision) || (meta.mapping.revision as number)<1 || !validDirectory(meta.mapping.directory,importStore(meta.location as string)!))) return false
   if (!value.rows.every(row => object(row) && keys(row, [...HOURS_COLUMNS, '__sourceRow']) && (row.__sourceRow === undefined || Number.isSafeInteger(row.__sourceRow) && (row.__sourceRow as number) >= 2) && HOURS_COLUMNS.every(key => typeof row[key] === 'string'))) return false
   const format = (value: string) => `${value.slice(2,4)}_${value.slice(5,7)}${value.slice(8,10)}`
   if (value.output && value.output.filename !== `${importStore(meta.location as string)}_${format(meta.startDate as string)}-${format(meta.endDate as string)}_EMPLOYEE_HOUR_LOG_SUMMARY.xlsx`) return false
