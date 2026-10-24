@@ -4,7 +4,7 @@ parent: INV
 title: "Add progress, remaining filters, and search"
 priority: P0
 delivery_class: CODE_ONLY
-status: planned
+status: ready
 owner: unassigned
 implementation_dependencies: [UX-03]
 activation_dependencies: []

@@ -81,9 +81,9 @@ def run():
         assert len(requests) == count_before_switch, 'Language switch must not refetch/remount the cash sheet'
         mode['hold'] = True
         page.get_by_role('button', name='Save day', exact=True).click()
-        expect(page.get_by_role('status')).to_contain_text('Loading')
+        expect(page.get_by_role('status')).to_contain_text('Sending')
         page.get_by_role('button', name='Español', exact=True).tap()
-        expect(page.get_by_role('status')).to_contain_text('Cargando')
+        expect(page.get_by_role('status')).to_contain_text('Enviando')
         assert pending, 'Expected held local save request'
         held, headers = pending.pop()
         mode['hold'] = False
@@ -124,7 +124,11 @@ def run():
             dialog.dismiss()
         page.on('dialog', dismiss)
         page.get_by_role('button', name='Borrar hoja', exact=True).click()
-        assert dialogs[-1].startswith('¿Borrar')
+        if page.get_by_role('dialog').is_visible():
+            expect(page.get_by_role('dialog')).to_contain_text('¿Borrar')
+            page.get_by_role('button', name='Cancelar', exact=True).click()
+        else:
+            assert dialogs[-1].startswith('¿Borrar')
         expect(page.locator('#am-0-toast')).to_have_value('123.45')
         # Browser print events preserve existing English output, then restore screen language.
         page.evaluate("window.dispatchEvent(new Event('beforeprint'))")

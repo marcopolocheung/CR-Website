@@ -134,5 +134,16 @@ const es: Record<keyof typeof en, string> = {
   "weekday.fri": "VIE",
   "weekday.sat": "SÁB",
   "weekday.sun": "DOM",
+  "feedback.fixFields": "Revise estos campos:",
+  "feedback.failed": "No se pudo guardar",
+  "feedback.confirmTitle": "Confirmar acción",
+  "feedback.cancel": "Cancelar",
+  "feedback.confirm": "Confirmar",
+  "feedback.storageFailed": "No se pudo guardar en este dispositivo. Mantenga esta página abierta o copie su trabajo.",
+  "imports.pickLocation": "Seleccione una ubicación.",
+  "imports.pickDate": "Seleccione una fecha.",
+  "cash.savedHistoryUnavailable": "Guardado en el servidor: {store} {date}. No se pudo actualizar el historial; conserve su trabajo e intente cargarlo de nuevo.",
+  'cash.draftContextNote': "Los valores de la hoja están guardados en este dispositivo. Confirme la tienda y la fecha al continuar.",
+  'cash.earlierVersionSaved': "Se guardó una versión anterior de {store} del {date} en el servidor. Sus cambios más recientes aún deben guardarse.",
 }
 export default es

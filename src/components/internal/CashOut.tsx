@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
+import { LabeledInput, EmptyState, SaveFeedback, focusField, useConfirmation, type SaveState } from './Feedback'
 import { errorKey, type Message } from '@/lib/internal-tools/i18n'
 import {
   DENOMINATIONS,
@@ -59,6 +60,7 @@ export function CodeGate({ onUnlock, title }: { onUnlock: (token: string) => voi
       onUnlock(code)
     } catch (caught) {
       setError({ key: errorKey(caught) })
+      focusField('cashout-code')
     } finally {
       setBusy(false)
     }
@@ -68,16 +70,8 @@ export function CodeGate({ onUnlock, title }: { onUnlock: (token: string) => voi
     <form onSubmit={submit} className="max-w-md my-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
       <h2 className="text-xl font-semibold text-gray-900 mb-2">{title ?? tr('cash.title')}</h2>
       <p className="text-sm text-gray-600 mb-4">{tr('cash.managerInstructions')}</p>
-      <label htmlFor="cashout-code" className="block text-sm font-medium text-gray-700 mb-1">{tr('cash.managerCode')}</label>
-      <input
-        id="cashout-code"
-        type="password"
-        autoComplete="off"
-        value={code}
-        onChange={e => setCode(e.target.value)}
-        className={inputClass}
-      />
-      {error && <p role="alert" className="mt-2 text-sm text-red-700">{tr(error.key, error.params)}</p>}
+      <LabeledInput id="cashout-code" label={{ key: 'cash.managerCode' }} error={error}
+        type="password" autoComplete="off" value={code} onChange={event => setCode(event.target.value)} className={inputClass} />
       <button
         type="submit"
         disabled={!code || busy}
@@ -112,6 +106,10 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
   const [history, setHistory] = useState<CashoutDay[]>([])
   const [status, setStatus] = useState<Message | null>(null)
   const [busy, setBusy] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState>('unsaved')
+  const confirmation = useConfirmation()
+  const currentEdit = useRef({ store, date, sheet })
+  currentEdit.current = { store, date, sheet }
 
   const run = useCallback(
     async (task: () => Promise<Message | void>) => {
@@ -131,7 +129,10 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
   )
 
   const refreshHistory = useCallback(
-    () => run(async () => setHistory(await fetchCashoutHistory(store, today(), token))),
+    () => run(async () => {
+      const days = await fetchCashoutHistory(store, today(), token)
+      if (currentEdit.current.store === store) setHistory(days)
+    }),
     [run, store, token],
   )
 
@@ -143,18 +144,30 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
     run(async () => {
       const saved = await fetchCashoutDay(store, day, token)
       if (!saved) return { key: 'cash.notSaved', params: { store, date: day } }
-      if (!confirm(tr('cash.replaceConfirm', { store, date: day }))) return
+      if (!await confirmation.ask({ key: 'cash.replaceConfirm', params: { store, date: day } }, true)) return
       setDate(day)
       setSheet(saved)
       return { key: 'cash.loaded', params: { store, date: day } }
     })
 
-  const saveDay = () =>
-    run(async () => {
+  const saveDay = () => run(async () => {
+    const stillCurrent = () => currentEdit.current.store === store && currentEdit.current.date === date && currentEdit.current.sheet === sheet
+    setSaveState('sending')
+    try {
       await saveCashoutDay(store, date, { sheet, totals: dayTotals(sheet.am, sheet.pm, sheet.zReport) }, token)
-      setHistory(await fetchCashoutHistory(store, today(), token))
-      return { key: 'cash.saved', params: { store, date } }
-    })
+    } catch (caught) {
+      const key = errorKey(caught)
+      if (stillCurrent()) setSaveState(key === 'errors.conflict' ? 'conflict' : key === 'errors.unavailable' ? 'waiting' : 'failed')
+      throw caught
+    }
+    if (stillCurrent()) setSaveState('server')
+    try {
+      const days = await fetchCashoutHistory(store, today(), token)
+      if (currentEdit.current.store === store) setHistory(days)
+    }
+    catch { return { key: stillCurrent() ? 'cash.savedHistoryUnavailable' : 'cash.earlierVersionSaved', params: { store, date } } }
+    return { key: stillCurrent() ? 'cash.saved' : 'cash.earlierVersionSaved', params: { store, date } }
+  })
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -165,8 +178,18 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
   }, [])
 
   useEffect(() => {
-    if (loaded) localStorage.setItem(STORAGE_KEY, JSON.stringify(sheet))
+    if (!loaded) return
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sheet))
+      setSaveState('device')
+      setStatus(previous => previous && ['cash.saved', 'cash.savedHistoryUnavailable', 'cash.earlierVersionSaved'].includes(previous.key) ? null : previous)
+    } catch {
+      setSaveState('failed')
+      setStatus({ key: 'feedback.storageFailed' })
+    }
   }, [sheet, loaded])
+
+  useEffect(() => { setSaveState('unsaved'); setStatus(null) }, [store, date])
 
   const updateCashier = (shift: Shift, idx: number, patch: Partial<Cashier>) =>
     setSheet(s => ({ ...s, [shift]: s[shift].map((c, i) => (i === idx ? { ...c, ...patch } : c)) }))
@@ -177,8 +200,8 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
     updateCashier(shift, idx, { counts })
   }
 
-  const removeCashier = (shift: Shift, idx: number) => {
-    if (confirm(tr('cash.removeConfirm'))) setSheet(s => ({ ...s, [shift]: s[shift].filter((_, i) => i !== idx) }))
+  const removeCashier = async (shift: Shift, idx: number) => {
+    if (await confirmation.ask({ key: 'cash.removeConfirm' }, true)) setSheet(s => ({ ...s, [shift]: s[shift].filter((_, i) => i !== idx) }))
   }
 
   const day = dayTotals(sheet.am, sheet.pm, sheet.zReport)
@@ -192,7 +215,7 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
             {tr('common.print')}
           </button>
           <button
-            onClick={() => confirm(tr('cash.clearConfirm')) && setSheet(emptySheet())}
+            onClick={async () => { if (await confirmation.ask({ key: 'cash.clearConfirm' }, true)) setSheet(emptySheet()) }}
             className="min-h-11 px-4 py-2 rounded-lg border border-red-300 text-red-700 text-sm font-medium hover:bg-red-50"
           >
             {tr('cash.clear')}
@@ -232,7 +255,7 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
             {tr('cash.save')}
           </button>
         </div>
-        <p role="status" className="text-sm text-gray-700 print:hidden">{busy ? tr('common.loading') : status ? tr(status.key, status.params) : null}</p>
+        <SaveFeedback state={saveState} message={busy && saveState !== 'sending' ? { key: 'common.loading' } : status ?? (saveState === 'device' ? { key: 'cash.draftContextNote' } : null)} />
       </div>
 
       {(['am', 'pm'] as const).map(shift => {
@@ -351,10 +374,11 @@ function CashOutSheet({ token, onLocked }: { token: string; onLocked: () => void
         <Row label={tr('cash.zDifference')}><Money cents={day.zOverShort} signed /></Row>
       </section>
 
+      {confirmation.dialog}
       <section className="mt-10 print:hidden">
         <h2 className="text-xl font-semibold text-gray-900 mb-3">{tr('cash.history', { store: STORE_LABELS[store] })}</h2>
         {history.length === 0 ? (
-          <p className="text-sm text-gray-600">{tr('cash.empty')}</p>
+          <EmptyState message={{ key: 'cash.empty' }} />
         ) : (
           <div className="overflow-x-auto bg-white rounded-xl border border-gray-200">
             <table className="w-full text-sm">
