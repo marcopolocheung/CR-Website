@@ -1,4 +1,5 @@
 const en = {
+  'entry.help': 'Tab / Shift+Tab move through controls. Enter / Shift+Enter move through entry fields. Enter never saves. Escape cancels a confirmation.',
   'shell.internal': 'Internal use only — not for customer distribution',
   'shell.language': 'Language / Idioma',
   'nav.tools': 'Internal tools',

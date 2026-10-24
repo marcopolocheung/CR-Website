@@ -10,6 +10,7 @@ import { isCashoutDraftSheet, readUnassignedCashout, type CashoutDraftSheet } fr
 import { businessDate } from '@/lib/internal-tools/contracts'
 import { useNavigationProtection } from './NavigationProtection'
 import { SingleFlight } from '@/lib/internal-tools/recovery'
+import EntryWorkspace from './EntryWorkspace'
 import { errorKey, type Message } from '@/lib/internal-tools/i18n'
 import {
   DENOMINATIONS,
@@ -39,7 +40,7 @@ const newCashier = (): Cashier => ({ name: '', counts: DENOMINATIONS.map(() => 0
 const emptySheet = (): Sheet => ({ am: [newCashier()], pm: [newCashier()], zReport: '' })
 
 const inputClass =
-  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500'
+  'min-h-11 w-full border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-red-500 print:min-h-0 print:py-2 print:text-sm'
 
 function Money({ cents, signed }: { cents: number | null; signed?: boolean }) {
   const { t: tr } = useInternalLanguage()
@@ -349,6 +350,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
             {tr('cash.load')}
           </button>
           <button
+            id="cashout-save"
             onClick={saveDay}
             disabled={busy || !date}
             className="min-h-11 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
@@ -359,6 +361,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
         <SaveFeedback state={saveState} message={busy && saveState !== 'sending' ? { key: 'common.loading' } : status} />
       </div>
 
+      <EntryWorkspace finishId="cashout-save" summary={<Row label={tr('cash.dayDeposit')}><Money cents={day.deposit} /></Row>}>
       {(['am', 'pm'] as const).map(shift => {
         const totals = shiftTotals(sheet[shift])
         return (
@@ -381,6 +384,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                   <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 break-inside-avoid">
                     <div className="flex gap-2 mb-3">
                       <input
+                        data-entry-field
                         aria-label={tr('cash.cashierName')}
                         placeholder={tr('cash.cashierPlaceholder', { number: idx + 1 })}
                         value={c.name}
@@ -405,6 +409,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                             </td>
                             <td className="py-0.5 pr-2">
                               <input
+                                data-entry-field
                                 id={`${id}-${d}`}
                                 type="number"
                                 inputMode="numeric"
@@ -412,7 +417,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                                 value={c.counts[di] || ''}
                                 placeholder="0"
                                 onChange={e => setCount(shift, idx, di, e.target.value)}
-                                className="w-full border border-gray-300 rounded px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-red-500"
+                                className="min-h-11 w-full border border-gray-300 rounded px-2 py-1 text-base text-right focus:outline-none focus:ring-2 focus:ring-red-500 print:min-h-0 print:text-sm"
                               />
                             </td>
                             <td className="py-0.5 text-right font-mono text-gray-500 w-24">
@@ -427,6 +432,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                       {tr('cash.toast')}
                     </label>
                     <input
+                      data-entry-field
                       id={`${id}-toast`}
                       type="number"
                       inputMode="decimal"
@@ -463,6 +469,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
           {tr('cash.zExpected')}
         </label>
         <input
+          data-entry-field
           id="z-report"
           type="number"
           inputMode="decimal"
@@ -474,6 +481,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
         />
         <Row label={tr('cash.zDifference')}><Money cents={day.zOverShort} signed /></Row>
       </section>
+      </EntryWorkspace>
 
       {confirmation.dialog}
       <section className="mt-10 print:hidden">
@@ -494,7 +502,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                 {history.map(h => (
                   <tr key={h.date} className="border-t border-gray-100">
                     <td className="px-3 py-2">
-                      <button onClick={() => loadDay(h.date)} disabled={busy} className="text-red-700 underline hover:text-red-900">
+                      <button onClick={() => loadDay(h.date)} disabled={busy} className="min-h-11 px-2 text-red-700 underline hover:text-red-900 focus-visible:outline-2 focus-visible:outline-red-700">
                         {h.date}
                       </button>
                     </td>
