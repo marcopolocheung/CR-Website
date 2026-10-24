@@ -40,6 +40,7 @@ def run():
   choices=page.locator('#mapping-row-2 option').evaluate_all('(options)=>options.map(o=>o.value).filter(Boolean)');assert len(choices)==2 and choices[0]!=choices[1]
   page.locator('#mapping-row-2').select_option(choices[0]);page.locator('#mapping-row-3').select_option(choices[0]);page.locator('#mapping-row-4').select_option(choices[1])
   expect(page.locator('#hc-download')).to_be_disabled()
+  page.locator('#hc-end').fill('2026-10-25');page.get_by_role('dialog').locator('button').first.tap();expect(page.locator('#hc-end')).to_have_value('2026-10-24');expect(page.locator('#mapping-row-4')).to_have_value(choices[1])
   state['mode']='conflict';page.locator('#mapping-save').tap();expect(page.locator('#panel-hours')).to_contain_text('Another editor saved a newer revision')
   expect(page.locator('#mapping-row-4')).to_have_value(choices[1]);assert state['record'] is None
   first_operation=state['writes'][-1]['mutation']['operationId'];state['mode']='ok';page.locator('#mapping-save').tap();expect(page.locator('#panel-hours')).to_contain_text('Mappings saved to server')

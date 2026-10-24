@@ -1,3 +1,5 @@
+import { publishedHours, weeksInPeriod } from '../../src/lib/converter/published-hours'
+import type { WeeklyStaffingTemplate } from '../../src/lib/scheduler/types'
 import { historyPage, historyRecord, saveHistory } from './import-history'
 import { directoryRecord, saveDirectory } from './import-directory'
 interface KVNamespace {
@@ -1074,6 +1076,25 @@ export default {
       }
       if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
       return json({ ok: true }, 200, request, env)
+    }
+
+    const importSchedulesMatch = path.match(/^\/api\/internal\/import-schedules\/(CR2|CR3)$/)
+    if (importSchedulesMatch && request.method === 'GET') {
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const store = importSchedulesMatch[1], start = url.searchParams.get('start') ?? '', end = url.searchParams.get('end') ?? ''
+      let weeks: string[]
+      try { weeks = weeksInPeriod(start,end) } catch { return json({error:'invalid_period'},400,request,env) }
+      try {
+        const stations = RESTAURANTS.filter(station => station.startsWith(store+'-'))
+        const publications = await Promise.all(stations.flatMap(station => weeks.map(async week => {
+          const [raw,weekRaw,globalRaw] = await Promise.all([readGoldenDoc(env,station,week),env.SCHEDULES.get(templateKeyForWeek(station,week)),readTemplateRaw(env,station)])
+          const weekDoc = weekRaw ? normalizeTemplateDoc(safeParse(weekRaw)) : null
+          const globalDoc = globalRaw ? normalizeTemplateDoc(safeParse(globalRaw)) : null
+          return publishedHours(station,week,raw?(safeParse(raw)??{}):null,(weekDoc?.template ?? null) as WeeklyStaffingTemplate|null,(globalDoc?.template ?? null) as WeeklyStaffingTemplate|null)
+        })))
+        return json({version:1,storeId:store,start,end,publications},200,request,env,{'Cache-Control':'no-store'})
+      } catch { return json({schemaVersion:1,error:{code:'unavailable'}},503,request,env,{'Cache-Control':'no-store'}) }
     }
 
     const importHistoryMatch = path.match(/^\/api\/internal\/import-history\/(CR2|CR3)(?:\/([A-Za-z0-9_-]{1,128}))?$/)
