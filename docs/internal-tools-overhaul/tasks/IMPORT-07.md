@@ -4,12 +4,12 @@ parent: IMPORT
 title: "Add import history and duplicate handling"
 priority: P1
 delivery_class: CODE_AND_EXTERNAL
-status: blocked
-owner: unassigned
-implementation_dependencies: [DATA-02, DATA-05, IMPORT-02, IMPORT-05, DEC-03]
+status: implemented
+owner: Codex
+implementation_dependencies: [DATA-02, DATA-05, IMPORT-02, IMPORT-05, DEC-03-IMPORT]
 activation_dependencies: [DATA-03, REL-03, DATA-09, REL-04]
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: pending
 live_verification: pending
 ---
@@ -45,7 +45,7 @@ See [current-state inventory](../current-state.md) and [supporting research](../
 - [DATA-05](DATA-05.md) at `implemented` (or `complete`).
 - [IMPORT-02](IMPORT-02.md) at `implemented` (or `complete`).
 - [IMPORT-05](IMPORT-05.md) at `implemented` (or `complete`).
-- [DEC-03](DEC-03.md) at `complete`.
+- [DEC-03-IMPORT](DEC-03-IMPORT.md) at `complete`: approved reviewed-values/fingerprints scope with no raw uploads or automatic disposal. Wider DEC-03 remains pending.
 
 **Needed to activate:**
 
@@ -60,25 +60,25 @@ Affected areas: src/components/internal/SalesConverter.tsx; src/components/inter
 
 ## Implementation checklist
 
-- [ ] Fingerprint source bytes and include store, period, type, and parser version in import identity
-- [ ] Distinguish repeat download from deliberate reprocessing and preserve superseded lineage
-- [ ] Keep source files only according to approved policy and use attachment references when retained
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Fingerprint source bytes and include store, period, type, and parser version in import identity
+- [x] Distinguish repeat download from deliberate reprocessing and preserve superseded lineage
+- [x] Keep source files only according to approved policy and use attachment references when retained
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Fingerprint source bytes and include store, period, type, and parser version in import identity. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Distinguish repeat download from deliberate reprocessing and preserve superseded lineage. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Keep source files only according to approved policy and use attachment references when retained. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Fingerprint source bytes and include store, period, type, and parser version in import identity. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Distinguish repeat download from deliberate reprocessing and preserve superseded lineage. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Keep source files only according to approved policy and use attachment references when retained. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
@@ -100,16 +100,15 @@ Evidence specific to this task: the three task scenarios above must pass against
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | pending | Environment, operation IDs, deployment/resource evidence, or staff-session execution. |
 | Live verification | pending | Observed target-environment behavior or staff acceptance with date and operator. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Business decision: DEC-03. Independent tasks remain available.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Scope/artifacts: [import-history.md](../import-history.md); Codex is the coordinating owner for touched shared files.
+- Checks/evidence: 45 import tests; 4 local D1 tests; 128 scheduler tests; build/types/SEO/dictionaries; local Worker packaging; history, sales-review and mapping browser flows passed. Local synthetic fixtures only; no live-system claim.
+- Implementation and local verification: done. External/live: pending; activation dependencies remain required.
+- Recovery/rollback and acceptance scenarios are recorded in the linked guide. Preserve prior records and drafts when reverting scoped changes.
+- Next owner/action: Codex continues the user-authorized six-PR import stack in one worktree. Open PRs only; no merging or auto-merge.

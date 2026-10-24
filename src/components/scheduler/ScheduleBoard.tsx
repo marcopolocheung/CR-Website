@@ -40,6 +40,7 @@ export function WeeklyScheduleBoard({
   onDropAssignment,
   onActivateSlot,
   roles,
+  showLegend = true,
 }: {
   slots: StaffingSlot[]
   weekStart: string
@@ -66,6 +67,7 @@ export function WeeklyScheduleBoard({
   onDropAssignment: (targetSlotId: string) => void
   onActivateSlot: (slotId: string) => void
   roles: string[]
+  showLegend?: boolean
 }) {
   return (
     <div className="mt-4 min-w-0">
@@ -155,7 +157,7 @@ export function WeeklyScheduleBoard({
           onDropAssignment={onDropAssignment}
         />
       )}
-      <BoardLegend roles={roles} />
+      {showLegend && <BoardLegend roles={roles} />}
     </div>
   )
 }
