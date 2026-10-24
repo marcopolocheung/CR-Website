@@ -5,8 +5,8 @@ import type { FormEvent, SetStateAction } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
 import { LabeledInput, EmptyState, SaveFeedback, focusField, useConfirmation, type SaveState } from './Feedback'
 import DraftChooser, { downloadDraftSource } from './DraftChooser'
-import { saveDraft, type Draft, type DraftContext } from '@/lib/internal-tools/drafts'
-import { isCashoutDraftSheet, type CashoutDraftSheet } from '@/lib/internal-tools/cashout-draft'
+import { newDraft, saveDraft, type Draft, type DraftContext } from '@/lib/internal-tools/drafts'
+import { isCashoutDraftSheet, readUnassignedCashout, type CashoutDraftSheet } from '@/lib/internal-tools/cashout-draft'
 import { businessDate } from '@/lib/internal-tools/contracts'
 import { errorKey, type Message } from '@/lib/internal-tools/i18n'
 import {
@@ -110,6 +110,8 @@ function CashOutWorkspace({ token, onLocked }: { token: string; onLocked: () => 
   const [storageFailed, setStorageFailed] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [legacy, setLegacy] = useState<string | null>(null)
+  const [legacyChanged, setLegacyChanged] = useState(false)
+  const confirmation = useConfirmation()
   const context = useMemo<DraftContext | null>(() => {
     const parsed = businessDate(date)
     return parsed ? { task: 'cash-out', storeId: store, businessDate: parsed } : null
@@ -131,7 +133,25 @@ function CashOutWorkspace({ token, onLocked }: { token: string; onLocked: () => 
       return saved
     } catch { setStorageFailed(true); return false }
   }, [])
-  const open = (draft: Draft<Sheet>) => { if (draft.context.task !== 'cash-out' || !draft.context.businessDate) return; setLastSavedAt(null); activeRef.current = draft; setActive(draft); persist(draft.payload) }
+  const open = (draft: Draft<Sheet>) => { if (draft.context.task !== 'cash-out' || !draft.context.businessDate) return; setStore(draft.context.storeId); setDate(draft.context.businessDate); setLastSavedAt(null); activeRef.current = draft; setActive(draft); persist(draft.payload) }
+  const assignLegacy = async () => {
+    if (!context || legacy === null || !preparer.trim()) return
+    const sourceStillCurrent = () => {
+      try {
+        const current = localStorage.getItem('cr-cash-out')
+        if (current === legacy) return true
+        setLegacy(current); setLegacyChanged(true); return false
+      } catch { setStorageFailed(true); return false }
+    }
+    if (!sourceStillCurrent()) return
+    const payload = readUnassignedCashout(legacy)
+    if (!payload) return
+    const approved = await confirmation.ask({ key: 'cash.legacyConfirm', params: { store: context.storeId, date: context.businessDate! } })
+    if (!approved || !sourceStillCurrent()) return
+    setLegacyChanged(false)
+    // This points to the actual retained legacy source key, not a guessed record ID/date.
+    open({ ...newDraft(context, preparer, payload), sourceId: 'cr-cash-out' })
+  }
   const leave = (lock = false, nextDate?: string) => {
     const current = activeRef.current
     if (current && !persist(current.payload)) return
@@ -156,6 +176,7 @@ function CashOutWorkspace({ token, onLocked }: { token: string; onLocked: () => 
         <p id="draft-preparer-help" className="mt-1 max-w-sm text-xs text-gray-600">{t('drafts.preparerHelp')}</p>
       </div>}
     </div>
+    {legacyChanged && <p role="alert" className="my-3 text-sm text-amber-900">{t('cash.legacyChanged')}</p>}
     {storageFailed && <p role="alert" className="my-3 text-sm text-red-700">{t('drafts.storageUnavailable')}</p>}
     {active ? <>
       <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 print:hidden">
@@ -173,9 +194,11 @@ function CashOutWorkspace({ token, onLocked }: { token: string; onLocked: () => 
       {context && <DraftChooser context={context} preparer={preparer} createPayload={emptySheet} validate={isCashoutDraftSheet} onOpen={open} />}
       {legacy !== null && <div className="my-4 rounded-lg border border-amber-300 bg-amber-50 p-3 print:hidden">
         <p className="text-sm text-amber-900">{t('drafts.legacy')}</p>
+        {readUnassignedCashout(legacy) ? <button type="button" disabled={!context || !preparer.trim()} onClick={assignLegacy} className="my-2 min-h-11 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50">{t('cash.assignLegacy')}</button> : <p className="mt-2 text-sm text-red-700">{t('cash.legacyInvalid')}</p>}
         <button type="button" onClick={() => downloadDraftSource(legacy)} className="min-h-11 px-3 py-2 text-sm text-red-700 underline">{t('drafts.downloadSource')}</button>
       </div>}
     </>}
+    {confirmation.dialog}
   </div>
 }
 
@@ -183,6 +206,8 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
   const { t: tr } = useInternalLanguage()
   const [sheet, setSheetState] = useState<Sheet>(() => draft.payload)
   const latestSheet = useRef(sheet)
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const store = draft.context.storeId
   const date = draft.context.businessDate! // Opened only from the exact cash-out day context above.
   const [history, setHistory] = useState<CashoutDay[]>([])
@@ -199,12 +224,13 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
       setStatus(null)
       try {
         const message = await task()
-        if (message) setStatus(message)
+        if (mounted.current && message) setStatus(message)
       } catch (caught) {
+        if (!mounted.current) return
         if (caught instanceof StoreAuthError) onLocked()
         else setStatus({ key: errorKey(caught) })
       } finally {
-        setBusy(false)
+        if (mounted.current) setBusy(false)
       }
     },
     [onLocked],
@@ -213,7 +239,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
   const refreshHistory = useCallback(
     () => run(async () => {
       const days = await fetchCashoutHistory(store, today(), token)
-      if (currentEdit.current.store === store) setHistory(days)
+      if (mounted.current && currentEdit.current.store === store) setHistory(days)
     }),
     [run, store, token],
   )
@@ -226,6 +252,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
     run(async () => {
       if (day !== date) { onChooseDate(day); return }
       const saved = await fetchCashoutDay(store, day, token)
+      if (!mounted.current) return
       if (!saved) return { key: 'cash.notSaved', params: { store, date: day } }
       if (!await confirmation.ask({ key: 'cash.replaceConfirm', params: { store, date: day } }, true)) return
       setSheet(saved)
@@ -233,7 +260,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
     })
 
   const saveDay = () => run(async () => {
-    const stillCurrent = () => currentEdit.current.store === store && currentEdit.current.date === date && latestSheet.current === sheet
+    const stillCurrent = () => mounted.current && currentEdit.current.store === store && currentEdit.current.date === date && latestSheet.current === sheet
     setSaveState('sending')
     try {
       await saveCashoutDay(store, date, { sheet, totals: dayTotals(sheet.am, sheet.pm, sheet.zReport) }, token)
@@ -245,7 +272,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
     if (stillCurrent()) setSaveState('server')
     try {
       const days = await fetchCashoutHistory(store, today(), token)
-      if (currentEdit.current.store === store) setHistory(days)
+      if (mounted.current && currentEdit.current.store === store) setHistory(days)
     }
     catch { return { key: stillCurrent() ? 'cash.savedHistoryUnavailable' : 'cash.earlierVersionSaved', params: { store, date } } }
     return { key: stillCurrent() ? 'cash.saved' : 'cash.earlierVersionSaved', params: { store, date } }
