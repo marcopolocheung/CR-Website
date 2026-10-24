@@ -1,6 +1,6 @@
 # Target architecture and minimum contracts
 
-**Proposed interfaces, not implemented APIs or an executed migration.** [Current state](current-state.md) documents existing behavior. DATA-01 turns these minimum agreements into exact versioned schemas, type definitions, adapters, error fixtures, and routes before independent consumers implement them. Unresolved policy fields remain unset/disabled until the linked decision is approved. Do not infer a deployed capability from a documented type.
+**Target architecture; no deployed APIs or executed migration are implied.** DATA-01 now provides [local executable contract v1](contract-v1.md); service routes and policy-dependent conversions remain pending. [Current state](current-state.md) documents existing behavior. DATA-01 turns these minimum agreements into exact versioned schemas, type definitions, adapters, error fixtures, and routes before independent consumers implement them. Unresolved policy fields remain unset/disabled until the linked decision is approved. Do not infer a deployed capability from a documented type.
 
 ## Storage and ownership
 

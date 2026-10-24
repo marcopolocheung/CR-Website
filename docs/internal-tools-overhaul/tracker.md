@@ -1,6 +1,6 @@
 # Internal-tools task tracker
 
-Individual briefs are canonical. Update the brief and this summary together when claiming, changing a gate, or handing off. Initial state: no implementation, local verification, activation, or live verification has occurred. Owner is unassigned everywhere. P0 establishes safety/compatibility or early workflow foundations; P1 completes core workflows; P2 follows core adoption. Priority is not a dependency.
+Individual briefs are canonical. Update the brief and this summary together when claiming, changing a gate, or handing off. Current implementation and evidence are recorded in the canonical briefs; external/live work remains separately gated. P0 establishes safety/compatibility or early workflow foundations; P1 completes core workflows; P2 follows core adoption. Priority is not a dependency.
 
 Milestones: I = implementation, L = local verification, E = external activation, V = live verification. P = pending; NA = not applicable; use done only with linked evidence in the brief. A CODE_ONLY completion does not claim frontend publication; REL-04 owns shared publication.
 
@@ -11,7 +11,7 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | ID | Title | Priority | Class | Implement dependencies | Activate dependencies | Status | Owner | Milestones I/L/E/V | Brief |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UX-01 | Establish translations and local dictionaries | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [UX-01](tasks/UX-01.md) |
-| DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [DATA-01](tasks/DATA-01.md) |
+| DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
 | SCH-08 | Verify existing scheduler and public compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [SCH-08](tasks/SCH-08.md) |
 | CASH-01 | Correct store/date-specific draft restoration | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [CASH-01](tasks/CASH-01.md) |
 | IMPORT-01 | Validate source files with actionable errors | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [IMPORT-01](tasks/IMPORT-01.md) |
@@ -122,13 +122,13 @@ This table is the complete ownership/status index, including ready decisions, pl
 | UX-05 | Implement labeled drafts and shared-device handoff | P0 | `CODE_ONLY` | UX-03 | — | planned | unassigned | P/P/NA/NA | [UX-05](tasks/UX-05.md) |
 | UX-06 | Handle unsaved changes, retries, and edit conflicts | P0 | `CODE_ONLY` | UX-03 | — | planned | unassigned | P/P/NA/NA | [UX-06](tasks/UX-06.md) |
 | UX-07 | Standardize print layouts and bilingual output | P1 | `CODE_ONLY` | UX-01, DEC-07 | — | blocked | unassigned | P/P/NA/NA | [UX-07](tasks/UX-07.md) |
-| DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [DATA-01](tasks/DATA-01.md) |
-| DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | planned | unassigned | P/P/NA/NA | [DATA-02](tasks/DATA-02.md) |
+| DATA-01 | Establish record and API compatibility contracts | P0 | `CODE_ONLY` | — | — | complete | Codex | D/D/NA/NA | [DATA-01](tasks/DATA-01.md) |
+| DATA-02 | Add D1 migrations, local configuration, and fixtures | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-02](tasks/DATA-02.md) |
 | DATA-03 | Provision and bind non-production D1/R2 | P0 | `EXTERNAL_ONLY` | DATA-02 | — | planned | unassigned | P/P/P/P | [DATA-03](tasks/DATA-03.md) |
 | DATA-04 | Implement employee directory and legacy mappings | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-04](tasks/DATA-04.md) |
 | DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | planned | unassigned | P/P/P/P | [DATA-05](tasks/DATA-05.md) |
 | DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
-| DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | planned | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
+| DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | DATA-08 | Rehearse migration and recovery in non-production | P0 | `EXTERNAL_ONLY` | DATA-03, DATA-07, DATA-02, DEC-03, REL-03 | — | blocked | unassigned | P/P/P/P | [DATA-08](tasks/DATA-08.md) |
 | DATA-09 | Execute production resource setup and verified cutover | P0 | `EXTERNAL_ONLY` | DATA-08, DEC-03 | — | blocked | unassigned | P/P/P/P | [DATA-09](tasks/DATA-09.md) |
 | DATA-10 | Implement and verify backup/export/restore procedures | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-07, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-10](tasks/DATA-10.md) |
@@ -173,7 +173,7 @@ This table is the complete ownership/status index, including ready decisions, pl
 | FORM-05 | Add follow-up dates, assignment, and resolution | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DATA-04 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [FORM-05](tasks/FORM-05.md) |
 | FORM-06 | Implement the selected next digital form | P2 | `CODE_AND_EXTERNAL` | DEC-06, FORM-02, FORM-03, DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | blocked | unassigned | P/P/P/P | [FORM-06](tasks/FORM-06.md) |
 | FORM-07 | Verify blank downloads and saved compatibility | P0 | `CODE_ONLY` | — | — | ready | unassigned | P/P/NA/NA | [FORM-07](tasks/FORM-07.md) |
-| DASH-01 | Define the outstanding-work summary contract | P0 | `CODE_ONLY` | DATA-01 | — | planned | unassigned | P/P/NA/NA | [DASH-01](tasks/DASH-01.md) |
+| DASH-01 | Define the outstanding-work summary contract | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DASH-01](tasks/DASH-01.md) |
 | DASH-02 | Add contextual exact-record links | P1 | `CODE_ONLY` | DASH-01, UX-02 | — | planned | unassigned | P/P/NA/NA | [DASH-02](tasks/DASH-02.md) |
 | DASH-03 | Surface closes, differences, and count progress | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, CASH-05, INV-01 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-03](tasks/DASH-03.md) |
 | DASH-04 | Surface deliveries, schedule changes, and follow-ups | P1 | `CODE_AND_EXTERNAL` | DASH-01, DASH-02, INV-07, SCH-04, FORM-05 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [DASH-04](tasks/DASH-04.md) |

@@ -4,12 +4,12 @@ parent: DATA
 title: "Establish record and API compatibility contracts"
 priority: P0
 delivery_class: CODE_ONLY
-status: ready
-owner: unassigned
+status: complete
+owner: Codex
 implementation_dependencies: []
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
@@ -52,25 +52,25 @@ Affected areas: worker/src/index.ts; worker/wrangler.toml; src/lib/schedule-stor
 
 ## Implementation checklist
 
-- [ ] Specify store/station/employee IDs, cents, dates, revisions, and error envelopes
-- [ ] Define additive old/new client compatibility and capability detection
-- [ ] Keep policy-dependent fields explicit and link their decision owners
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Specify store/station/employee IDs, cents, dates, revisions, and error envelopes
+- [x] Define additive old/new client compatibility and capability detection
+- [x] Keep policy-dependent fields explicit and link their decision owners
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Specify store/station/employee IDs, cents, dates, revisions, and error envelopes. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Define additive old/new client compatibility and capability detection. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Keep policy-dependent fields explicit and link their decision owners. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Specify store/station/employee IDs, cents, dates, revisions, and error envelopes. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Define additive old/new client compatibility and capability detection. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Keep policy-dependent fields explicit and link their decision owners. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Keep persisted values, IDs, enums, and API errors language independent; expose translation keys or stable error codes for English/Spanish clients.
-- [ ] Review downstream keyboard/touch and shared-device effects with the consuming task owner; no backend-only output requires a pointer gesture.
-- [ ] Print/output: preserve source record context and historical snapshots consumed by print/export; no direct print UI is introduced in this task.
-- [ ] Recovery: record a failure/reversal example and preserve original records, manifests, and evidence; mark genuinely inapplicable failure cases with reasons.
+- [x] Keep persisted values, IDs, enums, and API errors language independent; expose translation keys or stable error codes for English/Spanish clients.
+- [x] Review downstream keyboard/touch and shared-device effects with the consuming task owner; no backend-only output requires a pointer gesture.
+- [x] Print/output: preserve source record context and historical snapshots consumed by print/export; no direct print UI is introduced in this task.
+- [x] Recovery: record a failure/reversal example and preserve original records, manifests, and evidence; mark genuinely inapplicable failure cases with reasons.
 
 ## Verification commands and expected results
 
@@ -91,16 +91,19 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
 | Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: None established; verify access/context before work.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Artifacts: [contract v1](../contract-v1.md), `src/lib/internal-tools/contracts.ts`, `compatibility.ts`, and `contracts.test.ts`. Codex owns the additive contract; existing Worker and client routes are untouched.
+- Scenario 1: scalar fixtures accepted valid leap days, opaque IDs, safe integer cents/revisions and all four station mappings; rejected invalid dates, coercion and unsafe numbers (6 focused tests pass overall).
+- Scenario 2: manifest fixtures accepted explicit atomic/idempotent v1 support, selected legacy only on 404, rejected invalid/unknown/unavailable manifests; seven synthetic legacy response families round-tripped unchanged, including hidden ciphertext, inherited roster/template, raw mixed units and original Spanish narrative.
+- Scenario 3: all seven policy groups link DEC-01 through DEC-07 and remain unresolved; error/conflict fixtures retain rejected source context with language-independent codes.
+- Checks (isolated local worktree, 2026-10-24): focused command in contract v1, 6/6 pass; `npm run scheduler:test`, 128/128 pass; `npm run cashout:test`, 13/13 pass; `npm exec tsc -- --noEmit`, `npm run build`, `npm run seo:check`, and `git diff --check` pass. No new dependency. Installed Next package has no dist/docs; README inspected; no Next APIs changed.
+- Keyboard/touch/shared-device and print: no UI, persistence or output change. Contract keeps source snapshots and separate actor labels; consuming owners must test their UI. Failure/reversal example is documented in contract v1 and tested through retained conflict input; no records or drafts are modified.
+- Milestones I/L/E/V: done/done/not_applicable/not_applicable. No staging/production activation, cloud resources, migration, deployment or live check occurred.
+- Remaining external actions: none for DATA-01. Future service owners implement discovery/routes before advertising them. Decisions remain unapproved. Rollback is revert of the additive modules/docs; legacy data and readers remain intact.
+- Next owner/action: Codex continues DATA-02 from this PR head; DATA-07 and DASH-01 also become locally eligible. Source/tracker status is completion of local CODE_ONLY scope, not merge/publication.
