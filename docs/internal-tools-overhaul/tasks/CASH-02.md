@@ -4,12 +4,12 @@ parent: CASH
 title: "Add guided cashier entry"
 priority: P0
 delivery_class: CODE_ONLY
-status: ready
-owner: unassigned
+status: complete
+owner: Codex
 implementation_dependencies: [UX-03, UX-04]
 activation_dependencies: []
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: not_applicable
 live_verification: not_applicable
 ---
@@ -52,25 +52,25 @@ Affected areas: src/components/internal/CashOut.tsx; src/lib/cashout.ts; src/lib
 
 ## Implementation checklist
 
-- [ ] Keep repetitive entry on one workspace with Tab/Enter and a tablet keypad
-- [ ] Distinguish untouched counts from deliberate zero
-- [ ] Preserve counted cash, Toast/Z comparisons, and the familiar print output
-- [ ] Update task evidence and the tracker, including any newly discovered contract or policy gap.
+- [x] Keep repetitive entry on one workspace with Tab/Enter and a tablet keypad
+- [x] Distinguish untouched counts from deliberate zero
+- [x] Preserve counted cash, Toast/Z comparisons, and the familiar print output
+- [x] Update task evidence and the tracker, including any newly discovered contract or policy gap.
 
 ## Acceptance checklist
 
-- [ ] Scenario 1: Keep repetitive entry on one workspace with Tab/Enter and a tablet keypad. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 2: Distinguish untouched counts from deliberate zero. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Scenario 3: Preserve counted cash, Toast/Z comparisons, and the familiar print output. Record fixture/input, expected result, actual result, and evidence.
-- [ ] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
-- [ ] Record local results separately from staging activation and production/live results.
+- [x] Scenario 1: Keep repetitive entry on one workspace with Tab/Enter and a tablet keypad. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 2: Distinguish untouched counts from deliberate zero. Record fixture/input, expected result, actual result, and evidence.
+- [x] Scenario 3: Preserve counted cash, Toast/Z comparisons, and the familiar print output. Record fixture/input, expected result, actual result, and evidence.
+- [x] Preserve the exclusions and existing capabilities above; no unrelated prerequisite or paid component is introduced.
+- [x] Record local results separately from staging activation and production/live results.
 
 ## English/Spanish, devices, output, and recovery
 
-- [ ] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
-- [ ] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
-- [ ] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
-- [ ] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
+- [x] Translate visible labels, field errors, confirmations, statuses, and empty states with stable keys; language switching preserves record identity and entered values.
+- [x] Complete the relevant flow by keyboard and touch; retain visible focus, dialog focus recovery, readable wrapped Spanish, and generous frequent-action targets.
+- [x] Print/output: preserve familiar existing reports and downloads, show store/date/status, and check long Spanish and pagination where output is affected; otherwise record why print is unaffected.
+- [x] Recovery: exercise interrupted work, denied storage or authorization, late responses, retries, and a second editor where applicable; never label local-only work as server saved.
 
 ## Verification commands and expected results
 
@@ -89,16 +89,18 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Scoped artifact, code, decision record, or execution plan reviewed. |
+| Local verification | done | Commands/scenarios and observed results, or decision/protocol consistency review. |
 | External activation | not_applicable | No external operation in this task; frontend publication is REL-04. |
 | Live verification | not_applicable | Covered by shared release/acceptance tasks where applicable. |
 
 ## Handoff evidence
 
-- Commits/artifacts: none; this brief is planning documentation.
-- Checks performed: source inspection only; implementation scenarios not run.
-- Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: none for local implementation; UX-03 and UX-04 are complete.
-- External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
-- Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+- Scope/owner: Codex, 2026-10-24; `feat/overhaul-cash-02` follows UX-04 commit `e2a9214` / PR [#145](https://github.com/marcopolocheung/CR-Website/pull/145) in the same `/home/wslunusn/CR-Website-cashout` worktree. Artifacts and evidence: [guided-entry guide](../cashout-guided-entry.md), CountKeypad.tsx, cashout-draft helpers/tests, CashOut.tsx, expanded-summary viewport limit in EntryWorkspace.tsx, dictionaries and `scripts/test-cashout-entry.py`. No Worker, schema, API, financial-policy or dependency changes.
+- Scenario 1: synthetic cashier/count entry remains in one workspace using Tab/Enter or an optional inline touch keypad. Previous/next, digits/delete/clear, close/Escape, context/total visibility, long Spanish names and 44px targets PASS. A short 430px landscape viewport keeps the expanded keypad scrollable and Close reachable. Add/remove restore useful focus.
+- Scenario 2: initial blank, deliberately entered zero and historical unknown remain distinct. Explicit resume after reload restores zero, nonzero and blank fields. A second resumed editor preserves its independent values. Invalid raw text is retained and blocks a server write without truncation; denied storage retains the raw current input and prevents context teardown. Legacy source bytes remain untouched.
+- Scenario 3: AM $300 less $100 float versus Toast $199.75, PM $100 less $100 float versus Toast $0 and Z $200 produce the original integer-cent totals: deposit 20000, cash difference 25, Z difference 0. Server request has only original cashier fields; sales converter receives the same saved AM/PM deposit/difference. Three-page Letter PDF text/rendering verifies familiar English AM/PM/count/Toast/Z output even from Spanish UI; keypad/help/progress are omitted.
+- Checks: `npm run cashout:test` 19/19; dictionaries/drafts 9/9; TypeScript, static build, SEO and whitespace checks PASS. CASH-02 and UX-04 browser scripts PASS; CASH-01/UX-03/UX-05/UX-01 browser regressions PASS. Exact commands and fixtures are in the guide. Synthetic loopback API only; production Worker calls are rejected.
+- Milestones: done/done/not_applicable/not_applicable. No deployment/publication/live assertion. Physical tablet keyboards and staff acceptance remain REL-05/06. Blank fields preserve current financial meaning and do not introduce a submission policy; local entry status is not uploaded.
+- Rollback: revert the UI/helper change while retaining every draft/source key; extended sources can require recovery download in older readers. Restore through a compatible reader rather than deleting them. Failed server requests preserve values and can be retried.
+- Next owner/action: return to the user for DEC-02 starting cash/adjustments, deposit, submission/review requirements and correction permissions. CASH-03 and dependent cash workflow tasks remain gated. No subsequent cash task is claimed; do not merge either PR.
