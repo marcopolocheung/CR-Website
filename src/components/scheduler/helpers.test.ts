@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { expandTemplate, seedTemplate } from '../../lib/scheduler/data'
 import { seedEmployees } from '../../lib/scheduler/seed-crews'
-import { buildMovePreview, candidatesForSlot, createEmployeeId, proposeMovedAssignments, spotStatus, unassignableReason } from './helpers'
+import { buildMovePreview, candidatesForSlot, createEmployeeId, layoutStorageKey, proposeMovedAssignments, readLayoutPreference, spotStatus, unassignableReason } from './helpers'
 
 const slots = expandTemplate(seedTemplate, '2026-10-11')
 const [first, second] = slots
@@ -63,4 +63,36 @@ test('new employee ids never collide', () => {
   const taken = [{ ...employees[0], id: 'mary' }, { ...employees[0], id: 'mary-2' }]
   assert.equal(createEmployeeId(' Mary ', taken), 'mary-3')
   assert.equal(createEmployeeId('!!!', []), 'new-employee')
+})
+
+test('layout preference defaults to new, keeps a stored classic choice, and survives blocked storage', () => {
+  const globals = globalThis as unknown as { window?: { localStorage: { getItem: (key: string) => string | null } } }
+  assert.equal(readLayoutPreference(), 'new', 'no browser storage means the new default')
+  const stored = new Map<string, string>()
+  globals.window = {
+    localStorage: {
+      getItem: (key: string) => stored.get(key) ?? null,
+    },
+  }
+  try {
+    assert.equal(readLayoutPreference(), 'new')
+    stored.set(layoutStorageKey, 'classic')
+    assert.equal(readLayoutPreference(), 'classic')
+    stored.set(layoutStorageKey, 'new')
+    assert.equal(readLayoutPreference(), 'new')
+  } finally {
+    delete globals.window
+  }
+  globals.window = {
+    localStorage: {
+      getItem: () => {
+        throw new Error('storage blocked')
+      },
+    },
+  }
+  try {
+    assert.equal(readLayoutPreference(), 'new')
+  } finally {
+    delete globals.window
+  }
 })

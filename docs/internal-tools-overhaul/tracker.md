@@ -29,8 +29,8 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | implemented | Codex | D/D/P/P | [DATA-05](tasks/DATA-05.md) |
 | DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
 | DATA-10 | Implement and verify backup/export/restore procedures | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-07, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-10](tasks/DATA-10.md) |
-| SCH-01 | Persist dated time off and temporary availability | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [SCH-01](tasks/SCH-01.md) |
-| SCH-02 | Add manager-entered requests and review | P1 | `CODE_AND_EXTERNAL` | SCH-01, UX-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [SCH-02](tasks/SCH-02.md) |
+| SCH-01 | Persist dated time off and temporary availability | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [SCH-01](tasks/SCH-01.md) |
+| SCH-02 | Add manager-entered requests and review | P1 | `CODE_AND_EXTERNAL` | SCH-01, UX-03 | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [SCH-02](tasks/SCH-02.md) |
 | SCH-04 | Add publication revisions and readable comparisons | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [SCH-04](tasks/SCH-04.md) |
 | SCH-05 | Detect cross-station assignment conflicts | P1 | `CODE_AND_EXTERNAL` | DATA-04, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [SCH-05](tasks/SCH-05.md) |
 | CASH-03 | Recalculate financial totals on the server | P0 | `CODE_AND_EXTERNAL` | DATA-01, DEC-02 | REL-03, REL-04 | blocked | unassigned | P/P/P/P | [CASH-03](tasks/CASH-03.md) |
@@ -151,9 +151,9 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | DATA-08 | Rehearse migration and recovery in non-production | P0 | `EXTERNAL_ONLY` | DATA-03, DATA-07, DATA-02, DEC-03, REL-03 | — | blocked | unassigned | P/P/P/P | [DATA-08](tasks/DATA-08.md) |
 | DATA-09 | Execute production resource setup and verified cutover | P0 | `EXTERNAL_ONLY` | DATA-08, DEC-03 | — | blocked | unassigned | P/P/P/P | [DATA-09](tasks/DATA-09.md) |
 | DATA-10 | Implement and verify backup/export/restore procedures | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-07, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-10](tasks/DATA-10.md) |
-| SCH-01 | Persist dated time off and temporary availability | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [SCH-01](tasks/SCH-01.md) |
-| SCH-02 | Add manager-entered requests and review | P1 | `CODE_AND_EXTERNAL` | SCH-01, UX-03 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [SCH-02](tasks/SCH-02.md) |
-| SCH-03 | Apply approved exceptions to generation and validation | P1 | `CODE_ONLY` | SCH-01 | — | planned | unassigned | P/P/NA/NA | [SCH-03](tasks/SCH-03.md) |
+| SCH-01 | Persist dated time off and temporary availability | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [SCH-01](tasks/SCH-01.md) |
+| SCH-02 | Add manager-entered requests and review | P1 | `CODE_AND_EXTERNAL` | SCH-01, UX-03 | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [SCH-02](tasks/SCH-02.md) |
+| SCH-03 | Apply approved exceptions to generation and validation | P1 | `CODE_ONLY` | SCH-01 | — | implemented | Claude | D/D/NA/NA | [SCH-03](tasks/SCH-03.md) |
 | SCH-04 | Add publication revisions and readable comparisons | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05 | DATA-03, REL-03, DATA-09, REL-04 | ready | unassigned | P/P/P/P | [SCH-04](tasks/SCH-04.md) |
 | SCH-05 | Detect cross-station assignment conflicts | P1 | `CODE_AND_EXTERNAL` | DATA-04, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | planned | unassigned | P/P/P/P | [SCH-05](tasks/SCH-05.md) |
 | SCH-06 | Add combined hours and agreed warnings | P1 | `CODE_ONLY` | DATA-04, SCH-05, DEC-04 | — | blocked | unassigned | P/P/NA/NA | [SCH-06](tasks/SCH-06.md) |

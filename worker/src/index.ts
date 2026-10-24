@@ -1,3 +1,5 @@
+import { requestRecord, saveRequests, readRequestMutation } from './schedule-requests'
+import { isStationId } from '../../src/lib/internal-tools/contracts'
 import { publishedHours, weeksInPeriod } from '../../src/lib/converter/published-hours'
 import type { WeeklyStaffingTemplate } from '../../src/lib/scheduler/types'
 import { historyPage, historyRecord, saveHistory } from './import-history'
@@ -1076,6 +1078,22 @@ export default {
       }
       if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
       return json({ ok: true }, 200, request, env)
+    }
+
+    const requestsMatch = path.match(/^\/api\/internal\/schedule-requests\/([^/]+)$/)
+    if (requestsMatch && (request.method === 'GET' || request.method === 'PUT')) {
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      const station = requestsMatch[1]
+      if (!isStationId(station)) return json({ schemaVersion: 1, error: { code: 'validation_failed' } }, 400, request, env, noStore)
+      if (!env.INTERNAL_DB) return json({ schemaVersion: 1, error: { code: 'backend_unconfigured' } }, 503, request, env, noStore)
+      try {
+        if (request.method === 'GET') return json({ record: await requestRecord(env.INTERNAL_DB, station) }, 200, request, env, noStore)
+        if (!(await checkWriteThrottle(env, clientIp(request)))) return json({ error: 'rate_limited' }, 429, request, env, noStore)
+        const result = await saveRequests(env.INTERNAL_DB, station, await readRequestMutation(request))
+        return json(result.ok ? { record: result.record, replayed: result.replayed } : result.body, result.ok ? 200 : result.status, request, env, noStore)
+      } catch { return json({ schemaVersion: 1, error: { code: 'unavailable' } }, 503, request, env, noStore) }
     }
 
     const importSchedulesMatch = path.match(/^\/api\/internal\/import-schedules\/(CR2|CR3)$/)
