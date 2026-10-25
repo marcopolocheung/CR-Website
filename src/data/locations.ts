@@ -26,7 +26,7 @@ const allDays = [
 const standardHours: OpeningHours = {
   days: allDays,
   opens: '11:00',
-  closes: '21:00',
+  closes: '20:30',
 }
 
 /** Decimal degrees, taken from the location's own Google Business Profile link. */
@@ -153,7 +153,7 @@ function to12Hour(time: string) {
   return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${period}`
 }
 
-/** "11:00 AM – 9:00 PM" — the visible form of the value the JSON-LD emits. */
+/** "11:00 AM – 8:30 PM" — the visible form of the value the JSON-LD emits. */
 export function formatOpeningHours(hours: OpeningHours) {
   return `${to12Hour(hours.opens)} – ${to12Hour(hours.closes)}`
 }

@@ -23,7 +23,7 @@ type Status = {
 function hoursForDay() {
   return {
     open: 11 * 60,
-    close: 21 * 60,
+    close: 20 * 60 + 30,
   }
 }
 
