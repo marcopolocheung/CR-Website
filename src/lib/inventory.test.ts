@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DEFAULT_SHEETS, listProblem, newItemId, ordersBySupplier, parseAmount, suggestOrder } from './inventory'
+import { DEFAULT_SHEETS, filterBySupplier, listProblem, newItemId, ordersBySupplier, parseAmount, suggestOrder } from './inventory'
 
 const ITEMS = DEFAULT_SHEETS.flatMap(s => s.items)
 
@@ -35,6 +35,21 @@ test('orders top up to Use, matching the paper sheets', () => {
 test('orders group by supplier and skip blanks', () => {
   const groups = ordersBySupplier(DEFAULT_SHEETS, { rice: { inv: '11', order: '4' }, sugar: { inv: '5', order: '3' }, egg: { inv: '3', order: ' ' } })
   assert.deepEqual(groups.map(g => [g.sup, g.lines.map(l => l.order)]), [['D', ['3']], ['L/D', ['4']]])
+})
+
+test('supplier filter keeps rows shared between suppliers', () => {
+  const ids = (picked: string[]) => filterBySupplier(DEFAULT_SHEETS, picked).flatMap(s => s.items.map(i => i.id))
+  assert.equal(ids([]).length, ITEMS.length)
+  assert.ok(ids(['D']).includes('rice')) // L/D
+  assert.ok(ids(['L']).includes('egg')) // D/L
+  assert.ok(!ids(['D']).includes('pork'))
+  assert.ok(!ids(['B']).includes('degreaser')) // no supplier: only with no filter
+  assert.deepEqual(filterBySupplier(DEFAULT_SHEETS, ['Pepsi']).map(s => s.id), ['pepsi'])
+})
+
+test('orders carry the ordered check-off', () => {
+  const [group] = ordersBySupplier(DEFAULT_SHEETS, { sugar: { inv: '5', order: '3', done: true } })
+  assert.equal(group.lines[0].done, true)
 })
 
 test('new item ids are readable and never collide', () => {

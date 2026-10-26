@@ -6,7 +6,8 @@
  */
 export type InventoryItem = { id: string; name: string; sup: string; use: string; gray: boolean; note?: string }
 export type InventorySheet = { id: string; title?: string; account?: string; useLabel: string; showSup: boolean; items: InventoryItem[] }
-export type InventoryCell = { inv: string; order: string }
+// `done`: the order was placed (the paper crosses the ORDER number out).
+export type InventoryCell = { inv: string; order: string; done?: boolean }
 export type InventoryCounts = Record<string, InventoryCell>
 
 export const CHECK = '✓'
@@ -198,14 +199,27 @@ export function suggestOrder(use: string, inv: string): string {
   return String(Math.ceil(target - have))
 }
 
+/** Supplier codes on a row: "D/L" → ["D", "L"]. */
+export const supplierCodes = (sup: string) => sup.split('/').map(s => s.trim()).filter(Boolean)
+
+/** Only rows from the picked suppliers (none picked = everything); sheets left empty are dropped. */
+export function filterBySupplier(sheets: InventorySheet[], picked: string[]): InventorySheet[] {
+  if (!picked.length) return sheets
+  return sheets
+    .map(s => ({ ...s, items: s.items.filter(i => supplierCodes(i.sup).some(c => picked.includes(c))) }))
+    .filter(s => s.items.length)
+}
+
+type OrderLine = { item: InventoryItem; order: string; done: boolean }
+
 /** Every non-empty order, grouped by supplier in sheet order. */
-export function ordersBySupplier(sheets: InventorySheet[], counts: InventoryCounts): { sup: string; lines: { item: InventoryItem; order: string }[] }[] {
-  const groups = new Map<string, { item: InventoryItem; order: string }[]>()
+export function ordersBySupplier(sheets: InventorySheet[], counts: InventoryCounts): { sup: string; lines: OrderLine[] }[] {
+  const groups = new Map<string, OrderLine[]>()
   for (const item of sheets.flatMap(s => s.items)) {
     const order = counts[item.id]?.order.trim()
     if (!order) continue
     const sup = item.sup || 'No supplier'
-    groups.set(sup, [...(groups.get(sup) ?? []), { item, order }])
+    groups.set(sup, [...(groups.get(sup) ?? []), { item, order, done: !!counts[item.id]?.done }])
   }
   return [...groups].map(([sup, lines]) => ({ sup, lines }))
 }

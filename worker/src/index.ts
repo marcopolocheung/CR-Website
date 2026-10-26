@@ -790,7 +790,7 @@ const INVENTORY_ITEM_RE = /^[a-z0-9-]{1,60}$/
 // Counts like "3", "1/2", "3B/2T", or the ✓ mark for "enough".
 const INVENTORY_CELL_RE = /^[A-Za-z0-9./ ✓]{0,12}$/
 
-export type InventoryCell = { inv: string; order: string }
+export type InventoryCell = { inv: string; order: string; done?: true }
 export type InventoryDay = { v: 1; store: 'CR3'; date: string; counts: Record<string, InventoryCell>; updatedAt: string }
 
 export function validateInventoryBody(raw: unknown): Pick<InventoryDay, 'counts'> | null {
@@ -800,10 +800,10 @@ export function validateInventoryBody(raw: unknown): Pick<InventoryDay, 'counts'
   if (entries.length > MAX_INVENTORY_ITEMS) return null
   const out: Record<string, InventoryCell> = {}
   for (const [id, cell] of entries) {
-    const { inv, order } = (cell ?? {}) as Record<string, unknown>
+    const { inv, order, done } = (cell ?? {}) as Record<string, unknown>
     if (!INVENTORY_ITEM_RE.test(id) || typeof inv !== 'string' || typeof order !== 'string') return null
-    if (!INVENTORY_CELL_RE.test(inv) || !INVENTORY_CELL_RE.test(order)) return null
-    out[id] = { inv, order }
+    if (!INVENTORY_CELL_RE.test(inv) || !INVENTORY_CELL_RE.test(order) || (done !== undefined && typeof done !== 'boolean')) return null
+    out[id] = done ? { inv, order, done } : { inv, order }
   }
   return { counts: out }
 }
