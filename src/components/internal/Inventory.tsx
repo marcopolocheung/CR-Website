@@ -12,10 +12,12 @@ import { errorKey, type Message } from '@/lib/internal-tools/i18n'
 import {
   CHECK,
   DEFAULT_SHEETS,
+  filterBySupplier,
   listProblem,
   newItemId,
   ordersBySupplier,
   suggestOrder,
+  supplierCodes,
   type InventoryCounts,
   type InventoryItem,
   type InventorySheet,
@@ -34,6 +36,7 @@ const today = () => new Date().toLocaleDateString('en-CA')
 const shortDate = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`
 const button = 'min-h-11 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50'
 const cellBorder = 'border border-black'
+const chip = (on: boolean) => `min-h-11 min-w-11 px-3 rounded-lg text-sm font-semibold border ${on ? 'bg-zinc-900 text-white border-zinc-900' : 'border-gray-300 hover:bg-gray-50'}`
 // Earlier days are hidden on phones so today's INV / ORDER fit without scrolling.
 const pastOnly = 'max-sm:hidden'
 // New rows get a temporary id until the list is saved; real ids never start with "-".
@@ -66,6 +69,8 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   const [listRev, setListRev] = useState(0)
   // The item list being edited, or null while counting.
   const [draft, setDraft] = useState<InventorySheet[] | null>(null)
+  // Supplier codes picked above the sheets; none picked shows every row.
+  const [picked, setPicked] = useState<string[]>([])
   const draftRef = useRef(draft); draftRef.current = draft
   const dateRef = useRef(date); dateRef.current = date
   const countsRef = useRef(counts); countsRef.current = counts
@@ -193,10 +198,13 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   }
 
   const setInv = (item: InventoryItem, inv: string) => { setCountDirty(true); setCounts(c => ({ ...c, [item.id]: { inv, order: suggestOrder(item.use, inv) } })) }
-  const setOrder = (item: InventoryItem, order: string) => { setCountDirty(true); setCounts(c => ({ ...c, [item.id]: { inv: c[item.id]?.inv ?? '', order } })) }
+  const setOrder = (item: InventoryItem, order: string) => { setCountDirty(true); setCounts(c => ({ ...c, [item.id]: { ...c[item.id], inv: c[item.id]?.inv ?? '', order } })) }
+  const setDone = (item: InventoryItem, done: boolean) => { setCountDirty(true); setCounts(c => ({ ...c, [item.id]: { ...c[item.id], done } })) }
 
   const past = history.filter(d => d.date < date).slice(0, PAST_COLUMNS).reverse()
-  const orders = ordersBySupplier(sheets, counts)
+  const suppliers = [...new Set(sheets.flatMap(sh => sh.items.flatMap(i => supplierCodes(i.sup))))]
+  const shown = filterBySupplier(sheets, picked.filter(c => suppliers.includes(c)))
+  const orders = ordersBySupplier(shown, counts)
   const orderText = [`CR3 order ${date}`, ...orders.map(g => `\n${g.sup}\n${g.lines.map(l => `  ${l.item.name}: ${l.order}`).join('\n')}`)].join('\n')
 
   return (
@@ -241,7 +249,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
       <p className="text-sm text-gray-600 mb-6 print:hidden">
         {draft
           ? 'Change names, suppliers, and Use numbers, shade rows gray, reorder, add, or remove items. Counts already saved stay with their item even if it is renamed.'
-          : `Write a count in INV, or tap ${CHECK} if there is enough. ORDER fills in with what it takes to get back to Use; change it if needed.`}
+          : `Write a count in INV, or tap ${CHECK} if there is enough. ORDER fills in with what it takes to get back to Use; change it if needed. Pick suppliers to see only their rows, and check off each order once it is placed.`}
       </p>
 
       {draft && <RecoveryPanel message={{key:conflict ? 'recovery.conflict' : 'recovery.localList'}}
@@ -257,9 +265,23 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
               onChange={items => setDraft(d => d && d.map((sh, i) => (i === si ? { ...sh, items } : sh)))}
             />
           ))}</fieldset>
-        : sheets.map(sheet => (
+        : <>
+          <div role="group" aria-label="Show suppliers" className="flex flex-wrap items-center gap-2 mb-6 print:hidden">
+            <span className="text-sm font-medium text-gray-700">Show:</span>
+            <button type="button" aria-pressed={!picked.length} onClick={() => setPicked([])} className={chip(!picked.length)}>All</button>
+            {suppliers.map(code => {
+              const on = picked.includes(code)
+              return (
+                <button key={code} type="button" aria-pressed={on} onClick={() => setPicked(p => (on ? p.filter(c => c !== code) : [...p, code]))} className={chip(on)}>
+                  {on && '✓ '}{code}
+                </button>
+              )
+            })}
+          </div>
+          {shown.map(sheet => (
             <SheetTable key={sheet.id} sheet={sheet} date={date} past={past} counts={counts} onInv={setInv} onOrder={setOrder} />
           ))}
+        </>}
 
       {!draft && (
       <section className="mt-10 max-w-xl print:break-before-page">
@@ -282,9 +304,13 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
               <h3 className="font-bold text-gray-900 border-b border-black mb-1">{g.sup}</h3>
               <ul className="text-sm">
                 {g.lines.map(l => (
-                  <li key={l.item.id} className="flex justify-between py-0.5">
-                    <span>{l.item.name}</span>
-                    <span className={`font-semibold ${INK}`}>{l.order}</span>
+                  <li key={l.item.id}>
+                    <label className="flex items-center gap-3 min-h-11 cursor-pointer">
+                      <input type="checkbox" checked={l.done} onChange={e => setDone(l.item, e.target.checked)} className="w-5 h-5 accent-zinc-900 print:hidden" />
+                      <span className={`flex-1 ${l.done ? 'line-through text-gray-600' : ''}`}>{l.item.name}</span>
+                      <span className={`font-semibold ${INK} ${l.done ? 'line-through' : ''}`}>{l.order}</span>
+                      {l.done && <span className="text-xs text-gray-700">Ordered</span>}
+                    </label>
                   </li>
                 ))}
               </ul>

@@ -1096,6 +1096,8 @@ test('inventory bodies are strictly validated', () => {
   assert.equal(validateInventoryBody({ counts: { rice: { inv: 1, order: '' } } }), null)
   assert.equal(validateInventoryBody({ counts: { rice: { inv: '1234567890123', order: '' } } }), null)
   assert.equal(validateInventoryBody({ counts: { rice: null } }), null)
+  assert.deepEqual(validateInventoryBody({ counts: { rice: { inv: '1', order: '4', done: true }, egg: { inv: '', order: '', done: false } } }), { counts: { rice: { inv: '1', order: '4', done: true }, egg: { inv: '', order: '' } } })
+  assert.equal(validateInventoryBody({ counts: { rice: { inv: '1', order: '4', done: 'yes' } } }), null)
   const many = Object.fromEntries(Array.from({ length: 301 }, (_, i) => [`item-${i}`, { inv: '', order: '' }]))
   assert.equal(validateInventoryBody({ counts: many }), null)
 })
