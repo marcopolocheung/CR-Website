@@ -66,7 +66,7 @@ function restaurantNode(location: RestaurantLocation) {
     potentialAction: [
       {
         '@type': 'OrderAction',
-        name: 'Order pick-up on Toast',
+        name: 'Order pick-up',
         target: location.toastUrl,
       },
       {

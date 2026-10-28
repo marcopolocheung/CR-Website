@@ -145,10 +145,10 @@ export default function LocationPageContent({
             params={{ location: slug }}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={`Order Pick-Up on Toast - ${name}`}
+            aria-label={`Order Pick-Up - ${name}`}
             className="text-center bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-4 rounded-xl transition-colors"
           >
-            Order Pick-Up on Toast
+            Order Pick-Up
           </TrackedLink>
           <TrackedLink
             href={uberUrl}
@@ -156,10 +156,10 @@ export default function LocationPageContent({
             params={{ location: slug }}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={`Order Delivery on Uber Eats - ${name}`}
+            aria-label={`Order Delivery - ${name}`}
             className="text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
           >
-            Order Delivery on Uber Eats
+            Order Delivery
           </TrackedLink>
           <p className="text-xs text-gray-500 text-center">
             Ordering opens through third-party services. Availability and fees may vary.
@@ -193,10 +193,10 @@ export default function LocationPageContent({
               params={{ location: slug }}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`Order Pick-Up on Toast - ${name}`}
+              aria-label={`Order Pick-Up - ${name}`}
               className="text-center bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-3 rounded-xl transition-colors text-sm"
             >
-              Order Pick-Up on Toast
+              Order Pick-Up
             </TrackedLink>
             <TrackedLink
               href={uberUrl}
@@ -204,10 +204,10 @@ export default function LocationPageContent({
               params={{ location: slug }}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`Order Delivery on Uber Eats - ${name}`}
+              aria-label={`Order Delivery - ${name}`}
               className="text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-3 rounded-xl transition-colors text-sm"
             >
-              Order Delivery on Uber Eats
+              Order Delivery
             </TrackedLink>
             <p className="text-xs text-gray-500 leading-snug">
               Ordering opens through third-party services. Availability and fees may vary.
