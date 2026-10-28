@@ -26,7 +26,6 @@ const accent: Record<LocationSlug, { badge: string; border: string; focusRing: s
 type PendingOrder = {
   channel: 'pickup' | 'delivery'
   url: string
-  label: string
 }
 
 export default function LocationCard({ slug, name, areaLabel, address, phone, toastUrl, uberUrl, href }: LocationCardProps) {
@@ -52,9 +51,9 @@ export default function LocationCard({ slug, name, areaLabel, address, phone, to
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [pending])
 
-  function openConfirm(channel: PendingOrder['channel'], url: string, label: string, e: React.MouseEvent<HTMLButtonElement>) {
+  function openConfirm(channel: PendingOrder['channel'], url: string, e: React.MouseEvent<HTMLButtonElement>) {
     lastTriggerRef.current = e.currentTarget
-    setPending({ channel, url, label })
+    setPending({ channel, url })
   }
 
   function confirmOrder() {
@@ -71,7 +70,7 @@ export default function LocationCard({ slug, name, areaLabel, address, phone, to
           {areaLabel}
         </span>
         <h3 className="text-xl font-bold text-red-800">{name}</h3>
-        <p className="text-gray-600 mt-1">{address}</p>
+        <p className="text-gray-800 font-bold mt-1">{address}</p>
         <TrackedLink
           href={`tel:${phone.replace(/\D/g, '')}`}
           event="phone_click"
@@ -86,19 +85,19 @@ export default function LocationCard({ slug, name, areaLabel, address, phone, to
       <div className="flex flex-col gap-3">
         <button
           type="button"
-          onClick={(e) => openConfirm('pickup', toastUrl, 'Toast', e)}
-          aria-label={`Order Pick-Up on Toast - ${name}`}
+          onClick={(e) => openConfirm('pickup', toastUrl, e)}
+          aria-label={`Order Pick-Up - ${name}`}
           className="block text-center bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
         >
-          Order Pick-Up on Toast
+          Order Pick-Up
         </button>
         <button
           type="button"
-          onClick={(e) => openConfirm('delivery', uberUrl, 'Uber Eats', e)}
-          aria-label={`Order Delivery on Uber Eats - ${name}`}
+          onClick={(e) => openConfirm('delivery', uberUrl, e)}
+          aria-label={`Order Delivery - ${name}`}
           className="block text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
         >
-          Order Delivery on Uber Eats
+          Order Delivery
         </button>
         <p className="text-xs text-gray-500 text-center">
           Ordering opens through third-party services. Availability and fees may vary.
@@ -131,9 +130,9 @@ export default function LocationCard({ slug, name, areaLabel, address, phone, to
               Confirm your location
             </h4>
             <p className="text-gray-700 mt-2">
-              You&apos;re ordering {pending.channel === 'pickup' ? 'pick-up' : 'delivery'} from <strong>{name}</strong>
+              Are you ordering {pending.channel === 'pickup' ? 'pick-up' : 'delivery'} from our <strong>{name.replace(' - ', ' ')}</strong>?
               <br />
-              {address}
+              <strong>{address}</strong>
             </p>
             <div className="flex flex-col-reverse sm:flex-row gap-3 mt-5">
               <button
@@ -149,7 +148,7 @@ export default function LocationCard({ slug, name, areaLabel, address, phone, to
                 onClick={confirmOrder}
                 className="flex-1 text-center bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
               >
-                Continue to {pending.label}
+                Yes, continue
               </button>
             </div>
           </div>
