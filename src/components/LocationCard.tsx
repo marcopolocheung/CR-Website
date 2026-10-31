@@ -148,7 +148,7 @@ export default function LocationCard({ slug, name, areaLabel, address, phone, to
                 onClick={confirmOrder}
                 className="flex-1 text-center bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
               >
-                Yes, continue
+                {pending.channel === 'pickup' ? 'Order Pick-Up' : 'Order Delivery'}
               </button>
             </div>
           </div>
