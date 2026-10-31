@@ -9,6 +9,7 @@ export type RosterEmployee = Pick<
   | 'recurringAvailability'
   | 'maxDaysPerWeek'
   | 'maxShiftsPerWeek'
+  | 'maxHoursPerWeek'
   | 'allowDoubles'
   | 'maxDoublesPerWeek'
   | 'incompatibleEmployeeIds'
@@ -27,6 +28,7 @@ export function toRosterEmployee(employee: Employee): RosterEmployee {
     recurringAvailability: employee.recurringAvailability,
     maxDaysPerWeek: employee.maxDaysPerWeek,
     maxShiftsPerWeek: employee.maxShiftsPerWeek,
+    maxHoursPerWeek: employee.maxHoursPerWeek,
     allowDoubles: employee.allowDoubles,
     maxDoublesPerWeek: employee.maxDoublesPerWeek,
     incompatibleEmployeeIds: employee.incompatibleEmployeeIds ?? [],

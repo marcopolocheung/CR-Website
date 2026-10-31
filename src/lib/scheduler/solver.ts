@@ -426,6 +426,8 @@ function canAssign(allEmployees: Employee[], employee: Employee, slot: StaffingS
 
   if (employee.maxShiftsPerWeek !== undefined && existingSlots.length + 1 > employee.maxShiftsPerWeek) return false
 
+  if (employee.maxHoursPerWeek !== undefined && hoursAssigned(employee, state) + hoursFor(slot) > employee.maxHoursPerWeek) return false
+
   const periodsForDay = new Set(existingSlots.filter((existingSlot) => existingSlot.day === slot.day).map((existingSlot) => existingSlot.period))
   const alreadyDoubleToday = periodsForDay.size > 1
   periodsForDay.add(slot.period)

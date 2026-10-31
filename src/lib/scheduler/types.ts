@@ -131,6 +131,7 @@ export type Employee = {
   availabilityOverrides?: AvailabilityOverride[]
   maxDaysPerWeek?: number
   maxShiftsPerWeek?: number
+  maxHoursPerWeek?: number
   allowDoubles: boolean
   /** Cap on how many days this person may work both an AM and a PM shift. Ignored when `allowDoubles` is false. */
   maxDoublesPerWeek?: number
@@ -188,6 +189,7 @@ export type ValidationCode =
   | 'overlapping_assignment'
   | 'max_days_exceeded'
   | 'max_shifts_exceeded'
+  | 'max_hours_exceeded'
   | 'prohibited_double'
   | 'max_doubles_exceeded'
   | 'incompatible_pair'

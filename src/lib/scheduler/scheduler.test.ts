@@ -738,6 +738,47 @@ test('max doubles per week is a hard constraint', () => {
   )
 })
 
+test('max hours per week is a hard constraint', () => {
+  const capped: Employee = {
+    id: 'capped',
+    name: 'Capped',
+    roles: ['server'],
+    recurringAvailability: Object.fromEntries(DAYS.map((day) => [day, [{ start: minutes(9), end: minutes(23) }]])),
+    maxDaysPerWeek: 7,
+    maxHoursPerWeek: 15,
+    allowDoubles: true,
+    incompatibleEmployeeIds: [],
+    active: true,
+  }
+  // Three 7-hour shifts: 21h against a 15h cap.
+  const slots: StaffingSlot[] = ['Monday', 'Tuesday', 'Wednesday'].map((day) => ({
+    id: day,
+    day: day as (typeof DAYS)[number],
+    period: 'AM',
+    role: 'server',
+    label: 'Server',
+    start: minutes(9),
+    end: minutes(16),
+    required: false,
+  }))
+  const allThree = slots.map((target) => ({ slotId: target.id, employeeId: 'capped' }))
+  assert.ok(
+    validateSchedule({ employees: [capped], slots, assignments: allThree, requireCoverage: false }).some(
+      (violation) => violation.code === 'max_hours_exceeded',
+    ),
+  )
+  assert.deepEqual(
+    validateSchedule({ employees: [capped], slots, assignments: allThree.slice(0, 2), requireCoverage: false }).filter(
+      (violation) => violation.code === 'max_hours_exceeded',
+    ),
+    [],
+  )
+
+  const template = Object.fromEntries(DAYS.map((day) => [day, slots.filter((target) => target.day === day).map(({ id, day, ...rest }) => rest)])) as WeeklyStaffingTemplate
+  const result = generateSchedule({ employees: [capped], template })
+  assert.equal(result.assignments.filter((a) => a.employeeId === 'capped').length, 2, 'solver stops at the cap')
+})
+
 test('optional spots never block readiness — only required slots are checked', () => {
   const employees = structuredClone(seedKitchenEmployeesCR03)
   const slots = expandTemplate(defaultTemplateForRestaurant('CR3-kitchen'))

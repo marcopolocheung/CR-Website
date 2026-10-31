@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { expandTemplate, seedTemplate } from '../../lib/scheduler/data'
 import { seedEmployees } from '../../lib/scheduler/seed-crews'
-import { buildMovePreview, candidatesForSlot, createEmployeeId, layoutStorageKey, proposeMovedAssignments, readLayoutPreference, spotStatus, unassignableReason } from './helpers'
+import { buildMovePreview, candidatesForSlot, createEmployeeId, layoutStorageKey, parseMaxHours, proposeMovedAssignments, readLayoutPreference, spotStatus, unassignableReason } from './helpers'
 
 const slots = expandTemplate(seedTemplate, '2026-10-11')
 const [first, second] = slots
@@ -95,4 +95,12 @@ test('layout preference defaults to new, keeps a stored classic choice, and surv
   } finally {
     delete globals.window
   }
+})
+
+test('max hours: blank is no limit, otherwise whole hours from 1 to 80', () => {
+  assert.equal(parseMaxHours(''), undefined)
+  assert.equal(parseMaxHours('30'), 30)
+  assert.equal(parseMaxHours('0'), 1)
+  assert.equal(parseMaxHours('200'), 80)
+  assert.equal(parseMaxHours('12.5'), 12)
 })
