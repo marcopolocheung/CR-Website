@@ -373,6 +373,11 @@ function isValidStoredEmployee(value) {
             return false;
         }
     }
+    if (employee.maxHoursPerWeek !== undefined) {
+        if (typeof employee.maxHoursPerWeek !== 'number' || !Number.isInteger(employee.maxHoursPerWeek) || employee.maxHoursPerWeek < 1 || employee.maxHoursPerWeek > 80) {
+            return false;
+        }
+    }
     if (typeof employee.allowDoubles !== 'boolean')
         return false;
     if (employee.maxDoublesPerWeek !== undefined) {

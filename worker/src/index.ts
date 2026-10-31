@@ -416,6 +416,7 @@ export type StoredEmployee = {
   recurringAvailability: Record<string, StoredTimeRange[]>
   maxDaysPerWeek?: number
   maxShiftsPerWeek?: number
+  maxHoursPerWeek?: number
   allowDoubles: boolean
   maxDoublesPerWeek?: number
   incompatibleEmployeeIds: string[]
@@ -476,6 +477,11 @@ function isValidStoredEmployee(value: unknown): value is StoredEmployee {
   }
   if (employee.maxShiftsPerWeek !== undefined) {
     if (typeof employee.maxShiftsPerWeek !== 'number' || !Number.isInteger(employee.maxShiftsPerWeek) || employee.maxShiftsPerWeek < 1 || employee.maxShiftsPerWeek > 21) {
+      return false
+    }
+  }
+  if (employee.maxHoursPerWeek !== undefined) {
+    if (typeof employee.maxHoursPerWeek !== 'number' || !Number.isInteger(employee.maxHoursPerWeek) || employee.maxHoursPerWeek < 1 || employee.maxHoursPerWeek > 80) {
       return false
     }
   }

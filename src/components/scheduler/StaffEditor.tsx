@@ -17,7 +17,7 @@ import {
   type StaffingSlot,
   type TimeRange,
 } from '@/lib/scheduler'
-import { EmployeeDraft, amShift, availabilityPresets, availabilitySummary, clampAvailabilityRange, clampMaxDays, dayAvailabilityFromRanges, fullDay, gapAvailability, isCustomDayRanges, periodLabels, pmShift, rangesForDayToggle, roleChipClass, roleLabel, suspensionText } from './helpers'
+import { EmployeeDraft, amShift, availabilityPresets, availabilitySummary, clampAvailabilityRange, clampMaxDays, dayAvailabilityFromRanges, parseMaxHours, fullDay, gapAvailability, isCustomDayRanges, periodLabels, pmShift, rangesForDayToggle, roleChipClass, roleLabel, suspensionText } from './helpers'
 import { Disclosure, Icon } from './ui'
 import { TimeField, minutesToTimeValue, timeValueToMinutes } from './RulesEditor'
 export function AvailabilityPresetBar({
@@ -389,6 +389,19 @@ export function EmployeeForm({
             onChange={(event) => onDraftChange({ ...draft, maxDaysPerWeek: clampMaxDays(Number(event.target.value)) })}
           />
         </label>
+        <label className="text-sm font-medium text-zinc-800">
+          Max hours (optional)
+          <input
+            className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+            min={1}
+            max={80}
+            type="number"
+            inputMode="numeric"
+            placeholder="No limit"
+            value={draft.maxHoursPerWeek ?? ''}
+            onChange={(event) => onDraftChange({ ...draft, maxHoursPerWeek: parseMaxHours(event.target.value) })}
+          />
+        </label>
         <label className="flex items-end gap-2 pb-2 text-sm font-medium text-zinc-800">
           <input
             type="checkbox"
@@ -481,7 +494,7 @@ export function EmployeeCard({
           )}
         </div>
         <p className="mt-2 text-xs text-zinc-500">
-          Max {employee.maxDaysPerWeek ?? 7} days · {employee.allowDoubles ? `doubles${employee.maxDoublesPerWeek !== undefined ? ` (max ${employee.maxDoublesPerWeek})` : ''}` : 'no doubles'} · Priority {employee.priority ?? DEFAULT_PRIORITY}
+          Max {employee.maxDaysPerWeek ?? 7} days{employee.maxHoursPerWeek !== undefined && `, ${employee.maxHoursPerWeek} h`} · {employee.allowDoubles ? `doubles${employee.maxDoublesPerWeek !== undefined ? ` (max ${employee.maxDoublesPerWeek})` : ''}` : 'no doubles'} · Priority {employee.priority ?? DEFAULT_PRIORITY}
           {employee.suspendedFrom && ` · Suspended ${suspensionText(employee)}`}
         </p>
         {(employee.shiftRoles?.length ?? 0) > 0 && (
@@ -580,6 +593,19 @@ export function EmployeeCard({
             type="number"
             value={employee.maxDaysPerWeek ?? 7}
             onChange={(event) => onUpdate(employee.id, { maxDaysPerWeek: clampMaxDays(Number(event.target.value)) })}
+          />
+        </label>
+        <label className="text-sm text-zinc-700">
+          Max hours
+          <input
+            className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+            min={1}
+            max={80}
+            type="number"
+            inputMode="numeric"
+            placeholder="No limit"
+            value={employee.maxHoursPerWeek ?? ''}
+            onChange={(event) => onUpdate(employee.id, { maxHoursPerWeek: parseMaxHours(event.target.value) })}
           />
         </label>
         <label className="flex items-end gap-2 pb-1 text-sm text-zinc-700">

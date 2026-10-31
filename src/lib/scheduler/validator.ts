@@ -195,6 +195,15 @@ export function validateSchedule({
       })
     }
 
+    const hours = employeeSlots.reduce((total, { slot }) => total + hoursFor(slot), 0)
+    if (employee.maxHoursPerWeek !== undefined && hours > employee.maxHoursPerWeek) {
+      violations.push({
+        code: 'max_hours_exceeded',
+        employeeId,
+        message: `${employee.name} is assigned ${Math.round(hours * 10) / 10} hours, exceeding the max of ${employee.maxHoursPerWeek}.`,
+      })
+    }
+
     const byDay = new Map<DayOfWeek, StaffingSlot[]>()
     for (const { slot } of employeeSlots) {
       const slotsForDay = byDay.get(slot.day) ?? []

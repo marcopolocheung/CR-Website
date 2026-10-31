@@ -213,7 +213,8 @@ export default function ScheduleWorkspace(props: ScheduleWorkspaceProps) {
     const employee = byId.get(stat.employeeId)
     const maxDays = employee?.maxDaysPerWeek ?? 7
     const maxShifts = employee?.maxShiftsPerWeek
-    return stat.days > maxDays || (maxShifts !== undefined && stat.shifts > maxShifts)
+    const maxHours = employee?.maxHoursPerWeek
+    return stat.days > maxDays || (maxShifts !== undefined && stat.shifts > maxShifts) || (maxHours !== undefined && stat.hours > maxHours)
   }).length
   const hoursSummary = !hasSchedule
     ? 'Hours this week'

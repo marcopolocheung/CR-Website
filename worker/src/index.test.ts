@@ -329,6 +329,10 @@ test('employee roster bodies are strictly validated', () => {
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ roles: ['line cook'] })], baseRev: 0 }), null, 'spaces rejected')
   assert.ok(validateRosterBody({ employees: [rosterEmployee({ roles: ['cook', 'mv-prep'] })], baseRev: 0 }), 'kitchen posts accepted')
   assert.ok(validateRosterBody({ employees: [rosterEmployee({ suspendedFrom: '2026-10-12', suspendedUntil: '2026-10-20', priority: 1 })], baseRev: 0 }), 'suspension and priority accepted')
+  assert.ok(validateRosterBody({ employees: [rosterEmployee({ maxHoursPerWeek: 30 })], baseRev: 0 }), 'max hours accepted')
+  for (const maxHoursPerWeek of [0, 81, 12.5, '30']) {
+    assert.equal(validateRosterBody({ employees: [rosterEmployee({ maxHoursPerWeek } as never)], baseRev: 0 }), null, `max hours ${maxHoursPerWeek} rejected`)
+  }
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ suspendedFrom: '2026-10-20', suspendedUntil: '2026-10-12' })], baseRev: 0 }), null, 'backwards range rejected')
   assert.equal(validateRosterBody({ employees: [rosterEmployee({ suspendedUntil: '2026-10-12' })], baseRev: 0 }), null, 'end without start rejected')
   const tuePm = { day: 'Tuesday', period: 'PM', role: 'dishwasher' }

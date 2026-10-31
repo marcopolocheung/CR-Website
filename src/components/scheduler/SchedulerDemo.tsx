@@ -1260,6 +1260,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       roles: selectedRoles,
       recurringAvailability: draft.recurringAvailability,
       maxDaysPerWeek: draft.maxDaysPerWeek,
+      maxHoursPerWeek: draft.maxHoursPerWeek,
       allowDoubles: draft.allowDoubles,
       newHire: draft.newHire,
       incompatibleEmployeeIds: [],

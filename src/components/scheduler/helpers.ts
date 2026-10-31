@@ -34,6 +34,7 @@ export type EmployeeDraft = {
   roles: Record<string, boolean>
   recurringAvailability: Employee['recurringAvailability']
   maxDaysPerWeek: number
+  maxHoursPerWeek?: number
   allowDoubles: boolean
   newHire: boolean
 }
@@ -257,6 +258,13 @@ export function shortTimeRange(slot: StaffingSlot) {
 export function clampMaxDays(value: number) {
   if (!Number.isFinite(value)) return 1
   return Math.min(7, Math.max(1, Math.trunc(value)))
+}
+
+/** Blank means no hour limit. */
+export function parseMaxHours(text: string) {
+  const value = Number(text)
+  if (text.trim() === '' || !Number.isFinite(value)) return undefined
+  return Math.min(80, Math.max(1, Math.trunc(value)))
 }
 
 export function availabilitySummary(employee: Employee) {
@@ -599,6 +607,7 @@ export function dragErrorMessage(employee: Employee, slot: StaffingSlot, violati
   }
   if (first.code === 'max_days_exceeded') return `${employee.name} is limited to ${employee.maxDaysPerWeek ?? 'a set number of'} days a week.`
   if (first.code === 'max_shifts_exceeded') return `${employee.name} is limited to ${employee.maxShiftsPerWeek ?? 'a set number of'} shifts a week.`
+  if (first.code === 'max_hours_exceeded') return `${employee.name} is limited to ${employee.maxHoursPerWeek ?? 'a set number of'} hours a week.`
   if (first.code === 'prohibited_double') return `${employee.name} does not allow doubles — both shifts that day is not an option.`
   if (first.code === 'incompatible_pair') return first.message
 
@@ -729,6 +738,10 @@ export function reviewLabel(
     if (stats && employee?.maxShiftsPerWeek !== undefined) return `${name} would work ${stats.shifts} shifts — the limit is ${employee.maxShiftsPerWeek} a week.`
     return `${name} has too many shifts.`
   }
+  if (violation.code === 'max_hours_exceeded') {
+    if (stats && employee?.maxHoursPerWeek !== undefined) return `${name} would work ${stats.hours.toFixed(1)} hours — the limit is ${employee.maxHoursPerWeek} a week.`
+    return `${name} has too many hours.`
+  }
   if (violation.code === 'prohibited_double') return `${name} does not allow doubles, but this covers ${day} ${periodLabels.AM} and ${periodLabels.PM}.`
   if (violation.code === 'incompatible_pair') return violation.message
   if (violation.code === 'locked_assignment_changed') return `A kept spot changed and needs review.`
@@ -774,6 +787,7 @@ export function fixAdvice(code: string) {
   if (code === 'overlapping_assignment') return 'Move one of the two shifts to someone else. If the overlap comes from shift times (like the Friday manager starting at 3pm while mornings end at 4pm), adjusting the times in the rules fixes it for everyone.'
   if (code === 'max_days_exceeded') return 'Move a shift to someone else, or raise the weekly day limit in the staff list.'
   if (code === 'max_shifts_exceeded') return 'Move a shift to someone else, or raise the weekly shift limit in the staff list.'
+  if (code === 'max_hours_exceeded') return 'Move a shift to someone else, or raise the weekly hour limit in the staff list.'
   if (code === 'prohibited_double') return 'Give one of the two shifts to someone else, or allow doubles for them in the staff list.'
   if (code === 'max_doubles_exceeded') return 'Give one of their double shifts to someone else, or raise their double limit in the staff list.'
   if (code === 'incompatible_pair') return 'These two should not work the same shift. Move one of them.'
@@ -836,7 +850,7 @@ export function unassignableReason({
   )
   if (problems.length === 0) return null
   const code = problems[0].code
-  if (code === 'max_days_exceeded' || code === 'max_shifts_exceeded') return 'over limit'
+  if (code === 'max_days_exceeded' || code === 'max_shifts_exceeded' || code === 'max_hours_exceeded') return 'over limit'
   if (code === 'prohibited_double') return 'double that day'
   if (code === 'overlapping_assignment') {
     const conflict = slots.find((candidate) => candidate.id === problems[0].relatedSlotId)

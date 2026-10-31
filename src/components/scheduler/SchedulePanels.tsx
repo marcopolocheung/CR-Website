@@ -367,7 +367,8 @@ export function HoursSummary({ stats, employees }: { stats: ScheduleStats[]; emp
           const employee = employeeById.get(stat.employeeId)
           const maxDays = employee?.maxDaysPerWeek ?? 7
           const maxShifts = employee?.maxShiftsPerWeek
-          const overloaded = stat.days > maxDays || (maxShifts !== undefined && stat.shifts > maxShifts)
+          const maxHours = employee?.maxHoursPerWeek
+          const overloaded = stat.days > maxDays || (maxShifts !== undefined && stat.shifts > maxShifts) || (maxHours !== undefined && stat.hours > maxHours)
           return (
             <li key={stat.employeeId} className="flex items-center gap-3 py-1.5 text-sm">
               <span className="w-24 shrink-0 truncate font-medium text-zinc-900">
@@ -380,8 +381,8 @@ export function HoursSummary({ stats, employees }: { stats: ScheduleStats[]; emp
                   style={{ width: `${Math.round((stat.hours / mostHours) * 100)}%` }}
                 />
               </span>
-              <span className={`w-14 shrink-0 text-right font-semibold ${overloaded ? 'text-red-800' : 'text-zinc-900'}`}>
-                {stat.hours.toFixed(1)}h
+              <span className={`w-20 shrink-0 text-right font-semibold tabular-nums ${overloaded ? 'text-red-800' : 'text-zinc-900'}`}>
+                {stat.hours.toFixed(1)}h{maxHours !== undefined && <span className="font-normal text-zinc-600"> / {maxHours}h</span>}
               </span>
               <span className={`w-20 shrink-0 text-right text-xs ${overloaded ? 'font-semibold text-red-700' : 'text-zinc-500'}`}>
                 {stat.days}d · {stat.shifts} shift{stat.shifts === 1 ? '' : 's'}

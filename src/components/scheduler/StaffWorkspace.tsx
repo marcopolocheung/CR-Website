@@ -92,6 +92,7 @@ function staffNotes(employee: Employee) {
   const notes: string[] = []
   if (employee.newHire) notes.push('New hire')
   if ((employee.maxDaysPerWeek ?? 7) !== 7) notes.push(`Max ${employee.maxDaysPerWeek} days`)
+  if (employee.maxHoursPerWeek !== undefined) notes.push(`Max ${employee.maxHoursPerWeek} h`)
   if (employee.allowDoubles) notes.push('Doubles allowed')
   if ((employee.priority ?? DEFAULT_PRIORITY) !== DEFAULT_PRIORITY) notes.push(`Priority ${employee.priority}`)
   if (employee.suspendedFrom) notes.push(`Suspended ${suspensionText(employee)}`)
