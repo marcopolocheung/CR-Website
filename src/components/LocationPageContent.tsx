@@ -156,10 +156,10 @@ export default function LocationPageContent({
             params={{ location: slug }}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={`Order Delivery - ${name}`}
+            aria-label={`Order Delivery with Uber Eats - ${name}`}
             className="text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
           >
-            Order Delivery
+            Order Delivery with Uber Eats
           </TrackedLink>
           <p className="text-xs text-gray-500 text-center">
             Ordering opens through third-party services. Availability and fees may vary.
@@ -204,10 +204,10 @@ export default function LocationPageContent({
               params={{ location: slug }}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`Order Delivery - ${name}`}
+              aria-label={`Order Delivery with Uber Eats - ${name}`}
               className="text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-3 rounded-xl transition-colors text-sm"
             >
-              Order Delivery
+              Order Delivery with Uber Eats
             </TrackedLink>
             <p className="text-xs text-gray-500 leading-snug">
               Ordering opens through third-party services. Availability and fees may vary.

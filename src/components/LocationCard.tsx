@@ -94,10 +94,10 @@ export default function LocationCard({ slug, name, areaLabel, address, phone, to
         <button
           type="button"
           onClick={(e) => openConfirm('delivery', uberUrl, e)}
-          aria-label={`Order Delivery - ${name}`}
+          aria-label={`Order Delivery with Uber Eats - ${name}`}
           className="block text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
         >
-          Order Delivery
+          Order Delivery with Uber Eats
         </button>
         <p className="text-xs text-gray-500 text-center">
           Ordering opens through third-party services. Availability and fees may vary.
