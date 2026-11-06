@@ -156,3 +156,7 @@ vite.config.ts.timestamp-*
 
 # Local Python browser-test helper cache
 scripts/__pycache__/
+
+# Agent checkpoints contain private scheduling drafts.
+.agent-data/
+.env.agent
