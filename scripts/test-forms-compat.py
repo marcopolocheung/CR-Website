@@ -31,6 +31,7 @@ with sync_playwright() as p:
         if req.method == 'OPTIONS': return route.fulfill(status=204, headers=headers)
         if req.headers.get('authorization') != 'Bearer ' + TOKEN: return route.fulfill(status=401, json={'error': 'unauthorized'}, headers=headers)
         path = urlparse(req.url).path
+        if path == '/api/forms' and req.method == 'GET': return route.fulfill(status=200, json={'forms': []}, headers=headers)
         if path == '/api/auth/verify': return route.fulfill(status=200, json={'ok': True}, headers=headers)
         if path == '/api/writeups' and req.method == 'GET':
             return route.fulfill(status=200, json={'writeUps': [{'id': doc['id'], 'date': doc['form']['date'], 'employee': doc['form']['employee'], 'label': doc['label']}]}, headers=headers)

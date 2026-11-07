@@ -8,8 +8,13 @@ export default function FormsPage() {
   const base = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
   return (
     <>
+    <div className="max-w-6xl mx-auto px-4 pt-8 print:hidden">
+      <h1 className="text-2xl font-bold text-gray-900">Forms</h1>
+      <p className="mt-2 text-sm text-gray-600">Fill out and save digital forms, or download a blank paper copy below.</p>
+    </div>
+    <WriteUps />
     <div className="max-w-3xl mx-auto px-4 py-8 print:hidden">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Forms</h1>
+      <h2 className="text-xl font-bold text-gray-900 mb-2">Blank paper forms</h2>
       <p className="text-sm text-gray-600 mb-6">Blank forms to download and print. PDFs open in the browser; Excel and Word files download.</p>
       <ul className="divide-y divide-gray-200 border border-gray-200 rounded">
         {BLANK_FORMS.map(f => (
@@ -22,7 +27,6 @@ export default function FormsPage() {
         ))}
       </ul>
     </div>
-    <WriteUps />
     </>
   )
 }

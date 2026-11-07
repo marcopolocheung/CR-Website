@@ -22,6 +22,7 @@ import handler, {
   validateInventoryListBody,
   validateWriteUpForm,
 } from './index'
+import { DIGITAL_FORM_TYPES, emptyDigitalForm, type DigitalFormDoc } from '../../src/lib/digital-forms'
 import { DENOMINATIONS, dayTotals } from '../../src/lib/cashout'
 
 function mockEnv(token = 'manager-token', staffPassword?: string) {
@@ -29,6 +30,9 @@ function mockEnv(token = 'manager-token', staffPassword?: string) {
   const metadata = new Map<string, unknown>()
   return {
     SCHEDULES: {
+      async delete(key: string) {
+        data.delete(key)
+      },
       async get(key: string) {
         return data.get(key) ?? null
       },
@@ -641,6 +645,9 @@ test('legacy singleton docs fall back to the default restaurant only', async () 
   data.set('template:current', JSON.stringify({ v: 1, rev: 1, template: templatePayload(), updatedAt: 'x' }))
   const env = {
     SCHEDULES: {
+      async delete(key: string) {
+        data.delete(key)
+      },
       async get(key: string) {
         return data.get(key) ?? null
       },
@@ -1219,4 +1226,78 @@ test('write-up forms are strictly validated', () => {
   assert.equal(bad({ managerSignedDate: 'yesterday' }), null)
   assert.equal(bad({ manager: undefined }), null)
   assert.equal((validateWriteUpForm({ ...writeUp, extra: 'dropped' }) as Record<string, unknown>).extra, undefined)
+})
+
+test('all digital forms persist, paginate, label, reject form edits, and delete both record and list metadata', async () => {
+  const env = mockEnv()
+  for (const [index, type] of DIGITAL_FORM_TYPES.entries()) {
+    const form = emptyDigitalForm(type, `2026-11-0${index + 1}`)
+    form.preparedBy = 'Manager'
+    form.store = index % 2 ? 'CR2' : 'CR3'
+    Object.assign(form.fields, type === 'customer-complaint' ? { comments: 'Rice was cold', quality: ['Rice cold'] } : type === 'injury-report'
+      ? { employee: 'Injured customer', incidentDate: form.date, description: 'Slipped near entrance' }
+      : type === 'pay-rate-increase' ? { employee: 'Ana', presentRate: '15.00', proposedRate: '16.50', effectiveDate: form.date }
+      : { employee: 'Ana', periodEnd: form.date })
+    const response = await handler.fetch(authed('POST', '/api/forms', { type, form }), env)
+    assert.equal(response.status, 201, type)
+    assert.equal(response.headers.get('Cache-Control'), 'no-store')
+    const doc = await response.json() as DigitalFormDoc
+    assert.deepEqual(doc.form, form)
+    assert.equal(doc.type, type)
+    const read = await handler.fetch(authed('GET', `/api/forms/${doc.id}`), env)
+    assert.deepEqual((await read.json() as DigitalFormDoc).form, form)
+    assert.equal((await handler.fetch(authed('PUT', `/api/forms/${doc.id}`, { type, form }), env)).status, 404)
+    assert.equal((await handler.fetch(authed('PUT', `/api/forms/${doc.id}/label`, { label: '  Follow-up  ' }), env)).status, 200)
+  }
+  const list = await (await handler.fetch(authed('GET', '/api/forms'), env)).json() as { forms: { id: string; type: string; employee: string; label: string; date: string }[] }
+  assert.equal(list.forms.length, 4)
+  assert.deepEqual(list.forms.map(row => row.date), ['2026-11-04', '2026-11-03', '2026-11-02', '2026-11-01'])
+  assert.equal(list.forms.find(row => row.type === 'customer-complaint')?.employee, 'Anonymous customer')
+  assert.ok(list.forms.every(row => row.label === 'Follow-up'))
+  for (const row of list.forms) {
+    assert.equal((await handler.fetch(request('DELETE', `/api/forms/${row.id}`), env)).status, 401)
+    assert.equal((await handler.fetch(authed('DELETE', `/api/forms/${row.id}`), env)).status, 200)
+    assert.equal(await env.SCHEDULES.get(`form:${row.id}`), null)
+    assert.equal((await handler.fetch(authed('GET', `/api/forms/${row.id}`), env)).status, 404)
+    assert.equal((await handler.fetch(authed('PUT', `/api/forms/${row.id}/label`, { label: 'Restore?' }), env)).status, 404)
+  }
+  assert.deepEqual(await (await handler.fetch(authed('GET', '/api/forms'), env)).json(), { forms: [] })
+})
+
+test('digital form routes require manager authentication and configured storage; DELETE is allowed by CORS', async () => {
+  for (const [method, path] of [['GET', '/api/forms'], ['POST', '/api/forms'], ['GET', '/api/forms/abcdefghij'], ['PUT', '/api/forms/abcdefghij/label'], ['DELETE', '/api/forms/abcdefghij']]) {
+    assert.equal((await handler.fetch(request(method, path), mockEnv())).status, 401)
+    assert.equal((await handler.fetch(authed(method, path, undefined, 'wrong'), mockEnv())).status, 401)
+    assert.equal((await handler.fetch(authed(method, path), mockEnv(''))).status, 503)
+  }
+  const response = await handler.fetch(request('OPTIONS', '/api/forms/abcdefghij'), mockEnv())
+  assert.match(response.headers.get('Access-Control-Allow-Methods')!, /DELETE/)
+})
+
+test('digital form API rejects invalid fields and credentials without creating records', async () => {
+  const env = mockEnv()
+  const form = emptyDigitalForm('pay-rate-increase', '2026-11-07')
+  Object.assign(form.fields, { employee: 'Ana', presentRate: '15', proposedRate: '16', effectiveDate: form.date })
+  for (const body of [null, {}, { type: 'unknown', form }, { type: 'pay-rate-increase', form: { ...form, token: 'secret' } },
+    { type: 'pay-rate-increase', form: { ...form, fields: { ...form.fields, ssn: 'synthetic' } } },
+    { type: 'pay-rate-increase', form: { ...form, fields: { ...form.fields, proposedRate: '-10' } } },
+    { type: 'pay-rate-increase', form: { ...form, date: '2026-02-30' } },
+    { type: 'pay-rate-increase', form: { ...form, fields: { ...form.fields, employee: '' } } },
+  ]) assert.equal((await handler.fetch(authed('POST', '/api/forms', body), env)).status, 400)
+  assert.deepEqual(await (await handler.fetch(authed('GET', '/api/forms'), env)).json(), { forms: [] })
+})
+
+test('existing write-ups can be deleted without affecting other records', async () => {
+  const env = mockEnv()
+  const saved = await handler.fetch(authed('POST', '/api/writeups', writeUp), env)
+  const { id } = await saved.json() as { id: string }
+  const other = await handler.fetch(authed('POST', '/api/writeups', { ...writeUp, employee: 'Other employee' }), env)
+  const otherId = (await other.json() as { id: string }).id
+  assert.equal((await handler.fetch(request('DELETE', `/api/writeups/${id}`), env)).status, 401)
+  assert.equal((await handler.fetch(authed('DELETE', `/api/writeups/${id}`), env)).status, 200)
+  assert.equal(await env.SCHEDULES.get(`writeup:${id}`), null)
+  assert.equal((await handler.fetch(authed('GET', `/api/writeups/${id}`), env)).status, 404)
+  assert.equal((await handler.fetch(authed('DELETE', `/api/writeups/${id}`), env)).status, 404)
+  const list = await (await handler.fetch(authed('GET', '/api/writeups'), env)).json() as { writeUps: { id: string }[] }
+  assert.deepEqual(list.writeUps.map(row => row.id), [otherId])
 })

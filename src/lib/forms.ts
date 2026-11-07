@@ -1,3 +1,5 @@
+import { DIGITAL_FORM_TYPES } from './digital-forms'
+
 /** Blank paper forms served from public/internal/forms. */
 export const BLANK_FORMS = [
   { title: 'Hiring application', file: 'hiring-application.xlsx' },
@@ -16,9 +18,9 @@ export const BLANK_FORMS = [
 export const blankFormHref = (basePath: string, file: string) => `${basePath}/internal/forms/${file}`
 
 /** Every saved form type shares one list row shape so the forms list can search them together. */
-export const SAVED_FORM_TYPES = ['write-up'] as const
+export const SAVED_FORM_TYPES = ['write-up', ...DIGITAL_FORM_TYPES] as const
 export type SavedFormType = (typeof SAVED_FORM_TYPES)[number]
-export type SavedFormRow = { type: SavedFormType; id: string; date: string; employee: string; label: string }
+export type SavedFormRow = { type: SavedFormType; id: string; date: string; employee: string; label: string; store?: string }
 export type SavedFormFilter = { query: string; type: SavedFormType | ''; from: string; to: string }
 export const NO_FILTER: SavedFormFilter = { query: '', type: '', from: '', to: '' }
 
@@ -31,7 +33,7 @@ export function filterSavedForms(rows: SavedFormRow[], { query, type, from, to }
     if (type && row.type !== type) return false
     if (from && row.date < from) return false
     if (to && row.date > to) return false
-    const text = fold(`${row.employee} ${row.label}`)
+    const text = fold(`${row.employee} ${row.label} ${row.store ?? ''}`)
     return words.every(word => text.includes(word))
   })
 }
