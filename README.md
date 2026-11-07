@@ -1,14 +1,24 @@
 Deployment for chinarosesa.com
 
+## Scheduling agent
+
+The scheduler has an optional LangGraph assistant that compares schedules,
+independently validates them, and saves a proposal for manager review. Its Node
+service uses SQLite checkpoints; GitHub Pages continues serving the frontend.
+See [setup and architecture](agent/README.md) for local commands, configuration,
+capabilities, verification, and production requirements.
+
 ## Environment variables
 
-Both are `NEXT_PUBLIC_`, so they are inlined into the static export at build
-time and are visible in the page source. Neither is a secret.
+Variables prefixed `NEXT_PUBLIC_` are inlined into the static export at build
+time and are visible in the page source. They are not secrets.
 
 | Variable | Set in | Effect when unset |
 |---|---|---|
 | `NEXT_PUBLIC_GA_ID` | Repository **variable** (Settings → Secrets and variables → Actions → Variables), read by `.github/workflows/deploy.yml`. Locally, `.env.local`. | No analytics script, no events, no console output. Dev and PR builds stay out of the property by default. |
 | `NEXT_PUBLIC_BASE_PATH` | The deploy workflow, pinned to `''`. | Empty, which is correct for the custom domain. Only a GitHub project-pages deploy needs a path here; a wrong value rewrites every asset URL and canonical on the site. |
+| `NEXT_PUBLIC_SCHEDULE_API` | Locally, `.env.local`, or the build environment. | The existing production schedule Worker. Set a loopback URL for local data tests. |
+| `NEXT_PUBLIC_AGENT_API` | Repository **variable**, passed by the deploy workflow; locally, `.env.local`. | The scheduling assistant panel is hidden. Set the URL of the separately hosted agent service to enable it. |
 
 Copy `.env.example` to `.env.local` to set either one locally.
 
