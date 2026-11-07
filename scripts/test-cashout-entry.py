@@ -1,13 +1,19 @@
 """CASH-02: guided counts, local entry status, keypad, parity, print and recovery.
-Uses synthetic loopback responses only. Requires local Next with the loopback API override.
+Uses synthetic API responses only. Serve out/ with --api-base matching the build,
+or use local Next with the default loopback API override.
 """
+import argparse
 import json
-import sys
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
 from pypdf import PdfReader
 
-base = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:3027'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('base', nargs='?', default='http://127.0.0.1:3027')
+parser.add_argument('--api-base', default='http://127.0.0.1:8787', help='API URL intercepted with synthetic responses; never contacted')
+parser.add_argument('--page-path', default='/internal/bookkeeping/', help='Use /internal/bookkeeping.html when serving out/ with a plain HTTP server')
+args = parser.parse_args()
+base = args.base
 assert urlparse(base).hostname in ('127.0.0.1', 'localhost')
 TOKEN = 'synthetic-guided-count-token'
 with sync_playwright() as p:
@@ -27,13 +33,14 @@ with sync_playwright() as p:
             if mode['offline']: route.abort(); return
             writes.append(request.post_data_json)
             saved['sheet'] = request.post_data_json['sheet']
-            route.fulfill(status=200, json={'updatedAt':'2026-10-24T20:00:00Z'}, headers=headers)
+            saved['doc'] = {**request.post_data_json, 'store': path.split('/')[3], 'date': path.split('/')[4], 'updatedAt':'2026-10-24T20:00:00Z'}
+            route.fulfill(status=200, json={'updatedAt':'2026-10-24T20:00:00Z', 'extraMoney': saved['sheet'].get('extraMoney', '')}, headers=headers)
         elif path.count('/') == 4:
-            route.fulfill(status=200 if saved['sheet'] else 404, json={'sheet':saved['sheet']} if saved['sheet'] else {'error':'not_found'}, headers=headers)
+            route.fulfill(status=200 if saved['sheet'] else 404, json=saved['doc'] if saved['sheet'] else {'error':'not_found'}, headers=headers)
         else: route.fulfill(status=200, json={'days':[]}, headers=headers)
-    context.route('http://127.0.0.1:8787/**', api)
     def remote(route): errors.append('Unexpected production request: '+route.request.url); route.abort()
     context.route('https://*.workers.dev/**', remote)
+    context.route(args.api_base.rstrip('/')+'/**', api)
     page = context.new_page(); page.on('pageerror', lambda error: errors.append(str(error)))
     def unlock(target):
         target.locator('#cashout-code').fill(TOKEN)
@@ -45,7 +52,7 @@ with sync_playwright() as p:
         target.locator('#draft-preparer').fill(preparer)
     def row(target, preparer):
         return target.locator('li').filter(has=target.get_by_text('Preparer: '+preparer, exact=True))
-    page.goto(base+'/internal/bookkeeping/'); page.wait_for_load_state('networkidle')
+    page.goto(base+args.page_path); page.wait_for_load_state('networkidle')
     unlock(page); choose(page, 'Guided fixture')
     page.get_by_role('button', name='Start new draft', exact=True).click()
     am = page.locator('[data-cashier-card="am-0"]')
@@ -92,15 +99,32 @@ with sync_playwright() as p:
     assert not writes
     expect(page.locator('#am-0-10000')).to_have_value('1e3')
     page.locator('#am-0-10000').fill('0')
+    # Dollar entry updates counts exactly; nonmultiples remain visible and block save.
+    page.locator('#am-0-2000-amount').fill('60.00')
+    expect(page.locator('#am-0-2000')).to_have_value('3')
+    page.locator('#am-0-2000').fill('4')
+    expect(page.locator('#am-0-2000-amount')).to_have_value('80.00')
+    page.locator('#am-0-2000-amount').fill('10')
+    expect(page.locator('#am-0-2000-amount')).to_have_attribute('aria-invalid', 'true')
+    page.get_by_role('button', name='Save day', exact=True).click()
+    expect(page.locator('#am-0-2000-amount')).to_be_focused()
+    assert not writes
+    page.locator('#am-0-2000-amount').fill('')
+    expect(page.locator('#am-0-2000')).to_have_value('')
+    page.locator('#am-0-25-amount').fill('0.75')
+    expect(page.locator('#am-0-25')).to_have_value('3')
+    page.locator('#am-0-25-amount').fill('')
+    page.locator('#am-0-5000-amount').fill('100.00')
     page.get_by_role('button', name='Choose another draft', exact=True).click()
     page.reload(); page.wait_for_load_state('networkidle'); unlock(page); choose(page, 'Reload fixture')
     row(page, 'Guided fixture').get_by_role('button', name='Resume as a copy', exact=True).click()
     expect(page.locator('#am-0-10000')).to_have_value('0')
     expect(page.locator('#am-0-5000')).to_have_value('2')
+    expect(page.locator('#am-0-5000-amount')).to_have_value('100.00')
     expect(page.locator('#am-0-2000')).to_have_value('')
     # Independent resume preserves the original and does not overwrite the first editor's local status.
     second = context.new_page(); second.on('pageerror', lambda error: errors.append(str(error)))
-    second.goto(base+'/internal/bookkeeping/'); second.wait_for_load_state('networkidle')
+    second.goto(base+args.page_path); second.wait_for_load_state('networkidle')
     unlock(second); choose(second, 'Independent fixture')
     row(second, 'Guided fixture').get_by_role('button', name='Resume as a copy', exact=True).click()
     second.locator('#am-0-10000').fill('9')
@@ -133,12 +157,26 @@ with sync_playwright() as p:
     page.locator('#am-0-toast').fill('199.75')
     page.locator('#pm-0-name').fill('PM cashier')
     page.locator('#pm-0-5000').fill('2'); page.locator('#pm-0-toast').fill('0')
-    page.locator('#z-report').fill('200')
+    page.locator('#z-report').fill('201')
+    day_total = page.locator('section').filter(has=page.get_by_role('heading', name='Day total', exact=True))
+    expect(day_total).to_contain_text('-$1.00')
+    page.locator('#z-report').press('Enter')
+    expect(page.locator('#extra-money')).to_be_focused()
+    page.locator('#extra-money').fill('1.005')
+    page.get_by_role('button', name='Save day', exact=True).click()
+    expect(page.locator('#extra-money')).to_be_focused()
+    expect(page.locator('#extra-money')).to_have_attribute('aria-invalid', 'true')
+    assert not writes
+    page.locator('#extra-money').fill('1.00')
+    expect(day_total).not_to_contain_text('-$1.00')
+    expect(day_total).to_contain_text('$201.00')
     page.get_by_role('button', name='Save day', exact=True).click()
     expect(page.locator('[data-save-state]')).to_have_attribute('data-save-state','server')
-    expected = {'amDeposit':20000,'pmDeposit':0,'amOverShort':25,'pmOverShort':0,'deposit':20000,'overShort':25,'zOverShort':0}
+    expected = {'amDeposit':20000,'pmDeposit':0,'amOverShort':25,'pmOverShort':0,'deposit':20100,'overShort':25,'zOverShort':0}
     assert writes[-1]['totals'] == expected, writes[-1]
     assert 'countInputs' not in json.dumps(writes[-1])
+    assert 'amountInputs' not in json.dumps(writes[-1])
+    assert writes[-1]['sheet']['extraMoney'] == '1.00'
     assert writes[-1]['sheet']['am'][0]['counts'] == [3]+[0]*10
     # Existing sales converter receives the same saved-day amounts.
     page.get_by_role('tab', name='Daily sales report', exact=True).click()
@@ -157,7 +195,7 @@ with sync_playwright() as p:
     expect(page.locator('[data-entry-summary]')).not_to_be_visible()
     page.pdf(path='/tmp/cash-02-output.pdf', format='Letter', print_background=True)
     text = '\n'.join(sheet.extract_text() for sheet in PdfReader('/tmp/cash-02-output.pdf').pages)
-    for content in ['AM shift','PM shift','Toast cash payments','Z report expected cash','199.75','200.00','Ana long cashier','PM cashier']:
+    for content in ['AM shift','PM shift','Toast cash payments','Z report expected cash','Extra money ($)','201.00','199.75','200.00','Ana long cashier','PM cashier']:
         assert content in text, 'Missing print content: '+content
     assert 'Count keypad' not in text and 'denomination counts entered' not in text
     page.emulate_media(media='screen'); page.evaluate("window.dispatchEvent(new Event('afterprint'))")
@@ -168,6 +206,8 @@ with sync_playwright() as p:
     page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     expect(am).to_contain_text('original entry status is unknown')
     expect(page.locator('#am-0-10000')).to_have_value('3')
+    expect(page.locator('#am-0-10000-amount')).to_have_value('300.00')
+    expect(page.locator('#extra-money')).to_have_value('1.00')
     page.locator('#am-0-10000').fill('4')
     expect(am).to_contain_text('1 of 11 denomination counts entered')
     expect(am).to_contain_text('original entry status is unknown')
@@ -186,4 +226,4 @@ with sync_playwright() as p:
     expect(page.locator('#am-0-10000')).to_have_value('2.5')
     assert not errors, '\n'.join(errors)
     browser.close()
-    print('PASS CASH-02: blank/zero/reload/independent editor, EN/ES touch keypad, invalid retention/save guard, unchanged cents/float/Toast/Z wire and sales linkage, English PDF output, legacy unknown status, offline retry and denied-storage recovery')
+    print('PASS CASH-02: linked denomination count/amount entry, exact coin amounts, invalid-entry save guards, extra-money Z reconciliation, saved reload, EN/ES touch keypad, phone layout, sales linkage, English PDF output, offline retry and denied-storage recovery')

@@ -6,6 +6,15 @@ This decision supersedes the earlier planning assumptions about cash movements, 
 
 ## Current purpose and rules
 
+Owner-requested additions on 2026-11-07: each denomination accepts either a
+bill/coin count or its total dollar amount, with both fields synchronized.
+Amounts must be exact multiples of the denomination. An optional **Extra money**
+field follows **Z report expected cash** for money found after the counts: day
+turn-in = AM + PM + extra money, and the Z difference uses that adjusted total.
+Cashier and shift Toast figures stay as entered and counted. Older sheets without
+extra money behave as before. This updates the day formula below for sheets
+with extra money; the fixed $100 retained per drawer still applies.
+
 - Count each cashier's drawer by denomination for AM and PM, with store and selected date context.
 - Always retain **$100 per cashier drawer**, for both stores and both shifts. There is no store/shift override in this scope.
 - Drawer total = sum of denomination value × count. Calculated turn-in = drawer total − $100. Preserve the existing signed calculation, including a negative result when the drawer contains less than $100; do not introduce a clamp or another float.

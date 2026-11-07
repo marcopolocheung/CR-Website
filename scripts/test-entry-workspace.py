@@ -1,11 +1,16 @@
 """UX-04 browser checks. Requires a local server with the loopback API override.
 Reduced VisualViewport coverage simulates keyboard occlusion; it is not a native OS keyboard test.
 """
-import sys
+import argparse
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
 
-base = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:3027'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('base', nargs='?', default='http://127.0.0.1:3027')
+parser.add_argument('--api-base', default='http://127.0.0.1:8787', help='API URL intercepted with synthetic responses; never contacted')
+parser.add_argument('--page-path', default='/internal/bookkeeping/', help='Use /internal/bookkeeping.html when serving out/ with a plain HTTP server')
+args = parser.parse_args()
+base = args.base
 assert urlparse(base).hostname in ('127.0.0.1', 'localhost')
 TOKEN = 'synthetic-entry-token'
 with sync_playwright() as p:
@@ -20,12 +25,12 @@ with sync_playwright() as p:
         elif request.method == 'PUT': writes.append(request.post_data_json); route.fulfill(status=200, json={'ok':True}, headers=headers)
         elif '/api/auth/verify' in request.url: route.fulfill(status=200, json={'ok':True}, headers=headers)
         else: route.fulfill(status=200, json={'days':[]}, headers=headers)
-    context.route('http://127.0.0.1:8787/**', api)
     def remote(route): errors.append('Unexpected production request: ' + route.request.url); route.abort()
     context.route('https://*.workers.dev/**', remote)
+    context.route(args.api_base.rstrip('/')+'/**', api)
     page = context.new_page()
     page.on('pageerror', lambda error: errors.append(str(error)))
-    page.goto(base + '/internal/bookkeeping/'); page.wait_for_load_state('networkidle')
+    page.goto(base + args.page_path); page.wait_for_load_state('networkidle')
     page.locator('#cashout-code').fill(TOKEN)
     page.get_by_role('button', name='Unlock', exact=True).click()
     page.locator('#cashout-date').fill('2026-10-24')
@@ -35,11 +40,13 @@ with sync_playwright() as p:
     name.fill('Keyboard cashier')
     name.press('Enter'); expect(page.locator('#am-0-10000')).to_be_focused()
     page.locator('#am-0-10000').fill('2')
-    page.keyboard.press('Tab'); expect(page.locator('#am-0-5000')).to_be_focused()
+    page.keyboard.press('Tab'); expect(page.locator('#am-0-10000-amount')).to_be_focused()
     page.keyboard.press('Shift+Tab'); expect(page.locator('#am-0-10000')).to_be_focused()
-    page.keyboard.press('Enter'); expect(page.locator('#am-0-5000')).to_be_focused()
+    page.keyboard.press('Enter'); expect(page.locator('#am-0-10000-amount')).to_be_focused()
     page.keyboard.press('Shift+Enter'); expect(page.locator('#am-0-10000')).to_be_focused()
     page.locator('#z-report').focus(); page.keyboard.press('Enter')
+    expect(page.locator('#extra-money')).to_be_focused()
+    page.keyboard.press('Enter')
     expect(page.locator('#cashout-save')).to_be_focused()
     assert not writes, 'Entry must not submit a cash-out'
     page.get_by_role('button', name='Clear sheet', exact=True).click()
@@ -53,7 +60,7 @@ with sync_playwright() as p:
     expect(page.get_by_role('tab', name='Daily sales report', exact=True)).to_be_focused()
     page.locator('#sc-first').fill('Retained tab input')
     page.get_by_role('tab', name='Daily sales report', exact=True).focus()
-    page.keyboard.press('End'); expect(page.get_by_role('tab', name='Employee hours', exact=True)).to_be_focused()
+    page.keyboard.press('End'); expect(page.get_by_role('tablist').get_by_role('tab').last).to_be_focused()
     page.keyboard.press('Home'); expect(page.get_by_role('tab', name='Cash out', exact=True)).to_be_focused()
     expect(name).to_have_value('Keyboard cashier')
     page.get_by_role('tab', name='Daily sales report', exact=True).tap()
@@ -62,7 +69,7 @@ with sync_playwright() as p:
     # Both languages retain entry values and focus when moving through fields.
     page.get_by_role('button', name='Español', exact=True).tap()
     page.locator('#am-0-10000').focus(); page.keyboard.press('Enter')
-    expect(page.locator('#am-0-5000')).to_be_focused()
+    expect(page.locator('#am-0-10000-amount')).to_be_focused()
     expect(page.locator('[data-entry-summary]')).to_contain_text('Intro nunca guarda')
     expect(page.locator('#am-0-10000')).to_have_value('2')
     # Small tablet visual viewport with an offset, like a panned native keyboard.
