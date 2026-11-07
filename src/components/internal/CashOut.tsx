@@ -6,7 +6,7 @@ import { useInternalLanguage } from './InternalLanguage'
 import { LabeledInput, EmptyState, SaveFeedback, focusField, useConfirmation, type SaveState } from './Feedback'
 import DraftChooser, { downloadDraftSource } from './DraftChooser'
 import { newDraft, saveDraft, type Draft, type DraftContext } from '@/lib/internal-tools/drafts'
-import { isCashoutDraftSheet, readUnassignedCashout, cashoutServerSheet, changeCount, countInput, parseCountInput, type CashoutDraftCashier, type CashoutDraftSheet } from '@/lib/internal-tools/cashout-draft'
+import { isCashoutDraftSheet, readUnassignedCashout, cashoutServerSheet, changeCount, changeAmount, countInput, amountInput, parseCountInput, parseDenominationAmount, type CashoutDraftCashier, type CashoutDraftSheet } from '@/lib/internal-tools/cashout-draft'
 import { businessDate } from '@/lib/internal-tools/contracts'
 import { useNavigationProtection } from './NavigationProtection'
 import { SingleFlight } from '@/lib/internal-tools/recovery'
@@ -19,6 +19,7 @@ import {
   cashierTotals,
   dayTotals,
   formatCents,
+  parseCashAmount,
   shiftTotals,
 } from '@/lib/cashout'
 import {
@@ -37,7 +38,7 @@ type Sheet = CashoutDraftSheet
 export const STORE_LABELS: Record<CashoutStore, string> = { CR3: 'CR3 · W Military', CR2: 'CR2 · SW Military' }
 const today = () => new Date().toLocaleDateString('en-CA')
 const newCashier = (): CashoutDraftCashier => ({ name: '', counts: DENOMINATIONS.map(() => 0), countInputs: DENOMINATIONS.map(() => ''), toast: '' })
-const emptySheet = (): Sheet => ({ am: [newCashier()], pm: [newCashier()], zReport: '' })
+const emptySheet = (): Sheet => ({ am: [newCashier()], pm: [newCashier()], zReport: '', extraMoney: '' })
 
 const inputClass =
   'min-h-11 w-full border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-red-500 print:min-h-0 print:py-2 print:text-sm'
@@ -278,12 +279,14 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
   const saveDay = () => saving.current.run(() => run(async () => {
     if (!token) return
     const invalid = (['am', 'pm'] as const).flatMap(shift => sheet[shift].flatMap((cashier, index) =>
-      DENOMINATIONS.flatMap((d, denomination) => parseCountInput(countInput(cashier, denomination)) === null ? [`${shift}-${index}-${d}`] : [])))
+      DENOMINATIONS.flatMap((d, denomination) => parseCountInput(countInput(cashier, denomination)) === null ? [`${shift}-${index}-${d}`]
+        : parseDenominationAmount(amountInput(cashier, denomination), d) === null ? [`${shift}-${index}-${d}-amount`] : [])))
     if (invalid.length) { setKeypadOpen(false); focusField(invalid[0]); return { key: 'cash.fixCounts' } }
+    if (parseCashAmount(sheet.extraMoney ?? '') === null) { setKeypadOpen(false); focusField('extra-money'); return { key: 'cash.invalidExtraMoney' } }
     const stillCurrent = () => mounted.current && currentEdit.current.store === store && currentEdit.current.date === date && latestSheet.current === sheet
     setSaveState('sending')
     try {
-      await saveCashoutDay(store, date, { sheet: cashoutServerSheet(sheet), totals: dayTotals(sheet.am, sheet.pm, sheet.zReport) }, token)
+      await saveCashoutDay(store, date, { sheet: cashoutServerSheet(sheet), totals: dayTotals(sheet.am, sheet.pm, sheet.zReport, sheet.extraMoney) }, token)
     } catch (caught) {
       const key = errorKey(caught)
       if (stillCurrent()) setSaveState(key === 'errors.conflict' ? 'conflict' : key === 'errors.unavailable' ? 'waiting' : 'failed')
@@ -321,6 +324,9 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
   const setCount = (shift: Shift, idx: number, d: number, value: string) => {
     setSheet(s => ({ ...s, [shift]: s[shift].map((cashier, index) => index === idx ? changeCount(cashier, d, value) : cashier) }))
   }
+  const setAmount = (shift: Shift, idx: number, d: number, value: string) => {
+    setSheet(s => ({ ...s, [shift]: s[shift].map((cashier, index) => index === idx ? changeAmount(cashier, d, value) : cashier) }))
+  }
 
   const removeCashier = async (shift: Shift, idx: number) => {
     if (await confirmation.ask({ key: 'cash.removeConfirm' }, true)) {
@@ -330,7 +336,8 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
     }
   }
 
-  const day = dayTotals(sheet.am, sheet.pm, sheet.zReport)
+  const day = dayTotals(sheet.am, sheet.pm, sheet.zReport, sheet.extraMoney)
+  const invalidExtraMoney = parseCashAmount(sheet.extraMoney ?? '') === null
   const selectedCashier = activeDrawer ? sheet[activeDrawer.shift][activeDrawer.index] : null
   const countCashier = activeCount ? sheet[activeCount.shift][activeCount.index] : null
   const countFields = (['am','pm'] as const).flatMap(shift => sheet[shift].flatMap((_, index) => DENOMINATIONS.map((_, denomination) => ({ shift, index, denomination }))))
@@ -340,7 +347,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
     setKeypadOpen(false)
     if (activeCount) requestAnimationFrame(() => focusField(`${activeCount.shift}-${activeCount.index}-${DENOMINATIONS[activeCount.denomination]}`))
   }
-  const invalidCounts = (['am','pm'] as const).some(shift => sheet[shift].some(c => DENOMINATIONS.some((_, i) => parseCountInput(countInput(c, i)) === null)))
+  const invalidCounts = (['am','pm'] as const).some(shift => sheet[shift].some(c => DENOMINATIONS.some((d, i) => parseCountInput(countInput(c, i)) === null || parseDenominationAmount(amountInput(c, i), d) === null)))
 
   useEffect(() => { document.querySelector<HTMLInputElement>('#cashout-editor input:not([disabled])')?.focus() }, [])
 
@@ -454,11 +461,20 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                       {(!c.countInputs || c.countInputs.some(value => value === null)) && <p className="mt-1 text-xs text-amber-900">{tr('cash.legacyCountState')}</p>}
                     </div>
 
-                    <table className="w-full text-sm mb-3">
+                    <table className="w-full table-fixed text-sm mb-3">
+                      <thead>
+                        <tr className="text-left text-xs text-gray-600">
+                          <th scope="col" className="pb-1 pr-2 font-medium">{tr('cash.denomination')}</th>
+                          <th scope="col" className="pb-1 pr-2 text-right font-medium">{tr('cash.count')}</th>
+                          <th scope="col" className="pb-1 text-right font-medium">{tr('cash.amount')}</th>
+                        </tr>
+                      </thead>
                       <tbody>
                         {DENOMINATIONS.map((d, di) => {
                           const value = countInput(c, di)
                           const invalid = parseCountInput(value) === null
+                          const amount = amountInput(c, di)
+                          const invalidAmount = parseDenominationAmount(amount, d) === null
                           return (
                           <tr key={d}>
                             <td className="py-0.5 pr-2 text-gray-700 w-16">
@@ -469,6 +485,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                                 data-entry-field
                                 data-count-input
                                 id={`${id}-${d}`}
+                                aria-label={tr('cash.countFor', { amount: formatCents(d) })}
                                 type="text"
                                 inputMode={keypadOpen ? 'none' : 'numeric'}
                                 enterKeyHint="next"
@@ -480,12 +497,28 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                                 placeholder="—"
                                 onFocus={() => selectCount({ shift, index: idx, denomination: di })}
                                 onChange={e => setCount(shift, idx, di, e.target.value)}
-                                className="min-h-11 w-full border border-gray-300 rounded px-2 py-1 text-base text-right focus:outline-none focus:ring-2 focus:ring-red-500 print:min-h-0 print:text-sm"
+                                className="min-h-11 w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-base text-right focus:outline-none focus:ring-2 focus:ring-red-500 print:min-h-0 print:text-sm"
                               />
                               {invalid && <p id={`${id}-${d}-error`} className="mt-1 text-xs text-red-700">{tr('cash.invalidCount')}</p>}
                             </td>
-                            <td className="py-0.5 text-right font-mono text-gray-500 w-24">
-                              <span className="print:hidden">{value === '' || invalid ? '—' : formatCents(d * c.counts[di])}</span>
+                            <td className="py-0.5 text-right w-28">
+                              <input
+                                data-entry-field
+                                id={`${id}-${d}-amount`}
+                                aria-label={tr('cash.amountFor', { amount: formatCents(d) })}
+                                type="text"
+                                inputMode="decimal"
+                                enterKeyHint="next"
+                                autoComplete="off"
+                                spellCheck={false}
+                                aria-invalid={invalidAmount || undefined}
+                                aria-describedby={`cash-count-help${invalidAmount ? ` ${id}-${d}-amount-error` : ''}`}
+                                value={amount}
+                                placeholder="0.00"
+                                onChange={e => setAmount(shift, idx, di, e.target.value)}
+                                className="min-h-11 w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-base text-right focus:outline-none focus:ring-2 focus:ring-red-500 print:hidden"
+                              />
+                              {invalidAmount && <p id={`${id}-${d}-amount-error`} className="mt-1 text-xs text-red-700 print:hidden">{tr('cash.invalidAmount', { amount: formatCents(d) })}</p>}
                               <span className="hidden print:inline">{formatCents(d * c.counts[di])}</span>
                             </td>
                           </tr>
@@ -544,6 +577,24 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
           onChange={e => setSheet(s => ({ ...s, zReport: e.target.value }))}
           className={`${inputClass} mb-3`}
         />
+        <label htmlFor="extra-money" className="block text-sm font-medium text-gray-700 mb-1">
+          {tr('cash.extraMoney')}
+        </label>
+        <input
+          data-entry-field
+          id="extra-money"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          value={sheet.extraMoney ?? ''}
+          placeholder="0.00"
+          aria-invalid={invalidExtraMoney || undefined}
+          aria-describedby={`extra-money-help${invalidExtraMoney ? ' extra-money-error' : ''}`}
+          onChange={e => setSheet(s => ({ ...s, extraMoney: e.target.value }))}
+          className={inputClass}
+        />
+        <p id="extra-money-help" className="mt-1 mb-3 text-xs text-gray-600">{tr('cash.extraMoneyHelp')}</p>
+        {invalidExtraMoney && <p id="extra-money-error" role="alert" className="mb-3 text-sm text-red-700">{tr('cash.invalidExtraMoney')}</p>}
         <Row label={tr('cash.zDifference')}><Money cents={day.zOverShort} signed /></Row>
       </section>
       </EntryWorkspace>

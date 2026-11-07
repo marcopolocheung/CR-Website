@@ -365,6 +365,15 @@ async function saveRequests(db, station, raw) {
 }
 __name(saveRequests, "saveRequests");
 
+// ../src/lib/cashout.ts
+function parseCashAmount(value) {
+  if (value === "") return 0;
+  if (!/^(?:\d{1,8}(?:\.\d{0,2})?|\.\d{1,2})$/.test(value)) return null;
+  const [dollars, fraction = ""] = value.split(".");
+  return Number(dollars) * 100 + Number(fraction.padEnd(2, "0"));
+}
+__name(parseCashAmount, "parseCashAmount");
+
 // ../src/lib/scheduler/time.ts
 function minutes(hour, minute = 0) {
   return hour * 60 + minute;
@@ -701,11 +710,19 @@ var en = {
   "cash.closeKeypad": "Close keypad",
   "cash.countContext": "{shift} \xB7 {name}",
   "cash.countFor": "{amount} denomination count",
-  "cash.countHelp": "Blank counts are not entered; type 0 to record zero. Blank counts contribute $0 to the existing totals. Entry status stays on this device. Select a count to use the optional keypad.",
+  "cash.denomination": "Denomination",
+  "cash.count": "# bills / coins",
+  "cash.amount": "Amount ($)",
+  "cash.amountFor": "{amount} denomination amount ($)",
+  "cash.invalidAmount": "Enter a total in multiples of {amount}, up to 100000 bills or coins, or clear the field.",
+  "cash.countHelp": "Enter either the number of bills or coins, or their total dollar amount; the other field updates automatically. For example, 3 $20 bills = $60. Blank fields contribute $0; type 0 to record zero. Entry status stays on this device. Select a count to use the optional keypad.",
   "cash.countProgress": "{number} of {total} denomination counts entered on this device",
   "cash.legacyCountState": "This earlier sheet has counts whose original entry status is unknown. Editing one count does not confirm the others.",
   "cash.invalidCount": "Enter a whole count from 0 to 100000, or clear the field.",
-  "cash.fixCounts": "Correct invalid denomination counts before saving. Invalid counts contribute $0 to these preview totals; your original input is retained.",
+  "cash.fixCounts": "Correct invalid denomination counts or amounts before saving. Invalid entries contribute $0 to these preview totals; your original input is retained.",
+  "cash.extraMoney": "Extra money ($)",
+  "cash.extraMoneyHelp": "Money found after counting. Added to the day deposit and the comparison against Z. Enter it here only if it is not already in a drawer count.",
+  "cash.invalidExtraMoney": "Enter a nonnegative dollar amount with up to two decimal places, or leave it blank.",
   "entry.help": "Tab / Shift+Tab move through controls. Enter / Shift+Enter move through entry fields. Enter never saves. Escape cancels a confirmation.",
   "requests.title": "Time off requests",
   "requests.waiting": "{count} waiting",
@@ -934,7 +951,7 @@ var en = {
   "cash.shiftDeposit": "{shift} deposit",
   "cash.shiftOverShort": "{shift} over / short",
   "cash.dayTotal": "Day total",
-  "cash.actualDeposit": "Actual deposit (AM + PM)",
+  "cash.actualDeposit": "Actual deposit (AM + PM + extra)",
   "cash.cashierDifference": "Cashier over / short (AM + PM)",
   "cash.zExpected": "Z report expected cash",
   "cash.zDifference": "Over / short vs Z report",
@@ -1993,7 +2010,7 @@ __name(shiftCashoutTotals, "shiftCashoutTotals");
 function cashoutTotals(sheet) {
   const am = shiftCashoutTotals(sheet.am);
   const pm = shiftCashoutTotals(sheet.pm);
-  const deposit = am.deposit + pm.deposit;
+  const deposit = am.deposit + pm.deposit + (parseCashAmount(sheet.extraMoney ?? "") ?? 0);
   return {
     amDeposit: am.deposit,
     pmDeposit: pm.deposit,
@@ -2010,11 +2027,17 @@ function validateCashoutBody(raw) {
   const sheet = raw.sheet;
   if (!sheet || typeof sheet !== "object") return null;
   if (typeof sheet.zReport !== "string" || !MONEY_INPUT_RE.test(sheet.zReport)) return null;
+  if (sheet.extraMoney !== void 0 && (typeof sheet.extraMoney !== "string" || parseCashAmount(sheet.extraMoney) === null)) return null;
   const shifts = [sheet.am, sheet.pm].map(
     (shift) => Array.isArray(shift) && shift.length <= MAX_CASHIERS_PER_SHIFT ? shift.map(validateCashier) : null
   );
   if (shifts.some((shift) => !shift || shift.some((c) => !c))) return null;
-  const valid = { am: shifts[0], pm: shifts[1], zReport: sheet.zReport };
+  const valid = {
+    am: shifts[0],
+    pm: shifts[1],
+    zReport: sheet.zReport,
+    ...sheet.extraMoney === void 0 ? {} : { extraMoney: sheet.extraMoney }
+  };
   return { sheet: valid, totals: cashoutTotals(valid) };
 }
 __name(validateCashoutBody, "validateCashoutBody");
@@ -2397,7 +2420,7 @@ var index_default = {
       if (!valid) return json({ error: "invalid_body" }, 400, request, env);
       const doc = { v: 1, store, date, ...valid, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
       await env.SCHEDULES.put(cashoutKey(store, date), JSON.stringify(doc), { expirationTtl: CASHOUT_TTL_SECONDS });
-      return json({ updatedAt: doc.updatedAt }, 200, request, env);
+      return json({ updatedAt: doc.updatedAt, ...doc.sheet.extraMoney === void 0 ? {} : { extraMoney: doc.sheet.extraMoney } }, 200, request, env);
     }
     const inventoryListMatch = path.match(/^\/api\/inventory\/(CR3)\/list$/);
     if (inventoryListMatch && (request.method === "GET" || request.method === "PUT")) {

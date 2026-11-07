@@ -1,4 +1,5 @@
 import { requestRecord, saveRequests, readRequestMutation } from './schedule-requests'
+import { parseCashAmount } from '../../src/lib/cashout'
 import { isStationId } from '../../src/lib/internal-tools/contracts'
 import { publishedHours, weeksInPeriod } from '../../src/lib/converter/published-hours'
 import type { WeeklyStaffingTemplate } from '../../src/lib/scheduler/types'
@@ -720,7 +721,7 @@ export type CashoutDay = {
   v: 1
   store: (typeof CASHOUT_STORES)[number]
   date: string
-  sheet: { am: CashoutCashier[]; pm: CashoutCashier[]; zReport: string }
+  sheet: { am: CashoutCashier[]; pm: CashoutCashier[]; zReport: string; extraMoney?: string }
   totals: CashoutTotals
   updatedAt: string
 }
@@ -753,7 +754,7 @@ function shiftCashoutTotals(cashiers: CashoutCashier[]) {
 export function cashoutTotals(sheet: CashoutDay['sheet']): CashoutTotals {
   const am = shiftCashoutTotals(sheet.am)
   const pm = shiftCashoutTotals(sheet.pm)
-  const deposit = am.deposit + pm.deposit
+  const deposit = am.deposit + pm.deposit + (parseCashAmount(sheet.extraMoney ?? '') ?? 0)
   return {
     amDeposit: am.deposit,
     pmDeposit: pm.deposit,
@@ -771,11 +772,13 @@ export function validateCashoutBody(raw: unknown): Pick<CashoutDay, 'sheet' | 't
   const sheet = (raw as Record<string, unknown>).sheet as Record<string, unknown> | undefined
   if (!sheet || typeof sheet !== 'object') return null
   if (typeof sheet.zReport !== 'string' || !MONEY_INPUT_RE.test(sheet.zReport)) return null
+  if (sheet.extraMoney !== undefined && (typeof sheet.extraMoney !== 'string' || parseCashAmount(sheet.extraMoney) === null)) return null
   const shifts = [sheet.am, sheet.pm].map((shift) =>
     Array.isArray(shift) && shift.length <= MAX_CASHIERS_PER_SHIFT ? shift.map(validateCashier) : null,
   )
   if (shifts.some((shift) => !shift || shift.some((c) => !c))) return null
-  const valid = { am: shifts[0] as CashoutCashier[], pm: shifts[1] as CashoutCashier[], zReport: sheet.zReport }
+  const valid = { am: shifts[0] as CashoutCashier[], pm: shifts[1] as CashoutCashier[], zReport: sheet.zReport,
+    ...(sheet.extraMoney === undefined ? {} : { extraMoney: sheet.extraMoney as string }) }
   return { sheet: valid, totals: cashoutTotals(valid) }
 }
 
@@ -1221,7 +1224,7 @@ export default {
       // shortcut: last save wins, add a rev check if two managers ever edit the same day at once.
       const doc: CashoutDay = { v: 1, store, date, ...valid, updatedAt: new Date().toISOString() }
       await env.SCHEDULES.put(cashoutKey(store, date), JSON.stringify(doc), { expirationTtl: CASHOUT_TTL_SECONDS })
-      return json({ updatedAt: doc.updatedAt }, 200, request, env)
+      return json({ updatedAt: doc.updatedAt, ...(doc.sheet.extraMoney === undefined ? {} : { extraMoney: doc.sheet.extraMoney }) }, 200, request, env)
     }
 
     // Inventory item list: manager token for reads and writes, rev-checked so two editors cannot clobber each other.

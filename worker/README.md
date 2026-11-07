@@ -39,6 +39,15 @@ Plus two more stores, keyed separately per station:
   Reads AND writes need the manager token (cash figures, not public). Days
   expire after 31 days; last save wins.
 
+  Sheets may include optional `extraMoney` dollar text for cash found after the
+  drawer counts. It increases the day deposit and Z-report comparison; cashier
+  and shift Toast comparisons retain their original figures. The Worker validates
+  this amount, recalculates totals, and echoes `extraMoney` in a successful PUT
+  response. Deploy the updated Worker before the cash-out frontend: older
+  Workers discard this field, and the new frontend keeps the device draft and
+  reports setup incomplete rather than confirming such a save. No KV migration
+  or binding change is required.
+
 - Employee write-ups (`/api/writeups`): one record per write-up
   (`writeup:{id}`), entered on `/internal/forms`. `GET /api/writeups` lists
   them by date (newest first) then employee, `POST /api/writeups` saves a new

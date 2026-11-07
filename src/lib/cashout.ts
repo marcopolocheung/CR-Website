@@ -3,6 +3,15 @@ export const FLOAT_CENTS = 10000
 export const DENOMINATIONS = [10000, 5000, 2000, 1000, 500, 100, 50, 25, 10, 5, 1]
 
 export type Cashier = { name: string; counts: number[]; toast: string }
+export type CashoutSheet = { am: Cashier[]; pm: Cashier[]; zReport: string; extraMoney?: string }
+
+/** Parse a complete nonnegative dollar amount without rounding fractional cents. */
+export function parseCashAmount(value: string): number | null {
+  if (value === '') return 0
+  if (!/^(?:\d{1,8}(?:\.\d{0,2})?|\.\d{1,2})$/.test(value)) return null
+  const [dollars, fraction = ''] = value.split('.')
+  return Number(dollars) * 100 + Number(fraction.padEnd(2, '0'))
+}
 
 export function toCents(dollars: string): number {
   const n = parseFloat(dollars)
@@ -29,10 +38,10 @@ export function shiftTotals(cashiers: Cashier[]) {
   )
 }
 
-export function dayTotals(am: Cashier[], pm: Cashier[], zReport: string) {
+export function dayTotals(am: Cashier[], pm: Cashier[], zReport: string, extraMoney = '') {
   const a = shiftTotals(am)
   const p = shiftTotals(pm)
-  const deposit = a.deposit + p.deposit
+  const deposit = a.deposit + p.deposit + (parseCashAmount(extraMoney) ?? 0)
   return {
     amDeposit: a.deposit,
     pmDeposit: p.deposit,

@@ -1016,6 +1016,31 @@ test('cash-out bodies are strictly validated', () => {
   assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, zReport: '1.005' } })), null)
   assert.equal(bad((b) => ({ ...b, sheet: { ...b.sheet, pm: Array(21).fill(cashier) } })), null)
   assert.equal(bad(() => ({})), null)
+  for (const extraMoney of [-1, null, '-1', '.', '1e3', '1.005', '100000000']) {
+    assert.equal(bad(b => ({ ...b, sheet: { ...b.sheet, extraMoney } })), null)
+  }
+})
+
+test('cash-out found money is acknowledged, retained in history and recalculated against Z on the server', async () => {
+  const env = mockEnv()
+  const sheet = { ...cashoutBody.sheet, zReport: '513.75', extraMoney: '1.25' }
+  assert.equal(cashoutTotals({ ...sheet, extraMoney: '' }).zOverShort, -125)
+  const response = await handler.fetch(authed('PUT', '/api/cashout/CR3/2026-10-10', { sheet, totals: { deposit: 1 } }), env)
+  assert.equal(response.status, 200)
+  assert.equal((await response.json()).extraMoney, '1.25')
+  const day = await (await handler.fetch(authed('GET', '/api/cashout/CR3/2026-10-10'), env)).json()
+  assert.equal(day.sheet.extraMoney, '1.25')
+  assert.deepEqual(day.totals, dayTotals(sheet.am, sheet.pm, sheet.zReport, sheet.extraMoney))
+  assert.equal(day.totals.deposit, 51375)
+  assert.equal(day.totals.zOverShort, 0)
+  assert.equal(day.totals.amDeposit, cashoutBody.totals.amDeposit)
+  assert.equal(day.totals.amOverShort, cashoutBody.totals.amOverShort)
+  const history = await (await handler.fetch(authed('GET', '/api/cashout/CR3?to=2026-10-10'), env)).json()
+  assert.deepEqual(history.days[0].totals, day.totals)
+  for (const extraMoney of ['', '0.00', '1.25', '.29']) {
+    const candidate = { ...sheet, extraMoney }
+    assert.deepEqual(cashoutTotals(candidate), dayTotals(candidate.am, candidate.pm, candidate.zReport, extraMoney))
+  }
 })
 
 test('cash-out totals are recalculated on the server, ignoring what the client sent', () => {

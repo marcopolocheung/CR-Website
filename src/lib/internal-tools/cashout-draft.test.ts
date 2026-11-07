@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readUnassignedCashout, changeCount, countInput, parseCountInput, cashoutServerSheet, isCashoutDraftSheet } from './cashout-draft'
+import { readUnassignedCashout, changeCount, changeAmount, countInput, amountInput, parseCountInput, parseDenominationAmount, cashoutServerSheet, isCashoutDraftSheet } from './cashout-draft'
 import { DENOMINATIONS, dayTotals } from '../cashout'
 const source = () => ({ am: [{ name: 'Nombre original', counts: DENOMINATIONS.map((_,i) => i === 0 ? 3 : 0), toast: '125.50' }], pm: [], zReport: '600.25' })
 test('unassigned legacy sheet retains counts, AM/PM, source names and Toast/Z text without inventing context', () => {
@@ -58,4 +58,55 @@ test('server payload strips local status and preserves integer-cent totals and T
   assert.equal(dayTotals(wire.am, wire.pm, wire.zReport).deposit, 20000)
   wire.am[0].counts[0] = 99
   assert.equal(draft.am[0].counts[0], 3)
+})
+
+test('each bill and coin amount converts to an exact whole count and synchronizes in both directions', () => {
+  for (const [index, denomination] of DENOMINATIONS.entries()) {
+    const amount = (denomination * 3 / 100).toFixed(2)
+    assert.equal(parseDenominationAmount(amount, denomination), 3)
+    let cashier = changeAmount(source().am[0], index, amount)
+    assert.equal(countInput(cashier, index), '3')
+    assert.equal(amountInput(cashier, index), amount)
+    cashier = changeCount(cashier, index, '7')
+    assert.equal(amountInput(cashier, index), (denomination * 7 / 100).toFixed(2))
+    assert.ok(isCashoutDraftSheet({ ...source(), am: [cashier] }))
+    cashier = changeAmount(cashier, index, '')
+    assert.equal(countInput(cashier, index), '')
+    assert.equal(amountInput(cashier, index), '')
+    cashier = changeAmount(cashier, index, '0.00')
+    assert.equal(countInput(cashier, index), '0')
+    assert.equal(amountInput(cashier, index), '0.00')
+  }
+})
+
+test('nonmultiples and malformed amounts remain recoverable until corrected, without fractional bills', () => {
+  for (const amount of ['10', '20.01', '-20', '1e3', '0.001', '.', '2000020']) {
+    const index = DENOMINATIONS.indexOf(2000)
+    assert.equal(parseDenominationAmount(amount, 2000), null, amount)
+    const cashier = changeAmount(source().am[0], index, amount)
+    const restored = readUnassignedCashout(JSON.stringify({ ...source(), am: [cashier], extraMoney: '1.00' }))!
+    assert.ok(restored)
+    assert.equal(amountInput(restored.am[0], index), amount)
+    assert.equal(restored.am[0].counts[index], 0)
+    assert.equal(countInput(restored.am[0], index), '')
+    const fixed = changeCount(restored.am[0], index, '3')
+    assert.equal(amountInput(fixed, index), '60.00')
+    assert.equal(restored.extraMoney, '1.00')
+  }
+  assert.equal(parseDenominationAmount('2000000', 2000), 100000)
+})
+
+test('amount metadata stays local while found cash survives wire serialization and old drafts still load', () => {
+  const cashier = changeAmount(source().am[0], 2, '60.00')
+  const draft = { ...source(), am: [cashier], extraMoney: '1.25' }
+  const wire = cashoutServerSheet(draft)
+  assert.equal('amountInputs' in wire.am[0], false)
+  assert.equal('countInputs' in wire.am[0], false)
+  assert.equal(wire.am[0].counts[2], 3)
+  assert.equal(wire.extraMoney, '1.25')
+  assert.deepEqual(dayTotals(draft.am, draft.pm, draft.zReport, draft.extraMoney), dayTotals(wire.am, wire.pm, wire.zReport, wire.extraMoney))
+  assert.ok(readUnassignedCashout(JSON.stringify(source())))
+  assert.ok(isCashoutDraftSheet({ ...draft, extraMoney: 'invalid text retained' }))
+  assert.equal(isCashoutDraftSheet({ ...draft, extraMoney: 125 }), false)
+  assert.equal(isCashoutDraftSheet({ ...draft, am: [{ ...cashier, amountInputs: ['1'] }] }), false)
 })

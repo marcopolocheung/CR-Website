@@ -1,7 +1,8 @@
 import { canonicalJson } from './internal-tools/json'
 import type { CashoutLink } from './converter/sales-context'
 import { getScheduleApiBase, StoreAuthError, StoreUnavailableError } from './schedule-store'
-import type { Cashier, dayTotals } from './cashout'
+import { parseCashAmount, type CashoutSheet, type dayTotals } from './cashout'
+export type { CashoutSheet } from './cashout'
 
 /**
  * Cash-out day store (`/api/cashout/{store}/{date}`). Reads and writes both need
@@ -11,7 +12,6 @@ import type { Cashier, dayTotals } from './cashout'
 export const CASHOUT_STORES = ['CR3', 'CR2'] as const
 export type CashoutStore = (typeof CASHOUT_STORES)[number]
 export type CashoutTotals = ReturnType<typeof dayTotals>
-export type CashoutSheet = { am: Cashier[]; pm: Cashier[]; zReport: string }
 export type CashoutDay = { date: string; totals: CashoutTotals; updatedAt: string }
 
 export async function fetchCashoutDay(store: CashoutStore, date: string, token: string): Promise<CashoutSheet | null> {
@@ -35,8 +35,17 @@ export async function saveCashoutDay(
   input: { sheet: CashoutSheet; totals: CashoutTotals },
   token: string,
 ): Promise<void> {
-  const { status } = await requestJson(`/api/cashout/${store}/${date}`, token, { method: 'PUT', body: JSON.stringify(input) })
-  if (status === 200) return
+  const { status, body } = await requestJson(`/api/cashout/${store}/${date}`, token, { method: 'PUT', body: JSON.stringify(input) })
+  if (status === 200) {
+    // Older Workers accept the sheet but discard unknown fields. Confirm found
+    // cash was retained before reporting a successful save during rollout.
+    if (parseCashAmount(input.sheet.extraMoney ?? '') !== 0) {
+      if (!body || typeof body !== 'object' || !('extraMoney' in body) || body.extraMoney !== input.sheet.extraMoney) {
+        throw new StoreUnavailableError('Extra money saving is not set up on the server yet. Your device draft is retained.')
+      }
+    }
+    return
+  }
   throw errorFor(status)
 }
 
