@@ -50,6 +50,7 @@ import { WeeklyScheduleBoard } from './ScheduleBoard'
 import { GenerationReportBanner, GuidedFixPanel, HoursSummary, MonthStrip, OnboardingBanner } from './SchedulePanels'
 import ScheduleWorkspace, { type ScheduleWorkspaceProps } from './ScheduleWorkspace'
 import StaffWorkspace, { type StaffWorkspaceProps } from './StaffWorkspace'
+import SchedulingAgent from './SchedulingAgent'
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
   const restaurantName = restaurantId && isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
   // Schedule-only stations (CR3 Kitchen) ship default rules; their crew lives on the Worker.
@@ -1601,6 +1602,18 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       </header>
 
       <main className="mx-auto w-full max-w-none min-w-0 space-y-4 overflow-x-clip px-4 py-5">
+          {weekStart && tab === 'schedule' && <SchedulingAgent key={`${requestStation}:${weekStart}`} token={managerCode}
+            context={{ stationId: requestStation, weekStart, employees, template, assignments: assignments.filter(item => item.employeeId),
+              requests: { phase: requestSource.phase, revision: requestSource.record?.revision ?? 0, data: requestSource.record?.data ?? null } }}
+            disabled={storeLoading || storeOffline || isGenerating || ruleProblems.length > 0 || requestSource.phase !== 'ready' || requestDirty}
+            onApply={(next) => {
+              remember('schedule before assistant proposal')
+              setAssignments(cloneAssignmentList(next))
+              setGeneratedAssignments(cloneAssignmentList(next))
+              setWeekStatus(current => ({ ...current, [weekStart]: 'on' }))
+              setIgnoredIssueIds([])
+              setDiagnostics(['Assistant proposal added to the draft. Review the board, then publish when ready.'])
+            }} />}
           {layout === 'classic' && requestsPanel}
           {storeLoading && (
             <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">

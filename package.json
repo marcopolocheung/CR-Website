@@ -21,9 +21,15 @@
     "forms:test": "node --import jiti/register --test src/lib/forms.test.ts src/lib/digital-forms.test.ts src/lib/internal-tools/writeup-draft.test.ts src/lib/internal-tools/drafts.test.ts",
     "imports:worker:test": "node --test worker/src/import-directory.test.mjs worker/src/import-history.test.mjs worker/src/published-hours.test.mjs",
     "scheduler:requests:test": "node --import jiti/register --test src/lib/scheduler/requests.test.ts src/lib/scheduler/request-store.test.ts",
-    "scheduler:requests:worker:test": "node --test worker/src/schedule-requests.test.mjs"
+    "scheduler:requests:worker:test": "node --test worker/src/schedule-requests.test.mjs",
+    "agent:dev": "node --env-file-if-exists=.env.agent --import jiti/register agent/server.ts",
+    "agent:start": "node --import jiti/register agent/server.ts",
+    "agent:test": "node --import jiti/register --test agent/agent.test.ts agent/service.test.ts"
   },
   "dependencies": {
+    "@langchain/anthropic": "^1.6.0",
+    "@langchain/langgraph": "^1.7.1",
+    "@langchain/langgraph-checkpoint-sqlite": "^1.1.0",
     "@tailwindcss/postcss": "^4.2.1",
     "@types/node": "^25.3.3",
     "@types/react": "^19.2.14",
@@ -38,10 +44,13 @@
     "react-dom": "^19.2.4",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
-    "xlsx": "0.18.5"
+    "xlsx": "0.18.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "4.20260426.1",
+    "@types/better-sqlite3": "^9.6.0",
+    "jiti": "^2.7.0",
     "wrangler": "4.86.0"
   }
 }

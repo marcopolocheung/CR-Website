@@ -38,6 +38,10 @@ jobs:
 
       - run: npx tsc --noEmit
 
+      - run: npm run agent:test
+
+      - run: npm run scheduler:test
+
       - run: npm run build
         env:
           # Empty for a custom domain (chinarosesa.com). Only a project-pages
@@ -49,6 +53,8 @@ jobs:
           # variable can be read and changed without re-entering it. Unset, the
           # build simply ships no analytics rather than failing.
           NEXT_PUBLIC_GA_ID: ${{ vars.NEXT_PUBLIC_GA_ID }}
+          # Optional separately hosted scheduling agent. Unset keeps the panel hidden.
+          NEXT_PUBLIC_AGENT_API: ${{ vars.NEXT_PUBLIC_AGENT_API }}
 
       # The SEO guarantees — canonicals, JSON-LD, headings, robots, sitemap,
       # noindex on staff routes — are only guarantees if a broken one fails the
