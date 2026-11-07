@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { CodeGate } from './CashOut'
 import { StoreAuthError } from '@/lib/schedule-store'
@@ -14,7 +14,10 @@ import {
   type WriteUpDoc,
   type WriteUpForm,
 } from '@/lib/writeup-store'
-import { NO_FILTER, SAVED_FORM_TYPES, filterSavedForms, isFiltered, type SavedFormFilter, type SavedFormRow } from '@/lib/forms'
+import { NO_FILTER, SAVED_FORM_TYPES, filterSavedForms, isFiltered, type SavedFormFilter, type SavedFormRow, type SavedFormType } from '@/lib/forms'
+import { DIGITAL_FORMS, digitalFormPerson, type DigitalFormDoc } from '@/lib/digital-forms'
+import { deleteSavedForm, fetchDigitalForm, fetchDigitalForms, saveDigitalForm, saveDigitalFormLabel } from '@/lib/digital-form-store'
+import { DigitalPaperForm, NewDigitalForm } from './DigitalForm'
 import { useInternalLanguage } from './InternalLanguage'
 import { EmptyState, focusField } from './Feedback'
 import FormDraftWorkspace, { type FormEditorProps } from './FormDraftWorkspace'
@@ -37,13 +40,13 @@ const emptyForm = (date: string): WriteUpForm => ({
   managerSignedDate: '',
 })
 
-type View = { kind: 'list' } | { kind: 'new' } | { kind: 'saved'; doc: WriteUpDoc }
+type View = { kind: 'list' } | { kind: 'new'; type: SavedFormType } | { kind: 'saved'; doc: WriteUpDoc } | { kind: 'digital'; doc: DigitalFormDoc }
 
 const button = 'min-h-11 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50'
 const primary = `${button} bg-red-600 text-white hover:bg-red-700`
 const secondary = `${button} border border-gray-300 text-gray-700 hover:bg-gray-50`
 
-/** Employee write-ups: a list of saved records plus the paper form, behind the manager code. */
+/** Shared digital form book, retaining the original write-up editor and stored records. */
 export default function WriteUps() {
   // Manager token lives in memory only, like cash out.
   const [token, setToken] = useState('')
@@ -52,7 +55,7 @@ export default function WriteUps() {
     <>
       {!token && (
         <div className="max-w-6xl mx-auto px-4">
-          <CodeGate onUnlock={code => { setToken(code); setUnlocked(true) }} title="Employee write-ups" />
+          <CodeGate onUnlock={code => { setToken(code); setUnlocked(true) }} title="Saved forms" />
         </div>
       )}
       {/* After the first unlock the book stays mounted, so an expired code never discards an unsaved write-up. */}
@@ -67,6 +70,11 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
   const [loadFailed, setLoadFailed] = useState(false)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [deleting, setDeleting] = useState<SavedFormRow | null>(null)
+  // KV lists can briefly lag a delete. Keep removed records out of every view in this session.
+  const deleted = useRef(new Set<string>())
+  const savedHere = useRef(new Map<string, SavedFormRow>())
+  const remember = (row: SavedFormRow) => savedHere.current.set(`${row.type}:${row.id}`, row)
 
   const run = useCallback(
     async (task: () => Promise<string | void>) => {
@@ -90,7 +98,14 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
       run(async () => {
         setLoadFailed(false)
         try {
-          setList((await fetchWriteUps(token)).map(w => ({ type: 'write-up' as const, ...w })))
+          const [writeUps, forms] = await Promise.all([fetchWriteUps(token), fetchDigitalForms(token)])
+          const merged = new Map<string, SavedFormRow>([...writeUps.map(w => ({ type: 'write-up' as const, ...w })), ...forms]
+            .map(row => [`${row.type}:${row.id}`, row] as const))
+          // Keep confirmed saves and labels visible while KV's list metadata propagates.
+          for (const [key, row] of savedHere.current) merged.set(key, row)
+          setList([...merged.values()]
+            .filter(row => !deleted.current.has(`${row.type}:${row.id}`))
+            .sort((a, b) => b.date.localeCompare(a.date) || a.employee.localeCompare(b.employee)))
         } catch (caught) {
           // Keep the last good list on screen so a failed refresh never reads as "no records".
           if (!(caught instanceof StoreAuthError)) setLoadFailed(true)
@@ -104,7 +119,21 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
     if (token) refresh()
   }, [refresh, token])
 
-  const open = (row: SavedFormRow) => run(async () => setView({ kind: 'saved', doc: await fetchWriteUp(row.id, token) }))
+  const open = (row: SavedFormRow) => run(async () => setView(row.type === 'write-up'
+    ? { kind: 'saved', doc: await fetchWriteUp(row.id, token) }
+    : { kind: 'digital', doc: await fetchDigitalForm(row.id, token) }))
+  const confirmDelete = () => {
+    if (!deleting || busy) return
+    run(async () => {
+      await deleteSavedForm(deleting, token)
+      deleted.current.add(`${deleting.type}:${deleting.id}`)
+      savedHere.current.delete(`${deleting.type}:${deleting.id}`)
+      setList(rows => rows?.filter(row => row.type !== deleting.type || row.id !== deleting.id) ?? null)
+      setDeleting(null)
+      setView({ kind: 'list' })
+      return 'Form deleted.'
+    })
+  }
   const back = () => {
     setView({ kind: 'list' })
     refresh()
@@ -113,10 +142,10 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
-        <h1 className="text-2xl font-bold text-gray-900">Employee write-ups</h1>
-        <div className="flex gap-2">
+        <h2 className="text-2xl font-bold text-gray-900">{view.kind === 'new' ? `New ${view.type === 'write-up' ? 'write-up' : DIGITAL_FORMS[view.type].title.toLowerCase()}` : 'Digital forms'}</h2>
+        <div className="flex flex-wrap gap-2">
           {view.kind !== 'list' && (
-            <button type="button" onClick={back} className={secondary}>
+            <button type="button" disabled={busy} onClick={back} className={secondary}>
               Back to list
             </button>
           )}
@@ -125,11 +154,9 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
               Print
             </button>
           )}
-          {view.kind === 'list' && (
-            <button type="button" onClick={() => setView({ kind: 'new' })} className={primary}>
-              New write-up
-            </button>
-          )}
+          {(view.kind === 'saved' || view.kind === 'digital') && <button type="button" disabled={busy} className={secondary} onClick={() => { setStatus(''); setDeleting(view.kind === 'saved'
+            ? { type: 'write-up', id: view.doc.id, date: view.doc.form.date, employee: view.doc.form.employee, label: view.doc.label }
+            : { type: view.doc.type, id: view.doc.id, date: view.doc.form.date, employee: digitalFormPerson(view.doc.type, view.doc.form), label: view.doc.label }); }}>Delete form</button>}
         </div>
       </div>
       {status && !(view.kind === 'list' && loadFailed) && (
@@ -138,8 +165,24 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
         </p>
       )}
 
-      {view.kind === 'list' && <SavedFormsList list={list} failed={loadFailed} busy={busy} onOpen={open} onRetry={refresh} />}
-      {view.kind === 'new' && (
+      {view.kind === 'list' && <>
+        <section aria-label="Create a form" className="mb-8 print:hidden">
+          <p className="mb-3 text-sm text-gray-600">Create a digital form, review it, then save and print it. Saved forms are available to managers on any device.</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {SAVED_FORM_TYPES.map(type => <button key={type} type="button" disabled={busy} onClick={() => { setStatus(''); setView({ kind: 'new', type }) }} className={`${secondary} text-left`}>New {type === 'write-up' ? 'write-up' : DIGITAL_FORMS[type].title.toLowerCase()}</button>)}
+          </div>
+        </section>
+        <SavedFormsList list={list} failed={loadFailed} busy={busy} onOpen={open} onRetry={refresh} onDelete={row => { setStatus(''); setDeleting(row) }} />
+      </>}
+      {view.kind === 'new' && view.type !== 'write-up' && <NewDigitalForm key={view.type} type={view.type} busy={busy} onSave={(form, markSaved) => run(async () => {
+        if (view.type === 'write-up') return
+        const doc = await saveDigitalForm(view.type, form, token)
+        markSaved(doc.id)
+        remember({ type: doc.type, id: doc.id, date: doc.form.date, employee: digitalFormPerson(doc.type, doc.form), store: doc.form.store, label: doc.label })
+        setView({ kind: 'digital', doc })
+        return 'Saved.'
+      })} />}
+      {view.kind === 'new' && view.type === 'write-up' && (
         <FormDraftWorkspace formType="write-up" title="formDrafts.writeUpTitle" createForm={emptyForm} validateForm={isWriteUpDraft}>
           {editor => (
             <NewWriteUp
@@ -150,6 +193,7 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
                 run(async () => {
                   const id = await saveWriteUp(form, token)
                   editor.markSaved(id)
+                  remember({ type: 'write-up', id, date: form.date, employee: form.employee, label: '' })
                   setView({ kind: 'saved', doc: await fetchWriteUp(id, token) })
                   return 'Saved.'
                 })
@@ -167,6 +211,7 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
             onSave={label =>
               run(async () => {
                 await saveWriteUpLabel(view.doc.id, label, token)
+                remember({ type: 'write-up', id: view.doc.id, date: view.doc.form.date, employee: view.doc.form.employee, label })
                 setView({ kind: 'saved', doc: { ...view.doc, label } })
                 return 'Label saved.'
               })
@@ -175,14 +220,47 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
           <PaperForm form={view.doc.form} />
         </>
       )}
+      {view.kind === 'digital' && <>
+        <LabelEditor key={view.doc.id} doc={view.doc} busy={busy} onSave={label => run(async () => {
+          const doc = await saveDigitalFormLabel(view.doc.id, label, token)
+          remember({ type: doc.type, id: doc.id, date: doc.form.date, employee: digitalFormPerson(doc.type, doc.form), store: doc.form.store, label: doc.label })
+          setView({ kind: 'digital', doc })
+          return 'Label saved.'
+        })} />
+        <DigitalPaperForm type={view.doc.type} form={view.doc.form} />
+      </>}
+      {deleting && <DeleteFormDialog row={deleting} busy={busy} error={status} onCancel={() => { setDeleting(null); setStatus('') }} onConfirm={confirmDelete} />}
     </div>
+  )
+}
+
+function DeleteFormDialog({ row, busy, error, onCancel, onConfirm }: { row: SavedFormRow; busy: boolean; error: string; onCancel: () => void; onConfirm: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null)
+  const { t } = useInternalLanguage()
+  useEffect(() => {
+    const element = dialog.current!
+    element.showModal()
+    return () => element.close()
+  }, [])
+  return (
+    <dialog ref={dialog} aria-labelledby="delete-form-title" aria-describedby="delete-form-description" onCancel={e => { e.preventDefault(); if (!busy) onCancel() }} className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl border border-gray-300 bg-white p-6 shadow-xl backdrop:bg-black/40 print:hidden">
+      <h2 id="delete-form-title" className="mb-3 text-xl font-bold text-gray-900">{t('forms.deleteTitle')}</h2>
+      <p className="mb-2 break-words text-gray-900">{t(`forms.type.${row.type}`)} · {row.employee} · {row.date}{row.store && ` · ${row.store}`}</p>
+      {row.label && <p className="mb-2 break-words text-sm text-gray-700">{row.label}</p>}
+      <p id="delete-form-description" className="text-sm text-gray-700">{t('forms.deleteDescription')}</p>
+      {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
+      <div className="mt-5 flex justify-end gap-3">
+        <button type="button" autoFocus disabled={busy} onClick={onCancel} className={secondary}>{t('feedback.cancel')}</button>
+        <button type="button" disabled={busy} onClick={onConfirm} className={primary}>{busy ? t('common.loading') : t('forms.delete')}</button>
+      </div>
+    </dialog>
   )
 }
 
 const field = 'mt-1 block w-full min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base font-normal text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
 
 /** Search/filter over the saved list; `list` null with `failed` means the last load did not arrive. */
-function SavedFormsList({ list, failed, busy, onOpen, onRetry }: { list: SavedFormRow[] | null; failed: boolean; busy: boolean; onOpen: (row: SavedFormRow) => void; onRetry: () => void }) {
+function SavedFormsList({ list, failed, busy, onOpen, onRetry, onDelete }: { list: SavedFormRow[] | null; failed: boolean; busy: boolean; onOpen: (row: SavedFormRow) => void; onRetry: () => void; onDelete: (row: SavedFormRow) => void }) {
   const { t } = useInternalLanguage()
   const [filter, setFilter] = useState<SavedFormFilter>(NO_FILTER)
   const set = (patch: Partial<SavedFormFilter>) => setFilter(f => ({ ...f, ...patch }))
@@ -231,20 +309,23 @@ function SavedFormsList({ list, failed, busy, onOpen, onRetry }: { list: SavedFo
               <th className="px-3 py-2 font-medium hidden sm:table-cell">{t('forms.colType')}</th>
               <th className="px-3 py-2 font-medium">{t('forms.colEmployee')}</th>
               <th className="px-3 py-2 font-medium hidden sm:table-cell">{t('forms.colLabel')}</th>
-              <th className="px-3 py-2"><span className="sr-only">{t('forms.open')}</span></th>
+              <th className="px-3 py-2"><span className="sr-only">{t('forms.open')} / {t('forms.delete')}</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {shown.map(row => (
               <tr key={`${row.type}:${row.id}`}>
-                <td className="px-3 py-2 tabular-nums whitespace-nowrap">{row.date}<span className="block text-sm text-gray-600 sm:hidden">{t(`forms.type.${row.type}`)}</span></td>
+                <td className="px-2 py-2 tabular-nums whitespace-nowrap text-sm sm:px-3">{row.date}<span className="block max-w-28 whitespace-normal text-sm text-gray-600 sm:hidden">{t(`forms.type.${row.type}`)}</span>{row.store && <span className="block text-sm text-gray-600">{row.store}</span>}</td>
                 <td className="px-3 py-2 hidden sm:table-cell">{t(`forms.type.${row.type}`)}</td>
-                <td className="px-3 py-2 break-words">{row.employee}<span className="block text-sm text-gray-600 sm:hidden">{row.label}</span></td>
-                <td className="px-3 py-2 text-gray-700 hidden sm:table-cell">{row.label}</td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-2 py-2 [overflow-wrap:anywhere] sm:px-3">{row.employee}<span className="block text-sm text-gray-600 sm:hidden">{row.label}</span></td>
+                <td className="px-3 py-2 text-gray-700 hidden sm:table-cell [overflow-wrap:anywhere]">{row.label}</td>
+                <td className="px-2 py-2 text-right sm:px-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:justify-end">
                   <button type="button" disabled={busy} onClick={() => onOpen(row)}
                     aria-label={t('forms.openNamed', { type: t(`forms.type.${row.type}`), employee: row.employee, date: row.date })}
                     className={secondary}>{t('forms.open')}</button>
+                  <button type="button" disabled={busy} onClick={() => onDelete(row)} aria-label={t('forms.deleteNamed', { type: t(`forms.type.${row.type}`), employee: row.employee, date: row.date })} className={`${button} text-red-700 hover:bg-red-50`}>{t('forms.delete')}</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -292,7 +373,7 @@ function NewWriteUp({ editor, busy, onSave }: { editor: FormEditorProps<WriteUpF
   )
 }
 
-function LabelEditor({ doc, busy, onSave }: { doc: WriteUpDoc; busy: boolean; onSave: (label: string) => void }) {
+function LabelEditor({ doc, busy, onSave }: { doc: Pick<WriteUpDoc, 'label' | 'createdAt' | 'labelUpdatedAt'>; busy: boolean; onSave: (label: string) => void }) {
   const [label, setLabel] = useState(doc.label)
   return (
     <form

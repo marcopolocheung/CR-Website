@@ -2,7 +2,7 @@
   "$schema": "../node_modules/wrangler/config-schema.json",
   // Simulation only. These names identify local resources, not Cloudflare IDs.
   "name": "chinarose-internal-local",
-  "main": "src/index.ts",
+  "main": "src/entry.ts",
   "compatibility_date": "2026-09-01",
   "workers_dev": false,
   "kv_namespaces": [{ "binding": "SCHEDULES", "id": "local-schedules", "remote": false }],

@@ -41,7 +41,7 @@ export function formDraftValidator<F>(validForm: (value: unknown) => value is F)
 export default function FormDraftWorkspace<F extends Json>({ formType, title, createForm, validateForm, children }: {
   formType: string
   title: TranslationKey
-  createForm: (date: string) => F
+  createForm: (date: string, context: { store: CashoutStore; preparer: string }) => F
   validateForm: (value: unknown) => value is F
   children: (props: FormEditorProps<F>) => React.ReactNode
 }) {
@@ -149,7 +149,7 @@ export default function FormDraftWorkspace<F extends Json>({ formType, title, cr
       </div>
       {storageFailed && <p role="alert" className="my-3 text-sm text-red-700">{t('drafts.storageUnavailable')}</p>}
       {context
-        ? <DraftChooser context={context} preparer={preparer} createPayload={() => ({ form: createForm(context.businessDate!), savedId: null })} validate={validate} onOpen={open} />
+        ? <DraftChooser context={context} preparer={preparer} createPayload={() => ({ form: createForm(context.businessDate!, { store, preparer }), savedId: null })} validate={validate} onOpen={open} />
         : <p className="my-3 text-sm text-gray-700">{t('imports.pickDate')}</p>}
     </section>
   )

@@ -4,9 +4,11 @@ import { publishedHours, weeksInPeriod } from '../../src/lib/converter/published
 import type { WeeklyStaffingTemplate } from '../../src/lib/scheduler/types'
 import { historyPage, historyRecord, saveHistory } from './import-history'
 import { directoryRecord, saveDirectory } from './import-directory'
+import { digitalFormPerson, isDigitalForm, isDigitalFormType, type DigitalFormDoc } from '../../src/lib/digital-forms'
 interface KVNamespace {
   get(key: string): Promise<string | null>
   put(key: string, value: string, options?: { expirationTtl?: number; metadata?: unknown }): Promise<void>
+  delete(key: string): Promise<void>
   list(options: { prefix: string; cursor?: string }): Promise<{
     keys: { name: string; metadata?: unknown }[]
     list_complete: boolean
@@ -1082,7 +1084,7 @@ export default {
         status: 204,
         headers: {
           ...corsHeaders(request, env),
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
           'Access-Control-Max-Age': '86400',
         },
@@ -1290,12 +1292,63 @@ export default {
       return json({ updatedAt: doc.updatedAt }, 200, request, env)
     }
 
+    // New saved form types share one namespace and schema. No TTL; metadata is the only list index.
+    const formsMatch = path.match(/^\/api\/forms(?:\/([A-Za-z0-9_-]{10})(\/label)?)?$/)
+    if (formsMatch) {
+      const [, id, labelPath] = formsMatch
+      const route = !id ? `${request.method} list` : labelPath ? `${request.method} label` : `${request.method} one`
+      if (!['GET list', 'POST list', 'GET one', 'PUT label', 'DELETE one'].includes(route)) return json({ error: 'not_found' }, 404, request, env)
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (route === 'GET list') {
+        const forms: { id: string; type: string; date: string; employee: string; label: string; store: string }[] = []
+        let cursor: string | undefined
+        do {
+          const page = await env.SCHEDULES.list({ prefix: 'form:', cursor })
+          for (const key of page.keys) {
+            const meta = key.metadata as Omit<(typeof forms)[number], 'id'> | undefined
+            if (meta && isDigitalFormType(meta.type)) forms.push({ ...meta, id: key.name.slice('form:'.length) })
+          }
+          cursor = page.list_complete ? undefined : page.cursor
+        } while (cursor)
+        forms.sort((a, b) => b.date.localeCompare(a.date) || a.employee.localeCompare(b.employee))
+        return json({ forms }, 200, request, env, noStore)
+      }
+      const key = id ? `form:${id}` : ''
+      const existing = id ? safeParse((await env.SCHEDULES.get(key)) ?? '') as DigitalFormDoc | null : null
+      if (id && !existing) return json({ error: 'not_found' }, 404, request, env, noStore)
+      if (route === 'GET one') return json(existing, 200, request, env, noStore)
+      if (!(await checkWriteThrottle(env, clientIp(request)))) return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
+      if (route === 'DELETE one') {
+        // Deleting the KV key removes both the document and its list metadata.
+        await env.SCHEDULES.delete(key)
+        return json({ deleted: true }, 200, request, env, noStore)
+      }
+      let body: unknown
+      try { body = await readBody(request) } catch { return json({ error: 'body_too_large' }, 413, request, env) }
+      const now = new Date().toISOString()
+      let doc: DigitalFormDoc
+      if (route === 'POST list') {
+        const input = body as { type?: unknown; form?: unknown } | null
+        if (!input || !isDigitalFormType(input.type) || !isDigitalForm(input.form, input.type, true)) return json({ error: 'invalid_body' }, 400, request, env)
+        doc = { v: 1, id: newShareId(), type: input.type, form: input.form, label: '', createdAt: now, labelUpdatedAt: null }
+      } else {
+        const label = validateWriteUpLabel(body)
+        if (label === null) return json({ error: 'invalid_body' }, 400, request, env)
+        doc = { ...existing!, label, labelUpdatedAt: now }
+      }
+      const metadata = { type: doc.type, date: doc.form.date, employee: digitalFormPerson(doc.type, doc.form), label: doc.label, store: doc.form.store }
+      await env.SCHEDULES.put(`form:${doc.id}`, JSON.stringify(doc), { metadata })
+      return json(doc, route === 'POST list' ? 201 : 200, request, env, noStore)
+    }
+
     // Employee write-ups: manager token for reads and writes. The form is fixed once saved; only the label changes.
     const writeUpMatch = path.match(/^\/api\/writeups(?:\/([A-Za-z0-9_-]{10})(\/label)?)?$/)
     if (writeUpMatch) {
       const [, id, labelPath] = writeUpMatch
       const route = !id ? `${request.method} list` : labelPath ? `${request.method} label` : `${request.method} one`
-      if (!['GET list', 'POST list', 'GET one', 'PUT label'].includes(route)) return json({ error: 'not_found' }, 404, request, env)
+      if (!['GET list', 'POST list', 'GET one', 'PUT label', 'DELETE one'].includes(route)) return json({ error: 'not_found' }, 404, request, env)
       const denied = await managerAuthError(request, env)
       if (denied) return denied
       const noStore = { 'Cache-Control': 'no-store' }
@@ -1308,6 +1361,11 @@ export default {
 
       if (!(await checkWriteThrottle(env, clientIp(request)))) {
         return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
+      }
+      if (route === 'DELETE one') {
+        if (!existing) return json({ error: 'not_found' }, 404, request, env, noStore)
+        await env.SCHEDULES.delete(writeUpKey(id))
+        return json({ deleted: true }, 200, request, env, noStore)
       }
       let body: unknown
       try {

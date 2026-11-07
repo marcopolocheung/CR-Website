@@ -1,5 +1,5 @@
 name = "chinarose-schedule-api"
-main = "src/index.ts"
+main = "src/entry.ts"
 compatibility_date = "2026-09-01"
 
 [[kv_namespaces]]

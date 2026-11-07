@@ -40,12 +40,22 @@ Plus two more stores, keyed separately per station:
   expire after 31 days; last save wins.
 
 - Employee write-ups (`/api/writeups`): one record per write-up
-  (`writeup:{id}`), entered on `/internal/write-ups`. `GET /api/writeups` lists
+  (`writeup:{id}`), entered on `/internal/forms`. `GET /api/writeups` lists
   them by date (newest first) then employee, `POST /api/writeups` saves a new
   one, `GET /api/writeups/{id}` reads one, and `PUT /api/writeups/{id}/label`
-  rewrites its manager label. The form itself is never edited after saving.
+  rewrites its manager label. `DELETE /api/writeups/{id}` removes the
+  record and its list metadata. The form itself is never edited after saving.
   Reads AND writes need the manager token. Records never expire. The list row
   (date, employee, label) is kept as KV key metadata so listing needs no reads.
+
+- Digital injury reports, customer complaints, payroll change requests, and pay
+  rate increase applications (`/api/forms`): one versioned record at `form:{id}`
+  in the same KV binding, with type-specific validated answers and summary
+  metadata. `GET /api/forms` lists, `POST /api/forms` creates, `GET /api/forms/{id}`
+  reads, `PUT /api/forms/{id}/label` labels, and `DELETE /api/forms/{id}` deletes
+  the document and its list metadata. Answers are immutable, records do not expire,
+  and all endpoints require the manager token. No D1 migration is required.
+  Deploy these endpoints before the updated forms frontend.
 
 Stations: `CR3-diningroom` (default, owns pre-partition legacy data),
 `CR3-kitchen`, `CR2-kitchen`, `CR2-diningroom`. Omit `?restaurant=` to read the
@@ -111,9 +121,13 @@ memory for that page view.
 ## Regenerating dashboard.js after editing the TypeScript source
 
 ```sh
-npx tsc worker/src/index.ts --outDir /tmp/opencode/worker-out --target es2022 --module esnext --moduleResolution bundler --skipLibCheck
-cp /tmp/opencode/worker-out/index.js worker/dashboard.js
+npm run worker:build
 ```
+
+This bundles the shared form definitions and other imported modules using the
+pinned Wrangler dependency. `worker/src/entry.ts` exposes only the default
+handler; `index.ts` also exports constants and helpers for tests, which cannot
+be exposed as workerd service exports. The dashboard file has no external imports.
 
 ## Deploy option B: wrangler
 

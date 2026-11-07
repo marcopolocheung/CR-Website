@@ -25,6 +25,7 @@ with sync_playwright() as p:
         if req.headers.get('authorization') != 'Bearer ' + TOKEN or not mode['auth']:
             return route.fulfill(status=401, json={'error': 'unauthorized'}, headers=headers)
         path = urlparse(req.url).path
+        if path == '/api/forms' and req.method == 'GET': return route.fulfill(status=200, json={'forms': []}, headers=headers)
         if path == '/api/auth/verify': return route.fulfill(status=200, json={'ok': True}, headers=headers)
         if path == '/api/writeups' and req.method == 'GET':
             rows = [{'id': i, 'date': d['form']['date'], 'employee': d['form']['employee'], 'label': d['label']} for i, d in saved.items()]

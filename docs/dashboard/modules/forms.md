@@ -1,53 +1,69 @@
-# Forms and write-ups
+# Forms
 
-`/internal/forms` — `src/app/(order-shell)/internal/forms/page.tsx` (blank forms list), `WriteUps.tsx`, `src/lib/writeup-store.ts`. Files: `public/internal/forms/`, sources in `docs/forms/`.
+`/internal/forms` provides digital records and the original eleven blank downloads.
+The manager code unlocks a single searchable saved-forms table and five creation
+buttons: employee write-up, injury report, customer complaint, payroll change
+request, and pay rate increase application.
 
-## Job
+## Digital workflow
 
-Give managers the right paper form fast, and keep a reliable record of the ones that are HR events (write-ups, deductions, injuries, complaints).
+1. Choose a form, store, form date, and preparer. Start a draft or resume a device copy.
+2. Complete the form. Drafts save on the device while typing, scoped by form type,
+   store, and date; the manager credential stays in memory.
+3. For the four new types, review the completed answers and choose **Save form**.
+   This creates a permanent server record. Existing write-up saving remains compatible.
+4. Open saved records to read or print them and update their manager-only label.
+   Form answers are immutable. Print for any required handwritten signatures.
+5. Use **Delete** on any table row or **Delete form** in an opened record. The
+   confirmation identifies the form, person, and date. A successful deletion
+   removes the document and the metadata used by every saved-forms list. Errors
+   keep the record visible and allow retry; cancel and Escape do not delete it.
 
-## What exists
+Search matches person, label, or store; type and date filters apply across all
+five types. Complaints can be anonymous, and injury reports can describe an
+employee, customer, or other injured person. Empty lists, no matches, loading,
+and failed loads have distinct states. Device drafts and downloaded or printed
+copies are separate from saved server records, as the deletion dialog explains.
 
-- A list of 11 blank forms (download/print).
-- **Write-ups** rebuilt on screen to match the paper form exactly (two printed pages), saved to the Worker, **uneditable after saving** (only a manager label can change), listed by date/employee. That immutability is the right call for a disciplinary record.
+## Storage and compatibility
 
-## Each paper form: what it should become
+- Existing write-ups retain their `/api/writeups` endpoints and `writeup:{id}` KV
+  records. No migration or rewrite is necessary; DELETE is additive.
+- New records use `/api/forms` and `form:{id}` in the existing `SCHEDULES` KV
+  binding. A versioned document contains its type, form date, store, preparer,
+  answers, manager label, and timestamps. There is no expiration.
+- Key metadata contains only the list summary (type, date, person, store, label).
+  There is no second table or separate index to leave behind when deleting.
+  Lists paginate through KV; the browser merges them with write-up summaries
+  and orders by date, newest first, then person.
+- Reads, creates, label changes, and deletes all require the manager token.
+  Mutations use the existing rate limit. Shared field definitions validate both
+  editor payloads and Worker writes, including required fields, calendar dates,
+  money, and checkbox choices. Unknown fields and credentials are rejected.
+- Injury, complaint, and payroll fields follow the original templates. Pay rate
+  applications use an employee number; SSNs are deliberately not collected.
+  These saved requests do not automatically apply changes to payroll.
+- KV list propagation can briefly lag writes. This is the same storage model as
+  write-ups; the page keeps confirmed saves/labels visible and suppresses successfully
+  deleted rows for the current session.
 
-| Form | Today | Should be | Why |
-|---|---|---|---|
-| **Daily cash difference record** | Blank xlsx | **Retire**: the cash-out screen produces every field. Replace the download with "Use Cash out instead → [Open]", plus a monthly export in this layout (cash.md) | Duplicate data entry |
-| **CR3 inventory list** | Blank xlsx | **Retire** in favor of the inventory screen, keep "Print blank sheet" there | Same |
-| **Employee write-up** | Screen + saved | Keep. Add a **check-your-answers step** before the final save ("This can't be edited after saving"), a per-employee history ("3rd write-up for Ana this year"), and employee/manager sign on paper after printing | Permanent record. History is what makes progressive discipline consistent |
-| **Paycheck deduction approval** (drawer short) | Blank docx | **Fill-and-print** from cash history: name, date, amount pre-filled, printed for signatures. Never stored as a deduction instruction. See research.md §6 on written authorization and minimum wage limits **(verify)** | The signature is the legal requirement; pre-filling removes errors |
-| **Customer complaint** | Blank xlsx | **Screen form, saved** (location, date, shift, type checkboxes exactly as the paper: customer service / food quality / quantity / others, comments, shift manager). Then a monthly count by type on the home or cash page | Complaint *patterns* ("rice too hard ×6 in Oct") are only visible if they're data. The form is all checkboxes, so it's ideal to digitize |
-| **Injury report** | Blank PDF | Keep paper (signatures, may go to insurer/workers' comp). Add a one-line "log" (date, employee, kept where) so the GM knows one exists | Sensitive medical data stays off KV |
-| **Payroll change request** | Blank PDF | Keep paper, or a fill-and-print screen | Goes to payroll provider |
-| **Pay rate increase application** | Blank xlsx (CR2/CR3 sheets) | Fill-and-print screen; **never store SSN** (the form asks for it) | Sensitive |
-| **Hiring application** | Blank xlsx | Keep paper for now. Before digitizing, review questions (SSN, felony, medical history before an offer) with someone who knows employment law **(verify)**. A careers page already exists on the public site | Legal exposure |
-| **New hire packet** | PDF | Keep. Later: a checklist per new hire (I-9, W-4, food handler card, uniform) with ✓ per item | Onboarding checklists are a core feature of Homebase/7shifts **(verify)** |
-| **CR3 daily preparation list** | Blank xlsx | **Next screen to build after complaints**: same shape as inventory (ITEM, S.L. = par, INV, TO DO; units T/BU/BA/CS). Reuse the inventory components with a different item list and "TO DO" in place of "ORDER" | Daily task, same mental model as inventory, high reuse |
+No new database binding, dependency, or migration is needed. Deploy the Worker
+before the frontend so `/api/forms` and DELETE exist when the new page loads.
+Use `npm run worker:build` to regenerate the self-contained dashboard paste file.
+The Worker entry module exports only the handler; test helpers stay in `index.ts`.
 
-## Ideal page
+## Implementation and verification
 
-```
-Forms
-  On screen (saved)
-    Employee write-ups           3 this month     [Open]
-    Customer complaints          6 this month     [New] [Open]
-  Fill in and print
-    Paycheck deduction approval                   [Fill in]
-    Pay rate increase                             [Fill in]
-  Blank paper forms
-    Injury report · Payroll change · Hiring application · New hire packet   [PDF] [XLSX]
-  Moved to a screen
-    Daily cash difference → Cash out · Inventory list → Inventory · Prep list → Prep
-```
+- `src/components/internal/WriteUps.tsx`: manager gate, merged table, existing
+  write-up editor, label editing, and deletion confirmation.
+- `src/components/internal/DigitalForm.tsx`, `src/lib/digital-forms.ts`: shared
+  four-type schemas, editable/review/print views, and draft validation.
+- `src/components/internal/FormDraftWorkspace.tsx`: reusable device draft workflow.
+- `src/lib/digital-form-store.ts`, `worker/src/index.ts`: authenticated persistence.
 
-- **Write-ups move to their own page** (`/internal/forms/write-ups`), not below the blank-forms list with a second code gate on the same page.
-- Icons + file type words ("PDF · opens in browser", "Excel · downloads") instead of bare `XLSX`.
-
-## Why
-
-- Every paper form that duplicates a screen is a chance for the two to disagree. Retire it, and point people to the screen.
-- Forms that are mostly checkboxes (complaints) are the cheapest to digitize and the most valuable as data.
-- Forms with signatures and sensitive personal data stay on paper. That's safer and legally simpler. Fill-and-print removes the handwriting errors without storing the data.
+Run `npm run forms:test`, `node --import jiti/register --test worker/src/index.test.ts`,
+`npx tsc --noEmit`, `npm run worker:build`, `npm run build`, and `npm run seo:check`.
+`scripts/test-digital-forms.py` exercises the complete local browser/Worker flow
+with synthetic data, including reload/resume, review, print, labels, all five
+kinds of deletion, cancellation, failed deletion/retry, and mobile widths.
+The existing forms list, compatibility, and draft browser scripts remain valid.

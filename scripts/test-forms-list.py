@@ -31,6 +31,7 @@ with sync_playwright() as p:
         if req.method == 'OPTIONS': return route.fulfill(status=204, headers=headers)
         if req.headers.get('authorization') != 'Bearer ' + TOKEN: return route.fulfill(status=401, json={'error': 'unauthorized'}, headers=headers)
         path = urlparse(req.url).path
+        if path == '/api/forms' and req.method == 'GET': return route.fulfill(status=200, json={'forms': []}, headers=headers)
         if path == '/api/auth/verify': return route.fulfill(status=200, json={'ok': True}, headers=headers)
         if path == '/api/writeups':
             if mode['fail']: return route.abort('failed')
@@ -55,7 +56,7 @@ with sync_playwright() as p:
     # Scenario 1: filters by employee, label, type and date keep labels and server order.
     context, page = session({'width': 768, 'height': 1024}, True)
     assert employees(page) == ['Dana', 'Ana López', 'Carl', 'Ana López']
-    search = page.get_by_label('Search employee or label', exact=True)
+    search = page.get_by_label('Search name, label or store', exact=True)
     search.fill('ana lopez')
     expect(page.get_by_text('Showing 2 of 4')).to_be_visible()
     assert employees(page) == ['Ana López', 'Ana López']
