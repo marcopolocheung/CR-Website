@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
+import Link from 'next/link'
 import {
   calculateScheduleStats,
   defaultRoleForRestaurant,
@@ -1572,9 +1573,20 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2 text-sm text-zinc-700 print:hidden">
-              <span>Classic layout: {layout === 'classic' ? 'On' : 'Off'}</span>
-              <FlipSwitch on={layout === 'classic'} onFlip={toggleLayout} label="Use the classic layout" />
+            <div className="flex flex-wrap items-center gap-3 print:hidden">
+              <Link
+                href={restaurantId ? `/schedule/${restaurantId}` : '/schedule'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+                title="View the published staff schedule in a new tab"
+              >
+                View schedule<span className="sr-only"> (opens in a new tab)</span>
+              </Link>
+              <div className="flex items-center gap-2 text-sm text-zinc-700">
+                <span>Classic layout: {layout === 'classic' ? 'On' : 'Off'}</span>
+                <FlipSwitch on={layout === 'classic'} onFlip={toggleLayout} label="Use the classic layout" />
+              </div>
             </div>
           </div>
         </div>
