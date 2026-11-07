@@ -11,6 +11,7 @@ import {
 } from '@/lib/schedule-store'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeekStatus } from '@/lib/scheduler'
 import { formatUpdatedAt } from '@/lib/scheduler/time'
+import { validateSchedule } from '@/lib/scheduler/validator'
 import { useManagerCode } from './DemoGate'
 
 const scheduleChannelName = 'chinarose-schedule'
@@ -68,6 +69,13 @@ export default function PublishPanel({
   const [notice, setNotice] = useState('')
   const [scheduleUrl, setScheduleUrl] = useState('')
   const filled = assignments.filter((assignment) => assignment.employeeId).length
+  const qualificationViolations = useMemo(
+    () => validateSchedule({ employees, slots, assignments, requireCoverage: false })
+      .filter((violation) => violation.code === 'unqualified_employee'),
+    [employees, slots, assignments],
+  )
+  // Hiding an existing week must remain possible even when its assignments need fixing.
+  const qualificationBlocked = visible && qualificationViolations.length > 0
 
   useEffect(() => {
     const base = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
@@ -118,7 +126,7 @@ export default function PublishPanel({
   }, [weekStart, weekLabel, restaurantId])
 
   async function publish() {
-    if (filled === 0 || busy) return
+    if (filled === 0 || busy || qualificationBlocked) return
     setBusy(true)
     setError('')
     setNotice('')
@@ -220,7 +228,7 @@ export default function PublishPanel({
           type="button"
           className="inline-flex items-center justify-center gap-2 rounded bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={publish}
-          disabled={busy || loading || !dirty || filled === 0}
+          disabled={busy || loading || !dirty || filled === 0 || qualificationBlocked}
         >
           {busy ? 'Publishing…' : baseRev === null ? 'Publish' : 'Publish updates'}
         </button>
@@ -232,6 +240,14 @@ export default function PublishPanel({
           <span className="text-sm text-zinc-600">Not on the server yet — publishing creates it.</span>
         )}
       </div>
+      {qualificationBlocked && (
+        <div role="alert" className="mt-2 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+          <p className="font-semibold">Fix these position assignments before publishing:</p>
+          <ul className="mt-1 list-disc pl-5">
+            {qualificationViolations.map((violation) => <li key={violation.slotId}>{violation.message}</li>)}
+          </ul>
+        </div>
+      )}
       {filled === 0 && <p className="mt-2 text-sm text-zinc-600">Make a schedule for this week first.</p>}
       {loading && <p className="mt-2 text-sm text-zinc-600">Checking what is on the server...</p>}
       {error && <p className="mt-2 text-sm font-medium text-red-800">{error}</p>}

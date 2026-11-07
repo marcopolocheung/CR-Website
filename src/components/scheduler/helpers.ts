@@ -679,15 +679,24 @@ export function buildMovePreview({
     slots,
     assignments: proposeMovedAssignments(move, assignments, targetSlotId),
     requireCoverage: false,
-  }).filter((violation) => violation.slotId === targetSlotId || violation.employeeId === move.employeeId)
+  }).filter((violation) =>
+    violation.slotId === targetSlotId ||
+    violation.slotId === move.fromSlotId ||
+    violation.employeeId === move.employeeId ||
+    (replacedEmployee !== undefined && violation.employeeId === replacedEmployee.id),
+  )
 
   if (moveViolations.length > 0) {
+    const violation = moveViolations[0]
+    const affectedEmployee = employees.find((candidate) => candidate.id === violation.employeeId) ?? employee
+    const affectedSlot = slots.find((slot) => slot.id === violation.slotId) ??
+      (affectedEmployee.id === replacedEmployee?.id ? sourceSlot : targetSlot) ?? targetSlot
     return {
       status: 'invalid',
       employeeName: employee.name,
       replacedName: replacedEmployee?.name,
       isEmptyTarget,
-      message: dragErrorMessage(employee, targetSlot, moveViolations, weekStart, slots),
+      message: dragErrorMessage(affectedEmployee, affectedSlot, moveViolations, weekStart, slots),
     }
   }
 

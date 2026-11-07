@@ -236,6 +236,63 @@ def check_mobile_kitchen(browser, url, artifacts):
     context.close()
 
 
+def check_qualification_publishing(browser, url):
+    context, page, store, errors = open_scheduler(browser, url, 'CR3-kitchen')
+    schedule = page.locator('#scheduler-panel-schedule')
+    settings = page.locator('#scheduler-panel-settings')
+    schedule.get_by_role('button', name='Make schedule', exact=True).click()
+    expect(schedule.get_by_role('button', name='Move Sample Employee out of', exact=False)).to_have_count(7)
+    schedule.get_by_role('button', name='Publish to staff', exact=True).first.click()
+    page.get_by_role('button', name='Publish', exact=True).click()
+    expect(page.get_by_text('Published. Staff now see this week.', exact=True)).to_be_visible()
+    page.get_by_role('button', name='Close', exact=True).click()
+
+    # A later crew edit can invalidate assignments already in a published week.
+    page.get_by_role('tab', name='Employee settings', exact=True).click()
+    settings.get_by_label('Staff password', exact=True).fill('fixture-password')
+    settings.get_by_role('button', name='Unlock editing', exact=True).click()
+    positions = settings.get_by_role('group', name='Positions Sample Employee can work')
+    expect(settings.get_by_label('New hire (any position, still limited by max days)', exact=True)).not_to_be_checked()
+    positions.get_by_label('Dishwasher', exact=True).check()
+    positions.get_by_label('Cook', exact=True).uncheck()
+    page.get_by_role('button', name='Back to schedule', exact=True).click()
+    schedule.get_by_role('button', name='Publish to staff', exact=True).first.click()
+    warning = page.get_by_role('alert').filter(has_text='Fix these position assignments before publishing:')
+    expect(warning).to_be_visible()
+    expect(warning.get_by_role('listitem')).to_have_count(7)
+    expect(warning).to_contain_text('Sample Employee is not qualified')
+    publish = page.get_by_role('button', name='Publish updates', exact=True)
+    expect(publish).to_be_disabled()
+    assert len(store.writes) == 1, 'Blocked publishing must not save crew, rules, or schedule'
+
+    # Managers can hide an incorrect week, but cannot turn it back on unchanged.
+    page.get_by_role('button', name='Off', exact=True).click()
+    expect(warning).not_to_be_visible()
+    expect(publish).to_be_enabled()
+    publish.click()
+    expect(page.get_by_text('Saved. This week stays hidden from staff until you turn it on.', exact=True)).to_be_visible()
+    published = [doc for key, doc in store.saved.items() if key[0].startswith('/api/schedule/')]
+    assert len(published) == 1 and published[0]['visible'] is False
+    page.get_by_role('button', name='On', exact=True).click()
+    expect(warning).to_be_visible()
+    expect(publish).to_be_disabled()
+    page.get_by_role('button', name='Close', exact=True).click()
+
+    # Restoring the qualification enables publishing the existing assignments.
+    page.get_by_role('tab', name='Employee settings', exact=True).click()
+    positions.get_by_label('Cook', exact=True).check()
+    page.get_by_role('button', name='Back to schedule', exact=True).click()
+    schedule.get_by_role('button', name='Publish to staff', exact=True).first.click()
+    expect(warning).not_to_be_visible()
+    expect(publish).to_be_enabled()
+    publish.click()
+    expect(page.get_by_text('Published. Staff now see this week.', exact=True)).to_be_visible()
+    published = [doc for key, doc in store.saved.items() if key[0].startswith('/api/schedule/')]
+    assert len(published) == 1 and published[0]['visible'] is True
+    assert not errors, errors
+    context.close()
+
+
 def check_new_layout(browser, url, artifacts):
     context, page, store, errors = open_scheduler(browser, url, 'CR3-diningroom', layout=None)
     schedule = page.locator('#scheduler-panel-schedule')
@@ -352,6 +409,7 @@ if __name__ == '__main__':
         browser = playwright.chromium.launch(headless=True)
         check_dining(browser, args.url.rstrip('/'), artifacts)
         check_mobile_kitchen(browser, args.url.rstrip('/'), artifacts)
+        check_qualification_publishing(browser, args.url.rstrip('/'))
         check_new_layout(browser, args.url.rstrip('/'), artifacts)
         browser.close()
     print(f'Scheduler view checks passed. Screenshots: {artifacts}')
