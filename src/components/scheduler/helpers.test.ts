@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { expandTemplate, seedTemplate } from '../../lib/scheduler/data'
 import { seedEmployees } from '../../lib/scheduler/seed-crews'
+import { validateSchedule, type Employee, type StaffingSlot } from '../../lib/scheduler'
 import { buildMovePreview, candidatesForSlot, createEmployeeId, layoutStorageKey, parseMaxHours, proposeMovedAssignments, readLayoutPreference, spotStatus, unassignableReason } from './helpers'
 
 const slots = expandTemplate(seedTemplate, '2026-10-11')
@@ -26,6 +27,68 @@ test('moving onto a filled spot swaps the two people and drops their Keep', () =
 test('moving onto an empty spot leaves the old spot empty', () => {
   const moved = proposeMovedAssignments({ employeeId: 'a', fromSlotId: first.id }, [{ slotId: first.id, employeeId: 'a' }], second.id)
   assert.deepEqual(moved, [{ slotId: second.id, employeeId: 'a' }])
+})
+
+function kitchenSwap(replacement: Partial<Employee> = {}, unrelatedIssue = false) {
+  const availability = { Sunday: [{ start: 540, end: 1380 }] }
+  const crew: Employee[] = [
+    { id: 'cook', name: 'Cook', roles: ['cook', 'dishwasher'], active: true, newHire: false, allowDoubles: false, recurringAvailability: availability },
+    { id: 'dishwasher', name: 'Dishwasher', roles: ['dishwasher'], active: true, newHire: false, allowDoubles: false, recurringAvailability: availability, ...replacement },
+  ]
+  const kitchenSlots: StaffingSlot[] = [
+    { id: 'cook-am', day: 'Sunday', period: 'AM', role: 'cook', label: 'Cook', start: 540, end: 960, required: true },
+    { id: 'dishwasher-pm', day: 'Sunday', period: 'PM', role: 'dishwasher', label: 'Dishwasher', start: 1020, end: 1380, required: true },
+  ]
+  const assignments = [
+    { slotId: 'cook-am', employeeId: 'cook' },
+    { slotId: 'dishwasher-pm', employeeId: 'dishwasher' },
+  ]
+  if (unrelatedIssue) {
+    crew.push({ ...crew[0], id: 'unrelated', name: 'Unrelated employee', roles: ['dishwasher'] })
+    kitchenSlots.push({ ...kitchenSlots[0], id: 'unrelated-cook', day: 'Monday' })
+    assignments.push({ slotId: 'unrelated-cook', employeeId: 'unrelated' })
+  }
+  const move = { employeeId: 'cook', fromSlotId: 'cook-am' }
+  return {
+    preview: buildMovePreview({
+      move, targetSlotId: 'dishwasher-pm', employees: crew, slots: kitchenSlots, assignments,
+      assignmentMap: new Map(assignments.map((assignment) => [assignment.slotId, assignment])), weekStart: '2026-11-01',
+    }),
+    violations: validateSchedule({ employees: crew, slots: kitchenSlots, assignments: proposeMovedAssignments(move, assignments, 'dishwasher-pm') }),
+  }
+}
+
+test('a swap rejects moving a dishwasher into the cook spot and names the dishwasher', () => {
+  const { preview, violations } = kitchenSwap()
+  assert.ok(violations.some((violation) => violation.code === 'unqualified_employee'))
+  assert.equal(preview?.status, 'invalid')
+  assert.match(preview?.message ?? '', /Dishwasher is not trained for Cook/)
+})
+
+test('a swap checks the replacement employee availability at the source spot', () => {
+  const { preview, violations } = kitchenSwap({ roles: ['cook', 'dishwasher'], recurringAvailability: { Sunday: [{ start: 1020, end: 1380 }] } })
+  assert.ok(violations.some((violation) => violation.code === 'unavailable_employee'))
+  assert.equal(preview?.status, 'invalid')
+  assert.match(preview?.message ?? '', /Dishwasher is not free/)
+})
+
+test('a swap checks the replacement employee weekly limits', () => {
+  const { preview, violations } = kitchenSwap({ roles: ['cook', 'dishwasher'], maxHoursPerWeek: 6 })
+  assert.ok(violations.some((violation) => violation.code === 'max_hours_exceeded'))
+  assert.equal(preview?.status, 'invalid')
+  assert.match(preview?.message ?? '', /Dishwasher is limited to 6 hours/)
+})
+
+test('a swap accepts two qualified available employees', () => {
+  const { preview, violations } = kitchenSwap({ roles: ['cook', 'dishwasher'] })
+  assert.deepEqual(violations, [])
+  assert.equal(preview?.status, 'valid')
+})
+
+test('unrelated existing issues do not block a valid swap', () => {
+  const { preview, violations } = kitchenSwap({ roles: ['cook', 'dishwasher'] }, true)
+  assert.ok(violations.some((violation) => violation.employeeId === 'unrelated'))
+  assert.equal(preview?.status, 'valid')
 })
 
 test('a person marked Keep cannot be moved', () => {
