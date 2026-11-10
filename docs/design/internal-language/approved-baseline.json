@@ -1,0 +1,58 @@
+{
+  "bankVersion": "1.0",
+  "approvedOn": "2026-11-10",
+  "approvalSource": "Owner conversation: preserve the selected design language as a design bank with examples and actual guidelines.",
+  "selection": {
+    "direction": "Night shift",
+    "depth": "Layered paper",
+    "accent": "Patina teal",
+    "htmlParameters": {
+      "depth": "paper",
+      "accent": "patina"
+    },
+    "navigation": {
+      "movingSurface": "single brand-red highlight",
+      "durationMs": 220,
+      "easing": "cubic-bezier(.22, 1, .36, 1)",
+      "reducedMotion": "no transition"
+    }
+  },
+  "guidelines": "guidelines.md",
+  "entryPoint": "README.md",
+  "interactiveExample": "reference.html?depth=paper&accent=patina",
+  "selectedPreviews": [
+    "previews/depth-paper.png",
+    "previews/depth-cash-phone.png",
+    "previews/navigation-hover.png"
+  ],
+  "workflowPlan": "../../internal-tools-overhaul/implementation-guide.md",
+  "applicationSourceContext": {
+    "originMainAtPlanning": "64ffc15c013c8e1cd9ca33e8d46efc5afccb2ec3",
+    "note": "Planning context only. The preserved local specimen assets are identified by their own hashes and are not claimed to exist in that commit."
+  },
+  "verification": {
+    "file": "verification.json",
+    "checkedAt": "2026-11-10T20:16:13.493Z",
+    "sourcesUnchangedAtPreservation": true,
+    "scope": "Prior local prototype checks with synthetic data. Preservation verified by SHA-256; no application implementation, staff evaluation, production save or full accessibility-conformance claim."
+  },
+  "hashAlgorithm": "SHA-256",
+  "files": {
+    "guidelines.md": "ca3a6f19332d153d7f20965c2f2c2b64c8d0f3229ce6d0abba74250a02a1104b",
+    "reference.html": "a824d02bdd7c04bbdb469a31121ece8ca2048da4f47e3ba330988d7a02fa9723",
+    "reference.css": "d8a72417761ef2cd747b593ea979356a12757d74038f1df4008e93de61482c7c",
+    "reference.js": "466cf079d9d7f7a74b945f268a2f223b5e745b32fcc87ef4dc0dfcbfb68c7ed3",
+    "tokens.css": "f7d67e75bc59dc5385de9e9bedc47ed2ba1b9a0e53b0440686db3655c2874f58",
+    "verification.json": "6a0965c44159d67cf2d068eac4982b70fda68971b6a41347f5f541e52759a305",
+    "references.json": "f4a27133d153e28f11d63d0235e32896bbf8a910bcdc3bb0f31a08af1696e690",
+    "fonts/manifest.json": "eeb44e26eac60186809ed0827acefc5cd9dec7bd55d0c3fee2e03d542f6a285b",
+    "fonts/archivo-variable.ttf": "0e094a7d3c7c4c25cf1310c4b30014f1dae9332220b1c2c88f4fa996f0b05053",
+    "fonts/archivo-OFL.txt": "108b4e57c9c796d3d38d0428ca7ee39de47ad93187302718d9b2d8864b9b716b",
+    "fonts/grenze-variable.ttf": "04afa4836bcd41e1ff9867a0dc27d628d31ddec618ec67715c526ebc3cae92f4",
+    "fonts/grenze-OFL.txt": "55a21d1fcebfa5e02100db3ae4dcff2658e9ba63e0b64149203bf6a9d645db86",
+    "previews/depth-paper.png": "e8000e7203bb9a1b05cc270bf0b0016b7d12dfde1365ac43b1b9657e3ca35b97",
+    "previews/depth-cash-phone.png": "743743764d4e9785d89e374190fcdaa0bc1d4ede9473dc768a8e88e2368b1b0f",
+    "previews/navigation-hover.png": "1626c30e74b155f97a18a8fbbda5cd4d5608a6b9b652512031494c86498ba968"
+  },
+  "revisionPolicy": "Update examples, guidelines and manifest together for an intentional design revision. Preserve the preceding approved version in version control or a dated archive."
+}

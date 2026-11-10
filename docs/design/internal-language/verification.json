@@ -1,0 +1,345 @@
+{
+  "version": "0.2",
+  "errors": [],
+  "externalRequests": [],
+  "reflow": [
+    {
+      "depth": "paper",
+      "accent": "patina",
+      "width": 320,
+      "scroll": 320,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "paper",
+      "accent": "patina",
+      "width": 375,
+      "scroll": 375,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "paper",
+      "accent": "patina",
+      "width": 768,
+      "scroll": 768,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "paper",
+      "accent": "patina",
+      "width": 1440,
+      "scroll": 1440,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "paper",
+      "accent": "ice",
+      "width": 320,
+      "scroll": 320,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "paper",
+      "accent": "ice",
+      "width": 375,
+      "scroll": 375,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "paper",
+      "accent": "ice",
+      "width": 768,
+      "scroll": 768,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "paper",
+      "accent": "ice",
+      "width": 1440,
+      "scroll": 1440,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "paper",
+      "accent": "citron",
+      "width": 320,
+      "scroll": 320,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "paper",
+      "accent": "citron",
+      "width": 375,
+      "scroll": 375,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "paper",
+      "accent": "citron",
+      "width": 768,
+      "scroll": 768,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "paper",
+      "accent": "citron",
+      "width": 1440,
+      "scroll": 1440,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "console",
+      "accent": "patina",
+      "width": 320,
+      "scroll": 320,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "console",
+      "accent": "patina",
+      "width": 375,
+      "scroll": 375,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "console",
+      "accent": "patina",
+      "width": 768,
+      "scroll": 768,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "console",
+      "accent": "patina",
+      "width": 1440,
+      "scroll": 1440,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "console",
+      "accent": "ice",
+      "width": 320,
+      "scroll": 320,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "console",
+      "accent": "ice",
+      "width": 375,
+      "scroll": 375,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "console",
+      "accent": "ice",
+      "width": 768,
+      "scroll": 768,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "console",
+      "accent": "ice",
+      "width": 1440,
+      "scroll": 1440,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "console",
+      "accent": "citron",
+      "width": 320,
+      "scroll": 320,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "console",
+      "accent": "citron",
+      "width": 375,
+      "scroll": 375,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "console",
+      "accent": "citron",
+      "width": 768,
+      "scroll": 768,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "console",
+      "accent": "citron",
+      "width": 1440,
+      "scroll": 1440,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "signal",
+      "accent": "patina",
+      "width": 320,
+      "scroll": 320,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "signal",
+      "accent": "patina",
+      "width": 375,
+      "scroll": 375,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "signal",
+      "accent": "patina",
+      "width": 768,
+      "scroll": 768,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "signal",
+      "accent": "patina",
+      "width": 1440,
+      "scroll": 1440,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "signal",
+      "accent": "ice",
+      "width": 320,
+      "scroll": 320,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "signal",
+      "accent": "ice",
+      "width": 375,
+      "scroll": 375,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "signal",
+      "accent": "ice",
+      "width": 768,
+      "scroll": 768,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "signal",
+      "accent": "ice",
+      "width": 1440,
+      "scroll": 1440,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "signal",
+      "accent": "citron",
+      "width": 320,
+      "scroll": 320,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "signal",
+      "accent": "citron",
+      "width": 375,
+      "scroll": 375,
+      "minButtonHeight": 48.390625
+    },
+    {
+      "depth": "signal",
+      "accent": "citron",
+      "width": 768,
+      "scroll": 768,
+      "minButtonHeight": 48
+    },
+    {
+      "depth": "signal",
+      "accent": "citron",
+      "width": 1440,
+      "scroll": 1440,
+      "minButtonHeight": 48
+    }
+  ],
+  "contrast": [
+    {
+      "accent": "patina",
+      "onBlack": "9.03:1 · normal text",
+      "onWhite": "6.91:1 · normal text"
+    },
+    {
+      "accent": "ice",
+      "onBlack": "10.43:1 · normal text",
+      "onWhite": "7.16:1 · normal text"
+    },
+    {
+      "accent": "citron",
+      "onBlack": "11.25:1 · normal text",
+      "onWhite": "6.62:1 · normal text"
+    }
+  ],
+  "interactions": [
+    "Keyboard depth tabs: arrows/Home/End",
+    "Synthetic arithmetic, validation and state preserved across depth/accent changes",
+    "Decoration toggle and large amount visibility at 320px"
+  ],
+  "scope": "Local document QA with synthetic state. No staff, screen-reader, production or full WCAG conformance claim.",
+  "fonts": {
+    "archivo": true,
+    "grenze": true
+  },
+  "largeAmounts": [
+    {
+      "text": "$99,900.00",
+      "width": 90,
+      "scroll": 90
+    },
+    {
+      "text": "$19,980.00",
+      "width": 90,
+      "scroll": 90
+    }
+  ],
+  "iconSymbols": 20,
+  "visibleIcons": 23,
+  "duplicateIds": [],
+  "missingIcons": [],
+  "reducedMotion": "0s",
+  "navigationMotion": {
+    "movingTransition": [
+      {
+        "property": "transform",
+        "duration": 220
+      }
+    ],
+    "desktop": {
+      "x": 10,
+      "y": 72,
+      "width": 137,
+      "height": 48,
+      "duration": "0.22s, 0.22s, 0.22s",
+      "selected": "Cash"
+    },
+    "phoneGrid": {
+      "x": 111,
+      "y": 76,
+      "width": 103,
+      "height": 68,
+      "duration": "0.22s, 0.22s, 0.22s",
+      "selected": "Cash"
+    },
+    "reducedMotionDuration": "0s",
+    "checks": [
+      "Single moving highlight on hover",
+      "Active view unchanged by hover",
+      "Restores selected item on pointer exit",
+      "Follows keyboard focus",
+      "Click selection restored",
+      "Aligned after phone-grid reflow",
+      "No transition with reduced motion"
+    ]
+  },
+  "checkedAt": "2026-11-10T20:16:13.493Z",
+  "browser": "156.0.8078.4",
+  "sourceDigests": {
+    "reference.html": "a824d02bdd7c04bbdb469a31121ece8ca2048da4f47e3ba330988d7a02fa9723",
+    "reference.css": "d8a72417761ef2cd747b593ea979356a12757d74038f1df4008e93de61482c7c",
+    "reference.js": "466cf079d9d7f7a74b945f268a2f223b5e745b32fcc87ef4dc0dfcbfb68c7ed3",
+    "tokens.css": "f7d67e75bc59dc5385de9e9bedc47ed2ba1b9a0e53b0440686db3655c2874f58"
+  }
+}

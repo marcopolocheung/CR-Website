@@ -1,35 +1,56 @@
 ---
 name: internal-dashboard
-description: Design language and workflow rules for China Rose internal tools (/internal/**, cash out, bookkeeping, inventory, forms, write-ups, scheduler). Use before building, changing, or reviewing any internal page or component in src/components/internal, src/components/scheduler, or src/app/(order-shell)/internal, so the result matches one consistent, non-technical-friendly design.
+description: Design language and workflow rules for China Rose internal tools. Use before building, changing, or reviewing internal cash, bookkeeping, inventory, forms, write-ups, scheduling, or shared internal components so work matches the approved design bank and preserves existing business behavior.
 ---
 
 # China Rose internal dashboard
 
-The users are restaurant managers and shift leads, often on a phone, often in a hurry, often not confident with software. The test for every screen: **could a new shift lead, on a phone, finish the job without asking anyone?**
+Design for restaurant managers and shift leads using shared computers, phones
+and tablets. A new shift lead should be able to identify the task, finish it
+and tell whether the work was saved.
 
-## Before writing code
+## Read before editing
 
-1. Read `docs/dashboard/design-language.md` (rules, words, colors, sizes, components, patterns).
-2. Read the module page in `docs/dashboard/modules/` for the tool you're touching.
-3. Check `docs/dashboard/improvements.md` to see if the change is already planned, and in what form.
-4. If `src/components/internal/ui.tsx` exists, use its components. Don't re-declare button or field class strings.
+1. Read `docs/design/internal-language/README.md` and `guidelines.md` there.
+2. Inspect its approved examples and `tokens.css`. The baseline is **Night
+   shift + Layered paper + Patina teal**, with moving red navigation.
+3. For overhaul work, read the requested step in
+   `docs/internal-tools-overhaul/implementation-guide.md` and its preceding
+   checkpoint. Complete only the requested step and hand it back for review.
+4. Check current source, the relevant module and task brief, and existing
+   shared primitives before introducing another component or API contract.
 
-## Hard rules
+The bank supersedes earlier black-only primary buttons, red-only-for-danger
+rules and requirements to mirror the printed sheet on entry screens. Preserve
+recognizable field names and print fidelity while improving entry workflows.
+Historical module inventories must be checked against current source.
 
-- **Never lose work:** drafts in `localStorage` keyed by module + store + date; visible save status; `beforeunload` warning when unsaved; server saves send `baseRev` and handle 409 with "Someone else saved this…".
-- **One primary button per screen**, labeled verb + thing ("Save count"). Primary = `bg-zinc-900 text-white`. **Red is only for problems and delete**, never the main button.
-- **Status = color + icon + word** (✓ Saved, ! Not saved yet, ▼ Short $4.25). Never color alone.
-- **Sizes:** fields `text-base` and `min-h-11`; buttons and icon buttons ≥ 44px; `tabular-nums` for money; no `text-gray-400`/`500` for readable text.
-- **Words:** plain, from the restaurant ("Manager code", "Cash out", "Use", "Order", "Publish"). Never "token", "rev", "sync", "invalid", "error 409".
-- **No `window.confirm`.** Use a named confirm dialog ("Clear 23 counts" / "Keep counts") only for destructive or rare actions; use Undo for routine removals.
-- **Errors:** next to the field, say how to fix, keep the input. Soft warnings (outliers) never block saving.
-- **Paper parity:** where a paper form exists, keep its rows, names, spellings, and print layout.
-- **Money:** integer cents (`src/lib/cashout.ts`); a not-yet-entered figure is `null` and shows "—", never $0.
-- **Manager code** stays in memory only. Never in `localStorage`/`sessionStorage` unless the owner decides otherwise.
-- **Converter output is frozen** (`src/lib/converter/*`): same fields, cells, and file. Restyle only.
-- **Charts:** use the `dataviz` skill; every chart has a table view.
-- **Don't store** SSNs, medical details, or bank info in the Worker.
+## Apply the bank and preserve behavior
 
-## Before calling it done
+- Use the public-site red for primary actions, Patina's light/dark pair on
+  appropriate surfaces, square paper framing and a clear surface hierarchy.
+- Use the shared 24-unit outline icon grammar and visible labels. Status needs
+  words and icons as well as color. Keep copy direct; omit greetings and pep talk.
+- Preserve drafts, visible save state and context boundaries. Keep manager
+  credentials in memory. Do not introduce persistent credentials.
+- Preserve money arithmetic, blank versus zero, imported workbook fields and
+  outputs, record revisions, shared links and staff permissions unless the
+  requested step explicitly changes a reviewed contract. Surface unsupported
+  backend capabilities honestly; do not imply a successful save.
+- Keep errors close to the affected input and retain entered values. Use
+  named confirmation for destructive actions and undo for routine removals.
+- Provide keyboard access, visible focus, touch targets, reduced motion,
+  readable money, English/Spanish parity and a table alternative for charts.
+- Do not store SSNs, medical details or bank information in the Worker.
 
-Run through the checklist at the end of `docs/dashboard/design-language.md`, run the relevant tests (`npm run cashout:test`, `npm run scheduler:test`), and check the page in the browser at 375px and desktop width (use the `run` skill).
+## Verify and hand off
+
+Use the bank's review checklist and the requested step's domain checks.
+Inspect the actual changed screens at narrow and wide widths, including long
+Spanish labels and failure/recovery states. Run relevant existing tests and
+required type/build checks for application changes. Documentation-only work
+needs documentation checks, not an application rebuild.
+
+Record actual results, limitations and remaining release gates using
+`docs/internal-tools-overhaul/checkpoint-template.md`. Local implementation,
+owner review, external activation and live verification are separate evidence.

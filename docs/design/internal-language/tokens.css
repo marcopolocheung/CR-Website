@@ -1,0 +1,40 @@
+/* China Rose: agreed palette, exploratory geometry/type. Public Nav.tsx uses
+   Tailwind v4 red-800; preserve its OKLCH value, not the old Tailwind v3 hex. */
+:root {
+  --cr-white: #fff;
+  --cr-black: #171717;
+  --cr-red: #9f0712; /* sRGB fallback */
+  --cr-red: oklch(44.4% 0.177 26.899);
+  /* Night shift accent study: light for dark surfaces, ink for light surfaces. */
+  --cr-accent: #7bc5be;
+  --cr-accent-ink: #1b6460;
+  --cr-accent-wash: #eaf4f1;
+  --cr-canvas: #f5f5f5;
+  --cr-muted: #525252;
+  --cr-line: #d4d4d4; /* decorative separation only */
+  --cr-control: #737373; /* identifiable field boundary */
+  --cr-body: "Archivo", Arial, sans-serif;
+  --cr-display: "Grenze", Georgia, serif;
+  --cr-number: "Archivo", Arial, sans-serif;
+  --cr-text: 1rem;
+  --cr-leading: 1.55;
+  --cr-target: 3rem;
+  --cr-space-1: .25rem;
+  --cr-space-2: .5rem;
+  --cr-space-3: .75rem;
+  --cr-space-4: 1rem;
+  --cr-space-6: 1.5rem;
+  --cr-space-8: 2rem;
+  --cr-fast: 120ms;
+  --cr-settle: 180ms;
+}
+html[data-accent="ice"] {
+  --cr-accent: #a5c9f0;
+  --cr-accent-ink: #245c83;
+  --cr-accent-wash: #edf3fa;
+}
+html[data-accent="citron"] {
+  --cr-accent: #c2d677;
+  --cr-accent-ink: #4f641c;
+  --cr-accent-wash: #f1f5e7;
+}

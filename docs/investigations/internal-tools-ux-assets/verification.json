@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-11-10",
+  "main_source_commit": "64ffc15c013c8e1cd9ca33e8d46efc5afccb2ec3",
+  "starting_checkout_commit": "ca114a9",
+  "remote_main_rechecked": true,
+  "local_markdown_targets_and_anchors": 84,
+  "source_sha256_checked_against_git": 32,
+  "successful_browser_captures": 10,
+  "capture_steps_completed": true,
+  "capture_artifacts_complete_within_selected_scope": true,
+  "owned_capture_browsers_terminated": true,
+  "captured_page_errors": 0,
+  "json_xml_python_syntax_valid": true,
+  "png_signatures_and_capture_digests_valid": true,
+  "concept_rendered_and_visually_inspected": true,
+  "git_diff_check_passed": true,
+  "application_source_changed": false,
+  "application_tests_run": false,
+  "limitations": [
+    "Documentation-only verification; no staff usability study.",
+    "Source/dev render is not production deployment evidence.",
+    "Only listed synthetic states were exercised.",
+    "Static bundle analysis selected one Home entry and retains graph unknowns."
+  ]
+}
