@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1190" viewBox="0 0 1600 1190" role="img" aria-labelledby="title desc">
+<title id="title">Proposed China Rose internal app: Home and focused cash entry</title>
+<desc id="desc">Design concept with a consistent navigation rail, resume task, actionable issues, large task buttons, and a phone cash-entry workspace. All data is illustrative. This is not an implemented app.</desc>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#18181b} .muted{fill:#52525b} .white{fill:white} .blue{fill:#1d4ed8} .green{fill:#166534}</style>
+<rect x="0" y="0" width="1600" height="1190" rx="0" fill="#f0f0ed"/>
+<text x="40" y="55" font-size="34" font-weight="700" class="">A clearer place to work</text>
+<text x="40" y="88" font-size="18" font-weight="400" class="muted">Proposed experience · November 2026 · Illustrative data, not an implemented screen</text>
+<text x="40" y="132" font-size="14" font-weight="700" class="muted">DESKTOP HOME</text>
+<text x="1140" y="132" font-size="14" font-weight="700" class="muted">PHONE · CASH ENTRY</text>
+<rect x="40" y="150" width="1040" height="770" rx="16" fill="#f7f7f5" stroke="#d4d4d8"/>
+<rect x="40" y="150" width="190" height="770" rx="16" fill="#fff"/>
+<path d="M230 150h0" stroke="#e4e4e7"/>
+<text x="62" y="192" font-size="22" font-weight="700" class="">China Rose</text>
+<text x="62" y="218" font-size="15" font-weight="400" class="muted">Internal</text>
+<rect x="52" y="231" width="166" height="48" rx="8" fill="#eff6ff"/>
+<text x="70" y="260" font-size="17" font-weight="600" class="blue">Home</text>
+<text x="70" y="319" font-size="17" font-weight="400" class="">Cash</text>
+<text x="70" y="378" font-size="17" font-weight="400" class="">Inventory</text>
+<text x="70" y="437" font-size="17" font-weight="400" class="">Schedule</text>
+<text x="70" y="496" font-size="17" font-weight="400" class="">Reports &amp; imports</text>
+<text x="70" y="555" font-size="17" font-weight="400" class="">Forms</text>
+<text x="70" y="810" font-size="17" font-weight="400" class="muted">Utilities</text>
+<text x="70" y="858" font-size="17" font-weight="400" class="muted">Help &amp; practice</text>
+<rect x="230" y="150" width="850" height="73" rx="0" fill="#fff"/>
+<text x="258" y="194" font-size="18" font-weight="600" class="">CR3 · W Military</text>
+<text x="744" y="194" font-size="16" font-weight="400" class="muted">English / Español</text>
+<text x="990" y="194" font-size="16" font-weight="600" class="">Lock</text>
+<text x="264" y="277" font-size="30" font-weight="700" class="">Home</text>
+<text x="264" y="308" font-size="17" font-weight="400" class="muted">Tuesday, November 10</text>
+<rect x="262" y="332" width="788" height="175" rx="12" fill="#fff" stroke="#d4d4d8"/>
+<rect x="262" y="332" width="6" height="175" rx="3" fill="#1d4ed8"/>
+<text x="286" y="364" font-size="13" font-weight="700" class="blue">PICK UP WHERE YOU LEFT OFF</text>
+<text x="286" y="402" font-size="25" font-weight="700" class="">Count inventory</text>
+<text x="286" y="433" font-size="18" font-weight="400" class="muted">Dry storage · 18 items left</text>
+<text x="286" y="475" font-size="15" font-weight="400" class="muted">Draft on this device · Maria</text>
+<rect x="876" y="387" width="148" height="48" rx="8" fill="#18181b"/>
+<text x="892" y="417" font-size="17" font-weight="600" class="white">Resume</text>
+<text x="264" y="548" font-size="20" font-weight="700" class="">Needs attention</text>
+<rect x="262" y="568" width="788" height="87" rx="12" fill="#fff" stroke="#d4d4d8"/>
+<rect x="284" y="590" width="32" height="32" rx="8" fill="#fef3c7"/>
+<text x="296" y="613" font-size="22" font-weight="700" class="">!</text>
+<text x="334" y="601" font-size="18" font-weight="600" class="">Next week’s schedule</text>
+<text x="334" y="630" font-size="16" font-weight="400" class="muted">3 required shifts are open</text>
+<rect x="870" y="587" width="154" height="48" rx="8" fill="#fff" stroke="#a1a1aa"/>
+<text x="886" y="617" font-size="17" font-weight="600" class="">Fix coverage</text>
+<text x="264" y="702" font-size="20" font-weight="700" class="">Start a task</text>
+<rect x="262" y="723" width="250" height="114" rx="12" fill="#fff" stroke="#d4d4d8"/>
+<text x="282" y="761" font-size="20" font-weight="600" class="">Count cash</text>
+<text x="282" y="793" font-size="15" font-weight="400" class="muted">Drawers &amp; saved days</text>
+<text x="480" y="815" font-size="25" font-weight="400" class="blue">›</text>
+<rect x="531" y="723" width="250" height="114" rx="12" fill="#fff" stroke="#d4d4d8"/>
+<text x="551" y="761" font-size="20" font-weight="600" class="">Build schedule</text>
+<text x="551" y="793" font-size="15" font-weight="400" class="muted">Plan the week</text>
+<text x="749" y="815" font-size="25" font-weight="400" class="blue">›</text>
+<rect x="800" y="723" width="250" height="114" rx="12" fill="#fff" stroke="#d4d4d8"/>
+<text x="820" y="761" font-size="20" font-weight="600" class="">Create form</text>
+<text x="820" y="793" font-size="15" font-weight="400" class="muted">Choose a form</text>
+<text x="1018" y="815" font-size="25" font-weight="400" class="blue">›</text>
+<text x="264" y="884" font-size="17" font-weight="600" class="">Recent work</text>
+<text x="414" y="884" font-size="16" font-weight="400" class="muted">Cash · Nov 9    /    Sales report · Nov 8</text>
+<rect x="1120" y="150" width="430" height="770" rx="24" fill="#fff" stroke="#a1a1aa"/>
+<text x="1142" y="190" font-size="16" font-weight="600" class="blue">‹ Home</text>
+<text x="1358" y="190" font-size="15" font-weight="400" class="muted">English / ES</text>
+<path d="M1120 211h430" stroke="#e4e4e7"/>
+<text x="1144" y="247" font-size="27" font-weight="700" class="">Count cash</text>
+<text x="1144" y="275" font-size="17" font-weight="400" class="muted">CR3 · Tue, Nov 10</text>
+<rect x="1142" y="297" width="386" height="49" rx="8" fill="#f7f7f5" stroke="#d4d4d8"/>
+<text x="1160" y="329" font-size="18" font-weight="600" class="">AM · Ana</text>
+<text x="1430" y="329" font-size="16" font-weight="400" class="blue">Change</text>
+<rect x="1142" y="362" width="386" height="50" rx="8" fill="#f4f4f5"/>
+<rect x="1146" y="366" width="184" height="42" rx="6" fill="#18181b"/>
+<text x="1202" y="393" font-size="17" font-weight="600" class="white">Counts</text>
+<text x="1389" y="393" font-size="17" font-weight="500" class="">Amounts</text>
+<text x="1144" y="446" font-size="15" font-weight="600" class="muted">Denomination</text>
+<text x="1330" y="446" font-size="15" font-weight="600" class="muted">Count</text>
+<text x="1435" y="446" font-size="15" font-weight="600" class="muted">Amount</text>
+<text x="1150" y="496" font-size="21" font-weight="600" class="">$100</text>
+<rect x="1311" y="465" width="83" height="48" rx="8" fill="#fff" stroke="#71717a"/>
+<text x="1346" y="496" font-size="21" font-weight="600" class="">1</text>
+<text x="1420" y="496" font-size="19" font-weight="400" class="muted">$100.00</text>
+<path d="M1144 523h380" stroke="#e4e4e7"/>
+<text x="1150" y="560" font-size="21" font-weight="600" class="">$50</text>
+<rect x="1311" y="529" width="83" height="48" rx="8" fill="#fff" stroke="#71717a"/>
+<text x="1346" y="560" font-size="21" font-weight="600" class="">0</text>
+<text x="1420" y="560" font-size="19" font-weight="400" class="muted">$0.00</text>
+<path d="M1144 587h380" stroke="#e4e4e7"/>
+<text x="1150" y="624" font-size="21" font-weight="600" class="">$20</text>
+<rect x="1311" y="593" width="83" height="48" rx="8" fill="#fff" stroke="#71717a"/>
+<text x="1346" y="624" font-size="21" font-weight="600" class="">8</text>
+<text x="1420" y="624" font-size="19" font-weight="400" class="muted">$160.00</text>
+<path d="M1144 651h380" stroke="#e4e4e7"/>
+<text x="1150" y="688" font-size="21" font-weight="600" class="">$10</text>
+<rect x="1311" y="657" width="83" height="48" rx="8" fill="#fff" stroke="#71717a"/>
+<text x="1346" y="688" font-size="21" font-weight="600" class="">0</text>
+<text x="1420" y="688" font-size="19" font-weight="400" class="muted">$0.00</text>
+<path d="M1144 715h380" stroke="#e4e4e7"/>
+<text x="1146" y="745" font-size="16" font-weight="500" class="blue">Show remaining denominations</text>
+<rect x="1121" y="767" width="428" height="152" rx="0" fill="#fafaf9"/>
+<path d="M1121 767h428" stroke="#e4e4e7"/>
+<text x="1146" y="797" font-size="16" font-weight="400" class="muted">Drawer $260.00 − retained $100.00</text>
+<text x="1146" y="831" font-size="20" font-weight="600" class="">Turn-in</text>
+<text x="1400" y="831" font-size="25" font-weight="700" class="">$160.00</text>
+<text x="1146" y="886" font-size="14" font-weight="400" class="muted">Draft on this device</text>
+<rect x="1343" y="853" width="184" height="48" rx="8" fill="#18181b"/>
+<text x="1359" y="883" font-size="17" font-weight="600" class="white">Save cash day</text>
+<rect x="40" y="961" width="490" height="176" rx="12" fill="#fff"/>
+<rect x="60" y="981" width="32" height="32" rx="16" fill="#18181b"/>
+<text x="71" y="1004" font-size="18" font-weight="600" class="white">1</text>
+<text x="106" y="1005" font-size="20" font-weight="700" class="">One visual language</text>
+<text x="60" y="1051" font-size="16" font-weight="400" class="muted">Same navigation, context and save states.</text>
+<text x="60" y="1080" font-size="16" font-weight="400" class="muted">Dark action; blue focus; red for errors.</text>
+<rect x="555" y="961" width="490" height="176" rx="12" fill="#fff"/>
+<rect x="575" y="981" width="32" height="32" rx="16" fill="#18181b"/>
+<text x="586" y="1004" font-size="18" font-weight="600" class="white">2</text>
+<text x="621" y="1005" font-size="20" font-weight="700" class="">Work first, details nearby</text>
+<text x="575" y="1051" font-size="16" font-weight="400" class="muted">Resume and fix lead. Reports have a home.</text>
+<text x="575" y="1080" font-size="16" font-weight="400" class="muted">No empty charts or speculative overdue pile.</text>
+<rect x="1070" y="961" width="490" height="176" rx="12" fill="#fff"/>
+<rect x="1090" y="981" width="32" height="32" rx="16" fill="#18181b"/>
+<text x="1101" y="1004" font-size="18" font-weight="600" class="white">3</text>
+<text x="1136" y="1005" font-size="20" font-weight="700" class="">Responsive, readable entry</text>
+<text x="1090" y="1051" font-size="16" font-weight="400" class="muted">Large controls, a focused drawer and live math.</text>
+<text x="1090" y="1080" font-size="16" font-weight="400" class="muted">Evidence, recovery and full-sheet view stay reachable.</text>
+<text x="40" y="1170" font-size="16" font-weight="400" class="muted">Concept only. Full workflows, exception states, source evidence and validation criteria are defined in the accompanying report.</text>
+</svg>

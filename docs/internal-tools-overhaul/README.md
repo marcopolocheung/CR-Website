@@ -1,13 +1,19 @@
 # Internal-tools overhaul: agent-ready work package
 
+**Current execution sequence:** use the [step-by-step implementation guide](implementation-guide.md), the [checkpoint template](checkpoint-template.md) and the approved [Night shift design bank](../design/internal-language/README.md). The new UX overhaul proceeds one verified, reviewed step at a time; writing the guide does not implement its steps or change existing task statuses.
+
+For a fresh experience audit against main at `64ffc15` and a proposed design/feature overhaul, see the [November 10, 2026 usability report](../investigations/internal-tools-ux-2026-11-10.md). Its recommendations complement this package; dated inventory and status claims below are not a substitute for checking current source and individual task milestones.
+
 Current cash scope is the owner-approved [DEC-02 bookkeeping notebook](cashout-rules.md): always retain $100 per cashier drawer, calculate Toast/Z differences and save figures for later lookup. CASH-04/05/06 operational workflows are deferred; ordinary saving/history remains baseline. Earlier research and handoff snapshots do not override this decision.
 
-This package assigns future work for China Rose's English/Spanish internal product on shared computers and tablets. The deliverable here is documentation. No application change, resource creation, data migration, deployment, staff test, or live verification was performed. All 84 tasks remain ready, planned, blocked, or deferred, with pending applicable milestones.
+This package originally assigned 84 tasks for China Rose's English/Spanish internal product on shared computers and tablets. Its original delivery was documentation only. Since then, capabilities have been implemented in source; use current source, individual brief evidence and the tracker rather than treating this packaging snapshot as a current status claim. This design-bank and guide update performs no application change, migration, deployment or staff test.
 
 Start with the [tracker](tracker.md), claim one [task brief](tasks/DATA-01.md), and follow the [agent working guide](agent-guide.md). Individual briefs are canonical; update the tracker at the same time. One numbered outcome has one file; no further splits are currently needed. Prefixes preserve the parent workstream. Future splits must retain a parent reference and explicit independently deliverable scope.
 
 | Reference | Purpose |
 | --- | --- |
+| [Implementation guide](implementation-guide.md) | Current experience-overhaul sequence, acceptance scenarios and per-step review gates |
+| [Checkpoint template](checkpoint-template.md) | Record actual checks, visual review, limitations and release evidence for each step |
 | [Tracker](tracker.md) | Ownership, priorities, delivery classes, implementation/activation dependencies, statuses, and milestone views |
 | [Agent working guide](agent-guide.md) | Claiming, shared-file coordination, prerequisite gates, validation, and handoff |
 | [Task template](task-template.md) | Contract for new or split task briefs |
@@ -32,7 +38,9 @@ Statuses are `planned`, `ready`, `in_progress`, `blocked`, `implemented`, `compl
 
 D1 is the target for business records; R2 is the target for attachments. Existing KV readers/links remain compatible through staged adapters and verified migration. Records are language independent. Existing file imports and free reusable components are the baseline; no paid calendar timeline, form designer, translation service, or Toast API entitlement is presumed. Refer to the research when evaluating a component and verify the exact adopted license/version during implementation.
 
-## Initial delivery sequence
+## Original infrastructure delivery sequence
+
+This earlier sequence explains infrastructure dependencies. Use the implementation guide above to order the new experience work; reconcile affected briefs during each step.
 
 1. Claim independent foundations: DATA-01, UX-01, CASH-01, IMPORT-01, SCH-08, FORM-07, REL-01, or REL-02. Ready decisions can be resolved concurrently by their business owners. DATA-07 export tooling follows DATA-01 contracts.
 2. Use the contracts to add local schema/configuration, shared controls, context, draft recovery, previews, and progress. Do not hold independent code behind unrelated policy decisions.

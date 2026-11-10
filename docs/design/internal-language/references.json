@@ -1,0 +1,134 @@
+{
+  "inspected_at": "2026-11-10",
+  "references": [
+    {
+      "url": "https://www.playdeadlock.com/cityneversleeps",
+      "evidence_id": "ev_a4cd4919d108a66983b6c6b9c775b85ddb20105d6b2c2a1e90e7c1d4ce0fd2f6",
+      "local_raw_run": ".rea/runs/20261110T190010.429796Z-3c00336e",
+      "browser": {
+        "mode": "launch",
+        "process_ownership": "provider-owned",
+        "cleanup": "terminated-owned-process",
+        "product": "Chromium",
+        "version": "156.0.8078.4"
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "Opening viewport and one PageDown, reduced-motion browser setting. Rendered DOM also retained locally. Not a full-site or motion audit.",
+      "completeness": {
+        "status": "complete",
+        "equality_eligible": true,
+        "missing_sections": [],
+        "truncated_sections": []
+      },
+      "limitations": [
+        "Artifact identity is unavailable for this observation.",
+        "Event sequence records provider receipt order; simultaneous browser causality is not inferred.",
+        "Network content is retained only when selected; Playwright response-body bytes are API results and are not guaranteed to match wire bytes.",
+        "Request bytes are limited to what Playwright exposes; not_exposed does not establish body absence or multipart file coverage.",
+        "Network content reads settle within 5 seconds each and the observer does not request bodies from unfinished responses.",
+        "Playwright scenario events do not expose request initiator stacks; receipt order does not prove causality.",
+        "Storage values are hashed only after declared-secret redaction.",
+        "Browser host platform and architecture were not observed."
+      ],
+      "steps": [
+        {
+          "id": "scenario_start",
+          "status": "completed"
+        },
+        {
+          "id": "settle",
+          "status": "completed"
+        },
+        {
+          "id": "page-down",
+          "status": "completed"
+        },
+        {
+          "id": "second-section",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/marcopolocheung/umbra/blob/main/docs/design/redesign-2.0/reference.html",
+      "retrieved_source_sha256": "71adb52c29c875767d2d76747dea3ebdb5887c920226c8f2c3556cd3f70a454c",
+      "main_ref_observed": "42a4e0d745e903d85994d4766678250ec000dc06",
+      "scope": "Read complete source, styles, section structure and specimens. Did not render the full Umbra document or validate its measured claims."
+    }
+  ],
+  "static_reference_snapshot": {
+    "parent_evidence_id": "ev_0acfdff336489651bfd2608a2b87549d86391538d9fa8638a6d44c941ef6b04e",
+    "summary_evidence_id": "ev_ad0eb1aa8e0bf97fb94ceaba51822f2c0b12a1b6df48639ed2c27948569b2700",
+    "artifact": {
+      "path": "/tmp/cr-design-reference-snapshot",
+      "sha256": "fc89e5067778460920d5c5e8aa71ee508e0d28067eb8361a53080b62eb07692c"
+    },
+    "local_raw_run": ".rea/runs/20261110T190633.360597Z-315134c3",
+    "coverage": {
+      "status": "complete-within-view",
+      "examined": 0,
+      "total": 0,
+      "next_offset": null,
+      "exhausted": true
+    },
+    "limitations": [
+      "Boundary extraction covers unshadowed JSON/global coercions plus parse and validation method candidates.",
+      "Child-process extraction covers asynchronous node:child_process creation, literal argv/env/stdio options, exit/error listeners, and kill signals.",
+      "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+      "Configuration extraction covers process.env, process.argv, node:fs reads, and direct logical defaults.",
+      "Event extraction covers EventEmitter-style literal registrations, removals, and dispatch candidates; dynamic names remain unknown.",
+      "Function fingerprints are static candidates; equal digests can remain ambiguous and do not prove behavioral equivalence.",
+      "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+      "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+      "Local data flow does not claim control-flow-sensitive reaching definitions or arbitrary dynamic property resolution.",
+      "Promise ownership covers explicit unshadowed Promise construction, static factories, aggregation, chaining, and await syntax only.",
+      "Request extraction covers fetch, WebSocket, node:http/node:https construction, direct option fields, and exact local response consumers.",
+      "Resource extraction covers built-in filesystem/network acquisition and exact local close/destroy/end handles.",
+      "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+      "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+      "The semantic graph contains static syntax observations and conservative relationship candidates; it does not claim runtime execution.",
+      "Timer extraction covers global or node:timers scheduling and exact local-handle cancellation.",
+      "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code.",
+      "page.html has 1 inline JavaScript body starting at line 5 that was not analyzed; endpoints, storage, imports and other facts in it are absent from the evidence."
+    ],
+    "unknowns": [
+      "1 application graph unknowns remain in the parent Evidence.",
+      "Boundary extraction covers unshadowed JSON/global coercions plus parse and validation method candidates.",
+      "Child-process extraction covers asynchronous node:child_process creation, literal argv/env/stdio options, exit/error listeners, and kill signals.",
+      "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+      "Configuration extraction covers process.env, process.argv, node:fs reads, and direct logical defaults.",
+      "Event extraction covers EventEmitter-style literal registrations, removals, and dispatch candidates; dynamic names remain unknown.",
+      "Function fingerprints are static candidates; equal digests can remain ambiguous and do not prove behavioral equivalence.",
+      "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+      "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+      "Local data flow does not claim control-flow-sensitive reaching definitions or arbitrary dynamic property resolution.",
+      "Promise ownership covers explicit unshadowed Promise construction, static factories, aggregation, chaining, and await syntax only.",
+      "Request extraction covers fetch, WebSocket, node:http/node:https construction, direct option fields, and exact local response consumers.",
+      "Resource extraction covers built-in filesystem/network acquisition and exact local close/destroy/end handles.",
+      "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+      "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+      "The semantic graph contains static syntax observations and conservative relationship candidates; it does not claim runtime execution.",
+      "Timer extraction covers global or node:timers scheduling and exact local-handle cancellation.",
+      "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code.",
+      "graph.coverage.status is partial",
+      "page.html has 1 inline JavaScript body starting at line 5 that was not analyzed; endpoints, storage, imports and other facts in it are absent from the evidence.",
+      "semantic_graph.coverage.status is unknown"
+    ],
+    "interpretation": "HTML source inventory only; no application-graph nodes in the summary. One inline JavaScript body was not analyzed. Runtime visual conclusions come from the separate browser capture, not this static result."
+  },
+  "palette_source": {
+    "file": "src/components/Nav.tsx",
+    "class": "bg-red-800",
+    "theme_file": "node_modules/tailwindcss/theme.css",
+    "value": "oklch(44.4% 0.177 26.899)",
+    "srgb_approx": "#9F0712"
+  },
+  "failed_attempt": {
+    "local_raw_run": ".rea/runs/20261110T185857.794301Z-42b4c0e5",
+    "reason": "Browser startup exceeded default 20000ms; terminal command and no remaining owned Chrome process confirmed before corrected run. Raised command_timeout_ms to 60000 as instructed by REA.",
+    "ui_evidence": false
+  }
+}

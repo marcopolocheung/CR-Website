@@ -1,0 +1,22 @@
+[
+  {
+    "file": "grenze-variable.ttf",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/grenze/Grenze%5Bwght%5D.ttf",
+    "sha256": "04afa4836bcd41e1ff9867a0dc27d628d31ddec618ec67715c526ebc3cae92f4"
+  },
+  {
+    "file": "grenze-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/grenze/OFL.txt",
+    "sha256": "55a21d1fcebfa5e02100db3ae4dcff2658e9ba63e0b64149203bf6a9d645db86"
+  },
+  {
+    "file": "archivo-variable.ttf",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth%2Cwght%5D.ttf",
+    "sha256": "0e094a7d3c7c4c25cf1310c4b30014f1dae9332220b1c2c88f4fa996f0b05053"
+  },
+  {
+    "file": "archivo-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/OFL.txt",
+    "sha256": "108b4e57c9c796d3d38d0428ca7ee39de47ad93187302718d9b2d8864b9b716b"
+  }
+]
