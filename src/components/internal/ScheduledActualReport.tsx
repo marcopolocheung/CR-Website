@@ -1,4 +1,6 @@
 'use client'
+
+import { useShellTask } from './ShellTask'
 import { useRef, useState } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
 import { useConfirmation } from './Feedback'
@@ -9,6 +11,7 @@ import { compareScheduledActual, defaultImportSelection, type ComparisonInput } 
 import type { StoreId } from '@/lib/internal-tools/contracts'
 export default function ScheduledActualReport({token}:{token:string}){
  const {t}=useInternalLanguage(),confirmation=useConfirmation(),[start,setStart]=useState(''),[end,setEnd]=useState(''),[store,setStore]=useState('both'),[preparer,setPreparer]=useState(''),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[inputs,setInputs]=useState<ComparisonInput[]|null>(null),[scope,setScope]=useState({start:'',end:'',store:''}),[selected,setSelected]=useState<Set<string>>(new Set()),[report,setReport]=useState<ReturnType<typeof compareScheduledActual>|null>(null),[loadVersion,setLoadVersion]=useState(0)
+ useShellTask('comparison', {context:[store==='both'?t('shell.bothStores'):store,start,end].filter(Boolean).join(' · ')})
  const running=useRef(false),request=useRef(0),credential=useRef(token);credential.current=token
  const matches=scope.start===start&&scope.end===end&&scope.store===store
  const number=(value:number|null)=>value===null?t('salesReview.missingValue'):String(Math.round(value*1000000)/1000000)

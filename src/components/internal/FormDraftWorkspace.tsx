@@ -1,5 +1,7 @@
 'use client'
 
+import { useShellTask } from './ShellTask'
+
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { STORE_LABELS } from './CashOut'
 import DraftChooser, { downloadDraftSource } from './DraftChooser'
@@ -62,6 +64,8 @@ export default function FormDraftWorkspace<F extends Json>({ formType, title, cr
     const parsed = businessDate(date)
     return parsed ? { task: 'form', formType, storeId: store, businessDate: parsed } : null
   }, [formType, store, date])
+
+  useShellTask('forms-context', { context: context ? `${STORE_LABELS[store]} · ${date}` : null })
 
   const write = useCallback((payload: T): boolean => {
     const current = activeRef.current

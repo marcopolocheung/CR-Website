@@ -1,5 +1,7 @@
 'use client'
 
+import { useShellTask } from './ShellTask'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { CodeGate } from './CashOut'
@@ -51,6 +53,8 @@ export default function WriteUps() {
   // Manager token lives in memory only, like cash out.
   const [token, setToken] = useState('')
   const [unlocked, setUnlocked] = useState(false)
+  const lock = useCallback(() => setToken(''), [])
+  useShellTask('forms', { onLock: token ? lock : undefined })
   return (
     <>
       {!token && (
@@ -59,13 +63,14 @@ export default function WriteUps() {
         </div>
       )}
       {/* After the first unlock the book stays mounted, so an expired code never discards an unsaved write-up. */}
-      {unlocked && <div hidden={!token}><WriteUpBook token={token} onLocked={() => setToken('')} /></div>}
+      {unlocked && <div hidden={!token}><WriteUpBook token={token} onLocked={lock} /></div>}
     </>
   )
 }
 
 function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void }) {
   const [view, setView] = useState<View>({ kind: 'list' })
+  useShellTask('forms-record', { context: view.kind === 'saved' ? view.doc.form.date : view.kind === 'digital' ? `${view.doc.form.store} · ${view.doc.form.date}` : null })
   const [list, setList] = useState<SavedFormRow[] | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [status, setStatus] = useState('')

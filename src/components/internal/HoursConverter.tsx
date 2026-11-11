@@ -1,5 +1,7 @@
 'use client'
 
+import { useShellTask } from './ShellTask'
+
 import EmployeeMapping from './EmployeeMapping'
 import { mapHours, ambiguousNames, type ImportDirectory } from '@/lib/converter/employee-mapping'
 import type { DirectoryRecord } from '@/lib/converter/import-api'
@@ -52,6 +54,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
   const [resumed, setResumed] = useState(false)
   const [fileReset, setFileReset] = useState(0)
   const confirmation = useConfirmation()
+  useShellTask('hours', { context: [importStore(plant), startDate, endDate].filter(Boolean).join(' · ') })
   function invalidateOutput() { exportVersion.current++; setAcknowledged(false); setOutput(null); setDeviceSaved(false); setStatus(null) }
   useNavigationProtection({ dirty: !!(plant || startDate || endDate || preparer || csvFile), deviceSaved })
 

@@ -1,5 +1,7 @@
 # Investigations
 
+- [Step 03 internal-shell runtime evidence — November 11, 2026](internal-shell-2026-11-11.md): shell/build identity, navigation and preservation scenarios, and verification limits.
+
 - [Step 02 primitives runtime evidence — November 11, 2026](internal-primitives-2026-11-11.md): gallery/build identity, browser scenarios and verification limits.
 
 - [Step 01 source/runtime baseline — November 11, 2026](internal-tools-baseline-2026-11-11.md): current-source capabilities, disposable fixtures, local checks and review limitations.

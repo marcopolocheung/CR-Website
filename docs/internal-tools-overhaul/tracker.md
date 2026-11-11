@@ -1,5 +1,7 @@
 # Internal-tools task tracker
 
+The [Step 03 checkpoint](checkpoints/step-03.md) records the locally verified shell/navigation slice of UX-02. Its broader context/shared-access lifecycle checklist remains for Step 04; no unrelated or external/live milestones are changed.
+
 The [Step 02 checkpoint](checkpoints/step-02.md) records opt-in shared primitives and the verified component gallery. Related UX-01/03/04 follow-ups link actual results; unrelated task milestones remain unchanged.
 
 The [Step 01 checkpoint](checkpoints/step-01.md) records the November 11 current-source/runtime baseline and local checks. It does not complete unrelated legacy tasks or establish external/live milestones.

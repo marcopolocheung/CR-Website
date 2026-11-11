@@ -26,10 +26,12 @@ remain in the repository. No remote font request, new dependency or alternate st
   concepts delegate here at their existing 16px size; other scheduler-only icons
   remain unchanged pending their own adoption slice.
 - `MovingNavigation`: controlled `items`, `selectedId`, `onSelect`, `label`.
-  Buttons retain labels and `aria-pressed` selection. Hover/focus moves one red
+  Buttons retain labels and `aria-pressed` selection. Optional `items[].href` renders
+  real anchors with `aria-current="page"`; callers resolve their base path and route. Hover/focus moves one red
   surface and never invokes selection; activation invokes the caller. Resize /
   font observers realign it; touch avoids pointer-hover persistence. This is a
-  selector primitive, not the Step 03 routing shell or access controller.
+  selector primitive. The Step 03 InternalShell adapter supplies route/hash links;
+  neither primitive nor shell owns manager credentials or a global store selector.
 
 Reuse existing behaviors:
 

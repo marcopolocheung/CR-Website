@@ -1,5 +1,7 @@
 'use client'
 
+import { useShellTask } from './ShellTask'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CodeGate } from './CashOut'
 import { useInternalLanguage } from './InternalLanguage'
@@ -201,6 +203,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   const setOrder = (item: InventoryItem, order: string) => { setCountDirty(true); setCounts(c => ({ ...c, [item.id]: { ...c[item.id], inv: c[item.id]?.inv ?? '', order } })) }
   const setDone = (item: InventoryItem, done: boolean) => { setCountDirty(true); setCounts(c => ({ ...c, [item.id]: { ...c[item.id], done } })) }
 
+  useShellTask('inventory', { context: token ? `CR3 · ${date}` : null, onLock: token ? onLocked : undefined })
   const past = history.filter(d => d.date < date).slice(0, PAST_COLUMNS).reverse()
   const suppliers = [...new Set(sheets.flatMap(sh => sh.items.flatMap(i => supplierCodes(i.sup))))]
   const shown = filterBySupplier(sheets, picked.filter(c => suppliers.includes(c)))

@@ -1,5 +1,7 @@
 'use client'
 
+import { useShellTask } from './ShellTask'
+
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -39,6 +41,7 @@ export default function Dashboard() {
   // Manager token lives in memory only, like cash out.
   const [token, setToken] = useState('')
   const lock = useCallback(() => setToken(''), [])
+  useShellTask('dashboard', { onLock: token ? lock : undefined })
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-4">{tr('nav.home')}</h1>
@@ -63,6 +66,7 @@ function CashBoard({ token, onLocked }: { token: string; onLocked: () => void })
   const [store, setStore] = useState<CashoutStore | 'all'>('all')
   const [range, setRange] = useState<(typeof RANGES)[number]>(14)
   const [now] = useState(today)
+  useShellTask('dashboard-context', { context: `${store === 'all' ? tr('shell.bothStores') : STORE_LABELS[store]} · ${now} · ${tr('shell.days', { days: range })}` })
 
   useEffect(() => {
     let live = true
