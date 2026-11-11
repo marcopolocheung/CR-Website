@@ -1,0 +1,5 @@
+
+> chinarose@0.0.2 seo:check
+> node scripts/seo-check.mjs
+
+SEO check passed

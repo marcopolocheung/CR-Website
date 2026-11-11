@@ -46,8 +46,8 @@ Backend activation is not established by source presence. Some historical task d
 | --- | --- | --- |
 | 00 | Approved design bank, examples and written rules preserved | Complete for this documentation work |
 | 01 | Verified source/runtime baseline and task fixtures | Reviewed and merged ([PR #174](https://github.com/marcopolocheung/CR-Website/pull/174); [checkpoint](checkpoints/step-01.md)) |
-| 02 | Shared visual primitives and icon family | [Locally verified; owner review pending](checkpoints/step-02.md) |
-| 03 | Internal navigation and shell | Not started |
+| 02 | Shared visual primitives and icon family | Reviewed and merged ([PR #175](https://github.com/marcopolocheung/CR-Website/pull/175); [checkpoint](checkpoints/step-02.md)) |
+| 03 | Internal navigation and shell | [Locally verified; owner review pending](checkpoints/step-03.md) |
 | 04 | Shared context, access lifecycle and draft-safe navigation | Not started |
 | 05 | Task-oriented Home and separate Reports destination | Not started |
 | 06 | Focused cash entry | Not started |

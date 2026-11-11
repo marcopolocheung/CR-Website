@@ -83,7 +83,9 @@ with sync_playwright() as p:
       const box = document.activeElement.getBoundingClientRect();
       const summary = document.querySelector('[data-entry-summary]').getBoundingClientRect();
       const banner = document.querySelector('[data-internal-banner]').getBoundingClientRect();
-      return box.top >= 24 + summary.height + banner.height + 16 && box.bottom <= 430 && summary.top >= banner.bottom;
+      const sticky = getComputedStyle(document.querySelector('[data-internal-banner]')).position === 'sticky';
+      const obstruction = sticky ? banner.height : 0;
+      return box.top >= 24 + summary.height + obstruction + 16 && box.bottom <= 430 && summary.top >= (sticky ? banner.bottom : 0);
     }''')
     # Frequent controls and count fields have 44px touch targets. No drag gesture is required.
     assert page.locator('#pm-0-1').bounding_box()['height'] >= 44

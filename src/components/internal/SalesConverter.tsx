@@ -1,5 +1,7 @@
 'use client'
 
+import { useShellTask } from './ShellTask'
+
 import { useMemo, useRef, useState } from 'react'
 import { useNavigationProtection } from './NavigationProtection'
 import { useInternalLanguage } from './InternalLanguage'
@@ -63,6 +65,8 @@ export default function SalesConverter({
   const [status, setStatus] = useState<Message | null>(null)
   const [issues, setIssues] = useState<FieldIssue[]>([])
   useNavigationProtection({ dirty: Object.values(form).some(Boolean) || Object.values(files).some(Boolean), deviceSaved })
+
+  useShellTask('sales', { context: [importStore(form.location), form.date].filter(Boolean).join(' · ') })
 
   function invalidateReview() { editVersion.current++; setReview(null); setOutput(null); setDeviceSaved(false); setAcknowledged(false); setStatus(null) }
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

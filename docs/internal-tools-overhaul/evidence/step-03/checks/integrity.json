@@ -1,0 +1,9 @@
+{
+  "approvedBankManifestHashes": 15,
+  "allTrackedBankFilesIdenticalToMain": 28,
+  "sourceAndTestHashes": 40,
+  "screenshotHashes": 7,
+  "localDocumentationLinks": 42,
+  "diffWhitespaceCheck": "pass",
+  "originalWorkspace": "main at 6281dee; tracked/untracked status clean; original AGENTS.md preserved; earlier worktrees untouched"
+}

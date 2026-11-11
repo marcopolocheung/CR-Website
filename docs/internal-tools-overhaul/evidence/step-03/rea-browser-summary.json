@@ -1,0 +1,127 @@
+{
+  "evidence_id": "ev_ddb8ba8cb3166e5d65161541ea03e2844e9ad0d9bda84437de5870c03d1a3098",
+  "operation": "inspect_web_page",
+  "confidence": "observed",
+  "authority": "external-service",
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "Observation starts when REA attaches; prior network and console activity is unavailable.",
+    "Worker targets are a final inventory snapshot, not worker-session observation. Their attached flag describes any debugging client; this page-session collector does not observe worker network, console, or script events, and short-lived workers may be absent from the snapshot.",
+    "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+    "Source maps are reported only as declarative URLs and are not fetched.",
+    "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+    "CDP discovery omitted the target attachment state; attached is reported as unknown.",
+    "Browser host platform and architecture were not observed."
+  ],
+  "rawEvidenceLocalPath": ".rea/runs/20261111T192016.767969Z-e78e7709/stdout.txt",
+  "rawEvidenceSha256": "f3c1da424a7cae9f66321399718f310e78c8b51e90d0bff0b0e86e5b3f390bbc",
+  "normalized_result": {
+    "target": {
+      "target_id": "B1AFCFF8AFD4A56009259F16C3316188",
+      "type": "page",
+      "title": "China Rose",
+      "url": "http://127.0.0.1:3031/internal/bookkeeping.html#cash-out",
+      "origin": "http://127.0.0.1:3031",
+      "attached": null
+    },
+    "capture_window": {
+      "started_at": "2026-11-11T19:20:18.996Z",
+      "ended_at": "2026-11-11T19:20:19.698Z",
+      "observation_ms": 500
+    },
+    "completeness": {
+      "status": "policy_filtered",
+      "conditions": [
+        "attach_limited",
+        "policy_filtered"
+      ],
+      "policy_filtered_sections": [
+        "console_text",
+        "json_body_shapes",
+        "resources",
+        "script_sources",
+        "scripts",
+        "websocket_shapes"
+      ],
+      "attach_limited_sections": [
+        "console_events",
+        "metadata",
+        "network_requests",
+        "websocket_connections",
+        "websocket_frames",
+        "workers"
+      ],
+      "truncated_sections": [],
+      "unavailable_sections": [],
+      "excluded": [
+        {
+          "section": "console_text",
+          "reason": "not_approved",
+          "count": null
+        },
+        {
+          "section": "json_body_shapes",
+          "reason": "not_approved",
+          "count": null
+        },
+        {
+          "section": "resources",
+          "reason": "unsupported_url",
+          "count": 1
+        },
+        {
+          "section": "script_sources",
+          "reason": "not_approved",
+          "count": 19
+        },
+        {
+          "section": "scripts",
+          "reason": "unattributed_origin",
+          "count": 41
+        },
+        {
+          "section": "websocket_shapes",
+          "reason": "not_approved",
+          "count": null
+        }
+      ],
+      "dropped_events": {
+        "scripts": 0,
+        "network_requests": 0,
+        "console_events": 0,
+        "websocket_connections": 0,
+        "websocket_frames": 0,
+        "webmcp_tools": 0,
+        "timeline_events": 0,
+        "total": 0
+      }
+    },
+    "storage": {
+      "origin": "http://127.0.0.1:3031",
+      "usage_bytes": 0,
+      "quota_bytes": 449402942,
+      "local_storage_keys": [
+        "cr-internal-draft:%5B%22cash-out%22%2C%22CR2%22%2C%222026-11-11%22%2Cnull%2Cnull%2Cnull%2Cnull%2Cnull%5D:54dfb6ef-b33e-4677-a0c2-a5be570a7262",
+        "cr-internal-draft:%5B%22cash-out%22%2C%22CR2%22%2C%222026-11-11%22%2Cnull%2Cnull%2Cnull%2Cnull%2Cnull%5D:f6798871-43e0-4b4c-9c28-95243f98083a",
+        "cr-cash-out",
+        "cr-internal-locale"
+      ],
+      "session_storage_keys": [],
+      "indexed_db_names": [],
+      "cache_names": [],
+      "content_fingerprints": [],
+      "fingerprint_algorithm": "sha256",
+      "fingerprints_complete": false,
+      "values_redacted": true
+    },
+    "limitations": [
+      "Observation starts when REA attaches; prior network and console activity is unavailable.",
+      "Worker targets are a final inventory snapshot, not worker-session observation. Their attached flag describes any debugging client; this page-session collector does not observe worker network, console, or script events, and short-lived workers may be absent from the snapshot.",
+      "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+      "Source maps are reported only as declarative URLs and are not fetched.",
+      "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+      "CDP discovery omitted the target attachment state; attached is reported as unknown."
+    ]
+  },
+  "accessibilityNodes": 861
+}

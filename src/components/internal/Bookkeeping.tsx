@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import CashOut from './CashOut'
+import { useShellTask } from './ShellTask'
 import { useInternalLanguage } from './InternalLanguage'
 import SalesConverter from './SalesConverter'
 import ScheduledActualReport from './ScheduledActualReport'
@@ -26,11 +27,13 @@ export default function Bookkeeping() {
   // Manager token lives in memory only; the converters work without it.
   const [token, setToken] = useState('')
   const lock = useCallback(() => setToken(''), [])
+  useShellTask('bookkeeping', { onLock: token ? lock : undefined })
 
   useEffect(() => {
     const fromHash = () => {
       const id = window.location.hash.slice(1)
-      if (TABS.some(t => t.id === id)) setTab(id as TabId)
+      if (!id) setTab('cash-out')
+      else if (TABS.some(t => t.id === id)) setTab(id as TabId)
     }
     fromHash()
     window.addEventListener('hashchange', fromHash)
@@ -40,6 +43,7 @@ export default function Bookkeeping() {
   const select = (id: TabId) => {
     setTab(id)
     history.replaceState(null, '', `#${id}`)
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
   }
 
   const loadCashout = useCallback(

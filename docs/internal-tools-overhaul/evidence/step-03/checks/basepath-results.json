@@ -1,0 +1,18 @@
+{
+  "frontend": "http://127.0.0.1:3033",
+  "basePath": "/review",
+  "status": 200,
+  "links": [
+    "/review/internal",
+    "/review/internal/bookkeeping#cash-out",
+    "/review/internal/inventory",
+    "/review/scheduler-demo",
+    "/review/internal/bookkeeping#sales",
+    "/review/internal/forms"
+  ],
+  "sameDocumentSentinel": true,
+  "inventoryRoute": "http://127.0.0.1:3033/review/internal/inventory",
+  "externalAttempts": [],
+  "pageErrors": [],
+  "limitation": "Separate local Next dev compilation; not a deployed project-pages redirect check."
+}

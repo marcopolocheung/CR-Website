@@ -145,7 +145,9 @@ with sync_playwright() as p:
     page.set_viewport_size({'width':768, 'height':430})
     page.wait_for_function('''() => {
       const summary = document.querySelector('[data-entry-summary]');
-      return summary.getBoundingClientRect().height <= 430 - document.querySelector('[data-internal-banner]').offsetHeight - 16;
+      const banner = document.querySelector('[data-internal-banner]');
+      const obstruction = getComputedStyle(banner).position === 'sticky' ? banner.offsetHeight : 0;
+      return summary.getBoundingClientRect().height <= 430 - obstruction - 16;
     }''')
     spanish_keypad.get_by_role('button', name='Cerrar teclado', exact=True).tap()
     expect(page.locator('#am-0-5000')).to_be_focused()

@@ -52,10 +52,10 @@ with sync_playwright() as p:
         page.evaluate('document.fonts.ready')
         return context, page
 
-    def nav(page, item): return page.locator('[data-nav-item="' + item + '"]')
+    def nav(page, item): return page.locator('[data-ui-gallery] [data-nav-item="' + item + '"]')
     def aligned(page, item):
         target = nav(page, item).bounding_box()
-        actual = page.locator('[data-nav-surface]').bounding_box()
+        actual = page.locator('[data-ui-gallery] [data-nav-surface]').bounding_box()
         assert actual and target
         assert all(abs(actual[k] - target[k]) < 1.5 for k in ('x', 'y', 'width', 'height')), (item, target, actual)
     def settle(page): page.wait_for_timeout(280)
@@ -63,7 +63,7 @@ with sync_playwright() as p:
     context, page = workspace()
     expect(page.get_by_role('heading', name='Component gallery', exact=True)).to_be_visible()
     expect(page.locator('meta[name=robots]')).to_have_attribute('content', 'noindex, nofollow')
-    durations = page.locator('[data-nav-surface]').evaluate('e => getComputedStyle(e).transitionDuration')
+    durations = page.locator('[data-ui-gallery] [data-nav-surface]').evaluate('e => getComputedStyle(e).transitionDuration')
     assert all(abs(float(value.strip().removesuffix('s')) - .22) < .001 for value in durations.split(',')), durations
     expect(nav(page, 'cash')).to_have_attribute('aria-pressed', 'true')
     settle(page); aligned(page, 'cash')
@@ -71,7 +71,7 @@ with sync_playwright() as p:
     nav(page, 'form').hover(); settle(page); aligned(page, 'form')
     expect(nav(page, 'cash')).to_have_attribute('aria-pressed', 'true')
     assert page.url == original_url
-    assert page.locator('[data-nav-surface]').count() == 1
+    assert page.locator('[data-ui-gallery] [data-nav-surface]').count() == 1
     marker = nav(page, 'cash').evaluate("e => ({width: getComputedStyle(e, '::after').width, background: getComputedStyle(e, '::after').backgroundColor})")
     assert marker == {'width': '3px', 'background': 'rgb(255, 255, 255)'}
     shot(page, 'navigation-hover-desktop')
@@ -172,7 +172,7 @@ with sync_playwright() as p:
     record('touch emulation', 'Tap selects Forms; subsequent outside tap leaves surface at Forms; frequent action targets at least 44px high')
     page.emulate_media(reduced_motion='reduce')
     nav(page, 'home').hover(); aligned(page, 'home')
-    assert page.locator('[data-nav-surface]').evaluate('e => getComputedStyle(e).transitionDuration') == '0s'
+    assert page.locator('[data-ui-gallery] [data-nav-surface]').evaluate('e => getComputedStyle(e).transitionDuration') == '0s'
     page.locator('#gallery-save').hover()
     assert page.locator('#gallery-save').evaluate('e => getComputedStyle(e).transform') == 'none'
     shot(page, 'gallery-reduced-motion-phone')

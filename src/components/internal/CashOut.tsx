@@ -1,5 +1,7 @@
 'use client'
 
+import { useShellAvailable, useShellTask } from './ShellTask'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, SetStateAction } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
@@ -105,6 +107,7 @@ export default function CashOut({ token, onUnlock, onLocked }: { token: string; 
 
 function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlock: (token: string) => void; onLocked: () => void }) {
   const { t } = useInternalLanguage()
+  const inShell = useShellAvailable()
   const [store, setStore] = useState<CashoutStore>('CR3')
   const [date, setDate] = useState(today)
   const [preparer, setPreparer] = useState('')
@@ -165,6 +168,7 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
     if (lock) { onLocked(); requestAnimationFrame(() => focusField('cashout-code')) }
     else requestAnimationFrame(() => focusField('draft-preparer'))
   }
+  useShellTask('cash', { context: token && context ? `${STORE_LABELS[store]} · ${date}` : null, onLock: token ? () => leave(true) : undefined, lockLabel: active ? 'drafts.handoff' : 'shell.lock' })
   return <div>
     {!token && <CodeGate onUnlock={onUnlock} />}
     <div hidden={!token}>
@@ -190,7 +194,7 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
         <p className="text-xs text-gray-600">{lastSavedAt ? t('drafts.savedAt', { time: lastSavedAt }) : t('common.unsaved')}</p>
         <div className="mt-2 flex flex-wrap gap-2">
           <button type="button" onClick={() => leave()} className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm">{t('drafts.change')}</button>
-          <button type="button" onClick={() => leave(true)} className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm">{t('drafts.handoff')}</button>
+          {!inShell && <button type="button" onClick={() => leave(true)} className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm">{t('drafts.handoff')}</button>}
           <button type="button" onClick={() => downloadDraftSource(JSON.stringify(activeRef.current, null, 2))} className="min-h-11 px-3 py-2 text-sm text-red-700 underline">{t('drafts.downloadCurrent')}</button>
         </div>
       </div>

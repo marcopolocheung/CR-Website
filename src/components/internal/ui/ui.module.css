@@ -76,16 +76,17 @@
 .saveFeedback[data-save-state="failed"], .saveFeedback[data-save-state="conflict"] { color: var(--cr-red); border-color: var(--cr-red); }
 .entry { min-width: 0; }
 .entrySummary { padding: .75rem; border-block: 1px solid var(--cr-control); background: var(--cr-accent-wash); color: var(--cr-black); }
-.navigation { position: relative; isolation: isolate; display: flex; flex-direction: column; align-self: start; gap: 6px; padding: 12px; background: var(--cr-black); color: white; }
+/* Keep the moving decoration inside the rail during resize; padding retains the 6px focus halo. */
+.navigation { position: relative; isolation: isolate; overflow: clip; display: flex; flex-direction: column; align-self: start; gap: 6px; padding: 12px; background: var(--cr-black); color: white; }
 .navSurface { position: absolute; z-index: 0; left: 0; top: 0; opacity: 0; pointer-events: none; background: var(--cr-red); border: 1px solid #ffffff3d; transition: transform 220ms cubic-bezier(.22, 1, .36, 1), width 220ms cubic-bezier(.22, 1, .36, 1), height 220ms cubic-bezier(.22, 1, .36, 1); }
-.navItem { position: relative; z-index: 1; display: flex; align-items: center; gap: .625rem; min-width: 0; min-height: var(--cr-target); padding: .75rem; color: white; background: transparent; border: 0; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.navItem { text-decoration: none; position: relative; z-index: 1; display: flex; align-items: center; gap: .625rem; min-width: 0; min-height: var(--cr-target); padding: .75rem; color: white; background: transparent; border: 0; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
 .navItem > span { min-width: 0; }
-.navItem[aria-pressed="true"] { font-weight: 700; }
-.navItem[aria-pressed="true"]::after { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; background: white; pointer-events: none; }
+.navItem[aria-pressed="true"], .navItem[aria-current="page"] { font-weight: 700; }
+.navItem[aria-pressed="true"]::after, .navItem[aria-current="page"]::after { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; background: white; pointer-events: none; }
 @media (max-width: 640px) {
   .paper { padding: 1rem; }
   .navigation { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 6px; gap: 4px; }
-  .navItem { flex-direction: column; justify-content: center; text-align: center; padding: .625rem .25rem; gap: .375rem; }
+  .navItem { text-decoration: none; flex-direction: column; justify-content: center; text-align: center; padding: .625rem .25rem; gap: .375rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .theme *, .theme *::before, .theme *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }

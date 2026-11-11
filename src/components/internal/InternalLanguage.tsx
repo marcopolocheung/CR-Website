@@ -1,15 +1,17 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { Button } from './ui/controls'
+import shellStyles from './shell.module.css'
 import { flushSync } from 'react-dom'
 import type { Locale } from '@/lib/internal-tools/contracts'
 import { LOCALE_STORAGE_KEY, translate, type TranslationKey } from '@/lib/internal-tools/i18n'
 
-type Language = { locale: Locale; t: (key: TranslationKey, params?: Record<string, string | number>) => string }
-const Context = createContext<Language>({ locale: 'en', t: (key, params) => translate('en', key, params) })
+type Language = { choose: (locale: Locale) => void; locale: Locale; t: (key: TranslationKey, params?: Record<string, string | number>) => string }
+const Context = createContext<Language>({ choose: () => {}, locale: 'en', t: (key, params) => translate('en', key, params) })
 export function useInternalLanguage() { return useContext(Context) }
 
-export default function InternalLanguage({ children }: { children: React.ReactNode }) {
+export default function InternalLanguage({ children, banner: showBanner = true }: { children: React.ReactNode; banner?: boolean }) {
   const [locale, setLocale] = useState<Locale>('en')
   const [printing, setPrinting] = useState(false)
   const shell = useRef<HTMLDivElement>(null)
@@ -39,11 +41,11 @@ export default function InternalLanguage({ children }: { children: React.ReactNo
     try { localStorage.setItem(LOCALE_STORAGE_KEY, next) } catch { /* changing language still works */ }
   }, [])
   const effectiveLocale = printing ? 'en' : locale
-  const value = useMemo<Language>(() => ({ locale: effectiveLocale, t: (key, params) => translate(effectiveLocale, key, params) }), [effectiveLocale])
+  const value = useMemo<Language>(() => ({ choose, locale: effectiveLocale, t: (key, params) => translate(effectiveLocale, key, params) }), [effectiveLocale, choose])
   return (
     <Context.Provider value={value}>
       <div ref={shell} lang={effectiveLocale}>
-        <div ref={banner} data-internal-banner className="sticky top-0 z-20 border-b border-yellow-300 bg-yellow-100 px-4 py-2 text-yellow-900 print:hidden">
+        {showBanner && <div ref={banner} data-internal-banner className="sticky top-0 z-20 border-b border-yellow-300 bg-yellow-100 px-4 py-2 text-yellow-900 print:hidden">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold">{value.t('shell.internal')}</p>
             <div role="group" aria-label={value.t('shell.language')} className="flex flex-wrap gap-1">
@@ -56,9 +58,19 @@ export default function InternalLanguage({ children }: { children: React.ReactNo
               ))}
             </div>
           </div>
-        </div>
+        </div>}
         {children}
       </div>
     </Context.Provider>
   )
+}
+
+/** The shell reuses the same preference/print provider; no tool state is remounted. */
+export function LanguageControls({ appearance = 'legacy' }: { appearance?: 'legacy' | 'shell' }) {
+  const { locale, t, choose } = useInternalLanguage()
+  return <div role="group" aria-label={t('shell.language')} className={appearance === 'shell' ? shellStyles.languages : 'flex flex-wrap gap-1'}>
+    {(['en', 'es'] as const).map(language => <Button key={language} lang={language} aria-pressed={locale === language} onClick={() => choose(language)}>
+      {language === 'en' ? 'English' : 'Español'}
+    </Button>)}
+  </div>
 }
