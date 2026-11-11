@@ -1,5 +1,7 @@
 # Internal-tools task tracker
 
+The [Step 01 checkpoint](checkpoints/step-01.md) records the November 11 current-source/runtime baseline and local checks. It does not complete unrelated legacy tasks or establish external/live milestones.
+
 Cash scope: [DEC-02 is approved](cashout-rules.md) for a bookkeeping notebook with a fixed $100 per drawer. CASH-03 is implemented locally (server recalculation, awaiting deploy); CASH-04/05/06 operational workflows are deferred. CASH-08 ordinary saves/history uses DATA-05 and is independent of those deferred workflows.
 
 Individual briefs are canonical. Update the brief and this summary together when claiming, changing a gate, or handing off. Current implementation and evidence are recorded in the canonical briefs; external/live work remains separately gated. P0 establishes safety/compatibility or early workflow foundations; P1 completes core workflows; P2 follows core adoption. Priority is not a dependency.

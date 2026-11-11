@@ -1,0 +1,47 @@
+{
+  "error": "JavaScript application analysis failed",
+  "code": "provider_timeout",
+  "category": "timeout",
+  "message": "JavaScript source analysis reached its 300000ms per-source server/provider deadline (analysis_timeout_ms), not the MCP client deadline.",
+  "remediation": {
+    "action": "Reuse accessible partial_observation Evidence to avoid recomputation; reading it is not a prerequisite for a corrected retry. Increase analysis_timeout_ms through MCP, or use rea analyze-javascript-application <input_path> --analysis-timeout-ms <milliseconds> on the CLI. Alternatively, reduce semantic limits or select exact inventoried source_paths (CLI: --source-path on that command). Omit source_paths to analyze all sources; an empty array is invalid. detail: summary reduces response size, not analysis work. Allow execution, cleanup and delivery headroom in the MCP client tool deadline; increasing that client deadline alone does not change this server budget. Resolve any reported incomplete cleanup before retrying."
+  },
+  "recovery": {
+    "kind": "inspect_timeout_state",
+    "operation": "analyze_javascript_application",
+    "timeout_ms": 300000
+  },
+  "detailsKeys": [
+    "operation",
+    "timeout_ms",
+    "limit",
+    "captured_output",
+    "partial_observation"
+  ],
+  "partialEvidenceId": "ev_3d19f018356bc7e068daa613faadcc52d0a2abbe9217369a9465e7be9b8ff6e8",
+  "partialTarget": {
+    "name": "out",
+    "digest": {
+      "sha256": "b2ca29624549e6737bc579a2f052d5b783027235723afd7a4955fbeedccdd386"
+    },
+    "local_path": "/home/unusn/CR-step01/out",
+    "format": "directory",
+    "architecture": null
+  },
+  "partialLimitations": [
+    "404.html has 5 inline JavaScript bodies starting at lines 1, 1, 1, 1, 1 that were not analyzed; endpoints, storage, imports and other facts in them are absent from the evidence.",
+    "Alias selection expansion was conservatively bounded (maximum 512 additional selector states); selected paths remain unknown.",
+    "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+    "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+    "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+    "Source analysis was interrupted: Analysis operation timed out after 300000ms: analyze_javascript_application",
+    "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+    "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+    "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code.",
+    "_next/static/chunks/6caa463d69ba7603.js: Resource constraint during analyze_javascript_application: Semantic graph for _next/static/chunks/6caa463d69ba7603.js exceeds the parent's remaining result budget; static and module facts were retained",
+    "_next/static/chunks/820b8b3e9d2c83a7.js: Resource constraint during analyze_javascript_application: Semantic graph for _next/static/chunks/820b8b3e9d2c83a7.js exceeds the parent's remaining result budget; static and module facts were retained",
+    "_next/static/chunks/8d22dd14bd0473a7.js: Resource constraint during analyze_javascript_application: Semantic graph for _next/static/chunks/8d22dd14bd0473a7.js exceeds the parent's remaining result budget; static and module facts were retained",
+    "_next/static/chunks/a02a3e3ac06b7ac6.js: Resource constraint during analyze_javascript_application: Semantic graph for _next/static/chunks/a02a3e3ac06b7ac6.js exceeds the parent's remaining result budget; static and module facts were retained",
+    "_next/static/chunks/a4bad432b172e26d.js: Analysis operation timed out after 300000ms: analyze_javascript_application"
+  ]
+}

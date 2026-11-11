@@ -1,5 +1,7 @@
 # Current-state inventory
 
+> Historical October 24 source snapshot. Use the [November 11 Step 01 baseline](baselines/2026-11-11/README.md) for current-source capabilities and actual local verification. In particular, absence claims below about shared drafts/language, D1 services, imports and digital forms are historical. This pointer does not change legacy task milestones or establish live activation.
+
 Verified by local source inspection on 2026-10-24. Live endpoints, resources, staff usage, and production contents were not inspected. Source presence does not establish that a Worker version is deployed. The [research](../internal-tools-research.md) supplies supporting workflow evidence; this inventory checks repository claims.
 
 ## Frontend and shared experience

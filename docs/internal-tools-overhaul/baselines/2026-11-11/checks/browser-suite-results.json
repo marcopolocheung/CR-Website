@@ -1,0 +1,42 @@
+[
+  {
+    "command": "/tmp/cr-step01-venv/bin/python scripts/overhaul-baseline/run-existing.py scripts/test-cashout-entry.py http://127.0.0.1:3027",
+    "exit": 0,
+    "output": "PASS CASH-02: linked denomination count/amount entry, exact coin amounts, invalid-entry save guards, extra-money Z reconciliation, saved reload, EN/ES touch keypad, phone layout, sales linkage, English PDF output, offline retry and denied-storage recovery\nExternal network guard: 0 blocked attempts\n"
+  },
+  {
+    "command": "/tmp/cr-step01-venv/bin/python scripts/overhaul-baseline/run-existing.py scripts/test-cashout-context.py http://127.0.0.1:3027",
+    "exit": 0,
+    "output": "PASS CASH-01: explicit bilingual legacy assignment/cancel, all CR2/CR3 \u00d7 two-date reloads, rapid context switches, late 200/401 guards, storage denial retention and malformed-source recovery\nExternal network guard: 0 blocked attempts\n"
+  },
+  {
+    "command": "/tmp/cr-step01-venv/bin/python scripts/overhaul-baseline/run-existing.py scripts/test-internal-drafts.py http://127.0.0.1:3027",
+    "exit": 0,
+    "output": "PASS UX-05: explicit new/resume, complete context/preparer/time, independent second editors, intact corrupt/future/legacy sources, recovery downloads, quota preservation, bilingual touch, and safe credential-free handoff\nExternal network guard: 0 blocked attempts\n"
+  },
+  {
+    "command": "/tmp/cr-step01-venv/bin/python scripts/overhaul-baseline/run-existing.py scripts/test-internal-recovery.py http://127.0.0.1:3027",
+    "exit": 0,
+    "output": "PASS UX-06: route/reload cancellation, offline/auth retention, original-base 409 recovery, bilingual compare/copy/download/load, one in-flight save, and cash-out auth recovery after quota denial\nExternal network guard: 0 blocked attempts\n"
+  },
+  {
+    "command": "/tmp/cr-step01-venv/bin/python scripts/overhaul-baseline/run-existing.py scripts/test-internal-language.py http://127.0.0.1:3027",
+    "exit": 0,
+    "output": "PASS UX-01: dictionary integration, keyboard/touch, mid-edit switch, mounted tabs/files, localized late/save/failure states, confirmation cancellation, denied preference storage, print recovery, tablet layout, and credential isolation\nExternal network guard: 0 blocked attempts\n"
+  },
+  {
+    "command": "/tmp/cr-step01-venv/bin/python scripts/overhaul-baseline/run-existing.py scripts/test-import-hours-preview.py http://127.0.0.1:3027",
+    "exit": 0,
+    "output": "PASS IMPORT-05: physical source rows, identity gate, overnight inclusive filtering, visible open/bad/excluded rows, unchanged source regular/overtime workbook cells, acknowledgement invalidation, Spanish phone/keyboard/touch\nExternal network guard: 0 blocked attempts\n"
+  },
+  {
+    "command": "/tmp/cr-step01-venv/bin/python scripts/overhaul-baseline/run-existing.py scripts/test-forms-list.py http://127.0.0.1:3027",
+    "exit": 0,
+    "output": "PASS: FORM-01 saved form search, states and exact open\nExternal network guard: 0 blocked attempts\n"
+  },
+  {
+    "command": "/tmp/cr-step01-venv/bin/python scripts/overhaul-baseline/run-existing.py scripts/test-scheduler-views.py --url http://127.0.0.1:3027 --artifacts .rea/step01-checks/scheduler-browser",
+    "exit": 0,
+    "output": "Scheduler view checks passed. Screenshots: .rea/step01-checks/scheduler-browser\nExternal network guard: 0 blocked attempts\n"
+  }
+]
