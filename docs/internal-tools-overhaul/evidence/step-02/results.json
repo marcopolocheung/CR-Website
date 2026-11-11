@@ -1,0 +1,179 @@
+{
+  "baseCommit": "b800af4863f88d2f0e86e9de6f21b6bebc3ba867",
+  "sourceFilesSha256": {
+    "src/components/internal/ui/PrimitiveGallery.tsx": "f293e119061ca38994a4c2093b715f4821baf11e7bcdccbc67f19f5453c0e35b",
+    "src/components/internal/ui/MovingNavigation.tsx": "55a2f9b1c65cdd095a5bbdbaffc6eb2b6ccc39347d09db831a978afec48aa8bf",
+    "src/components/internal/ui/Theme.tsx": "40adf382743d02b94b999f3b71b1cf570079d934e814c7c84dbaa6ee9d7dc068",
+    "src/components/internal/ui/controls.tsx": "f751c2f98c43b432aa47605dfaf3a7917f625fa09d6f574926280b8ffda8b730",
+    "src/components/internal/ui/Icon.tsx": "e1ea1bc21b63d96cf42d573c3c4e74118d359aee5c5e63f3db98c5bba0fad07f",
+    "src/components/internal/ui/gallery.module.css": "7717cca8b57d49f9464b57495e2a43c6b5ae2626b956fd5f35d09b58ad932db2",
+    "src/components/internal/ui/ui.module.css": "18d93b7b4634f88fe6deaa164a3bb044aadcfd976512b926b55bf072b302c0b9",
+    "src/components/internal/Feedback.tsx": "a37c6ab1ebdf32d0d3ae0fa456759ae60de0164faabbe40c074cb52de1fba8c1",
+    "src/components/internal/EntryWorkspace.tsx": "9ca19febcf427c87929cee9ee727b6949d3b8c5af4ef3094792f942f3e5e224a",
+    "src/components/internal/InternalLanguage.tsx": "5422fe170a24672d96525f33050c75e004d9692d56af2ca591f928f68244546d",
+    "src/components/scheduler/ui.tsx": "77dae2f7485e21aa3fb2d6d6ceb79b1dc5fa31ed5d8dfefbe524d7b7f09500a0",
+    "src/app/(order-shell)/internal/ui-gallery/page.tsx": "5a8590773e616b82d1b1d24eff529c6a3e364d75c42d3ca32602009e0cc49f48",
+    "scripts/test-internal-primitives.py": "e35bc1c9e3feaca1c20dc22b5bc6b93a5bd88d4da6e213e7923891bcb274883c"
+  },
+  "browser": "158.0.8127.18",
+  "base": "http://127.0.0.1:3029",
+  "scenarios": [
+    {
+      "scenario": "pointer navigation",
+      "observed": "One surface retargets, restores selected Cash, never selects/navigates on hover; independent white current marker remains"
+    },
+    {
+      "scenario": "keyboard navigation",
+      "observed": "Tab follows visible focus, Enter changes controlled selection, blur restores selection; visible 3px focus independent of surface"
+    },
+    {
+      "scenario": "entry and error",
+      "observed": "Enter/Shift+Enter use existing EntryWorkspace; final Enter only focuses Save; native Tab includes read-only context; invalid raw value retained with linked hint/error, icon and persistent boundary"
+    },
+    {
+      "scenario": "busy and disabled",
+      "observed": "Zero remains entered; busy button is native-disabled and announces busy; disabled action inactive; completion explicitly says no record saved"
+    },
+    {
+      "scenario": "confirmation",
+      "observed": "Existing Escape/cancel preserves entered values and restores trigger focus"
+    },
+    {
+      "scenario": "bank roles",
+      "observed": {
+        "palette": {
+          "dark": {
+            "bg": "rgb(23, 23, 23)",
+            "fg": "rgb(123, 197, 190)"
+          },
+          "light": {
+            "bg": "rgb(255, 255, 255)",
+            "fg": "rgb(27, 100, 96)"
+          },
+          "paper": {
+            "bg": "rgb(255, 255, 255)",
+            "fg": "rgb(23, 23, 23)"
+          },
+          "primary": {
+            "bg": "lab(33.7174 55.8993 41.0293)",
+            "fg": "rgb(255, 255, 255)"
+          }
+        },
+        "brandRgbaActualAndReference": [
+          [
+            159,
+            7,
+            18,
+            255
+          ],
+          [
+            159,
+            7,
+            18,
+            255
+          ]
+        ],
+        "fonts": [
+          {
+            "family": "archivo",
+            "status": "loaded"
+          },
+          {
+            "family": "archivo Fallback",
+            "status": "unloaded"
+          },
+          {
+            "family": "grenze",
+            "status": "loaded"
+          },
+          {
+            "family": "grenze Fallback",
+            "status": "unloaded"
+          }
+        ],
+        "activePaper": "square, approved three-offset shadow; supporting paper has lighter shadow"
+      }
+    },
+    {
+      "scenario": "language and reflow",
+      "observed": "EN/ES preserves both inputs; Spanish action wraps; surface aligns at 1440/768/375/320px; no horizontal page overflow"
+    },
+    {
+      "scenario": "enlarged text",
+      "observed": "200% root text at 320px: page has no horizontal overflow, long Spanish labels reflow and surface remains aligned"
+    },
+    {
+      "scenario": "touch emulation",
+      "observed": "Tap selects Forms; subsequent outside tap leaves surface at Forms; frequent action targets at least 44px high"
+    },
+    {
+      "scenario": "reduced motion",
+      "observed": "Zero-duration navigation transition; no button hover translation; destination and focus state retained"
+    },
+    {
+      "scenario": "print",
+      "observed": "Navigation/controls/ornamental shadow hidden; synthetic preview label and sample values retained in PDF; not official form/output approval"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "navigation-hover-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "95aa34a204461f4926d5bd86ed99b7f88415a3bd3cd3611914db3bc823cecf17"
+    },
+    {
+      "file": "field-error-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "33de81972d6aec41812d6d9ca93b47b6c9e82ec6891f0356b81e4fee64c38750"
+    },
+    {
+      "file": "gallery-es-1440.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "d0647b2221ff97a5b33059e638bfa7ca42860723582bec6858fa5bf6f49e83ac"
+    },
+    {
+      "file": "gallery-es-375.png",
+      "viewport": {
+        "width": 375,
+        "height": 1000
+      },
+      "sha256": "d95a30cf3cd6d034e7893295ebae04f453cde3edb8e704c268b2c40f4d3b7478"
+    },
+    {
+      "file": "gallery-es-320.png",
+      "viewport": {
+        "width": 320,
+        "height": 1000
+      },
+      "sha256": "50f56df80646ba2f3ea4d3253806c6e22ad6cff8729783f902a0a0ef603fd26f"
+    },
+    {
+      "file": "gallery-es-large-text-320.png",
+      "viewport": {
+        "width": 320,
+        "height": 1000
+      },
+      "sha256": "ad807a6bce21b2c13bab0839c8fd37dd5c31cd1e404bdf9dae9709d0d94192b7"
+    },
+    {
+      "file": "gallery-reduced-motion-phone.png",
+      "viewport": {
+        "width": 375,
+        "height": 1000
+      },
+      "sha256": "08185d51350126d3e121028497c6f57271905d8cf7a40536d1181be06a821088"
+    }
+  ],
+  "externalAttempts": [],
+  "apiRequests": [],
+  "pageErrors": []
+}

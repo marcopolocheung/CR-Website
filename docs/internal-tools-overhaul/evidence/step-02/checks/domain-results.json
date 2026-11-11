@@ -1,0 +1,52 @@
+[
+  {
+    "command": "npm run cashout:test",
+    "exit": 0,
+    "summary": [
+      "# tests 27",
+      "# pass 27",
+      "# fail 0",
+      "# skipped 0"
+    ]
+  },
+  {
+    "command": "npm run recovery:test",
+    "exit": 0,
+    "summary": [
+      "# tests 7",
+      "# pass 7",
+      "# fail 0",
+      "# skipped 0"
+    ]
+  },
+  {
+    "command": "npm run forms:test",
+    "exit": 0,
+    "summary": [
+      "# tests 15",
+      "# pass 15",
+      "# fail 0",
+      "# skipped 0"
+    ]
+  },
+  {
+    "command": "npm run scheduler:test",
+    "exit": 0,
+    "summary": [
+      "# tests 145",
+      "# pass 145",
+      "# fail 0",
+      "# skipped 0"
+    ]
+  },
+  {
+    "command": "node --import jiti/register --test src/lib/internal-tools/i18n/i18n.test.ts src/lib/internal-tools/contracts.test.ts",
+    "exit": 0,
+    "summary": [
+      "# tests 9",
+      "# pass 9",
+      "# fail 0",
+      "# skipped 0"
+    ]
+  }
+]

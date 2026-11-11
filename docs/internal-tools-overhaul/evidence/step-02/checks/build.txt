@@ -1,0 +1,55 @@
+
+> chinarose@0.0.2 build
+> next build && node scripts/mirror-trailing-slash.mjs
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.3s
+  Running TypeScript ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/31) ...
+  Generating static pages using 11 workers (7/31)
+  Generating static pages using 11 workers (15/31)
+  Generating static pages using 11 workers (23/31)
+✓ Generating static pages using 11 workers (31/31) in 476.9ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /apple-icon.png
+├ ○ /careers
+├ ○ /icon.png
+├ ○ /internal
+├ ○ /internal/bookkeeping
+├ ○ /internal/forms
+├ ○ /internal/inventory
+├ ○ /internal/qr-generator
+├ ○ /internal/ui-gallery
+├ ○ /locations/sw-military
+├ ○ /locations/w-military
+├ ○ /menu
+├ ○ /order
+├ ○ /order/confirmation
+├ ○ /order/review
+├ ○ /robots.txt
+├ ○ /schedule
+├ ● /schedule/[restaurantId]
+│ ├ /schedule/CR3-diningroom
+│ ├ /schedule/CR3-kitchen
+│ ├ /schedule/CR2-kitchen
+│ └ /schedule/CR2-diningroom
+├ ○ /scheduler-demo
+├ ● /scheduler-demo/[restaurantId]
+│ ├ /scheduler-demo/CR3-diningroom
+│ ├ /scheduler-demo/CR3-kitchen
+│ ├ /scheduler-demo/CR2-kitchen
+│ └ /scheduler-demo/CR2-diningroom
+└ ○ /sitemap.xml
+
+
+○  (Static)  prerendered as static content
+●  (SSG)     prerendered as static HTML (uses generateStaticParams)
+
+mirror-trailing-slash: mirrored 4 routes

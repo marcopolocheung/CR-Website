@@ -1,0 +1,116 @@
+{
+  "evidence_id": "ev_bae26dd8636198cf7e83c0674f7c0fd4bb55f50e7a8fde4ff20d84f0cf29e4ff",
+  "operation": "inspect_web_page",
+  "confidence": "observed",
+  "authority": "external-service",
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "Observation starts when REA attaches; prior network and console activity is unavailable.",
+    "Worker targets are a final inventory snapshot, not worker-session observation. Their attached flag describes any debugging client; this page-session collector does not observe worker network, console, or script events, and short-lived workers may be absent from the snapshot.",
+    "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+    "Source maps are reported only as declarative URLs and are not fetched.",
+    "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+    "CDP discovery omitted the target attachment state; attached is reported as unknown.",
+    "Browser host platform and architecture were not observed."
+  ],
+  "rawEvidenceSha256": "aa31bda5f116e94209101814f46d70297ade234fd39e0073a2bfea3d7f25cfa3",
+  "rawEvidenceLocalPath": ".rea/runs/20261111T182712.533712Z-02f804cd/stdout.txt",
+  "normalized_result": {
+    "target": {
+      "target_id": "58AC7EB24F1CD553E7DB35EF5218DAF3",
+      "type": "page",
+      "title": "Internal component gallery | China Rose",
+      "url": "http://127.0.0.1:3029/internal/ui-gallery",
+      "origin": "http://127.0.0.1:3029",
+      "attached": null
+    },
+    "capture_window": {
+      "started_at": "2026-11-11T18:27:14.502Z",
+      "ended_at": "2026-11-11T18:27:15.116Z",
+      "observation_ms": 500
+    },
+    "completeness": {
+      "status": "policy_filtered",
+      "conditions": [
+        "attach_limited",
+        "policy_filtered"
+      ],
+      "policy_filtered_sections": [
+        "console_text",
+        "json_body_shapes",
+        "script_sources",
+        "scripts",
+        "websocket_shapes"
+      ],
+      "attach_limited_sections": [
+        "console_events",
+        "metadata",
+        "network_requests",
+        "websocket_connections",
+        "websocket_frames",
+        "workers"
+      ],
+      "truncated_sections": [],
+      "unavailable_sections": [],
+      "excluded": [
+        {
+          "section": "console_text",
+          "reason": "not_approved",
+          "count": null
+        },
+        {
+          "section": "json_body_shapes",
+          "reason": "not_approved",
+          "count": null
+        },
+        {
+          "section": "script_sources",
+          "reason": "not_approved",
+          "count": 16
+        },
+        {
+          "section": "scripts",
+          "reason": "unattributed_origin",
+          "count": 28
+        },
+        {
+          "section": "websocket_shapes",
+          "reason": "not_approved",
+          "count": null
+        }
+      ],
+      "dropped_events": {
+        "scripts": 0,
+        "network_requests": 0,
+        "console_events": 0,
+        "websocket_connections": 0,
+        "websocket_frames": 0,
+        "webmcp_tools": 0,
+        "timeline_events": 0,
+        "total": 0
+      }
+    },
+    "storage": {
+      "origin": "http://127.0.0.1:3029",
+      "usage_bytes": 0,
+      "quota_bytes": 468020891,
+      "local_storage_keys": [],
+      "session_storage_keys": [],
+      "indexed_db_names": [],
+      "cache_names": [],
+      "content_fingerprints": [],
+      "fingerprint_algorithm": "sha256",
+      "fingerprints_complete": false,
+      "values_redacted": true
+    },
+    "limitations": [
+      "Observation starts when REA attaches; prior network and console activity is unavailable.",
+      "Worker targets are a final inventory snapshot, not worker-session observation. Their attached flag describes any debugging client; this page-session collector does not observe worker network, console, or script events, and short-lived workers may be absent from the snapshot.",
+      "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+      "Source maps are reported only as declarative URLs and are not fetched.",
+      "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+      "CDP discovery omitted the target attachment state; attached is reported as unknown."
+    ]
+  },
+  "accessibilityNodes": 283
+}
