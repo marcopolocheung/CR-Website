@@ -3,18 +3,17 @@
 import { useCallback, useEffect, useId, useRef, useState, type InputHTMLAttributes } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
 import type { Message } from '@/lib/internal-tools/i18n'
+import { Field } from './ui/controls'
+import { Icon, type IconName } from './ui/Icon'
+import styles from './ui/ui.module.css'
 
 export type FieldIssue = { fieldId: string; message: Message }
 export function focusField(fieldId: string) {
   document.getElementById(fieldId)?.focus()
 }
-export function LabeledInput({ id, label, error, ...props }: InputHTMLAttributes<HTMLInputElement> & { id: string; label: Message; error?: Message | null }) {
+export function LabeledInput({ id, label, error, appearance = 'legacy', ...props }: InputHTMLAttributes<HTMLInputElement> & { id: string; label: Message; error?: Message | null; appearance?: 'legacy' | 'paper' }) {
   const { t } = useInternalLanguage()
-  return <div>
-    <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700">{t(label.key, label.params)}</label>
-    <input {...props} id={id} aria-invalid={error ? true : undefined} aria-describedby={[props['aria-describedby'], error ? `${id}-error` : null].filter(Boolean).join(' ') || undefined} />
-    {error && <p id={`${id}-error`} role="alert" className="mt-2 text-sm text-red-700">{t(error.key, error.params)}</p>}
-  </div>
+  return <Field {...props} id={id} label={t(label.key, label.params)} error={error ? t(error.key, error.params) : undefined} appearance={appearance} />
 }
 export function ErrorSummary({ issues }: { issues: FieldIssue[] }) {
   const { t } = useInternalLanguage()
@@ -37,10 +36,13 @@ const STATE_KEYS = {
   unsaved: 'common.unsaved', device: 'common.savedDevice', sending: 'common.sending', server: 'common.savedServer',
   waiting: 'common.waiting', failed: 'feedback.failed', conflict: 'errors.conflict',
 } as const
-export function SaveFeedback({ state, message }: { state: SaveState; message?: Message | null }) {
+const STATE_ICONS: Record<SaveState, IconName> = {
+  unsaved: 'clock', device: 'clock', sending: 'clock', server: 'check', waiting: 'clock', failed: 'close', conflict: 'warning',
+}
+export function SaveFeedback({ state, message, appearance = 'legacy' }: { state: SaveState; message?: Message | null; appearance?: 'legacy' | 'paper' }) {
   const { t } = useInternalLanguage()
-  return <div role="status" aria-live="polite" aria-atomic="true" data-save-state={state} className="text-sm text-gray-700 print:hidden">
-    <p className="font-medium">{t(STATE_KEYS[state])}</p>
+  return <div role="status" aria-live="polite" aria-atomic="true" data-save-state={state} className={appearance === 'paper' ? styles.saveFeedback : 'text-sm text-gray-700 print:hidden'}>
+    <p className="font-medium">{appearance === 'paper' && <Icon name={STATE_ICONS[state]} size={18} />}{t(STATE_KEYS[state])}</p>
     {message && <p>{t(message.key, message.params)}</p>}
   </div>
 }

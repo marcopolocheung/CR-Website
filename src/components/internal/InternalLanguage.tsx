@@ -46,7 +46,7 @@ export default function InternalLanguage({ children }: { children: React.ReactNo
         <div ref={banner} data-internal-banner className="sticky top-0 z-20 border-b border-yellow-300 bg-yellow-100 px-4 py-2 text-yellow-900 print:hidden">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold">{value.t('shell.internal')}</p>
-            <div role="group" aria-label={value.t('shell.language')} className="flex gap-1">
+            <div role="group" aria-label={value.t('shell.language')} className="flex flex-wrap gap-1">
               {(['en', 'es'] as const).map(language => (
                 <button key={language} type="button" lang={language} aria-pressed={locale === language}
                   onClick={() => choose(language)}

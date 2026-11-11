@@ -1,5 +1,7 @@
 # Internal-tools task tracker
 
+The [Step 02 checkpoint](checkpoints/step-02.md) records opt-in shared primitives and the verified component gallery. Related UX-01/03/04 follow-ups link actual results; unrelated task milestones remain unchanged.
+
 The [Step 01 checkpoint](checkpoints/step-01.md) records the November 11 current-source/runtime baseline and local checks. It does not complete unrelated legacy tasks or establish external/live milestones.
 
 Cash scope: [DEC-02 is approved](cashout-rules.md) for a bookkeeping notebook with a fixed $100 per drawer. CASH-03 is implemented locally (server recalculation, awaiting deploy); CASH-04/05/06 operational workflows are deferred. CASH-08 ordinary saves/history uses DATA-05 and is independent of those deferred workflows.

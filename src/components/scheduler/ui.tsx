@@ -1,6 +1,7 @@
 'use client'
 
 import { type PublishState } from '@/lib/scheduler'
+import { Icon as SharedIcon } from '@/components/internal/ui/Icon'
 export function FlipSwitch({
   on,
   onFlip,
@@ -182,27 +183,23 @@ export type IconName =
   | 'warning'
 
 export function Icon({ name }: { name: IconName }) {
-  const paths: Record<IconName, React.ReactNode> = {
-    check: <path d="M5 12l4 4L19 6" />,
-    chevronDown: <path d="M6 9l6 6 6-6" />,
+  // Existing scheduler concepts share the bank paths; unrelated icons retain their contract.
+  const shared = { check: 'check', close: 'close', lock: 'lock', plus: 'plus', print: 'print', chevronDown: 'chevron', warning: 'warning' } as const
+  if (name in shared) return <SharedIcon name={shared[name as keyof typeof shared]} size={16} className="shrink-0" />
+  const paths: Record<Exclude<IconName, keyof typeof shared>, React.ReactNode> = {
     chevronLeft: <path d="M15 6l-6 6 6 6" />,
     chevronRight: <path d="M9 6l6 6-6 6" />,
-    close: <path d="M6 6l12 12M18 6L6 18" />,
-    lock: <path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v10H6z" />,
     move: <path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" />,
-    plus: <path d="M12 5v14M5 12h14" />,
-    print: <path d="M7 8V4h10v4M7 17H5V9h14v8h-2M7 14h10v6H7z" />,
     reset: <path d="M4 12a8 8 0 1 0 2.3-5.7M4 5v5h5" />,
     share: <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M12 3v13M8 7l4-4 4 4" />,
     spark: <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z" />,
     target: <path d="M12 2v4M12 18v4M2 12h4M18 12h4M7 12a5 5 0 1 0 10 0 5 5 0 0 0-10 0zM10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0z" />,
     undo: <path d="M9 14l-4-4 4-4M5 10h9a5 5 0 1 1 0 10h-1" />,
-    warning: <path d="M12 9v4M12 17h.01M10.3 4.9L2.8 18a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.9a2 2 0 0 0-3.4 0z" />,
   }
 
   return (
     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {paths[name]}
+      {paths[name as keyof typeof paths]}
     </svg>
   )
 }
