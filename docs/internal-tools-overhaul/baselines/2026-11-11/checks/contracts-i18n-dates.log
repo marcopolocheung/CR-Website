@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: Central midnight is seasonal rather than a fixed CST offset
+ok 1 - Central midnight is seasonal rather than a fixed CST offset
+  ---
+  duration_ms: 10.110605
+  type: 'test'
+  ...
+# Subtest: DST transitions preserve dates; repeated fall clock is two distinct instants
+ok 2 - DST transitions preserve dates; repeated fall clock is two distinct instants
+  ---
+  duration_ms: 0.878873
+  type: 'test'
+  ...
+# Subtest: existing Sunday weeks and calendar arithmetic remain stable across DST
+ok 3 - existing Sunday weeks and calendar arithmetic remain stable across DST
+  ---
+  duration_ms: 0.262943
+  type: 'test'
+  ...
+# Subtest: dates validate calendar dates independently of timezone or business-day policy
+ok 4 - dates validate calendar dates independently of timezone or business-day policy
+  ---
+  duration_ms: 0.797232
+  type: 'test'
+  ...
+# Subtest: money, revision, and identity reject coercion and preserve missing versus zero
+ok 5 - money, revision, and identity reject coercion and preserve missing versus zero
+  ---
+  duration_ms: 0.216088
+  type: 'test'
+  ...
+# Subtest: legacy restaurant query preserves all explicit station/store mappings and defaults
+ok 6 - legacy restaurant query preserves all explicit station/store mappings and defaults
+  ---
+  duration_ms: 0.150743
+  type: 'test'
+  ...
+# Subtest: capability detection fails closed, distinguishes unavailable, and requires atomic/idempotent writes
+ok 7 - capability detection fails closed, distinguishes unavailable, and requires atomic/idempotent writes
+  ---
+  duration_ms: 0.532233
+  type: 'test'
+  ...
+# Subtest: legacy fixtures round-trip intact without claiming stronger persistence guarantees
+ok 8 - legacy fixtures round-trip intact without claiming stronger persistence guarantees
+  ---
+  duration_ms: 0.433324
+  type: 'test'
+  ...
+# Subtest: errors and policy gates remain language independent and preserve rejected input
+ok 9 - errors and policy gates remain language independent and preserve rejected input
+  ---
+  duration_ms: 0.279386
+  type: 'test'
+  ...
+# Subtest: English/Spanish dictionaries have identical keys, nonempty text and matching placeholders
+ok 10 - English/Spanish dictionaries have identical keys, nonempty text and matching placeholders
+  ---
+  duration_ms: 3.792487
+  type: 'test'
+  ...
+# Subtest: missing keys and parameters stay visible; original input is never translated or coerced
+ok 11 - missing keys and parameters stay visible; original input is never translated or coerced
+  ---
+  duration_ms: 0.206964
+  type: 'test'
+  ...
+# Subtest: legacy failures map to stable translation keys without exposing arbitrary server text
+ok 12 - legacy failures map to stable translation keys without exposing arbitrary server text
+  ---
+  duration_ms: 0.215043
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 289.880638

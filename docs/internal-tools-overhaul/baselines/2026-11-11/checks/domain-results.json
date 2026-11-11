@@ -1,0 +1,122 @@
+[
+  {
+    "command": "npm run cashout:test",
+    "exit": 0,
+    "summary": [
+      "# tests 27",
+      "# pass 27",
+      "# fail 0",
+      "# skipped 0",
+      "# duration_ms 603.901787"
+    ],
+    "seconds": 0.75
+  },
+  {
+    "command": "npm run recovery:test",
+    "exit": 0,
+    "summary": [
+      "# tests 7",
+      "# pass 7",
+      "# fail 0",
+      "# skipped 0",
+      "# duration_ms 505.49857"
+    ],
+    "seconds": 0.61
+  },
+  {
+    "command": "npm run imports:test",
+    "exit": 0,
+    "summary": [
+      "# tests 52",
+      "# pass 52",
+      "# fail 0",
+      "# skipped 0",
+      "# duration_ms 7647.628157"
+    ],
+    "seconds": 6.0
+  },
+  {
+    "command": "npm run forms:test",
+    "exit": 0,
+    "summary": [
+      "# tests 15",
+      "# pass 15",
+      "# fail 0",
+      "# skipped 0",
+      "# duration_ms 678.332334"
+    ],
+    "seconds": 1.08
+  },
+  {
+    "command": "npm run scheduler:test",
+    "exit": 0,
+    "summary": [
+      "# tests 145",
+      "# pass 145",
+      "# fail 0",
+      "# skipped 0",
+      "# duration_ms 2750.548005"
+    ],
+    "seconds": 2.88
+  },
+  {
+    "command": "npm run scheduler:requests:test",
+    "exit": 0,
+    "summary": [
+      "# tests 5",
+      "# pass 5",
+      "# fail 0",
+      "# skipped 0",
+      "# duration_ms 424.823893"
+    ],
+    "seconds": 0.54
+  },
+  {
+    "command": "npm run agent:test",
+    "exit": 0,
+    "summary": [
+      "# tests 13",
+      "# pass 13",
+      "# fail 0",
+      "# skipped 0",
+      "# duration_ms 2739.397135"
+    ],
+    "seconds": 2.86
+  },
+  {
+    "command": "npm run data:test",
+    "exit": 0,
+    "summary": [
+      "# tests 10",
+      "# pass 10",
+      "# fail 0",
+      "# skipped 0",
+      "# duration_ms 44117.071501"
+    ],
+    "seconds": 42.45
+  },
+  {
+    "command": "npm run imports:worker:test",
+    "exit": 0,
+    "summary": [
+      "# tests 5",
+      "# pass 5",
+      "# fail 0",
+      "# skipped 0",
+      "# duration_ms 27584.380884"
+    ],
+    "seconds": 25.96
+  },
+  {
+    "command": "npm run scheduler:requests:worker:test",
+    "exit": 0,
+    "summary": [
+      "# tests 4",
+      "# pass 4",
+      "# fail 0",
+      "# skipped 0",
+      "# duration_ms 23829.566732"
+    ],
+    "seconds": 22.19
+  }
+]

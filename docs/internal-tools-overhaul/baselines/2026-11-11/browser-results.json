@@ -1,0 +1,320 @@
+{
+  "fixture": "step01-2026-11-11-v1",
+  "sourceCommit": "f65777963cd0f1ff722c75d67a31a3189c1de40b",
+  "frontend": "http://127.0.0.1:3027",
+  "api": "http://127.0.0.1:8787 (intercepted; no real service)",
+  "assistant": "disabled",
+  "browser": "158.0.8127.18",
+  "scenarios": [
+    {
+      "scenario": "/internal",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/internal/bookkeeping",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/internal/inventory",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/internal/forms",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/internal/qr-generator",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/scheduler-demo",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/schedule",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/scheduler-demo/CR2-diningroom",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/schedule/CR2-diningroom",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/scheduler-demo/CR2-kitchen",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/schedule/CR2-kitchen",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/scheduler-demo/CR3-diningroom",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/schedule/CR3-diningroom",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/scheduler-demo/CR3-kitchen",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "/schedule/CR3-kitchen",
+      "observed": "HTTP 200; hydrated title visible; external network blocked"
+    },
+    {
+      "scenario": "#cash-out",
+      "observed": "Matching tab selected and panel visible"
+    },
+    {
+      "scenario": "#sales",
+      "observed": "Matching tab selected and panel visible"
+    },
+    {
+      "scenario": "#hours",
+      "observed": "Matching tab selected and panel visible"
+    },
+    {
+      "scenario": "#comparison",
+      "observed": "Matching tab selected and panel visible"
+    },
+    {
+      "scenario": "forms-empty-failed",
+      "observed": "Empty list and failed fetch have distinct messages; failed read does not claim an empty history"
+    },
+    {
+      "scenario": "CR2",
+      "observed": "Blank/zero distinct; $300 drawer/$200 turn-in; zero Toast gives +$200; tab/reload/resume preserves changed draft; failed save retains inputs; legacy bytes unchanged; no stored token"
+    },
+    {
+      "scenario": "CR2-partial-hours",
+      "observed": "CSV parsed with matched and open/unmatched rows; partial source retained for later review"
+    },
+    {
+      "scenario": "CR3",
+      "observed": "Blank/zero distinct; $300 drawer/$200 turn-in; zero Toast gives +$200; tab/reload/resume preserves changed draft; failed save retains inputs; legacy bytes unchanged; no stored token"
+    },
+    {
+      "scenario": "CR3-partial-hours",
+      "observed": "CSV parsed with matched and open/unmatched rows; partial source retained for later review"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "internal-initial.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "internal-inventory-initial.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "internal-forms-initial.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "schedule-CR2-kitchen-initial.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "cash-empty-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "forms-empty-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "forms-history-failed.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "cash-CR2-populated.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "cash-CR2-interrupted.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "cash-CR2-save-failed.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "hours-CR2-partial.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "cash-CR3-populated.png",
+      "viewport": {
+        "width": 375,
+        "height": 1000
+      }
+    },
+    {
+      "file": "cash-CR3-interrupted.png",
+      "viewport": {
+        "width": 375,
+        "height": 1000
+      }
+    },
+    {
+      "file": "cash-CR3-save-failed.png",
+      "viewport": {
+        "width": 375,
+        "height": 1000
+      }
+    },
+    {
+      "file": "hours-CR3-partial.png",
+      "viewport": {
+        "width": 375,
+        "height": 1000
+      }
+    }
+  ],
+  "apiRequests": [
+    {
+      "method": "GET",
+      "path": "/api/schedule"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/writeups"
+    },
+    {
+      "method": "GET",
+      "path": "/api/forms"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/writeups"
+    },
+    {
+      "method": "GET",
+      "path": "/api/forms"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-11"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR3/2026-11-11"
+    }
+  ],
+  "externalAttempts": [],
+  "pageErrors": [],
+  "sha256": {
+    "scheduler-schedule-mobile.png": "835a6278f873f2179680a2b8f5c33f4e791cde82626eb1fda7b29e75003be2c0",
+    "cash-CR3-populated.png": "c66f5c99ce1cd536a58b683261a55ba95a482f201943eebbbdad1c28640d341e",
+    "schedule-CR2-kitchen-initial.png": "0fdd13ccb4f115148553b6e0d4403bbd9a36db0e6ccb5f7ed577000eca951654",
+    "cash-CR3-save-failed.png": "9c82adca61bf38eea51691b3a610c0a11892ee27b3da744144528e5c825957a4",
+    "cash-CR2-save-failed.png": "71a6db2b2796e252c7d06871fcce47d1e8d65a454ac2252a6a5b52c0c0614bab",
+    "hours-CR3-partial.png": "908a884f101220b84ab47ab01565edf4d8d01eda8c95ba9cc08d312c1a2ffdbb",
+    "forms-history-failed.png": "3f817da165c66db9685cf6365890cae3a968f347b68b2972c24460f25164a7cf",
+    "internal-inventory-initial.png": "ac716493cd57520878d394325d933c8bbe4d802876c2e96e90d007ea60233dac",
+    "scheduler-schedule-new-desktop.png": "e0af471b9b86da951d5b0c8535f23fa332861692e856161b616ef38b74ca3301",
+    "cash-CR2-populated.png": "3ad68b99dee5d24b95ebbf4903b9202af43398a3f794b199acbeb0253d4fcb93",
+    "internal-forms-initial.png": "3ba26b18608bd234d3cb62fd4f6e7f68c472793ef97bbe15f6cbbe1de883face",
+    "hours-CR2-partial.png": "e78ac8a3664720b00f6ad1ca0f53e1b81c5a2045e3fb57c56afacbbe1fd9aa0a",
+    "forms-empty-desktop.png": "6900c0e96b70257244a836eaf96ec14a1f8a26e3baccd16537362ede8fe05cd3",
+    "cash-empty-desktop.png": "76220209d7e3dcd6d9dc2f45a483c2705c1ed88da3e5cfe21d1a86b032d1457e",
+    "cash-CR3-interrupted.png": "8e323bfe8f48b0645abdc0b0afe3fa2e4c3675100f95e26ce60ffacc7899845c",
+    "internal-initial.png": "a3f3312b468aa28db94bc1b6255c79df6021e32bb92936a1bf6fcd1f40bf6ddf",
+    "cash-CR2-interrupted.png": "6ab8cfd778eb6fc229273ce8adcb2d8576569797b13746eafaf6f7e58cef2c1d"
+  }
+}

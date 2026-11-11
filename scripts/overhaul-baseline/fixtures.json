@@ -1,0 +1,15 @@
+{
+  "id": "step01-2026-11-11-v1",
+  "synthetic": true,
+  "date": "2026-11-11",
+  "stores": ["CR2", "CR3"],
+  "preparer": "Synthetic baseline",
+  "cashier": "Fixture cashier",
+  "count": "3",
+  "zero": "0",
+  "blank": "",
+  "expectedDrawerCents": 30000,
+  "expectedTurnInCents": 20000,
+  "legacyDraft": "{\"am\":[],\"pm\":[],\"zReport\":\"123.45\"}",
+  "partialHours": "Employee External Id,Employee,Job Title,In Date,Out Date,Total Hours,Regular Hours,Overtime Hours\ne1,Synthetic matched,Cook,11/11/2026 08:00 AM,11/11/2026 04:00 PM,8,7.5,0.5\n,Synthetic unmatched,Cook,11/11/2026 08:00 AM,,4,4,0\n"
+}
