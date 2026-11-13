@@ -29,6 +29,13 @@ def shot(page, name):
     file = args.artifacts / (name+'.png'); page.screenshot(path=str(file), full_page=True)
     images.append({'file': file.name, 'viewport': page.viewport_size, 'sha256': hashlib.sha256(file.read_bytes()).hexdigest()})
 def nav(page, item): return page.locator('[data-shell-chrome] [data-nav-item="'+item+'"]')
+def open_sales(page):
+    nav(page,'reports').click()
+    page.wait_for_url(re.compile('/internal/reports$'))
+    page.wait_for_load_state('networkidle')
+    page.locator('[data-internal-workspace=reports] a[href$="#sales"]').click()
+    expect(page).to_have_url(re.compile('/internal/bookkeeping#sales$'))
+    expect(page.locator('#tab-sales')).to_have_attribute('aria-selected','true')
 def selected(page, item): expect(nav(page,item)).to_have_attribute('aria-current','page')
 def context_line(page): return page.locator('[data-shell-context]')
 def aligned(page,item):
@@ -92,7 +99,7 @@ with sync_playwright() as p:
         for item in ('cash','reports','inventory','forms','dashboard'):
             if mode=='keyboard':nav(page,item).focus();page.keyboard.press('Enter')
             else:nav(page,item).click()
-            expected = {'cash':'/internal/bookkeeping#cash-out','reports':'/internal/bookkeeping#sales','inventory':'/internal/inventory','forms':'/internal/forms','dashboard':'/internal'}[item]
+            expected = {'cash':'/internal/bookkeeping#cash-out','reports':'/internal/reports','inventory':'/internal/inventory','forms':'/internal/forms','dashboard':'/internal'}[item]
             expect(page).to_have_url(re.compile(re.escape(expected)+'$'))
             page.wait_for_load_state('networkidle');expect(page.locator('[data-shell-ready=true]')).to_be_visible();selected(page,item)
             expect(page.locator('h1:visible').first).to_be_visible()
@@ -114,10 +121,10 @@ with sync_playwright() as p:
         expect(context_line(page)).to_contain_text('CR2');expect(context_line(page)).to_contain_text('2026-11-11')
         page.evaluate('window.shellMountedSentinel="retained"')
         nav(page,'reports').hover();aligned(page,'reports');selected(page,'cash')
-        nav(page,'reports').click();selected(page,'reports')
+        open_sales(page);selected(page,'reports')
         assert page.evaluate('window.shellMountedSentinel')=='retained',variant
-        page.go_back();selected(page,'cash');expect(page.locator('#tab-cash-out')).to_have_attribute('aria-selected','true')
-        page.go_forward();selected(page,'reports');expect(page.locator('#tab-sales')).to_have_attribute('aria-selected','true')
+        page.go_back();page.wait_for_url(re.compile('/internal/reports$'));page.go_back();selected(page,'cash');expect(page.locator('#tab-cash-out')).to_have_attribute('aria-selected','true')
+        page.go_forward();page.wait_for_url(re.compile('/internal/reports$'));page.go_forward();selected(page,'reports');expect(page.locator('#tab-sales')).to_have_attribute('aria-selected','true')
         page.get_by_role('link',name='Skip to workspace',exact=True).focus();page.keyboard.press('Enter')
         expect(page.locator('#internal-workspace')).to_be_focused();selected(page,'reports')
         page.locator('#sc-location').select_option(index=1);page.locator('#sc-date').fill('2026-11-10');page.locator('#sc-first').fill('Sales fixture')
@@ -128,7 +135,7 @@ with sync_playwright() as p:
         page.evaluate('window.shellOriginalFile=document.querySelector("#hc-file").files[0]')
         expect(context_line(page)).to_contain_text('CR2');expect(context_line(page)).to_contain_text('2026-11-30')
         nav(page,'cash').click();selected(page,'cash');expect(page.locator('#am-0-name')).to_have_value('Synthetic CR2 cashier');expect(page.locator('#am-0-10000')).to_have_value('3')
-        nav(page,'reports').click();expect(page.locator('#sc-first')).to_have_value('Sales fixture')
+        open_sales(page);expect(page.locator('#sc-first')).to_have_value('Sales fixture')
         page.locator('#tab-hours').click();assert page.locator('#hc-file').evaluate('e=>e.files[0].name')=='synthetic-hours.csv'
         assert page.evaluate('window.shellOriginalFile===document.querySelector("#hc-file").files[0]')
         assert page.evaluate('window.shellMountedSentinel')=='retained'

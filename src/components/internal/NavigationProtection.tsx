@@ -71,7 +71,12 @@ export default function NavigationProtection({ children }: { children: React.Rea
       const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null
       if (!(anchor instanceof HTMLAnchorElement) || anchor.hasAttribute('download') || (anchor.target && anchor.target !== '_self')) return
       const target = new URL(anchor.href,location.href)
-      if (!['http:','https:'].includes(target.protocol) || (target.origin === location.origin && target.pathname === location.pathname && target.search === location.search)) return
+      if (!['http:','https:'].includes(target.protocol)) return
+      if (target.origin === location.origin && target.pathname === location.pathname && target.search === location.search) {
+        // Re-selecting the active task must not reload the memory-only session.
+        if (target.hash === location.hash) { event.preventDefault(); event.stopImmediatePropagation() }
+        return
+      }
       const normalized = target.pathname.replace(/\.html$/, '').replace(/\/$/, '')
       const base = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '')
       if (target.origin === location.origin && (normalized === `${base}/internal` || normalized.startsWith(`${base}/internal/`))) {

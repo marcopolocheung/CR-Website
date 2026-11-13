@@ -1,0 +1,18 @@
+{
+  "scripts/test-internal-language.py": "4e3ad058b4aa7aadc247e3327382d5545872887f425d8acf871b2bcb432bc8bf",
+  "scripts/test-internal-session.py": "a69ad0c1612b594ace8880f07a8d158c5724ca3361b01423a4205e5b900bdcc0",
+  "scripts/test-internal-shell.py": "d9107f8b9ac5dbbbbd82ae7ca94b104ee27b53a0f081cbed874f1279361e5cf3",
+  "src/components/internal/Dashboard.tsx": "ed54a28b2a2c9edaf8bbd2cc738fe91270c17ecd2b7622dca53e1ba17af77612",
+  "src/components/internal/InternalShell.tsx": "b6433237c894b6b90ce925cf1d5f443ba6c83f0237d51e16bcba00fbf21fff45",
+  "src/components/internal/NavigationProtection.tsx": "e6b9d04c57eab58472c9ff0a5478e6fd9a7d7d4f0ddb82415bc55530732f4dbe",
+  "src/components/internal/SHELL.md": "fb6e761be885b9fb94b1a0d0956bd5332dff5ba2428a74a12f5d8dd92f2b7d03",
+  "src/components/internal/WorkspaceHost.tsx": "4839830c1ca8438c5f880fe785c0cbe943ec013d8bf68bc84ed8c53f45856e4a",
+  "src/lib/internal-tools/i18n/en.ts": "7933bc06edd46641294988e7541d6a1cfb355bff1802647a54da1f52d99e0de6",
+  "src/lib/internal-tools/i18n/es.ts": "dc16af174fc5b1f1bcbcc047acbddac7a79ed243bbf69801f311dd28a9bb5553",
+  "scripts/test-internal-home-reports.py": "c7ac46dc49fd070646189d10d3e4abbc807efc2762ff3dd81a5c07d54c73ddc6",
+  "src/app/(order-shell)/internal/reports/page.tsx": "61dbe499bf520dc7f2d4e667ce63da4758c59b18c33e88ccd1bbb2fd2eb169d3",
+  "src/components/internal/CashReports.tsx": "b5f2df1b97f95e0eea8a02e8062a526593b20b7f05f40fcc0a6b5992486d6f03",
+  "src/components/internal/ReportsWorkspace.tsx": "5205492e408cf1d3fc8bf78770f11a2f8d3fea14ef3f45d3dce3b27d69bfb4c1",
+  "src/components/internal/TaskLinks.tsx": "edc731a6911c7849839b68519a548edf5c06dd02209483734e8e1b8012e829bf",
+  "src/components/internal/task-links.module.css": "b328be7cd95d668025baf7748c3edc42a8bb634caa4da012631e547c8c5a12cf"
+}

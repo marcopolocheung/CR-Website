@@ -17,7 +17,7 @@ const destinations = [
   { id: 'cash', icon: 'cash', href: '/internal/bookkeeping#cash-out' },
   { id: 'inventory', icon: 'inventory', href: '/internal/inventory' },
   { id: 'schedule', icon: 'calendar', href: '/scheduler-demo' },
-  { id: 'reports', icon: 'report', href: '/internal/bookkeeping#sales' },
+  { id: 'reports', icon: 'report', href: '/internal/reports' },
   { id: 'forms', icon: 'form', href: '/internal/forms' },
 ] as const
 const reportTabs = ['sales', 'hours', 'comparison']
@@ -37,20 +37,20 @@ export default function InternalShell({ children, themeClassName }: { children: 
     return () => { window.removeEventListener('hashchange', update); window.removeEventListener('popstate', update) }
   }, [pathname])
   const section = pathname.endsWith('/bookkeeping') ? (reportTabs.includes(hash) ? 'reports' : 'cash')
-    : pathname.endsWith('/inventory') ? 'inventory' : pathname.endsWith('/forms') ? 'forms'
+    : pathname.endsWith('/reports') ? 'reports' : pathname.endsWith('/inventory') ? 'inventory' : pathname.endsWith('/forms') ? 'forms'
     : pathname.endsWith('/qr-generator') ? 'qr' : pathname.endsWith('/ui-gallery') ? 'gallery' : 'dashboard'
-  const taskId = section === 'reports' ? hash : section
+  const taskId = section === 'reports' && pathname.endsWith('/bookkeeping') ? hash : section
   const session = useManagerSession()
   const tasks = useShellTasks()
   const metadata = tasks[taskId]
   const access = (section === 'cash' ? metadata : undefined) ?? tasks[section === 'reports' ? 'bookkeeping' : section]
   const detailed = (section === 'forms' && access?.onLock ? (tasks['forms-context'] ?? tasks['forms-record']) : undefined)
-    ?? (section === 'dashboard' && access?.onLock ? tasks['dashboard-context'] : undefined)
+    ?? (section === 'reports' && pathname.endsWith('/reports') && session.token ? tasks['reports-context'] : undefined)
   const { t } = useInternalLanguage()
   const context = detailed?.context ?? metadata?.context
   const title = t(`shell.${section}` as TranslationKey)
   const items = useMemo(() => destinations.map(item => ({ ...item, icon: item.icon as IconName,
-    href: /\/bookkeeping(?:\.html)?\/?$/.test(localPath) && (item.id === 'cash' || item.id === 'reports')
+    href: /\/bookkeeping(?:\.html)?\/?$/.test(localPath) && item.id === 'cash'
       ? `${localPath}#${item.id === 'cash' ? 'cash-out' : 'sales'}` : base + item.href,
     label: t(`shell.${item.id}` as TranslationKey) })), [t, localPath])
   const root = useRef<HTMLDivElement>(null)

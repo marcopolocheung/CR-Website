@@ -131,6 +131,8 @@ with sync_playwright() as p:
             nav(page, destination).focus(); page.keyboard.press('Enter')
         else: nav(page, destination).click()
         selected(page, destination)
+        if destination == 'reports':
+            page.locator('[data-internal-workspace=reports] a[href$="#sales"]').click()
         expect(page.locator('[data-shell-ready=true]')).to_be_visible()
         assert not page.get_by_role('dialog').is_visible(), 'Retained internal navigation must not ask to abandon work'
 
@@ -294,6 +296,7 @@ with sync_playwright() as p:
     page.get_by_role('dialog').get_by_role('button').last.click()
     expect(visible(page, '#inventory-date')).to_have_value(next_date)
     expect(count).to_have_value('')
+    expect(page.get_by_role('button', name='Save count', exact=True)).to_be_enabled()
     visible(page, '#inventory-date').fill(original_date); accept_dialog_if_any(page)
     expect(count).to_have_value('3B/2T')
     page.locator('#inventory-edit-list').click()
@@ -301,6 +304,8 @@ with sync_playwright() as p:
     name.fill('Catalog name retained across shared lock')
     go(page, 'dashboard')
     page.locator('[data-shell-lock]').click(); accept_dialog_if_any(page)
+    expect(page.locator('[data-shell-lock]')).to_be_disabled()
+    go(page, 'inventory')
     expect(visible(page, '#cashout-code')).to_have_count(1)
     recovery = page.evaluate('JSON.parse(localStorage.getItem("cr-inventory-catalog-recovery-v1"))')
     assert recovery['baseRevision'] == 7 and recovery['sheets'][0]['items'][0]['name'] == 'Catalog name retained across shared lock'

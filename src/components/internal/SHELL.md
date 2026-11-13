@@ -80,3 +80,21 @@ The provider never persists credentials. Preparer labels remain user-entered
 labels. API authorization, legacy conflict/retry limitations, scheduler-specific
 permissions, public schedules and encrypted-link adapters remain independent.
 See the [Step 04 checkpoint](../../../docs/internal-tools-overhaul/checkpoints/step-04.md).
+
+
+## Step 05: Home and Reports
+
+Home is a five-task launcher with no history fetch, credential gate, charts or
+invented resume/attention signals. Reports now has a retained `/internal/reports`
+workspace with cash history and links to the original sales/hours/comparison
+Bookkeeping hashes. Primary Reports navigation always opens the hub. Legacy
+Bookkeeping hashes and Cash's current-path aliases remain compatible; the host
+keeps their editors and File objects alive while visiting either new destination.
+The preceding Step 03 Cash/Reports hash-link description is historical.
+
+`CashReports` preserves the original Dashboard cash report's populated calculations,
+filters, chart/table output and endpoints. Empty selected coverage now has an
+explicit empty state; failed reads have an alert/retry and do not masquerade as
+empty data. No backend, parser, retention or business formula changed. Cross-tool
+work signals remain Step 17. Re-selecting an identical active internal link is a
+no-op to avoid reloading the memory-only session; changed hashes remain native.
