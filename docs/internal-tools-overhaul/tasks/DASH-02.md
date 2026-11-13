@@ -101,3 +101,11 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - Blockers: Listed prerequisites are pending.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+
+
+## Overhaul Step 05 — November 13, 2026
+
+The [Step 05 checkpoint](../checkpoints/step-05.md) records Home's task launcher,
+separate Reports destination, relocated original cash report and truthful
+empty/failure behavior. Cross-tool resume/recent/attention signals remain Step 17.
+This bounded review does not close unrelated backend, retention or live milestones.

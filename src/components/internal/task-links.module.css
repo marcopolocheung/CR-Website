@@ -1,0 +1,8 @@
+.workspace { padding: clamp(16px, 3vw, 36px); color: var(--cr-black); }
+.title { font-family: var(--cr-display); font-size: clamp(32px, 4vw, 46px); line-height: 1.1; font-weight: 700; margin: 0 0 24px; overflow-wrap: anywhere; }
+.links { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 20px; margin-bottom: 32px; }
+.link { display: flex; align-items: center; gap: 16px; min-height: 96px; padding: 20px; border: 1px solid #555; background: white; box-shadow: 2px 3px #b4b4b4; font-size: 20px; font-weight: 600; color: #171717; text-decoration: none; overflow-wrap: anywhere; min-width: 0; }
+.link svg { flex-shrink: 0; color: var(--cr-accent-ink); }
+.link:hover { border-color: var(--cr-red); }
+.link:focus-visible { outline: 3px solid #171717; outline-offset: 4px; }
+@media print { .links { display: none; } }

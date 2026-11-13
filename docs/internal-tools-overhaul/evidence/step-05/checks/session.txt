@@ -1,0 +1,50 @@
+
+> chinarose@0.0.2 internal:session:test
+> node --import jiti/register --test src/lib/internal-tools/manager-session.test.ts src/lib/internal-tools/work-transitions.test.ts
+
+TAP version 13
+# Subtest: session lifetime rejects old successful requests and old expiry with the same code
+ok 1 - session lifetime rejects old successful requests and old expiry with the same code
+  ---
+  duration_ms: 0.785659
+  type: 'test'
+  ...
+# Subtest: unauthorized response clears current access while unowned APIs remain independent
+ok 2 - unauthorized response clears current access while unowned APIs remain independent
+  ---
+  duration_ms: 0.113154
+  type: 'test'
+  ...
+# Subtest: internal request rejects a delayed body after reauthentication and does not expire newer access
+ok 3 - internal request rejects a delayed body after reauthentication and does not expire newer access
+  ---
+  duration_ms: 13.785967
+  type: 'test'
+  ...
+# Subtest: a verification completing after the layout exits cannot revive access
+ok 4 - a verification completing after the layout exits cannot revive access
+  ---
+  duration_ms: 0.141307
+  type: 'test'
+  ...
+# Subtest: failed storage checkpoints other tasks without closing any editor
+ok 5 - failed storage checkpoints other tasks without closing any editor
+  ---
+  duration_ms: 1.084675
+  type: 'test'
+  ...
+# Subtest: busy work prevents partial handoff and unsupported memory-only work stays open
+ok 6 - busy work prevents partial handoff and unsupported memory-only work stays open
+  ---
+  duration_ms: 0.144734
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 357.327309

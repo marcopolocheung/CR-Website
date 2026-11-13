@@ -1,0 +1,116 @@
+{
+  "evidence_id": "ev_09e6af1e8373c5f4b371f783e8d4d798e84ecf77ca8040a4ddfb16f0b82415a3",
+  "target": {
+    "target_id": "9ABEB6ED0EA34610C345D8775C567726",
+    "type": "page",
+    "title": "Reports | China Rose",
+    "url": "http://127.0.0.1:3039/internal/reports",
+    "origin": "http://127.0.0.1:3039",
+    "attached": null
+  },
+  "provider": {
+    "id": "rea-cdp-browser",
+    "name": "REA Chrome DevTools Protocol observation provider",
+    "version": "2"
+  },
+  "capture_window": {
+    "started_at": "2026-11-13T22:33:37.513Z",
+    "ended_at": "2026-11-13T22:33:38.201Z",
+    "observation_ms": 500
+  },
+  "completeness": {
+    "status": "policy_filtered",
+    "conditions": [
+      "attach_limited",
+      "policy_filtered"
+    ],
+    "policy_filtered_sections": [
+      "console_text",
+      "json_body_shapes",
+      "resources",
+      "script_sources",
+      "scripts",
+      "websocket_shapes"
+    ],
+    "attach_limited_sections": [
+      "console_events",
+      "metadata",
+      "network_requests",
+      "websocket_connections",
+      "websocket_frames",
+      "workers"
+    ],
+    "truncated_sections": [],
+    "unavailable_sections": [],
+    "excluded": [
+      {
+        "section": "console_text",
+        "reason": "not_approved",
+        "count": null
+      },
+      {
+        "section": "json_body_shapes",
+        "reason": "not_approved",
+        "count": null
+      },
+      {
+        "section": "resources",
+        "reason": "unsupported_url",
+        "count": 1
+      },
+      {
+        "section": "script_sources",
+        "reason": "not_approved",
+        "count": 22
+      },
+      {
+        "section": "scripts",
+        "reason": "unattributed_origin",
+        "count": 35
+      },
+      {
+        "section": "websocket_shapes",
+        "reason": "not_approved",
+        "count": null
+      }
+    ],
+    "dropped_events": {
+      "scripts": 0,
+      "network_requests": 0,
+      "console_events": 0,
+      "websocket_connections": 0,
+      "websocket_frames": 0,
+      "webmcp_tools": 0,
+      "timeline_events": 0,
+      "total": 0
+    }
+  },
+  "dom_total_nodes": 1568,
+  "storage": {
+    "origin": "http://127.0.0.1:3039",
+    "usage_bytes": 0,
+    "quota_bytes": 469845008,
+    "local_storage_keys": [
+      "cr-internal-draft:%5B%22cash-out%22%2C%22CR2%22%2C%222026-11-12%22%2Cnull%2Cnull%2Cnull%2Cnull%2Cnull%5D:0620aa44-8621-46f3-a940-71f97d0a30ef",
+      "cr-internal-locale",
+      "cr-internal-draft:%5B%22form%22%2C%22CR3%22%2C%222026-11-11%22%2Cnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22write-up%22%5D:78e0308c-cdfa-43d1-a4ac-464cdc23e696"
+    ],
+    "session_storage_keys": [],
+    "indexed_db_names": [],
+    "cache_names": [],
+    "content_fingerprints": [],
+    "fingerprint_algorithm": "sha256",
+    "fingerprints_complete": false,
+    "values_redacted": true
+  },
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "Observation starts when REA attaches; prior network and console activity is unavailable.",
+    "Worker targets are a final inventory snapshot, not worker-session observation. Their attached flag describes any debugging client; this page-session collector does not observe worker network, console, or script events, and short-lived workers may be absent from the snapshot.",
+    "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+    "Source maps are reported only as declarative URLs and are not fetched.",
+    "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+    "CDP discovery omitted the target attachment state; attached is reported as unknown.",
+    "Browser host platform and architecture were not observed."
+  ]
+}
