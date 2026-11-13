@@ -7,7 +7,7 @@ import { STORE_LABELS } from './CashOut'
 import DraftChooser, { downloadDraftSource } from './DraftChooser'
 import { LabeledInput, focusField } from './Feedback'
 import { useInternalLanguage } from './InternalLanguage'
-import { useNavigationProtection } from './NavigationProtection'
+import { useNavigationProtection, useWorkTransitions } from './NavigationProtection'
 import { CASHOUT_STORES, type CashoutStore } from '@/lib/cashout-store'
 import { businessDate, type Json } from '@/lib/internal-tools/contracts'
 import { saveDraft, type Draft, type DraftContext } from '@/lib/internal-tools/drafts'
@@ -58,7 +58,7 @@ export default function FormDraftWorkspace<F extends Json>({ formType, title, cr
   const [storageFailed, setStorageFailed] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
-  useNavigationProtection({ dirty: !!active && dirty && !active.payload.savedId, deviceSaved: !storageFailed })
+  const transitions = useWorkTransitions()
 
   const context = useMemo<DraftContext | null>(() => {
     const parsed = businessDate(date)
@@ -93,6 +93,10 @@ export default function FormDraftWorkspace<F extends Json>({ formType, title, cr
     setDirty(false)
   }, [write])
 
+  useNavigationProtection({ dirty: !!active && dirty && !active.payload.savedId, deviceSaved: !storageFailed,
+    checkpoint: () => !activeRef.current || write(activeRef.current.payload),
+    leave: () => { activeRef.current = null; setActive(null); setDirty(false) } })
+
   const open = (draft: Draft<T>) => {
     if (draft.context.task !== 'form' || draft.context.formType !== formType || !draft.context.businessDate) return
     setStore(draft.context.storeId)
@@ -122,7 +126,7 @@ export default function FormDraftWorkspace<F extends Json>({ formType, title, cr
             {active.payload.savedId ? `✓ ${t('formDrafts.saved')}` : storageFailed ? `✕ ${t('drafts.storageUnavailable')}` : lastSavedAt ? `✓ ${t('drafts.savedAt', { time: new Date(lastSavedAt).toLocaleTimeString() })}` : `! ${t('common.unsaved')}`}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" onClick={close} className={small}>{t('drafts.change')}</button>
+            <button type="button" onClick={() => void transitions.change(close)} className={small}>{t('drafts.change')}</button>
             <button type="button" onClick={() => downloadDraftSource(JSON.stringify(activeRef.current, null, 2))} className="min-h-11 px-3 py-2 text-sm text-red-700 underline">{t('drafts.downloadCurrent')}</button>
           </div>
         </div>

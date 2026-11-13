@@ -40,6 +40,8 @@ jobs:
 
       - run: npm run agent:test
 
+      - run: npm run internal:session:test
+
       - run: npm run scheduler:test
 
       - run: npm run build

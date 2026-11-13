@@ -1,4 +1,7 @@
 'use client'
+import { usePathname } from 'next/navigation'
+import { useManagerSession } from './ManagerSession'
+import { useWorkspaceVisible, WorkspaceVisibility } from './WorkspaceVisibility'
 
 import { useCallback, useEffect, useState } from 'react'
 import CashOut from './CashOut'
@@ -23,10 +26,11 @@ const storeForLocation = importStore
 /** Cash out, daily sales report, and employee hours on one page. Only cash out needs the manager code. */
 export default function Bookkeeping() {
   const { t: tr } = useInternalLanguage()
+  const pathname = usePathname()
+  const visible = useWorkspaceVisible()
   const [tab, setTab] = useState<TabId>('cash-out')
   // Manager token lives in memory only; the converters work without it.
-  const [token, setToken] = useState('')
-  const lock = useCallback(() => setToken(''), [])
+  const { token, unlock: setToken, expire: lock } = useManagerSession()
   useShellTask('bookkeeping', { onLock: token ? lock : undefined })
 
   useEffect(() => {
@@ -35,10 +39,11 @@ export default function Bookkeeping() {
       if (!id) setTab('cash-out')
       else if (TABS.some(t => t.id === id)) setTab(id as TabId)
     }
+    if (!visible) return
     fromHash()
     window.addEventListener('hashchange', fromHash)
     return () => window.removeEventListener('hashchange', fromHash)
-  }, [])
+  }, [pathname, visible])
 
   const select = (id: TabId) => {
     setTab(id)
@@ -88,16 +93,16 @@ export default function Bookkeeping() {
       </div>
 
       {/* Panels stay mounted so switching tabs never drops a half-filled form. */}
-      <div role="tabpanel" id="panel-cash-out" aria-labelledby="tab-cash-out" hidden={tab !== 'cash-out'}>
+      <div role="tabpanel" id="panel-cash-out" aria-labelledby="tab-cash-out" hidden={tab !== 'cash-out'}><WorkspaceVisibility.Provider value={visible && tab === 'cash-out'}>
         <CashOut token={token} onUnlock={setToken} onLocked={lock} />
-      </div>
-      <div role="tabpanel" id="panel-sales" aria-labelledby="tab-sales" hidden={tab !== 'sales'}>
+      </WorkspaceVisibility.Provider></div>
+      <div role="tabpanel" id="panel-sales" aria-labelledby="tab-sales" hidden={tab !== 'sales'}><WorkspaceVisibility.Provider value={visible && tab === 'sales'}>
         <SalesConverter token={token} loadCashout={token ? loadCashout : null} />
-      </div>
-      <div role="tabpanel" id="panel-comparison" aria-labelledby="tab-comparison" hidden={tab !== 'comparison'}><ScheduledActualReport token={token} /></div>
-      <div role="tabpanel" id="panel-hours" aria-labelledby="tab-hours" hidden={tab !== 'hours'}>
+      </WorkspaceVisibility.Provider></div>
+      <div role="tabpanel" id="panel-comparison" aria-labelledby="tab-comparison" hidden={tab !== 'comparison'}><WorkspaceVisibility.Provider value={visible && tab === 'comparison'}><ScheduledActualReport token={token} /></WorkspaceVisibility.Provider></div>
+      <div role="tabpanel" id="panel-hours" aria-labelledby="tab-hours" hidden={tab !== 'hours'}><WorkspaceVisibility.Provider value={visible && tab === 'hours'}>
         <HoursConverter token={token} />
-      </div>
+      </WorkspaceVisibility.Provider></div>
     </div>
   )
 }

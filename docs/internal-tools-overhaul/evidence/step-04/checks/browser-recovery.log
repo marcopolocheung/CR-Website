@@ -1,0 +1,2 @@
+PASS UX-06: route/reload cancellation, offline/auth retention, original-base 409 recovery, bilingual compare/copy/download/load, one in-flight save, and cash-out auth recovery after quota denial
+External network guard: 0 blocked attempts

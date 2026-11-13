@@ -1,3 +1,4 @@
+import { managerSession, SessionChangedError } from './internal-tools/manager-session'
 import { canonicalJson } from './internal-tools/json'
 import type { CashoutLink } from './converter/sales-context'
 import { getScheduleApiBase, StoreAuthError, StoreUnavailableError } from './schedule-store'
@@ -64,6 +65,7 @@ export async function requestJson(
   init?: RequestInit,
   unreachable = 'Could not reach the cash-out store.',
 ): Promise<{ status: number; body: unknown }> {
+  const checkSession = managerSession.capture(token)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 10000)
   try {
@@ -79,8 +81,10 @@ export async function requestJson(
     } catch {
       body = null
     }
+    checkSession()
     return { status: response.status, body }
-  } catch {
+  } catch (caught) {
+    if (caught instanceof SessionChangedError) throw caught
     throw new StoreUnavailableError(unreachable)
   } finally {
     clearTimeout(timer)

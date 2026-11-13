@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+import { useManagerSession } from './ManagerSession'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import { LanguageControls, useInternalLanguage } from './InternalLanguage'
@@ -38,6 +40,7 @@ export default function InternalShell({ children, themeClassName }: { children: 
     : pathname.endsWith('/inventory') ? 'inventory' : pathname.endsWith('/forms') ? 'forms'
     : pathname.endsWith('/qr-generator') ? 'qr' : pathname.endsWith('/ui-gallery') ? 'gallery' : 'dashboard'
   const taskId = section === 'reports' ? hash : section
+  const session = useManagerSession()
   const tasks = useShellTasks()
   const metadata = tasks[taskId]
   const access = (section === 'cash' ? metadata : undefined) ?? tasks[section === 'reports' ? 'bookkeeping' : section]
@@ -75,12 +78,12 @@ export default function InternalShell({ children, themeClassName }: { children: 
       event.preventDefault(); document.getElementById('internal-workspace')?.focus()
     }}>{t('shell.skip')}</a>
     <header ref={header} className={`${themeClassName} ${styles.header}`} data-internal-banner data-shell-chrome>
-      <a className={styles.brand} href={`${base}/internal`}>CHINA ROSE <span>/ {t('shell.identity')}</span></a>
+      <Link className={styles.brand} href={`${base}/internal`}>CHINA ROSE <span>/ {t('shell.identity')}</span></Link>
       <div className={styles.controls}>
         <LanguageControls appearance="shell" />
         <Button onClick={() => setHelp(true)} aria-haspopup="dialog">{t('shell.help')}</Button>
-        <Button icon="lock" data-shell-lock disabled={!access?.onLock} onClick={access?.onLock}
-          title={!access?.onLock ? t('shell.noAccess') : undefined}>{t(access?.lockLabel ?? 'shell.lock')}</Button>
+        <Button icon="lock" data-shell-lock disabled={!session.token} onClick={session.lock}
+          title={!session.token ? t('shell.noAccess') : undefined}>{t('session.lock')}</Button>
       </div>
       <div className={styles.context} data-shell-context><strong>{title}</strong><span>{context || t(`shell.context.${section}` as TranslationKey)}</span></div>
     </header>

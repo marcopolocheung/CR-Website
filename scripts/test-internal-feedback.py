@@ -110,6 +110,8 @@ with sync_playwright() as p:
     mode['history_fail'] = False
     # A change of record context invalidates the last acknowledged indicator.
     page.get_by_role('button', name='Elegir otro borrador', exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirmar', exact=True).click()
     page.locator('#cashout-date').fill('2026-10-19')
     page.get_by_role('button', name='Empezar un borrador nuevo', exact=True).click()
     expect(feedback).to_have_attribute('data-save-state', 'device')

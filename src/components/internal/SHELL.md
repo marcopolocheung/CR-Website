@@ -36,3 +36,47 @@ component gallery have a way home without falsely selecting a primary destinatio
 
 The [checkpoint](../../../docs/internal-tools-overhaul/checkpoints/step-03.md)
 records actual checks, screenshots, staged-review gates and verification limits.
+
+## Step 04: shared access and retained work
+
+The internal layout now owns ManagerSession and WorkspaceHost. The host lazily
+mounts each visited primary tool once, keeps its React state/File objects alive,
+and hides inactive workspaces from focus, accessibility and print. Native
+same-document hashes remain native; NavigationProtection routes ordinary internal
+cross-document anchors through Next's router, preserving the layout. Schedule and
+external departures retain confirmation/unload behavior. Reload and another tab
+start locked. No universal mobile process-termination protection is claimed.
+
+ShellTask remains display metadata; its old callbacks are compatibility metadata,
+not authorization grants. The header uses the session's coordinated handoff.
+Task context remains task-owned, with no global store/date selector. Hidden tools
+suspend automatic reads; held operations stay bound to their original inputs.
+
+Manual “Save drafts & lock” checkpoints every visited participant before closing
+any editor or clearing shared access. A busy operation, denied storage, incomplete
+import without a supported saved snapshot, or unsaved mapping blocks manual lock.
+The alert leaves work open; finish/save the import snapshot or mapping, or use the
+available recovery controls. No raw File is silently serialized or discarded.
+Local converters remain available without manager authority as before.
+
+Authorization failure instead clears the matching session immediately and hides
+protected editors without discarding their working copies. Reauthentication
+restores them; writes require deliberate retry. Transport leases reject stale
+response bodies after a session change even when the same code is reentered.
+Live consumers handle authorization errors after their task/context guards, so a
+late failure from a closed cash editor cannot lock a newer record. Pending-request
+counts prevent an old finally from enabling saves during a newer request.
+
+Cash and Forms retain their original draft keys/readers. Inventory additionally
+checkpoints `cr-inventory-day:<date>` and a validated
+`cr-inventory-catalog-recovery-v1` envelope containing CR3, original base revision
+and raw edited sheets. It still writes the old `cr-inventory` count format.
+Catalog recovery requires explicit Resume and preserves conflicts against newer
+server revisions; source downloads and UUID-keyed archives preserve original
+bytes when a recovery is explicitly resolved. These are device copies, not new
+backend history, revisions or durable count states.
+
+The provider never persists credentials. Preparer labels remain user-entered
+labels. API authorization, legacy conflict/retry limitations, scheduler-specific
+permissions, public schedules and encrypted-link adapters remain independent.
+See the [Step 04 checkpoint](../../../docs/internal-tools-overhaul/checkpoints/step-04.md).

@@ -1,5 +1,17 @@
 # Navigation and retry/conflict recovery (UX-06)
 
+**Current overhaul integration:** [Step 04](checkpoints/step-04.md) adds an
+internal-layout in-memory manager session, retained visited workspaces,
+client navigation within `/internal`, coordinated device checkpoints before
+manual lock, and immediate scope-aware expiry. Ordinary internal tool links now
+retain mounted work without a departure warning. Departing the internal layout
+and native reload still use the recovery protections below. Context/draft
+replacement requires explicit confirmation and a successful checkpoint. The
+remaining sections preserve the original UX-06 contract and service limitations;
+[adapter details](../../src/components/internal/SHELL.md#step-04-shared-access-and-retained-work)
+describe the new integration. No backend capability is activated by this slice.
+
+
 UX-06 provides shared navigation protection, single-flight submission control, capability-gated v1 retry coordination, and explicit recovery/compare/copy controls. First consumers are cash-out, mounted bookkeeping converter work, and the existing revisioned inventory-list adapter. There is no Worker route, resource, authentication-model or financial-policy change.
 
 ## Navigation and retained work

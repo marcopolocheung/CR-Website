@@ -1,4 +1,5 @@
 'use client'
+import { useImportAccess } from './useImportAccess'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
 import { useNavigationProtection } from './NavigationProtection'
@@ -7,13 +8,14 @@ import { putDirectory, ImportApiError, type DirectoryRecord } from '@/lib/conver
 import { emptyDirectory } from '@/lib/converter/employee-mapping'
 import type { ComparisonInput } from '@/lib/converter/scheduled-actual'
 export default function ScheduleIdentityMapping({input,token,preparer,onSaved}:{input:ComparisonInput;token:string;preparer:string;onSaved:(record:DirectoryRecord)=>void}){
+ const failureKey = useImportAccess()
  const {t}=useInternalLanguage(),[draft,setDraft]=useState(input.directory?.data??emptyDirectory()),[busy,setBusy]=useState(false),[status,setStatus]=useState('')
  const credential=useRef(token);credential.current=token
  const running=useRef(false),alive=useRef(true),operation=useRef<{content:string;id:string}|null>(null)
  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
  const choices=useMemo(()=>input.page.publications.filter(pub=>pub.status==='published').flatMap(pub=>pub.people.map(person=>({pub,person}))),[input.page])
  const dirty=canonicalJson(draft)!==canonicalJson(input.directory?.data??emptyDirectory())
- useNavigationProtection({dirty,deviceSaved:false})
+ useNavigationProtection({dirty,deviceSaved:false,busy})
  async function save(){
   if(running.current||!token||!preparer.trim())return
   const reviewed={...draft,mappings:draft.mappings.map(mapping=>{const old=input.directory?.data.mappings.find(m=>m.id===mapping.id);return old&&canonicalJson(old)===canonicalJson(mapping)?mapping:{...mapping,reviewedBy:preparer.trim()}})}
@@ -22,7 +24,7 @@ export default function ScheduleIdentityMapping({input,token,preparer,onSaved}:{
   const capturedToken=token
   running.current=true;setBusy(true)
   try{const record=await putDirectory(input.storeId,token,input.directory,reviewed,preparer,operation.current.id);if(!alive.current||capturedToken!==credential.current)return;setStatus('mapping.saved');setDraft(record.data);onSaved(record);operation.current=null}
-  catch(e){if(alive.current)setStatus(`importApi.${e instanceof ImportApiError?e.code:'unavailable'}`)}
+  catch(e){if(alive.current&&capturedToken===credential.current)setStatus(failureKey(e))}
   finally{running.current=false;if(alive.current)setBusy(false)}
  }
  return <section className="mt-4 rounded border p-3" aria-label={`${t('comparison.mapping')} ${input.storeId}`}><h3 className="font-semibold">{t('comparison.mapping')} · {input.storeId}</h3><p className="mt-2 text-sm">{t('comparison.mappingNote')}</p>

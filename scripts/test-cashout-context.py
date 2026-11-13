@@ -46,6 +46,8 @@ with sync_playwright() as p:
         expect(page.get_by_label('Cashier name',exact=True).first).to_be_visible()
     def leave():
         page.get_by_role('button',name='Choose another draft',exact=True).click()
+        if page.get_by_role('dialog').is_visible():
+            page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
         expect(page.locator('#draft-preparer')).to_be_visible()
     def source_row(preparer):
         return page.locator('li').filter(has=page.get_by_text('Preparer: '+preparer,exact=True))
@@ -130,6 +132,8 @@ with sync_playwright() as p:
     page.get_by_label('Cashier name',exact=True).first.fill('Retain after denied storage')
     expect(page.locator('[data-save-state]')).to_have_attribute('data-save-state','failed')
     page.get_by_role('button',name='Choose another draft',exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     expect(page.get_by_label('Cashier name',exact=True).first).to_have_value('Retain after denied storage')
     assert page.evaluate('localStorage.getItem("cr-cash-out")')==raw
     # Malformed legacy source offers recovery, with no assignment/coercion.

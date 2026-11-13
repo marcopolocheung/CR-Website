@@ -1,4 +1,10 @@
 const en = {
+  "session.catalogDraft": "Catalog draft on this device. Resume it to review changes against the current list.",
+  "session.resumeCatalog": "Resume catalog draft",
+  "session.dismiss": "Close",
+  "session.lock": "Save drafts & lock",
+  "session.changeContext": "Save a device copy and leave the current work? Your draft keeps its original store and date.",
+  "session.checkpointFailed": "Access remains unlocked. Wait for pending work to finish, or save a recoverable device copy of every open task before locking or changing context. If device storage is unavailable, keep this page open and use the task’s download/copy recovery controls.",
   'shell.navigation': 'Internal navigation',
   "shell.identity": "Internal",
   "shell.dashboard": "Dashboard",

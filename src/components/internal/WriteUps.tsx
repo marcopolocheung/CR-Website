@@ -1,4 +1,7 @@
 'use client'
+import { useNavigationProtection, useWorkTransitions } from './NavigationProtection'
+import { useManagerSession } from './ManagerSession'
+import { useWorkspaceVisible } from './WorkspaceVisibility'
 
 import { useShellTask } from './ShellTask'
 
@@ -50,16 +53,17 @@ const secondary = `${button} border border-gray-300 text-gray-700 hover:bg-gray-
 
 /** Shared digital form book, retaining the original write-up editor and stored records. */
 export default function WriteUps() {
+  const visible = useWorkspaceVisible()
   // Manager token lives in memory only, like cash out.
-  const [token, setToken] = useState('')
+  const { token, unlock: setToken, expire: lock } = useManagerSession()
   const [unlocked, setUnlocked] = useState(false)
-  const lock = useCallback(() => setToken(''), [])
+  if (token && !unlocked) setUnlocked(true)
   useShellTask('forms', { onLock: token ? lock : undefined })
   return (
     <>
-      {!token && (
+      {!token && visible && (
         <div className="max-w-6xl mx-auto px-4">
-          <CodeGate onUnlock={code => { setToken(code); setUnlocked(true) }} title="Saved forms" />
+          <CodeGate onUnlock={setToken} title="Saved forms" />
         </div>
       )}
       {/* After the first unlock the book stays mounted, so an expired code never discards an unsaved write-up. */}
@@ -70,6 +74,8 @@ export default function WriteUps() {
 
 function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void }) {
   const [view, setView] = useState<View>({ kind: 'list' })
+  const visible = useWorkspaceVisible()
+  const transitions = useWorkTransitions()
   useShellTask('forms-record', { context: view.kind === 'saved' ? view.doc.form.date : view.kind === 'digital' ? `${view.doc.form.store} · ${view.doc.form.date}` : null })
   const [list, setList] = useState<SavedFormRow[] | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -81,8 +87,10 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
   const savedHere = useRef(new Map<string, SavedFormRow>())
   const remember = (row: SavedFormRow) => savedHere.current.set(`${row.type}:${row.id}`, row)
 
+  const pendingRequests = useRef(0)
   const run = useCallback(
     async (task: () => Promise<string | void>) => {
+      pendingRequests.current++
       setBusy(true)
       setStatus('')
       try {
@@ -92,7 +100,8 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
         if (caught instanceof StoreAuthError) onLocked()
         else setStatus((caught as Error).message)
       } finally {
-        setBusy(false)
+        pendingRequests.current--
+        setBusy(pendingRequests.current > 0)
       }
     },
     [onLocked],
@@ -121,8 +130,8 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
   )
 
   useEffect(() => {
-    if (token) refresh()
-  }, [refresh, token])
+    if (token && visible) refresh()
+  }, [refresh, token, visible])
 
   const open = (row: SavedFormRow) => run(async () => setView(row.type === 'write-up'
     ? { kind: 'saved', doc: await fetchWriteUp(row.id, token) }
@@ -139,10 +148,11 @@ function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void 
       return 'Form deleted.'
     })
   }
-  const back = () => {
+  useNavigationProtection({ dirty: false, deviceSaved: true, busy, leave: () => setView({ kind: 'list' }) })
+  const back = () => { void transitions.change(() => {
     setView({ kind: 'list' })
     refresh()
-  }
+  }) }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">

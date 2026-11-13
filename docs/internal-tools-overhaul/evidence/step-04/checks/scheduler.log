@@ -1,0 +1,884 @@
+
+> chinarose@0.0.2 scheduler:test
+> node --import jiti/register --test src/lib/scheduler/scheduler.test.ts src/lib/scheduler/week-visibility.test.ts src/lib/scheduler/editor-state.test.ts src/components/scheduler/helpers.test.ts src/lib/schedule-share.test.ts src/lib/schedule-store.test.ts worker/src/index.test.ts
+
+TAP version 13
+# Subtest: moving onto a filled spot swaps the two people and drops their Keep
+ok 1 - moving onto a filled spot swaps the two people and drops their Keep
+  ---
+  duration_ms: 3.736995
+  type: 'test'
+  ...
+# Subtest: moving onto an empty spot leaves the old spot empty
+ok 2 - moving onto an empty spot leaves the old spot empty
+  ---
+  duration_ms: 0.22528
+  type: 'test'
+  ...
+# Subtest: a swap rejects moving a dishwasher into the cook spot and names the dishwasher
+ok 3 - a swap rejects moving a dishwasher into the cook spot and names the dishwasher
+  ---
+  duration_ms: 19.989492
+  type: 'test'
+  ...
+# Subtest: a swap checks the replacement employee availability at the source spot
+ok 4 - a swap checks the replacement employee availability at the source spot
+  ---
+  duration_ms: 0.933724
+  type: 'test'
+  ...
+# Subtest: a swap checks the replacement employee weekly limits
+ok 5 - a swap checks the replacement employee weekly limits
+  ---
+  duration_ms: 0.561661
+  type: 'test'
+  ...
+# Subtest: a swap accepts two qualified available employees
+ok 6 - a swap accepts two qualified available employees
+  ---
+  duration_ms: 0.298004
+  type: 'test'
+  ...
+# Subtest: unrelated existing issues do not block a valid swap
+ok 7 - unrelated existing issues do not block a valid swap
+  ---
+  duration_ms: 0.532485
+  type: 'test'
+  ...
+# Subtest: a person marked Keep cannot be moved
+ok 8 - a person marked Keep cannot be moved
+  ---
+  duration_ms: 0.387194
+  type: 'test'
+  ...
+# Subtest: candidates are exactly the people with no reason to refuse the spot
+ok 9 - candidates are exactly the people with no reason to refuse the spot
+  ---
+  duration_ms: 0.974222
+  type: 'test'
+  ...
+# Subtest: an empty optional spot is open, an empty required spot is missing
+ok 10 - an empty optional spot is open, an empty required spot is missing
+  ---
+  duration_ms: 0.510943
+  type: 'test'
+  ...
+# Subtest: new employee ids never collide
+ok 11 - new employee ids never collide
+  ---
+  duration_ms: 0.304455
+  type: 'test'
+  ...
+# Subtest: layout preference defaults to new, keeps a stored classic choice, and survives blocked storage
+ok 12 - layout preference defaults to new, keeps a stored classic choice, and survives blocked storage
+  ---
+  duration_ms: 0.217337
+  type: 'test'
+  ...
+# Subtest: max hours: blank is no limit, otherwise whole hours from 1 to 80
+ok 13 - max hours: blank is no limit, otherwise whole hours from 1 to 80
+  ---
+  duration_ms: 0.174186
+  type: 'test'
+  ...
+# Subtest: a built week carries the current share version
+ok 14 - a built week carries the current share version
+  ---
+  duration_ms: 1.446178
+  type: 'test'
+  ...
+# Subtest: a real generated week maps every assignment back by name
+ok 15 - a real generated week maps every assignment back by name
+  ---
+  duration_ms: 299.200932
+  type: 'test'
+  ...
+# Subtest: unfilled spots travel as nobody rather than as a stray name
+ok 16 - unfilled spots travel as nobody rather than as a stray name
+  ---
+  duration_ms: 0.5487
+  type: 'test'
+  ...
+# Subtest: a published week round-trips back into editor assignments
+ok 17 - a published week round-trips back into editor assignments
+  ---
+  duration_ms: 189.546909
+  type: 'test'
+  ...
+# Subtest: removed staff come back unassigned instead of misfiled
+ok 18 - removed staff come back unassigned instead of misfiled
+  ---
+  duration_ms: 0.363899
+  type: 'test'
+  ...
+# Subtest: the template hash is stable and changes with the shift layout
+ok 19 - the template hash is stable and changes with the shift layout
+  ---
+  duration_ms: 0.781515
+  type: 'test'
+  ...
+# Subtest: a kitchen week published with the default kitchen rules opens on /schedule
+ok 20 - a kitchen week published with the default kitchen rules opens on /schedule
+  ---
+  duration_ms: 1.383489
+  type: 'test'
+  ...
+# Subtest: a kitchen week published before kitchen posts existed still opens
+ok 21 - a kitchen week published before kitchen posts existed still opens
+  ---
+  duration_ms: 0.719641
+  type: 'test'
+  ...
+# Subtest: a week published with its own saved rules is read with those rules
+ok 22 - a week published with its own saved rules is read with those rules
+  ---
+  duration_ms: 0.921577
+  type: 'test'
+  ...
+# Subtest: fetchGoldenWeek returns null on 404 and the doc on 200
+ok 23 - fetchGoldenWeek returns null on 404 and the doc on 200
+  ---
+  duration_ms: 2.095748
+  type: 'test'
+  ...
+# Subtest: golden reads map network failure to unavailable
+ok 24 - golden reads map network failure to unavailable
+  ---
+  duration_ms: 0.818943
+  type: 'test'
+  ...
+# Subtest: fetchGoldenMonth returns weeks and rev on 200 and an empty list for a bad month
+ok 25 - fetchGoldenMonth returns weeks and rev on 200 and an empty list for a bad month
+  ---
+  duration_ms: 0.405665
+  type: 'test'
+  ...
+# Subtest: fetchGoldenMonth sends knownRev and honors notModified
+ok 26 - fetchGoldenMonth sends knownRev and honors notModified
+  ---
+  duration_ms: 0.274727
+  type: 'test'
+  ...
+# Subtest: golden reads and saves scope to the restaurant query param
+ok 27 - golden reads and saves scope to the restaurant query param
+  ---
+  duration_ms: 0.709799
+  type: 'test'
+  ...
+# Subtest: saveGoldenWeek sends the write token and maps 401 to auth
+ok 28 - saveGoldenWeek sends the write token and maps 401 to auth
+  ---
+  duration_ms: 0.417714
+  type: 'test'
+  ...
+# Subtest: saveGoldenWeek maps 503 to an unavailable error saying saving is not set up
+ok 29 - saveGoldenWeek maps 503 to an unavailable error saying saving is not set up
+  ---
+  duration_ms: 0.322829
+  type: 'test'
+  ...
+# Subtest: saveGoldenWeek maps 409 to a conflict carrying the server revision
+ok 30 - saveGoldenWeek maps 409 to a conflict carrying the server revision
+  ---
+  duration_ms: 9.617033
+  type: 'test'
+  ...
+# Subtest: verifyWriteToken sends the bearer code and maps statuses
+ok 31 - verifyWriteToken sends the bearer code and maps statuses
+  ---
+  duration_ms: 1.119959
+  type: 'test'
+  ...
+# Subtest: built-in rules have no problems
+ok 32 - built-in rules have no problems
+  ---
+  duration_ms: 2.429504
+  type: 'test'
+  ...
+# Subtest: a spot that ends before it starts, or has no label, is named
+ok 33 - a spot that ends before it starts, or has no label, is named
+  ---
+  duration_ms: 0.542724
+  type: 'test'
+  ...
+# Subtest: publish state tells drafts, hidden, changed and live weeks apart
+ok 34 - publish state tells drafts, hidden, changed and live weeks apart
+  ---
+  duration_ms: 0.17713
+  type: 'test'
+  ...
+# Subtest: validator catches unavailable employees
+ok 35 - validator catches unavailable employees
+  ---
+  duration_ms: 3.309822
+  type: 'test'
+  ...
+# Subtest: validator catches unqualified employees
+ok 36 - validator catches unqualified employees
+  ---
+  duration_ms: 0.745426
+  type: 'test'
+  ...
+# Subtest: new hires bypass the role check but still need to be available
+ok 37 - new hires bypass the role check but still need to be available
+  ---
+  duration_ms: 0.770226
+  type: 'test'
+  ...
+# Subtest: validator catches max days exceeded
+ok 38 - validator catches max days exceeded
+  ---
+  duration_ms: 0.346522
+  type: 'test'
+  ...
+# Subtest: validator catches prohibited doubles
+ok 39 - validator catches prohibited doubles
+  ---
+  duration_ms: 0.299921
+  type: 'test'
+  ...
+# Subtest: validator allows doubles for employees configured to allow them
+ok 40 - validator allows doubles for employees configured to allow them
+  ---
+  duration_ms: 0.651121
+  type: 'test'
+  ...
+# Subtest: overlapping assignment violation references both conflicting slots
+ok 41 - overlapping assignment violation references both conflicting slots
+  ---
+  duration_ms: 0.412789
+  type: 'test'
+  ...
+# Subtest: validator catches employee incompatibility
+ok 42 - validator catches employee incompatibility
+  ---
+  duration_ms: 0.170456
+  type: 'test'
+  ...
+# Subtest: validator catches missing manager coverage
+ok 43 - validator catches missing manager coverage
+  ---
+  duration_ms: 0.323807
+  type: 'test'
+  ...
+# Subtest: validator catches missing staffing coverage
+ok 44 - validator catches missing staffing coverage
+  ---
+  duration_ms: 0.383483
+  type: 'test'
+  ...
+# Subtest: weekend availability exception allows Javier on Saturday PM
+ok 45 - weekend availability exception allows Javier on Saturday PM
+  ---
+  duration_ms: 0.147568
+  type: 'test'
+  ...
+# Subtest: validator catches changed locked assignments
+ok 46 - validator catches changed locked assignments
+  ---
+  duration_ms: 0.206643
+  type: 'test'
+  ...
+# Subtest: solver returns infeasible when no lead or manager is active
+ok 47 - solver returns infeasible when no lead or manager is active
+  ---
+  duration_ms: 1.689542
+  type: 'test'
+  ...
+# Subtest: generated seed schedule passes independent validation
+ok 48 - generated seed schedule passes independent validation
+  ---
+  duration_ms: 256.70923
+  type: 'test'
+  ...
+# Subtest: manual locked assignment is preserved during regeneration
+ok 49 - manual locked assignment is preserved during regeneration
+  ---
+  duration_ms: 193.72489
+  type: 'test'
+  ...
+# Subtest: availability is checked against exact slot time, not only shift name
+ok 50 - availability is checked against exact slot time, not only shift name
+  ---
+  duration_ms: 1.611546
+  type: 'test'
+  ...
+# Subtest: every schedule strategy produces a valid week
+ok 51 - every schedule strategy produces a valid week
+  ---
+  duration_ms: 645.644148
+  type: 'test'
+  ...
+# Subtest: the same strategy always returns the same week
+ok 52 - the same strategy always returns the same week
+  ---
+  duration_ms: 1101.423381
+  type: 'test'
+  ...
+# Subtest: fewest doubles strategy does not increase double shifts
+ok 53 - fewest doubles strategy does not increase double shifts
+  ---
+  duration_ms: 242.015852
+  type: 'test'
+  ...
+# Subtest: keep similar strategy stays closer to the week it is given
+ok 54 - keep similar strategy stays closer to the week it is given
+  ---
+  duration_ms: 345.611413
+  type: 'test'
+  ...
+# Subtest: week keys land on Sunday regardless of the day inside the week
+ok 55 - week keys land on Sunday regardless of the day inside the week
+  ---
+  duration_ms: 0.655374
+  type: 'test'
+  ...
+# Subtest: week maths survives a daylight saving change
+ok 56 - week maths survives a daylight saving change
+  ---
+  duration_ms: 0.251441
+  type: 'test'
+  ...
+# Subtest: day dates follow the day order used by the board
+ok 57 - day dates follow the day order used by the board
+  ---
+  duration_ms: 0.30275
+  type: 'test'
+  ...
+# Subtest: week ranges spell the month out for headings
+ok 58 - week ranges spell the month out for headings
+  ---
+  duration_ms: 7.336877
+  type: 'test'
+  ...
+# Subtest: day labels abbreviate for the table header
+ok 59 - day labels abbreviate for the table header
+  ---
+  duration_ms: 0.518877
+  type: 'test'
+  ...
+# Subtest: times always read as a padded 12 hour clock with AM or PM
+ok 60 - times always read as a padded 12 hour clock with AM or PM
+  ---
+  duration_ms: 0.184176
+  type: 'test'
+  ...
+# Subtest: mid 12-7 worker fits a 12-4 extra slot but not full AM or PM halves
+ok 61 - mid 12-7 worker fits a 12-4 extra slot but not full AM or PM halves
+  ---
+  duration_ms: 0.2993
+  type: 'test'
+  ...
+# Subtest: evening 4-7 worker fits a 4-7 extra slot but not the full 4-11 PM
+ok 62 - evening 4-7 worker fits a 4-7 extra slot but not the full 4-11 PM
+  ---
+  duration_ms: 0.165927
+  type: 'test'
+  ...
+# Subtest: mid worker spanning AM and PM extra slots needs doubles allowed
+ok 63 - mid worker spanning AM and PM extra slots needs doubles allowed
+  ---
+  duration_ms: 0.303886
+  type: 'test'
+  ...
+# Subtest: kitchen pages offer kitchen posts only — no dining posts
+ok 64 - kitchen pages offer kitchen posts only — no dining posts
+  ---
+  duration_ms: 0.149709
+  type: 'test'
+  ...
+# Subtest: custom posts slugify, validate, and label for display
+ok 65 - custom posts slugify, validate, and label for display
+  ---
+  duration_ms: 0.300039
+  type: 'test'
+  ...
+# Subtest: CR03 sample crew covers every required kitchen slot
+ok 66 - CR03 sample crew covers every required kitchen slot
+  ---
+  duration_ms: 157.473288
+  type: 'test'
+  ...
+# Subtest: CR03 crew carries the sheet’s post qualifications and double limits
+ok 67 - CR03 crew carries the sheet’s post qualifications and double limits
+  ---
+  duration_ms: 0.388292
+  type: 'test'
+  ...
+# Subtest: M/V prep qualification implies meat prep, but not the reverse
+ok 68 - M/V prep qualification implies meat prep, but not the reverse
+  ---
+  duration_ms: 0.149572
+  type: 'test'
+  ...
+# Subtest: a shift role limits a person to one post on that shift only
+ok 69 - a shift role limits a person to one post on that shift only
+  ---
+  duration_ms: 0.687641
+  type: 'test'
+  ...
+# Subtest: optional spots are filled when a candidate exists, and left open when not
+ok 70 - optional spots are filled when a candidate exists, and left open when not
+  ---
+  duration_ms: 0.38114
+  type: 'test'
+  ...
+# Subtest: M/V prep qualification implies meat prep, but not the reverse
+ok 71 - M/V prep qualification implies meat prep, but not the reverse
+  ---
+  duration_ms: 0.125929
+  type: 'test'
+  ...
+# Subtest: optional spots are filled when a candidate exists, and left open when not
+ok 72 - optional spots are filled when a candidate exists, and left open when not
+  ---
+  duration_ms: 0.337557
+  type: 'test'
+  ...
+# Subtest: max doubles per week is a hard constraint
+ok 73 - max doubles per week is a hard constraint
+  ---
+  duration_ms: 0.260526
+  type: 'test'
+  ...
+# Subtest: max hours per week is a hard constraint
+ok 74 - max hours per week is a hard constraint
+  ---
+  duration_ms: 0.460786
+  type: 'test'
+  ...
+# Subtest: optional spots never block readiness — only required slots are checked
+ok 75 - optional spots never block readiness — only required slots are checked
+  ---
+  duration_ms: 2.462173
+  type: 'test'
+  ...
+# Subtest: CR03 kitchens never inherit the dining crew and no station ships a built-in crew
+ok 76 - CR03 kitchens never inherit the dining crew and no station ships a built-in crew
+  ---
+  duration_ms: 0.439427
+  type: 'test'
+  ...
+# Subtest: custom roles qualify and schedule like built-in ones
+ok 77 - custom roles qualify and schedule like built-in ones
+  ---
+  duration_ms: 0.284306
+  type: 'test'
+  ...
+# Subtest: extra mid and evening slots schedule on top of core AM/PM coverage
+ok 78 - extra mid and evening slots schedule on top of core AM/PM coverage
+  ---
+  duration_ms: 1.047666
+  type: 'test'
+  ...
+# Subtest: suspended employees are skipped only on dates inside the range
+ok 79 - suspended employees are skipped only on dates inside the range
+  ---
+  duration_ms: 1.67586
+  type: 'test'
+  ...
+# Subtest: higher priority staff are picked first for required and optional spots
+ok 80 - higher priority staff are picked first for required and optional spots
+  ---
+  duration_ms: 1.709026
+  type: 'test'
+  ...
+# Subtest: only approved dated requests change generation and manual validation; suspension stays separate
+ok 81 - only approved dated requests change generation and manual validation; suspension stays separate
+  ---
+  duration_ms: 4.54851
+  type: 'test'
+  ...
+# Subtest: off weeks are hidden from the visible list
+ok 82 - off weeks are hidden from the visible list
+  ---
+  duration_ms: 1.391597
+  type: 'test'
+  ...
+# Subtest: toggling status keeps assignments intact
+ok 83 - toggling status keeps assignments intact
+  ---
+  duration_ms: 0.170756
+  type: 'test'
+  ...
+# Subtest: copying a week duplicates assignments without aliasing
+ok 84 - copying a week duplicates assignments without aliasing
+  ---
+  duration_ms: 0.157486
+  type: 'test'
+  ...
+# Subtest: month helpers cover partial edge weeks
+ok 85 - month helpers cover partial edge weeks
+  ---
+  duration_ms: 22.398683
+  type: 'test'
+  ...
+# Subtest: v1 migration turns filled weeks on and keeps generated snapshots
+ok 86 - v1 migration turns filled weeks on and keeps generated snapshots
+  ---
+  duration_ms: 0.429348
+  type: 'test'
+  ...
+# Subtest: month grid builds sunday rows with edge dimming and today marking
+ok 87 - month grid builds sunday rows with edge dimming and today marking
+  ---
+  duration_ms: 0.448749
+  type: 'test'
+  ...
+# Subtest: todayIsoDate renders the local calendar date
+ok 88 - todayIsoDate renders the local calendar date
+  ---
+  duration_ms: 0.161952
+  type: 'test'
+  ...
+# Subtest: share ids are short, url safe, and valid
+ok 89 - share ids are short, url safe, and valid
+  ---
+  duration_ms: 2.89101
+  type: 'test'
+  ...
+# Subtest: publish bodies are strictly validated
+ok 90 - publish bodies are strictly validated
+  ---
+  duration_ms: 0.353747
+  type: 'test'
+  ...
+# Subtest: a week survives publish, read, update, and conflicts reject stale writes
+ok 91 - a week survives publish, read, update, and conflicts reject stale writes
+  ---
+  duration_ms: 28.57525
+  type: 'test'
+  ...
+# Subtest: bad ids and bodies fail closed
+ok 92 - bad ids and bodies fail closed
+  ---
+  duration_ms: 3.015868
+  type: 'test'
+  ...
+# Subtest: month listing shows only visible weeks
+ok 93 - month listing shows only visible weeks
+  ---
+  duration_ms: 3.405905
+  type: 'test'
+  ...
+# Subtest: golden weeks cover every Sunday touching the month
+ok 94 - golden weeks cover every Sunday touching the month
+  ---
+  duration_ms: 0.720967
+  type: 'test'
+  ...
+# Subtest: golden week bodies are strictly validated
+ok 95 - golden week bodies are strictly validated
+  ---
+  duration_ms: 0.3092
+  type: 'test'
+  ...
+# Subtest: golden writes need the manager token and create on first save
+ok 96 - golden writes need the manager token and create on first save
+  ---
+  duration_ms: 2.741824
+  type: 'test'
+  ...
+# Subtest: golden month listing shows only visible weeks
+ok 97 - golden month listing shows only visible weeks
+  ---
+  duration_ms: 1.921641
+  type: 'test'
+  ...
+# Subtest: golden writes fail closed without a configured token
+ok 98 - golden writes fail closed without a configured token
+  ---
+  duration_ms: 0.527942
+  type: 'test'
+  ...
+# Subtest: auth verify accepts the manager token and nothing else
+ok 99 - auth verify accepts the manager token and nothing else
+  ---
+  duration_ms: 0.803269
+  type: 'test'
+  ...
+# Subtest: auth verify fails closed without a configured token
+ok 100 - auth verify fails closed without a configured token
+  ---
+  duration_ms: 0.65855
+  type: 'test'
+  ...
+# Subtest: employee roster bodies are strictly validated
+ok 101 - employee roster bodies are strictly validated
+  ---
+  duration_ms: 2.398121
+  type: 'test'
+  ...
+# Subtest: roster writes need the manager token and create on first save, and real deletes persist
+ok 102 - roster writes need the manager token and create on first save, and real deletes persist
+  ---
+  duration_ms: 5.121995
+  type: 'test'
+  ...
+# Subtest: roster and crew reads need the manager token
+ok 103 - roster and crew reads need the manager token
+  ---
+  duration_ms: 3.0143
+  type: 'test'
+  ...
+# Subtest: roster writes fail closed without a configured token
+ok 104 - roster writes fail closed without a configured token
+  ---
+  duration_ms: 0.277033
+  type: 'test'
+  ...
+# Subtest: staffing template bodies are strictly validated
+ok 105 - staffing template bodies are strictly validated
+  ---
+  duration_ms: 0.486254
+  type: 'test'
+  ...
+# Subtest: template writes need the manager token, create on first save, and round-trip
+ok 106 - template writes need the manager token, create on first save, and round-trip
+  ---
+  duration_ms: 1.645363
+  type: 'test'
+  ...
+# Subtest: template GET answers rev 0 and null template before anything is saved
+ok 107 - template GET answers rev 0 and null template before anything is saved
+  ---
+  duration_ms: 0.26324
+  type: 'test'
+  ...
+# Subtest: golden month revs answer cheap change checks
+ok 108 - golden month revs answer cheap change checks
+  ---
+  duration_ms: 2.004864
+  type: 'test'
+  ...
+# Subtest: golden saves spanning two months bump both revs
+ok 109 - golden saves spanning two months bump both revs
+  ---
+  duration_ms: 1.208945
+  type: 'test'
+  ...
+# Subtest: visibility can toggle without re-encrypting
+ok 110 - visibility can toggle without re-encrypting
+  ---
+  duration_ms: 0.859275
+  type: 'test'
+  ...
+# Subtest: restaurant ids validate and default when omitted
+ok 111 - restaurant ids validate and default when omitted
+  ---
+  duration_ms: 0.109201
+  type: 'test'
+  ...
+# Subtest: invalid restaurant ids fail closed
+ok 112 - invalid restaurant ids fail closed
+  ---
+  duration_ms: 0.40148
+  type: 'test'
+  ...
+# Subtest: rosters are isolated per restaurant
+ok 113 - rosters are isolated per restaurant
+  ---
+  duration_ms: 1.641208
+  type: 'test'
+  ...
+# Subtest: golden weeks and month revs are isolated per restaurant
+ok 114 - golden weeks and month revs are isolated per restaurant
+  ---
+  duration_ms: 3.526885
+  type: 'test'
+  ...
+# Subtest: legacy singleton docs fall back to the default restaurant only
+ok 115 - legacy singleton docs fall back to the default restaurant only
+  ---
+  duration_ms: 1.932799
+  type: 'test'
+  ...
+# Subtest: weekStart params parse and per-week keys are namespaced
+ok 116 - weekStart params parse and per-week keys are namespaced
+  ---
+  duration_ms: 0.825287
+  type: 'test'
+  ...
+# Subtest: rosters are isolated per week and fall back to the global seed
+ok 117 - rosters are isolated per week and fall back to the global seed
+  ---
+  duration_ms: 4.449729
+  type: 'test'
+  ...
+# Subtest: templates are isolated per week and fall back to the global seed
+ok 118 - templates are isolated per week and fall back to the global seed
+  ---
+  duration_ms: 1.543243
+  type: 'test'
+  ...
+# Subtest: schedule-only stations refuse roster and global template writes
+ok 119 - schedule-only stations refuse roster and global template writes
+  ---
+  duration_ms: 1.116957
+  type: 'test'
+  ...
+# Subtest: schedule-only stations still accept schedule writes
+ok 120 - schedule-only stations still accept schedule writes
+  ---
+  duration_ms: 0.434936
+  type: 'test'
+  ...
+# Subtest: staff editing is password-gated and starts empty
+ok 121 - staff editing is password-gated and starts empty
+  ---
+  duration_ms: 0.777709
+  type: 'test'
+  ...
+# Subtest: crew saves persist for every week and undo steps back through history
+ok 122 - crew saves persist for every week and undo steps back through history
+  ---
+  duration_ms: 2.768521
+  type: 'test'
+  ...
+# Subtest: staff writes reject stale revisions and unauthorized callers
+ok 123 - staff writes reject stale revisions and unauthorized callers
+  ---
+  duration_ms: 9.772031
+  type: 'test'
+  ...
+# Subtest: staff password falls back to the hardcoded demo value and locked stations are refused
+ok 124 - staff password falls back to the hardcoded demo value and locked stations are refused
+  ---
+  duration_ms: 1.250741
+  type: 'test'
+  ...
+# Subtest: cash-out days need the manager token to read or write
+ok 125 - cash-out days need the manager token to read or write
+  ---
+  duration_ms: 0.365002
+  type: 'test'
+  ...
+# Subtest: cash-out day saves, loads, and shows in the 30-day history
+ok 126 - cash-out day saves, loads, and shows in the 30-day history
+  ---
+  duration_ms: 2.11639
+  type: 'test'
+  ...
+# Subtest: cash-out bodies are strictly validated
+ok 127 - cash-out bodies are strictly validated
+  ---
+  duration_ms: 0.733763
+  type: 'test'
+  ...
+# Subtest: cash-out found money is acknowledged, retained in history and recalculated against Z on the server
+ok 128 - cash-out found money is acknowledged, retained in history and recalculated against Z on the server
+  ---
+  duration_ms: 1.341878
+  type: 'test'
+  ...
+# Subtest: cash-out totals are recalculated on the server, ignoring what the client sent
+ok 129 - cash-out totals are recalculated on the server, ignoring what the client sent
+  ---
+  duration_ms: 0.188395
+  type: 'test'
+  ...
+# Subtest: cash-out PUT stores server totals even when the client tampers
+ok 130 - cash-out PUT stores server totals even when the client tampers
+  ---
+  duration_ms: 0.515951
+  type: 'test'
+  ...
+# Subtest: server cash-out totals match the browser on the DEC-02 notebook examples
+ok 131 - server cash-out totals match the browser on the DEC-02 notebook examples
+  ---
+  duration_ms: 0.579947
+  type: 'test'
+  ...
+# Subtest: cash-out history spans 30 days, newest first, across a month edge
+ok 132 - cash-out history spans 30 days, newest first, across a month edge
+  ---
+  duration_ms: 0.134628
+  type: 'test'
+  ...
+# Subtest: inventory counts need the manager token
+ok 133 - inventory counts need the manager token
+  ---
+  duration_ms: 0.362464
+  type: 'test'
+  ...
+# Subtest: inventory days save and come back in the 14-day history, newest first
+ok 134 - inventory days save and come back in the 14-day history, newest first
+  ---
+  duration_ms: 3.592938
+  type: 'test'
+  ...
+# Subtest: inventory bodies are strictly validated
+ok 135 - inventory bodies are strictly validated
+  ---
+  duration_ms: 1.522829
+  type: 'test'
+  ...
+# Subtest: the inventory item list needs the manager token and starts empty
+ok 136 - the inventory item list needs the manager token and starts empty
+  ---
+  duration_ms: 0.693609
+  type: 'test'
+  ...
+# Subtest: inventory item list saves with a rev and rejects stale writes
+ok 137 - inventory item list saves with a rev and rejects stale writes
+  ---
+  duration_ms: 2.801756
+  type: 'test'
+  ...
+# Subtest: inventory item lists are strictly validated
+ok 138 - inventory item lists are strictly validated
+  ---
+  duration_ms: 0.562319
+  type: 'test'
+  ...
+# Subtest: write-ups need the manager token to read or write
+ok 139 - write-ups need the manager token to read or write
+  ---
+  duration_ms: 0.509007
+  type: 'test'
+  ...
+# Subtest: write-ups save, list newest first, and only the label can change
+ok 140 - write-ups save, list newest first, and only the label can change
+  ---
+  duration_ms: 14.515003
+  type: 'test'
+  ...
+# Subtest: write-up forms are strictly validated
+ok 141 - write-up forms are strictly validated
+  ---
+  duration_ms: 0.462739
+  type: 'test'
+  ...
+# Subtest: all digital forms persist, paginate, label, reject form edits, and delete both record and list metadata
+ok 142 - all digital forms persist, paginate, label, reject form edits, and delete both record and list metadata
+  ---
+  duration_ms: 7.35209
+  type: 'test'
+  ...
+# Subtest: digital form routes require manager authentication and configured storage; DELETE is allowed by CORS
+ok 143 - digital form routes require manager authentication and configured storage; DELETE is allowed by CORS
+  ---
+  duration_ms: 1.962478
+  type: 'test'
+  ...
+# Subtest: digital form API rejects invalid fields and credentials without creating records
+ok 144 - digital form API rejects invalid fields and credentials without creating records
+  ---
+  duration_ms: 2.783799
+  type: 'test'
+  ...
+# Subtest: existing write-ups can be deleted without affecting other records
+ok 145 - existing write-ups can be deleted without affecting other records
+  ---
+  duration_ms: 3.337951
+  type: 'test'
+  ...
+1..145
+# tests 145
+# suites 0
+# pass 145
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4870.806311
