@@ -51,12 +51,16 @@ with sync_playwright() as p:
     assert first['value']['context']=={'task':'cash-out','storeId':'CR2','businessDate':'2026-10-20'}
     assert first['value']['preparer']=='Preparer A' and first['value']['knownServerRevision'] is None
     page.get_by_role('button',name='Choose another draft',exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     expect(page.locator('#draft-preparer')).to_be_focused()
     first=next(d for d in drafts() if d['key']==first['key'])
     page.locator('#draft-preparer').fill('Preparer B');page.get_by_role('button',name='Start new draft',exact=True).click()
     expect(page.get_by_label('Cashier name',exact=True).first).to_have_value('')
     page.get_by_label('Cashier name',exact=True).first.fill('Independent B')
     page.get_by_role('button',name='Choose another draft',exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     page.locator('#draft-preparer').fill('Preparer C')
     source=page.locator('li').filter(has_text='Preparer: Preparer A')
     source.get_by_role('button',name='Resume as a copy',exact=True).click()
@@ -81,6 +85,8 @@ with sync_playwright() as p:
     page.evaluate('([k,v])=>localStorage.setItem(k,v)',[corrupt_key,'{readable broken source'])
     page.evaluate('([k,v])=>localStorage.setItem(k,v)',[future_key,future])
     page.get_by_role('button',name='Choose another draft',exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     expect(page.get_by_text('This draft could not be read.',exact=False)).to_have_count(2)
     unreadable=page.locator('li').filter(has_text='This draft could not be read.').first
     with page.expect_download() as downloaded:
@@ -96,7 +102,7 @@ with sync_playwright() as p:
     page.evaluate('() => { window.originalDraftSetItem=Storage.prototype.setItem; Storage.prototype.setItem=function(){throw new DOMException("quota","QuotaExceededError")} }')
     page.locator('#am-0-toast').fill('456.78')
     expect(page.locator('[data-save-state]')).to_have_attribute('data-save-state','failed')
-    page.get_by_role('button',name='Guardar borrador y bloquear',exact=True).click()
+    page.get_by_role('button',name='Guardar borradores y bloquear',exact=True).click()
     expect(page.locator('#cashout-editor')).to_be_visible()
     expect(page.locator('#am-0-toast')).to_have_value('456.78')
     with page.expect_download() as current_download:
@@ -105,7 +111,7 @@ with sync_playwright() as p:
     assert copy['payload']['am'][0]['toast']=='456.78' and copy['preparer']=='After corruption'
     assert token not in json.dumps(copy)
     page.evaluate('() => { Storage.prototype.setItem=window.originalDraftSetItem }')
-    page.get_by_role('button',name='Guardar borrador y bloquear',exact=True).click()
+    page.get_by_role('button',name='Guardar borradores y bloquear',exact=True).click()
     expect(page.locator('#cashout-code')).to_be_focused()
     expect(page.locator('#cashout-editor')).not_to_be_visible()
     assert page.evaluate('(k)=>localStorage.getItem(k)',corrupt_key)=='{readable broken source'

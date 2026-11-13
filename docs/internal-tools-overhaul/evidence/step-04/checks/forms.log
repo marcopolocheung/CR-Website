@@ -1,0 +1,104 @@
+
+> chinarose@0.0.2 forms:test
+> node --import jiti/register --test src/lib/forms.test.ts src/lib/digital-forms.test.ts src/lib/internal-tools/writeup-draft.test.ts src/lib/internal-tools/drafts.test.ts
+
+TAP version 13
+# Subtest: draft contracts reject unknown fields, credentials, and invalid checkboxes while allowing partial typing
+ok 1 - draft contracts reject unknown fields, credentials, and invalid checkboxes while allowing partial typing
+  ---
+  duration_ms: 1.991586
+  type: 'test'
+  ...
+# Subtest: calendar dates reject rollovers and accept leap days
+ok 2 - calendar dates reject rollovers and accept leap days
+  ---
+  duration_ms: 0.159369
+  type: 'test'
+  ...
+# Subtest: mixed saved-form lists search names, stores and labels and filter all five types
+ok 3 - mixed saved-form lists search names, stores and labels and filter all five types
+  ---
+  duration_ms: 1.449023
+  type: 'test'
+  ...
+# Subtest: every blank form in the catalog exists with its original format
+ok 4 - every blank form in the catalog exists with its original format
+  ---
+  duration_ms: 8.015315
+  type: 'test'
+  ...
+# Subtest: blank form links respect the deploy base path
+ok 5 - blank form links respect the deploy base path
+  ---
+  duration_ms: 0.17133
+  type: 'test'
+  ...
+# Subtest: saved form search filters by employee, label, type and date range without reordering
+ok 6 - saved form search filters by employee, label, type and date range without reordering
+  ---
+  duration_ms: 0.855915
+  type: 'test'
+  ...
+# Subtest: complete context dimensions isolate drafts; store/date/task/station/shift/record are independent
+ok 7 - complete context dimensions isolate drafts; store/date/task/station/shift/record are independent
+  ---
+  duration_ms: 3.317353
+  type: 'test'
+  ...
+# Subtest: form type separates form drafts and leaves existing keys unchanged
+ok 8 - form type separates form drafts and leaves existing keys unchanged
+  ---
+  duration_ms: 0.39326
+  type: 'test'
+  ...
+# Subtest: resuming forks into a new independent ID and preserves original source, preparer and values
+ok 9 - resuming forks into a new independent ID and preserves original source, preparer and values
+  ---
+  duration_ms: 6.700951
+  type: 'test'
+  ...
+# Subtest: corrupt/future payloads remain readable and cannot be overwritten; no cleanup/disposal is introduced
+ok 10 - corrupt/future payloads remain readable and cannot be overwritten; no cleanup/disposal is introduced
+  ---
+  duration_ms: 0.499518
+  type: 'test'
+  ...
+# Subtest: defined v0 upgrades in memory, then forks without changing the original bytes
+ok 11 - defined v0 upgrades in memory, then forks without changing the original bytes
+  ---
+  duration_ms: 0.381694
+  type: 'test'
+  ...
+# Subtest: denied storage is unavailable, never an empty success or a false save
+ok 12 - denied storage is unavailable, never an empty success or a false save
+  ---
+  duration_ms: 0.94292
+  type: 'test'
+  ...
+# Subtest: credentials, unsupported context, malformed cash payloads and renamed contexts are rejected
+ok 13 - credentials, unsupported context, malformed cash payloads and renamed contexts are rejected
+  ---
+  duration_ms: 0.382557
+  type: 'test'
+  ...
+# Subtest: write-up draft payloads accept only the form fields
+ok 14 - write-up draft payloads accept only the form fields
+  ---
+  duration_ms: 0.967657
+  type: 'test'
+  ...
+# Subtest: write-up drafts are scoped by store, date and form type and keep names and narratives as typed
+ok 15 - write-up drafts are scoped by store, date and form type and keep names and narratives as typed
+  ---
+  duration_ms: 2.149354
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 756.294768

@@ -1,0 +1,133 @@
+{
+  "evidence_id": "ev_a254a2979680fb5a977949fbb94ff864b05fd80afd322ab5c8a18328313acf5f",
+  "target": {
+    "target_id": "491608B72D390C74D6E35BE813F85D75",
+    "type": "page",
+    "title": "China Rose",
+    "url": "http://127.0.0.1:3035/internal/bookkeeping#cash-out",
+    "origin": "http://127.0.0.1:3035",
+    "attached": null
+  },
+  "provider": {
+    "id": "rea-cdp-browser",
+    "name": "REA Chrome DevTools Protocol observation provider",
+    "version": "2"
+  },
+  "capture_window": {
+    "started_at": "2026-11-13T05:44:26.609Z",
+    "ended_at": "2026-11-13T05:44:27.791Z",
+    "observation_ms": 500
+  },
+  "completeness": {
+    "status": "policy_filtered",
+    "conditions": [
+      "attach_limited",
+      "policy_filtered"
+    ],
+    "policy_filtered_sections": [
+      "console_events",
+      "console_text",
+      "json_body_shapes",
+      "resources",
+      "script_sources",
+      "scripts",
+      "source_maps",
+      "websocket_shapes"
+    ],
+    "attach_limited_sections": [
+      "console_events",
+      "metadata",
+      "network_requests",
+      "websocket_connections",
+      "websocket_frames",
+      "workers"
+    ],
+    "truncated_sections": [],
+    "unavailable_sections": [],
+    "excluded": [
+      {
+        "section": "console_events",
+        "reason": "unsupported_url",
+        "count": 3
+      },
+      {
+        "section": "console_text",
+        "reason": "not_approved",
+        "count": null
+      },
+      {
+        "section": "json_body_shapes",
+        "reason": "not_approved",
+        "count": null
+      },
+      {
+        "section": "resources",
+        "reason": "unsupported_url",
+        "count": 1
+      },
+      {
+        "section": "script_sources",
+        "reason": "not_approved",
+        "count": 17
+      },
+      {
+        "section": "scripts",
+        "reason": "unattributed_origin",
+        "count": 35
+      },
+      {
+        "section": "scripts",
+        "reason": "unsupported_url",
+        "count": 288
+      },
+      {
+        "section": "source_maps",
+        "reason": "unsupported_url",
+        "count": 1
+      },
+      {
+        "section": "websocket_shapes",
+        "reason": "not_approved",
+        "count": null
+      }
+    ],
+    "dropped_events": {
+      "scripts": 0,
+      "network_requests": 0,
+      "console_events": 0,
+      "websocket_connections": 0,
+      "websocket_frames": 0,
+      "webmcp_tools": 0,
+      "timeline_events": 0,
+      "total": 0
+    }
+  },
+  "dom_total_nodes": 1159,
+  "storage": {
+    "origin": "http://127.0.0.1:3035",
+    "usage_bytes": 0,
+    "quota_bytes": 474005333,
+    "local_storage_keys": [
+      "cr-internal-draft:%5B%22cash-out%22%2C%22CR2%22%2C%222026-11-12%22%2Cnull%2Cnull%2Cnull%2Cnull%2Cnull%5D:ef592fbf-3b6e-4c97-bcad-0896027294a1",
+      "cr-internal-draft:%5B%22form%22%2C%22CR3%22%2C%222026-11-11%22%2Cnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22write-up%22%5D:5c01b2f7-a228-4d2f-a54d-2f5f764f820f",
+      "cr-internal-locale"
+    ],
+    "session_storage_keys": [],
+    "indexed_db_names": [],
+    "cache_names": [],
+    "content_fingerprints": [],
+    "fingerprint_algorithm": "sha256",
+    "fingerprints_complete": false,
+    "values_redacted": true
+  },
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "Observation starts when REA attaches; prior network and console activity is unavailable.",
+    "Worker targets are a final inventory snapshot, not worker-session observation. Their attached flag describes any debugging client; this page-session collector does not observe worker network, console, or script events, and short-lived workers may be absent from the snapshot.",
+    "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+    "Source maps are reported only as declarative URLs and are not fetched.",
+    "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+    "CDP discovery omitted the target attachment state; attached is reported as unknown.",
+    "Browser host platform and architecture were not observed."
+  ]
+}

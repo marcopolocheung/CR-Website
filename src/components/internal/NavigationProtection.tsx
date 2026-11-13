@@ -1,18 +1,28 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, useMemo } from 'react'
+import { managerSession } from '@/lib/internal-tools/manager-session'
+import { useRouter } from 'next/navigation'
+import { useWorkspaceVisible } from './WorkspaceVisibility'
+import { Icon } from './ui/Icon'
+import { Button } from './ui/controls'
 import { useConfirmation } from './Feedback'
+import { useInternalLanguage } from './InternalLanguage'
 import type { Message } from '@/lib/internal-tools/i18n'
 
-type Work = { dirty: boolean; deviceSaved: boolean }
+import { checkpointWork, type Work } from '@/lib/internal-tools/work-transitions'
+const Transitions = createContext({ handoff: async (_done: () => void) => {}, change: async (_done: () => void) => {} })
+export function useWorkTransitions() { return useContext(Transitions) }
 const Context = createContext<(id: string, read: () => Work) => () => void>(() => () => {})
 export function useNavigationProtection(work: Work) {
   const id = useId()
-  const current = useRef(work); current.current = work
+  const visible = useWorkspaceVisible()
+  const current = useRef(work); current.current = { ...work, active: visible }
   const register = useContext(Context)
   useEffect(() => register(id, () => current.current), [id,register,work.dirty,work.deviceSaved])
 }
 export default function NavigationProtection({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
   const work = useRef(new Map<string, () => Work>())
   const [hasDirty,setHasDirty] = useState(false)
   const register = useCallback((id: string, read: () => Work) => {
@@ -21,6 +31,33 @@ export default function NavigationProtection({ children }: { children: React.Rea
     return () => { work.current.delete(id); refresh() }
   }, [])
   const confirmation = useConfirmation()
+  const [blocked, setBlocked] = useState(false)
+  const running = useRef(false)
+  const handoff = useCallback(async (done: () => void) => {
+    if (running.current) return
+    running.current = true
+    try {
+      const entries = [...work.current.values()].map(read => read())
+      if (!checkpointWork(entries)) { setBlocked(true); return }
+      entries.forEach(entry => entry.leave?.())
+      setBlocked(false); done()
+    } finally { running.current = false }
+  }, [])
+  const change = useCallback(async (done: () => void) => {
+    if (running.current) return
+    running.current = true
+    try {
+      const generation = managerSession.getSnapshot().generation
+      let entries = [...work.current.values()].map(read => read()).filter(entry => entry.active !== false)
+      if (entries.some(entry => entry.busy)) { setBlocked(true); return }
+      if (entries.some(entry => entry.dirty) && !await confirmation.ask({ key: 'session.changeContext' }, true)) return
+      if (generation !== managerSession.getSnapshot().generation) return
+      entries = [...work.current.values()].map(read => read()).filter(entry => entry.active !== false)
+      if (!checkpointWork(entries)) { setBlocked(true); return }
+      setBlocked(false); done()
+    } finally { running.current = false }
+  }, [confirmation.ask])
+  const transitions = useMemo(() => ({ handoff, change }), [handoff, change])
   const leaving = useRef(false)
   const prompting = useRef(false)
   useEffect(() => {
@@ -35,6 +72,13 @@ export default function NavigationProtection({ children }: { children: React.Rea
       if (!(anchor instanceof HTMLAnchorElement) || anchor.hasAttribute('download') || (anchor.target && anchor.target !== '_self')) return
       const target = new URL(anchor.href,location.href)
       if (!['http:','https:'].includes(target.protocol) || (target.origin === location.origin && target.pathname === location.pathname && target.search === location.search)) return
+      const normalized = target.pathname.replace(/\.html$/, '').replace(/\/$/, '')
+      const base = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '')
+      if (target.origin === location.origin && (normalized === `${base}/internal` || normalized.startsWith(`${base}/internal/`))) {
+        event.preventDefault(); event.stopImmediatePropagation()
+        router.push(normalized.slice(base.length) + target.search + target.hash)
+        return
+      }
       const entries = pending()
       if (!entries.length || leaving.current) return
       event.preventDefault(); event.stopImmediatePropagation()
@@ -49,6 +93,15 @@ export default function NavigationProtection({ children }: { children: React.Rea
     if (hasDirty) window.addEventListener('beforeunload',unload)
     document.addEventListener('click',click,true)
     return () => { window.removeEventListener('beforeunload',unload); document.removeEventListener('click',click,true) }
-  },[confirmation.ask,hasDirty])
-  return <Context.Provider value={register}>{children}{confirmation.dialog}</Context.Provider>
+  },[confirmation.ask,hasDirty,router])
+  return <Context.Provider value={register}><Transitions.Provider value={transitions}>{children}
+    {blocked && <Blocked onClose={() => setBlocked(false)} />}{confirmation.dialog}
+  </Transitions.Provider></Context.Provider>
+}
+
+function Blocked({ onClose }: { onClose: () => void }) {
+  const { t } = useInternalLanguage()
+  return <div role="alert" className="fixed bottom-4 left-4 right-4 z-50 border-2 border-red-800 bg-white p-4 text-zinc-900 shadow-lg print:hidden">
+    <p className="flex items-start gap-2"><Icon name="warning" /><span>{t('session.checkpointFailed')}</span></p><Button onClick={onClose}>{t('session.dismiss')}</Button>
+  </div>
 }

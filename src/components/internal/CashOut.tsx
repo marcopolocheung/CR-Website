@@ -1,4 +1,8 @@
 'use client'
+import { useWorkspaceVisible } from './WorkspaceVisibility'
+import { useManagerSession } from './ManagerSession'
+import { managerSession } from '@/lib/internal-tools/manager-session'
+import { useWorkTransitions } from './NavigationProtection'
 
 import { useShellAvailable, useShellTask } from './ShellTask'
 
@@ -65,8 +69,9 @@ export function CodeGate({ onUnlock, title }: { onUnlock: (token: string) => voi
     setBusy(true)
     setError(null)
     try {
+      const generation = managerSession.getSnapshot().generation
       await verifyWriteToken(code)
-      onUnlock(code)
+      if (!managerSession.active || generation === managerSession.getSnapshot().generation) onUnlock(code)
     } catch (caught) {
       setError({ key: errorKey(caught) })
       focusField('cashout-code')
@@ -106,6 +111,7 @@ export default function CashOut({ token, onUnlock, onLocked }: { token: string; 
 }
 
 function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlock: (token: string) => void; onLocked: () => void }) {
+  const visible = useWorkspaceVisible()
   const { t } = useInternalLanguage()
   const inShell = useShellAvailable()
   const [store, setStore] = useState<CashoutStore>('CR3')
@@ -159,6 +165,9 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
     // This points to the actual retained legacy source key, not a guessed record ID/date.
     open({ ...newDraft(context, preparer, payload), sourceId: 'cr-cash-out' })
   }
+  const session = useManagerSession()
+  const transitions = useWorkTransitions()
+  useNavigationProtection({ dirty: false, deviceSaved: !storageFailed, checkpoint: () => !activeRef.current || persist(activeRef.current.payload), leave: () => { activeRef.current = null; setActive(null); requestAnimationFrame(() => { const gate = document.querySelector<HTMLInputElement>('[data-internal-workspace]:not([hidden]) #cashout-code'); gate?.focus() }) } })
   const leave = (lock = false, nextDate?: string) => {
     const current = activeRef.current
     if (current && !persist(current.payload)) return
@@ -170,16 +179,16 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
   }
   useShellTask('cash', { context: token && context ? `${STORE_LABELS[store]} · ${date}` : null, onLock: token ? () => leave(true) : undefined, lockLabel: active ? 'drafts.handoff' : 'shell.lock' })
   return <div>
-    {!token && <CodeGate onUnlock={onUnlock} />}
+    {!token && visible && <CodeGate onUnlock={onUnlock} />}
     <div hidden={!token}>
     <div className="mb-4 flex flex-wrap items-end gap-3">
-      <div><label htmlFor="cashout-store" className="mb-1 block text-sm font-medium text-gray-700">{t('common.store')}</label>
+      <div className="min-w-0 max-w-full"><label htmlFor="cashout-store" className="mb-1 block text-sm font-medium text-gray-700">{t('common.store')}</label>
         <select id="cashout-store" value={store} disabled={!!active} onChange={event => setStore(event.target.value as CashoutStore)} className={inputClass}>
           {CASHOUT_STORES.map(store => <option key={store} value={store}>{STORE_LABELS[store]}</option>)}
         </select>
       </div>
-      <div><label htmlFor="cashout-date" className="mb-1 block text-sm font-medium text-gray-700">{t('common.date')}</label>
-        <input id="cashout-date" type="date" value={date} disabled={!!active} onChange={event => setDate(event.target.value)} className={inputClass} />
+      <div className="min-w-0 max-w-full"><label htmlFor="cashout-date" className="mb-1 block text-sm font-medium text-gray-700">{t('common.date')}</label>
+        <input id="cashout-date" type="date" value={date} disabled={!!active} onChange={event => setDate(event.target.value)} className={`${inputClass} min-w-0 max-w-full`} />
       </div>
       {!active && <div className="print:hidden">
         <LabeledInput id="draft-preparer" label={{ key: 'drafts.preparer' }} maxLength={120} value={preparer} onChange={event => setPreparer(event.target.value)} className={inputClass} aria-describedby="draft-preparer-help" />
@@ -193,12 +202,12 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
         <p className="break-words text-sm font-medium">{t('drafts.active', { store, date, preparer: active.preparer })}</p>
         <p className="text-xs text-gray-600">{lastSavedAt ? t('drafts.savedAt', { time: lastSavedAt }) : t('common.unsaved')}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button type="button" onClick={() => leave()} className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm">{t('drafts.change')}</button>
-          {!inShell && <button type="button" onClick={() => leave(true)} className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm">{t('drafts.handoff')}</button>}
+          <button type="button" onClick={() => void transitions.change(() => leave())} className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm">{t('drafts.change')}</button>
+          {!inShell && <button type="button" onClick={session.lock} className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm">{t('drafts.handoff')}</button>}
           <button type="button" onClick={() => downloadDraftSource(JSON.stringify(activeRef.current, null, 2))} className="min-h-11 px-3 py-2 text-sm text-red-700 underline">{t('drafts.downloadCurrent')}</button>
         </div>
       </div>
-      <CashOutSheet key={active.id} token={token} onLocked={onLocked} draft={active} persist={persist} onChooseDate={day => leave(false, day)} />
+      <CashOutSheet key={active.id} token={token} onLocked={onLocked} draft={active} persist={persist} onChooseDate={day => { void transitions.change(() => leave(false, day)) }} />
     </> : <>
       {!context && <EmptyState message={{ key: 'imports.pickDate' }} />}
       {context && <DraftChooser context={context} preparer={preparer} createPayload={emptySheet} validate={isCashoutDraftSheet} onOpen={open} />}
@@ -214,6 +223,7 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
 }
 
 function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token: string; onLocked: () => void; draft: Draft<Sheet>; persist: (payload: Sheet) => boolean; onChooseDate: (day: string) => void }) {
+  const visible = useWorkspaceVisible()
   const { t: tr } = useInternalLanguage()
   const [sheet, setSheetState] = useState<Sheet>(() => draft.payload)
   const latestSheet = useRef(sheet)
@@ -230,7 +240,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
   const [activeDrawer, setActiveDrawer] = useState<{ shift: Shift; index: number } | null>(null)
   const [keypadOpen, setKeypadOpen] = useState(false)
   const saving = useRef(new SingleFlight<void>())
-  useNavigationProtection({ dirty: saveState !== 'server', deviceSaved })
+  useNavigationProtection({ dirty: saveState !== 'server', deviceSaved, busy: saveState === 'sending', checkpoint: () => persist(latestSheet.current) })
   const confirmation = useConfirmation()
   const tokenRef = useRef(token); tokenRef.current = token
   const currentEdit = useRef({ store, date, sheet })
@@ -255,11 +265,11 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
   )
 
   const refreshHistory = useCallback(
-    () => { if (!token) return Promise.resolve(); return run(async () => {
+    () => { if (!token || !visible) return Promise.resolve(); return run(async () => {
       const days = await fetchCashoutHistory(store, today(), token)
       if (mounted.current && currentEdit.current.store === store) setHistory(days)
     }) },
-    [run, store, token],
+    [run, store, token, visible],
   )
 
   useEffect(() => {

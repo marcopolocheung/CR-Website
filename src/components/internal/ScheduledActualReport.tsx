@@ -1,4 +1,5 @@
 'use client'
+import { useImportAccess } from './useImportAccess'
 
 import { useShellTask } from './ShellTask'
 import { useRef, useState } from 'react'
@@ -10,6 +11,7 @@ import { weeksInPeriod } from '@/lib/converter/published-hours'
 import { compareScheduledActual, defaultImportSelection, type ComparisonInput } from '@/lib/converter/scheduled-actual'
 import type { StoreId } from '@/lib/internal-tools/contracts'
 export default function ScheduledActualReport({token}:{token:string}){
+ const failureKey = useImportAccess()
  const {t}=useInternalLanguage(),confirmation=useConfirmation(),[start,setStart]=useState(''),[end,setEnd]=useState(''),[store,setStore]=useState('both'),[preparer,setPreparer]=useState(''),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[inputs,setInputs]=useState<ComparisonInput[]|null>(null),[scope,setScope]=useState({start:'',end:'',store:''}),[selected,setSelected]=useState<Set<string>>(new Set()),[report,setReport]=useState<ReturnType<typeof compareScheduledActual>|null>(null),[loadVersion,setLoadVersion]=useState(0)
  useShellTask('comparison', {context:[store==='both'?t('shell.bothStores'):store,start,end].filter(Boolean).join(' · ')})
  const running=useRef(false),request=useRef(0),credential=useRef(token);credential.current=token
@@ -28,13 +30,13 @@ export default function ScheduledActualReport({token}:{token:string}){
    }))
    if(at!==request.current||capturedToken!==credential.current)return
    setInputs(next);setScope({start,end,store});setSelected(defaultImportSelection(next));setReport(null);setLoadVersion(v=>v+1);setStatus('comparison.loaded')
-  }catch(e){if(at===request.current&&capturedToken===credential.current)setStatus(`importApi.${e instanceof ImportApiError?e.code:'unavailable'}`)}
+  }catch(e){if(at===request.current&&capturedToken===credential.current)setStatus(failureKey(e))}
   finally{running.current=false;if(at===request.current)setBusy(false)}
  }
  async function loadMore(input:ComparisonInput){
   if(running.current||!token||!input.nextCursor)return
   const at=request.current,capturedToken=token;running.current=true;setBusy(true)
-  try{const page=await getHistory(input.storeId,'hours',input.page.start,input.page.end,token,input.nextCursor);if(at!==request.current||capturedToken!==credential.current)return;setInputs(old=>old?.map(item=>item.storeId===input.storeId?{...item,imports:[...item.imports,...page.records.filter(record=>!item.imports.some(r=>r.id===record.id))],hasMore:!!page.nextCursor,nextCursor:page.nextCursor}:item)??null);setReport(null)}catch(e){setStatus(`importApi.${e instanceof ImportApiError?e.code:'unavailable'}`)}finally{running.current=false;setBusy(false)}
+  try{const page=await getHistory(input.storeId,'hours',input.page.start,input.page.end,token,input.nextCursor);if(at!==request.current||capturedToken!==credential.current)return;setInputs(old=>old?.map(item=>item.storeId===input.storeId?{...item,imports:[...item.imports,...page.records.filter(record=>!item.imports.some(r=>r.id===record.id))],hasMore:!!page.nextCursor,nextCursor:page.nextCursor}:item)??null);setReport(null)}catch(e){setStatus(failureKey(e))}finally{running.current=false;setBusy(false)}
  }
  function compare(){if(inputs&&matches)setReport(compareScheduledActual(inputs,start,end,selected))}
  return <div className="comparison-print max-w-5xl rounded-xl border bg-white p-5">

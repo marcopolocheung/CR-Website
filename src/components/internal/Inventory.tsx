@@ -1,4 +1,6 @@
 'use client'
+import { useManagerSession } from './ManagerSession'
+import { useWorkspaceVisible } from './WorkspaceVisibility'
 
 import { useShellTask } from './ShellTask'
 
@@ -6,8 +8,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CodeGate } from './CashOut'
 import { useInternalLanguage } from './InternalLanguage'
 import { useConfirmation, focusField } from './Feedback'
-import { useNavigationProtection } from './NavigationProtection'
+import { useNavigationProtection, useWorkTransitions } from './NavigationProtection'
+import { downloadDraftSource } from './DraftChooser'
 import RecoveryPanel from './RecoveryPanel'
+import { businessDate } from '@/lib/internal-tools/contracts'
 import { SingleFlight } from '@/lib/internal-tools/recovery'
 import { inventoryComparison, isInventorySheets } from '@/lib/internal-tools/inventory-recovery'
 import { errorKey, type Message } from '@/lib/internal-tools/i18n'
@@ -48,14 +52,15 @@ let nextNewId = 0
 /** CR3 supply inventory: the clipboard sheets on screen, behind the manager code. */
 export default function Inventory() {
   // Manager token lives in memory only, like cash out.
-  const [token, setToken] = useState('')
-  const lock = useCallback(() => setToken(''), [])
+  const { token, unlock: setToken, expire: lock } = useManagerSession()
   return <InventoryBook token={token} onUnlock={setToken} onLocked={lock} />
 }
 
 function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock: (token: string) => void; onLocked: () => void }) {
   const { t: tr } = useInternalLanguage()
   const confirmation = useConfirmation()
+  const visible = useWorkspaceVisible()
+  const transitions = useWorkTransitions()
   const tokenRef = useRef(token); tokenRef.current = token
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
@@ -77,14 +82,28 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   const dateRef = useRef(date); dateRef.current = date
   const countsRef = useRef(counts); countsRef.current = counts
   const listRevRef = useRef(listRev); listRevRef.current = listRev
+  const [catalogSource, setCatalogSource] = useState<string | null>(null)
+  const [catalogRecovery, setCatalogRecovery] = useState<{ baseRevision: number; sheets: InventorySheet[] } | null>(null)
   const [conflict,setConflict] = useState(false)
   const [serverList,setServerList] = useState<{rev:number;sheets:InventorySheet[] | null} | null>(null)
   const [countDirty,setCountDirty] = useState(false)
   const [deviceSaved,setDeviceSaved] = useState(false)
-  useNavigationProtection({ dirty: !!draft || countDirty, deviceSaved: !draft && deviceSaved })
+  const checkpoint = () => {
+    if (!loaded) return true
+    try {
+      localStorage.setItem(`cr-inventory-day:${date}`, JSON.stringify({ date, counts }))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ date, counts }))
+      if (draft) localStorage.setItem('cr-inventory-catalog-recovery-v1', JSON.stringify({ schemaVersion: 1, storeId: 'CR3', baseRevision: listRev, sheets: draft }))
+      setDeviceSaved(true); return true
+    } catch { setDeviceSaved(false); setStatus({key:'feedback.storageFailed'}); return false }
+  }
+  useNavigationProtection({ dirty: !!draft || countDirty, deviceSaved: !draft && deviceSaved, busy, checkpoint,
+    leave: () => { setDraft(null); setConflict(false); setServerList(null); restored.current = false; setLoaded(false); setCounts({}); setCountDirty(false) } })
 
+  const pendingRequests = useRef(0)
   const run = useCallback(
     async (task: () => Promise<string | Message | void>) => {
+      pendingRequests.current++
       setBusy(true)
       setStatus('')
       try {
@@ -95,7 +114,8 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
         setStatus({key:errorKey(caught)})
         if (caught instanceof StoreAuthError) onLocked()
       } finally {
-        if (mounted.current && tokenRef.current === token) setBusy(false)
+        pendingRequests.current--
+        if (mounted.current) setBusy(pendingRequests.current > 0)
       }
     },
     [onLocked, token],
@@ -103,13 +123,23 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
 
   // Restore once; reauthentication must not replace on-screen list/count edits.
   useEffect(() => {
-    if (!token) return
+    if (!token || !visible) return
     let start = dateRef.current
     if (!restored.current) {
       let saved: { date: string; counts: InventoryCounts } | null = null
       try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') } catch { /* original draft behavior; retain entered values on later failures */ }
-      start = saved?.date ?? today()
-      if (saved) { setDate(saved.date); setCounts(saved.counts); setCountDirty(!!Object.keys(saved.counts).length) }
+      start = saved && businessDate(saved.date) && validCounts(saved.counts) ? saved.date : today()
+      if (saved && businessDate(saved.date) && validCounts(saved.counts)) { setDate(saved.date); setCounts(saved.counts); setCountDirty(!!Object.keys(saved.counts).length) }
+      try {
+        const raw = localStorage.getItem('cr-inventory-catalog-recovery-v1')
+        if (raw) {
+          setCatalogSource(raw)
+          const saved = JSON.parse(raw)
+          if (saved.schemaVersion === 1 && saved.storeId === 'CR3' && Number.isSafeInteger(saved.baseRevision) && saved.baseRevision >= 0 && isInventorySheets(saved.sheets)) {
+            setCatalogRecovery({ baseRevision: saved.baseRevision, sheets: saved.sheets })
+          }
+        }
+      } catch { /* Preserve malformed source bytes; never replace the working copy. */ }
       setLoaded(true)
       restored.current = true
     }
@@ -125,7 +155,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
       const saved = days.find(d => d.date === start)
       if (saved && !Object.keys(countsRef.current).length) setCounts(saved.counts)
     })
-  }, [run, token])
+  }, [run, token, visible])
 
   useEffect(() => {
     if (!loaded) return
@@ -134,16 +164,22 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   }, [date, counts, loaded])
 
   const changeDate = (next: string) => {
-    if (!next) return
-    if (Object.keys(counts).length && !confirm('Switch dates? Counts on screen that are not saved will be lost.')) return
-    setDate(next)
-    setCounts({})
-    run(async () => {
-      const days = await fetchInventoryHistory(next, token)
-      if (mounted.current && dateRef.current === next && tokenRef.current === token) {
-        setHistory(days)
-        if (!Object.keys(countsRef.current).length) setCounts(days.find(d => d.date === next)?.counts ?? {})
-      }
+    if (!next || next === date) return
+    void transitions.change(() => {
+      setDate(next); setCounts({}); setCountDirty(false)
+      // The old exact-day copy remains available after changing context.
+      try {
+        const raw = localStorage.getItem(`cr-inventory-day:${next}`)
+        const saved = raw ? JSON.parse(raw) : null
+        if (saved?.date === next && validCounts(saved.counts)) { setCounts(saved.counts); setCountDirty(true) }
+      } catch { setStatus({key:'feedback.storageFailed'}) }
+      run(async () => {
+        const days = await fetchInventoryHistory(next, token)
+        if (mounted.current && dateRef.current === next && tokenRef.current === token) {
+          setHistory(days)
+          if (!Object.keys(countsRef.current).length) setCounts(days.find(d => d.date === next)?.counts ?? {})
+        }
+      })
     })
   }
 
@@ -177,6 +213,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
         }
         throw caught
       }
+      try { const raw = localStorage.getItem('cr-inventory-catalog-recovery-v1'); if (raw) localStorage.setItem(`cr-inventory-catalog-recovery-archive:${crypto.randomUUID()}`, raw); localStorage.removeItem('cr-inventory-catalog-recovery-v1'); setCatalogSource(null); setCatalogRecovery(null) } catch { setStatus({key:'feedback.storageFailed'}) }
       setSheets(next)
       if (draftRef.current === candidate) setDraft(null)
       return {key:'recovery.listSaved'}
@@ -189,14 +226,26 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   })
   const useServer = async () => {
     if (!serverList || !await confirmation.ask({key:'recovery.replaceConfirm'},true,{key:'recovery.useServer'})) return
+    try { const raw = localStorage.getItem('cr-inventory-catalog-recovery-v1'); if (raw) localStorage.setItem(`cr-inventory-catalog-recovery-archive:${crypto.randomUUID()}`, raw); localStorage.removeItem('cr-inventory-catalog-recovery-v1'); setCatalogSource(null); setCatalogRecovery(null) } catch { setStatus({key:'feedback.storageFailed'}); return }
     setSheets(serverList.sheets ?? DEFAULT_SHEETS); setListRev(serverList.rev)
     setDraft(null); setConflict(false); setServerList(null)
     requestAnimationFrame(() => focusField('inventory-edit-list'))
   }
   const cancelList = async () => {
     if (!await confirmation.ask({key:'recovery.dropList'},true)) return
+    try { const raw = localStorage.getItem('cr-inventory-catalog-recovery-v1'); if (raw) localStorage.setItem(`cr-inventory-catalog-recovery-archive:${crypto.randomUUID()}`, raw); localStorage.removeItem('cr-inventory-catalog-recovery-v1'); setCatalogSource(null); setCatalogRecovery(null) } catch { setStatus({key:'feedback.storageFailed'}); return }
     setDraft(null); setConflict(false); setServerList(null)
     requestAnimationFrame(() => focusField('inventory-edit-list'))
+  }
+
+  const resumeCatalog = () => {
+    if (!catalogRecovery) return
+    void transitions.change(() => {
+      setDraft(structuredClone(catalogRecovery.sheets))
+      setConflict(catalogRecovery.baseRevision !== listRev)
+      setListRev(catalogRecovery.baseRevision)
+      setServerList(null)
+    })
   }
 
   const setInv = (item: InventoryItem, inv: string) => { setCountDirty(true); setCounts(c => ({ ...c, [item.id]: { inv, order: suggestOrder(item.use, inv) } })) }
@@ -212,8 +261,13 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
 
   return (
     <div>
-      {!token && <CodeGate onUnlock={onUnlock} title={tr('nav.inventory')} />}
+      {!token && visible && <CodeGate onUnlock={onUnlock} title={tr('nav.inventory')} />}
       <div hidden={!token}>
+      {catalogSource && !draft && <div className="mb-4 border border-gray-300 p-3 print:hidden">
+        <p>{tr(catalogRecovery ? 'session.catalogDraft' : 'drafts.unreadable')}</p>
+        {catalogRecovery && <button type="button" disabled={busy} className={button} onClick={resumeCatalog}>{tr('session.resumeCatalog')}</button>}
+        <button type="button" className={button} onClick={() => downloadDraftSource(catalogSource)}>{tr('drafts.downloadSource')}</button>
+      </div>}
       <div className="flex flex-wrap items-end gap-3 mb-6 print:hidden">
         <div>
           <label htmlFor="inventory-date" className="block text-sm font-medium text-gray-700 mb-1">Count date</label>
@@ -242,7 +296,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
             >
               Clear
             </button>
-            <button id="inventory-edit-list" onClick={() => { setConflict(false); setServerList(null); setDraft(structuredClone(sheets)) }} disabled={busy} className={`${button} border border-gray-300 hover:bg-gray-50`}>
+            <button id="inventory-edit-list" hidden={!!catalogSource} onClick={() => { setConflict(false); setServerList(null); setDraft(structuredClone(sheets)) }} disabled={busy} className={`${button} border border-gray-300 hover:bg-gray-50`}>
               {tr('recovery.editList')}
             </button>
           </>
@@ -506,4 +560,10 @@ function PastPair({ cell }: { cell?: { inv: string; order: string } }) {
       <td className={`${cellBorder} px-2 text-center text-base w-14 ${INK} ${pastOnly}`}>{cell?.order}</td>
     </>
   )
+}
+
+function validCounts(value: unknown): value is InventoryCounts {
+  return !!value && typeof value === 'object' && !Array.isArray(value) && Object.values(value).every(entry =>
+    !!entry && typeof entry === 'object' && !Array.isArray(entry) && Object.entries(entry).every(([key, v]) =>
+      (key === 'inv' || key === 'order') ? typeof v === 'string' : key === 'done' && typeof v === 'boolean'))
 }

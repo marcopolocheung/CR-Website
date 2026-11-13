@@ -1,7 +1,2 @@
-'use client'
 
-import Bookkeeping from '@/components/internal/Bookkeeping'
-
-export default function BookkeepingPage() {
-  return <Bookkeeping />
-}
+export default function Page() { return null }

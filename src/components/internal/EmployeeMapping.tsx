@@ -1,4 +1,5 @@
 'use client'
+import { useImportAccess } from './useImportAccess'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigationProtection } from './NavigationProtection'
 import { useConfirmation } from './Feedback'
@@ -10,9 +11,10 @@ import type { HoursRow } from '@/lib/converter/validation'
 import { sourceTime } from '@/lib/converter/business-date'
 import { canonicalJson } from '@/lib/internal-tools/json'
 export default function EmployeeMapping({store,rows,fingerprint,token,preparer,onRecord,onDirty}:{onDirty?:(dirty:boolean)=>void;store:StoreId;rows:HoursRow[];fingerprint:string;token:string;preparer:string;onRecord:(record:DirectoryRecord|null)=>void}){
+ const failureKey = useImportAccess()
  const {t}=useInternalLanguage(),[record,setRecord]=useState<DirectoryRecord|null>(null),[draft,setDraft]=useState<ImportDirectory>(emptyDirectory),[loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[name,setName]=useState(''),[sharedId,setSharedId]=useState('')
  const confirmation=useConfirmation()
- useNavigationProtection({dirty:loaded&&canonicalJson(draft)!==canonicalJson(record?.data??emptyDirectory()),deviceSaved:false})
+ useNavigationProtection({dirty:loaded&&canonicalJson(draft)!==canonicalJson(record?.data??emptyDirectory()),deviceSaved:false,busy})
  useEffect(()=>{onDirty?.(loaded&&canonicalJson(draft)!==canonicalJson(record?.data??emptyDirectory()))},[draft,record,loaded,onDirty])
  useEffect(()=>()=>onDirty?.(false),[onDirty])
  const generation=useRef(0),working=useRef(false),operation=useRef<{content:string;id:string}|null>(null)
@@ -25,7 +27,7 @@ export default function EmployeeMapping({store,rows,fingerprint,token,preparer,o
   if(loaded&&canonicalJson(draft)!==canonicalJson(record?.data??emptyDirectory())&&!await confirmation.ask({key:'mapping.replace'},true))return
   const version=generation.current;working.current=true;setBusy(true)
   try {const saved=await getDirectory(store,token);if(version!==generation.current)return;setRecord(saved);setDraft(saved?.data??emptyDirectory());setLoaded(true);onRecord(saved);setStatus('mapping.loaded')}
-  catch(e){if(version===generation.current)setStatus(`importApi.${e instanceof ImportApiError?e.code:'unavailable'}`)}
+  catch(e){if(version===generation.current)setStatus(failureKey(e))}
   finally{working.current=false;if(version===generation.current)setBusy(false)}
  }
  async function save(){
@@ -35,7 +37,7 @@ export default function EmployeeMapping({store,rows,fingerprint,token,preparer,o
   if(operation.current?.content!==content)operation.current={content,id:crypto.randomUUID()}
   working.current=true;setBusy(true)
   try{const saved=await putDirectory(store,token,record,reviewed,preparer,operation.current.id);if(version!==generation.current)return;setRecord(saved);setDraft(saved.data);onRecord(saved);setStatus('mapping.saved');operation.current=null}
-  catch(e){if(version===generation.current)setStatus(`importApi.${e instanceof ImportApiError?e.code:'unavailable'}`)}
+  catch(e){if(version===generation.current)setStatus(failureKey(e))}
   finally{working.current=false;if(version===generation.current)setBusy(false)}
  }
  function map(key:string,employeeId:string){

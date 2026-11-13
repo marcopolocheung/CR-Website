@@ -43,6 +43,7 @@ with sync_playwright() as p:
     page = context.new_page(); page.on('pageerror', lambda e: errors.append(str(e)))
 
     def unlock():
+        page.wait_for_load_state('networkidle')
         page.locator('#cashout-code').fill(TOKEN)
         page.get_by_role('button', name='Unlock', exact=True).click()
         expect(page.get_by_role('button', name='New write-up', exact=True)).to_be_visible()
@@ -76,6 +77,8 @@ with sync_playwright() as p:
     assert value['payload']['savedId'] is None and value['preparer'] == 'Manager A'
 
     page.get_by_role('button', name='Choose another draft', exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     expect(page.locator('#form-draft-preparer')).to_be_focused()
     page.locator('#form-draft-store').select_option('CR3')
     page.locator('#form-draft-preparer').fill('Manager B')
@@ -84,6 +87,8 @@ with sync_playwright() as p:
     expect(employee()).to_have_value('')
     employee().fill('Carl')
     page.get_by_role('button', name='Choose another draft', exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     page.locator('#form-draft-store').select_option('CR2')
     expect(page.get_by_text('Preparer: Manager A')).to_be_visible()
     expect(page.get_by_text('Preparer: Manager B')).to_have_count(0)
@@ -97,7 +102,7 @@ with sync_playwright() as p:
     expect(employee()).to_have_value('Ana López')
     expect(incident()).to_have_value('Llegó tarde.\nSecond line')
     incident().fill('Llegó tarde.\nSecond line\nThird line')
-    page.evaluate("() => { const a = document.createElement('a'); a.href = '/internal/'; a.textContent = 'Leave fixture'; document.body.append(a) }")
+    page.evaluate("() => { const a = document.createElement('a'); a.href = '/scheduler-demo'; a.textContent = 'Leave fixture'; document.body.append(a) }")
     page.get_by_role('link', name='Leave fixture', exact=True).click()
     dialog = page.get_by_role('dialog')
     expect(dialog).to_contain_text('Your work has a copy on this device')
@@ -113,7 +118,7 @@ with sync_playwright() as p:
 
     # Second tab edits its own copy; the first tab's fields are not replaced.
     other = context.new_page(); other.on('pageerror', lambda e: errors.append(str(e)))
-    other.goto(base + '/internal/forms')
+    other.goto(base + '/internal/forms'); other.wait_for_load_state('networkidle')
     other.locator('#cashout-code').fill(TOKEN); other.get_by_role('button', name='Unlock', exact=True).click()
     other.get_by_role('button', name='New write-up', exact=True).click()
     other.locator('#form-draft-store').select_option('CR2'); other.locator('#form-draft-date').fill('2026-10-20'); other.locator('#form-draft-preparer').fill('Tab two')
@@ -128,6 +133,8 @@ with sync_playwright() as p:
     expect(page.get_by_text('Draft storage is unavailable', exact=False).first).to_be_visible()
     expect(incident()).to_have_value('Typed while storage is full')
     page.get_by_role('button', name='Choose another draft', exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     expect(incident()).to_have_value('Typed while storage is full')  # cannot leave until the device copy saves
     page.evaluate('() => { Storage.prototype.setItem = window.realSetItem }')
     incident().fill('Typed after storage returned')
@@ -138,6 +145,8 @@ with sync_playwright() as p:
     corrupt_key = cr2.rsplit(':', 1)[0] + ':corrupt-fixture'
     page.evaluate('([k, v]) => localStorage.setItem(k, v)', [corrupt_key, '{broken write-up'])
     page.get_by_role('button', name='Choose another draft', exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     page.get_by_role('button', name='Refresh drafts', exact=True).click()
     expect(page.get_by_text('This draft could not be read.', exact=False)).to_be_visible()
     with page.expect_download() as dl:

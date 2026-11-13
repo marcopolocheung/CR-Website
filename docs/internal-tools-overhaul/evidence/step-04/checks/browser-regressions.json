@@ -1,0 +1,26 @@
+[
+  {
+    "suite": "internal-language",
+    "exitCode": 0
+  },
+  {
+    "suite": "internal-feedback",
+    "exitCode": 0
+  },
+  {
+    "suite": "cashout-context",
+    "exitCode": 0
+  },
+  {
+    "suite": "cashout-entry",
+    "exitCode": 0
+  },
+  {
+    "suite": "entry-workspace",
+    "exitCode": 0
+  },
+  {
+    "suite": "import-review",
+    "exitCode": 0
+  }
+]

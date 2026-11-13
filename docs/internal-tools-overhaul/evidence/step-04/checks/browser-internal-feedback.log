@@ -1,0 +1,2 @@
+PASS UX-03: retained field errors/focus, bilingual summaries, modal focus trap/Escape/return, device/send/server/wait/failure states, stale acknowledgment guard, and post-ack history failure
+External network guard: 0 blocked attempts

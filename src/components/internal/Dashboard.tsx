@@ -1,4 +1,6 @@
 'use client'
+import { useManagerSession } from './ManagerSession'
+import { useWorkspaceVisible } from './WorkspaceVisibility'
 
 import { useShellTask } from './ShellTask'
 
@@ -37,10 +39,10 @@ const shortDate = (date: string, weekday?: 'short', locale = 'en-US') => new Dat
 
 /** Internal home: links to every tool, then the cash numbers behind the manager code. */
 export default function Dashboard() {
+  const visible = useWorkspaceVisible()
   const { t: tr } = useInternalLanguage()
   // Manager token lives in memory only, like cash out.
-  const [token, setToken] = useState('')
-  const lock = useCallback(() => setToken(''), [])
+  const { token, unlock: setToken, expire: lock } = useManagerSession()
   useShellTask('dashboard', { onLock: token ? lock : undefined })
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -53,13 +55,14 @@ export default function Dashboard() {
           </Link>
         ))}
       </nav>
-      {token ? <CashBoard token={token} onLocked={lock} /> : <CodeGate onUnlock={setToken} title={tr('cash.dashboard')} />}
+      {token ? <CashBoard token={token} onLocked={lock} /> : visible ? <CodeGate onUnlock={setToken} title={tr('cash.dashboard')} /> : null}
     </div>
   )
 }
 
 function CashBoard({ token, onLocked }: { token: string; onLocked: () => void }) {
   const { locale, t: tr } = useInternalLanguage()
+  const visible = useWorkspaceVisible()
   const dateLabel = (date: string, weekday?: 'short') => shortDate(date, weekday, locale)
   const [histories, setHistories] = useState<Record<CashoutStore, CashoutDay[]> | null>(null)
   const [error, setError] = useState<TranslationKey | null>(null)
@@ -69,6 +72,7 @@ function CashBoard({ token, onLocked }: { token: string; onLocked: () => void })
   useShellTask('dashboard-context', { context: `${store === 'all' ? tr('shell.bothStores') : STORE_LABELS[store]} · ${now} · ${tr('shell.days', { days: range })}` })
 
   useEffect(() => {
+    if (!visible) return
     let live = true
     Promise.all(CASHOUT_STORES.map(s => fetchCashoutHistory(s, now, token)))
       .then(all => live && setHistories(Object.fromEntries(CASHOUT_STORES.map((s, i) => [s, all[i]])) as Record<CashoutStore, CashoutDay[]>))
@@ -80,7 +84,7 @@ function CashBoard({ token, onLocked }: { token: string; onLocked: () => void })
     return () => {
       live = false
     }
-  }, [now, token, onLocked])
+  }, [now, token, onLocked, visible])
 
   if (error) return <p className="text-sm text-red-700">{tr(error)}</p>
   if (!histories) return <p className="text-sm text-gray-600">{tr('dashboard.loading')}</p>
@@ -261,6 +265,7 @@ function Columns({
   tooltip: (r: DayRow) => [string, string, string?][]
 }) {
   const { locale, t: tr } = useInternalLanguage()
+  const visible = useWorkspaceVisible()
   const dateLabel = (date: string) => shortDate(date, undefined, locale)
   const [active, setActive] = useState<number | null>(null)
   const sums = rows.map(r => segments(r).reduce((s, x) => s + x.value, 0))

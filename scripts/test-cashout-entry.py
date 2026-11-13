@@ -116,6 +116,8 @@ with sync_playwright() as p:
     page.locator('#am-0-25-amount').fill('')
     page.locator('#am-0-5000-amount').fill('100.00')
     page.get_by_role('button', name='Choose another draft', exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     page.reload(); page.wait_for_load_state('networkidle'); unlock(page); choose(page, 'Reload fixture')
     row(page, 'Guided fixture').get_by_role('button', name='Resume as a copy', exact=True).click()
     expect(page.locator('#am-0-10000')).to_have_value('0')
@@ -225,6 +227,8 @@ with sync_playwright() as p:
     page.locator('#am-0-10000').fill('2.5')
     expect(page.locator('[data-save-state]')).to_have_attribute('data-save-state','failed')
     page.get_by_role('button', name='Choose another draft', exact=True).click()
+    if page.get_by_role('dialog').is_visible():
+        page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     expect(page.locator('#am-0-10000')).to_have_value('2.5')
     assert not errors, '\n'.join(errors)
     browser.close()

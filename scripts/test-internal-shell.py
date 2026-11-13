@@ -95,7 +95,7 @@ with sync_playwright() as p:
             expected = {'cash':'/internal/bookkeeping#cash-out','reports':'/internal/bookkeeping#sales','inventory':'/internal/inventory','forms':'/internal/forms','dashboard':'/internal'}[item]
             expect(page).to_have_url(re.compile(re.escape(expected)+'$'))
             page.wait_for_load_state('networkidle');expect(page.locator('[data-shell-ready=true]')).to_be_visible();selected(page,item)
-            expect(page.locator('h1').first).to_be_visible()
+            expect(page.locator('h1:visible').first).to_be_visible()
         shot(page,'dashboard-'+mode)
     record('destinations', 'Cash/Reports/Inventory/Forms/Dashboard navigated by keyboard and mouse with nonblank workspaces; each includes a way home')
     # Help is a native modal with Escape/return focus, language stays at the same header location.
@@ -132,11 +132,18 @@ with sync_playwright() as p:
         page.locator('#tab-hours').click();assert page.locator('#hc-file').evaluate('e=>e.files[0].name')=='synthetic-hours.csv'
         assert page.evaluate('window.shellOriginalFile===document.querySelector("#hc-file").files[0]')
         assert page.evaluate('window.shellMountedSentinel')=='retained'
-        nav(page,'inventory').click();expect(page.get_by_role('dialog')).to_be_visible()
+        nav(page,'schedule').click();expect(page.get_by_role('dialog')).to_be_visible()
         page.get_by_role('dialog').get_by_role('button',name='Cancel',exact=True).click()
         selected(page,'reports');expect(page.locator('#hc-start')).to_have_value('2026-11-01')
-        record(variant,'Native same-document Cash/Reports links preserve mounted cash/sales/hours fields and File object; legacy tabs synchronize selected nav/context; canceling cross-route departure preserves edits')
+        record(variant,'Native same-document Cash/Reports links preserve mounted cash/sales/hours fields and File object; legacy tabs synchronize selected nav/context; canceling departure to Schedule preserves edits')
         if variant.endswith('.html'):
+            # Lock checkpoints all visited tools now; use a fresh cash-only context
+            # rather than claiming incomplete sales/hours inputs are recoverable.
+            ctx.close();ctx,page=workspace();visit(page,variant)
+            page.evaluate('(raw)=>localStorage.setItem("cr-cash-out",raw)',LEGACY)
+            unlock(page);page.locator('#cashout-store').select_option('CR2');page.locator('#cashout-date').fill('2026-11-11');page.locator('#draft-preparer').fill('Shell fixture')
+            page.get_by_role('button',name='Start new draft',exact=True).click()
+            page.locator('#am-0-name').fill('Synthetic CR2 cashier');page.locator('#am-0-10000').fill('3')
             nav(page,'cash').click();shot(page,'cash-cr2-desktop')
             # Existing cash handoff refuses to lock if device persistence fails.
             page.evaluate('() => {window.shellOriginalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new DOMException("Synthetic quota","QuotaExceededError")}}')
@@ -147,7 +154,7 @@ with sync_playwright() as p:
             unlock(page);expect(page.locator('#draft-preparer')).to_be_visible()
             source=page.locator('li').filter(has=page.get_by_text('Preparer: Shell fixture',exact=True))
             source.get_by_role('button',name='Resume as a copy',exact=True).click();expect(page.locator('#am-0-10000')).to_have_value('3')
-            record('local cash lock','Header delegates existing Save draft and lock; quota failure retains active editor/access, successful handoff preserves original draft, explicit resume restores count; no shared session introduced')
+            record('local cash lock','Header delegates existing Save draft and lock; quota failure retains active editor/access, successful handoff preserves original draft, explicit resume restores count; shared session cleared after all device checkpoints succeed')
             page.get_by_role('button',name='Español',exact=True).click()
             expect(page.locator('#am-0-name')).to_have_value('Synthetic CR2 cashier');expect(context_line(page)).to_contain_text('CR2')
             for width in (768,375,320):
@@ -180,9 +187,12 @@ with sync_playwright() as p:
     page.get_by_label('Incident Descriptions',exact=True).fill('Synthetic incident retained through lock')
     expect(context_line(page)).to_contain_text('CR2');expect(context_line(page)).to_contain_text('2026-11-09')
     page.locator('[data-shell-lock]').tap();expect(page.locator('#cashout-code')).to_be_visible();unlock(page)
+    page.get_by_role('button',name='New write-up',exact=True).click()
+    page.locator('#form-draft-store').select_option('CR2');page.locator('#form-draft-date').fill('2026-11-09');page.locator('#form-draft-preparer').fill('Resume form')
+    page.locator('li').filter(has=page.get_by_text('Preparer: Form fixture',exact=True)).get_by_role('button',name='Resume as a copy',exact=True).click()
     expect(page.get_by_label('Incident Descriptions',exact=True)).to_have_value('Synthetic incident retained through lock')
     shot(page,'forms-context-phone')
-    record('form context/local lock','Header shows actual form store/date, never guessed from prior tool; existing hidden book stays mounted through local lock/unlock and narrative survives')
+    record('form context/local lock','Header shows actual form store/date, never guessed from prior tool; manual lock checkpoints and leaves the editor; explicit resume restores its narrative')
     ctx.close()
     ctx,page=workspace(320,True);visit(page,'/internal/inventory');unlock(page)
     expect(context_line(page)).to_contain_text('CR3');shot(page,'inventory-cr3-phone')

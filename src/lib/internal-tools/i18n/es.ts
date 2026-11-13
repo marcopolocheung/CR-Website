@@ -1,5 +1,11 @@
 import type en from './en'
 const es: Record<keyof typeof en, string> = {
+  "session.catalogDraft": "Borrador del catálogo en este dispositivo. Reanúdelo para revisar los cambios frente a la lista actual.",
+  "session.resumeCatalog": "Reanudar borrador del catálogo",
+  "session.dismiss": "Cerrar",
+  "session.lock": "Guardar borradores y bloquear",
+  "session.changeContext": "¿Guardar una copia en este dispositivo y salir del trabajo actual? El borrador conserva su tienda y fecha originales.",
+  "session.checkpointFailed": "El acceso sigue desbloqueado. Espere a que termine el trabajo pendiente o guarde una copia recuperable de cada tarea abierta antes de bloquear o cambiar el contexto. Si el almacenamiento no está disponible, mantenga esta página abierta y use los controles de descarga o copia de la tarea.",
   'shell.navigation': 'Navegación interna',
   "shell.identity": "Interno",
   "shell.dashboard": "Inicio",

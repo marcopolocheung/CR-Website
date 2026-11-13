@@ -49,7 +49,7 @@ with sync_playwright() as p:
     name=page.locator('input[aria-label$=" name"]').first
     name.fill('Local retained item')
     # In-app navigation cancels without changing the page or entered fields.
-    page.evaluate("() => { const a=document.createElement('a');a.href='/internal/';a.textContent='Recovery navigation fixture';document.body.append(a) }")
+    page.evaluate("() => { const a=document.createElement('a');a.href='/scheduler-demo';a.textContent='Recovery navigation fixture';document.body.append(a) }")
     page.get_by_role('link',name='Recovery navigation fixture',exact=True).click()
     dialog=page.get_by_role('dialog')
     expect(dialog).to_contain_text('without a reliable device copy')
@@ -123,7 +123,7 @@ with sync_playwright() as p:
     expect(page.get_by_role('button',name='Edit list',exact=True)).to_be_visible()
     # Successful acknowledgment clears this editor's navigation warning.
     page.get_by_role('link',name='Recovery navigation fixture',exact=True).click()
-    page.wait_for_url(lambda url: urlparse(url).path.rstrip('/') == '/internal')
+    page.wait_for_url(lambda url: urlparse(url).path.rstrip('/') == '/scheduler-demo')
     # Cash-out retains an in-memory copy through auth failure even when device writes fail.
     page.goto(base+'/internal/bookkeeping/');page.wait_for_load_state('networkidle');unlock()
     page.locator('#draft-preparer').fill('Recovery preparer');page.get_by_role('button',name='Start new draft',exact=True).click()
