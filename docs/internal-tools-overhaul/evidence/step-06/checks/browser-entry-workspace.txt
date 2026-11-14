@@ -1,0 +1,2 @@
+PASS UX-04: Enter/Tab/reverse entry, no implicit save, Escape focus, roving/touch tabs, mounted inputs, EN/ES, 44px targets, keyboard-sized VisualViewport, phone overflow and print exclusion
+External network guard: 0 blocked attempts

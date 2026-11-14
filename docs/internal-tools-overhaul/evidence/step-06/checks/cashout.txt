@@ -1,0 +1,176 @@
+
+> chinarose@0.0.2 cashout:test
+> node --import jiti/register --test src/lib/cashout.test.ts src/lib/dashboard.test.ts src/lib/inventory.test.ts src/lib/internal-tools/cashout-draft.test.ts
+
+TAP version 13
+# Subtest: cashier drawer, turn-in and over/short
+ok 1 - cashier drawer, turn-in and over/short
+  ---
+  duration_ms: 0.980742
+  type: 'test'
+  ...
+# Subtest: day totals add both shifts and compare deposit to the Z report
+ok 2 - day totals add both shifts and compare deposit to the Z report
+  ---
+  duration_ms: 0.172783
+  type: 'test'
+  ...
+# Subtest: blank Toast or Z report leaves over/short unknown instead of $0
+ok 3 - blank Toast or Z report leaves over/short unknown instead of $0
+  ---
+  duration_ms: 0.171741
+  type: 'test'
+  ...
+# Subtest: money parsing and formatting
+ok 4 - money parsing and formatting
+  ---
+  duration_ms: 0.145903
+  type: 'test'
+  ...
+# Subtest: found cash resolves a Z shortage without rewriting cashier or shift comparisons
+ok 5 - found cash resolves a Z shortage without rewriting cashier or shift comparisons
+  ---
+  duration_ms: 0.376914
+  type: 'test'
+  ...
+# Subtest: cash amount entry accepts exact cents and rejects incomplete, signed or fractional-cent amounts
+ok 6 - cash amount entry accepts exact cents and rejects incomplete, signed or fractional-cent amounts
+  ---
+  duration_ms: 0.162153
+  type: 'test'
+  ...
+# Subtest: extra money requires a server acknowledgement so older Workers cannot silently discard it
+ok 7 - extra money requires a server acknowledgement so older Workers cannot silently discard it
+  ---
+  duration_ms: 13.829737
+  type: 'test'
+  ...
+# Subtest: datesEnding is oldest first and crosses month ends
+ok 8 - datesEnding is oldest first and crosses month ends
+  ---
+  duration_ms: 1.773584
+  type: 'test'
+  ...
+# Subtest: dailyRows sums stores and keeps blank over/short as null
+ok 9 - dailyRows sums stores and keeps blank over/short as null
+  ---
+  duration_ms: 1.15636
+  type: 'test'
+  ...
+# Subtest: summarize averages saved days and counts missing store-days before today
+ok 10 - summarize averages saved days and counts missing store-days before today
+  ---
+  duration_ms: 0.373849
+  type: 'test'
+  ...
+# Subtest: unassigned legacy sheet retains counts, AM/PM, source names and Toast/Z text without inventing context
+ok 11 - unassigned legacy sheet retains counts, AM/PM, source names and Toast/Z text without inventing context
+  ---
+  duration_ms: 1.365903
+  type: 'test'
+  ...
+# Subtest: malformed legacy sources are rejected without coercing invalid values to zero or fabricating a sheet
+ok 12 - malformed legacy sources are rejected without coercing invalid values to zero or fabricating a sheet
+  ---
+  duration_ms: 0.275906
+  type: 'test'
+  ...
+# Subtest: unknown context and credential-bearing legacy objects remain unassigned for recovery
+ok 13 - unknown context and credential-bearing legacy objects remain unassigned for recovery
+  ---
+  duration_ms: 0.196377
+  type: 'test'
+  ...
+# Subtest: blank, explicit zero and historical unknown entry states survive serialization independently
+ok 14 - blank, explicit zero and historical unknown entry states survive serialization independently
+  ---
+  duration_ms: 0.221174
+  type: 'test'
+  ...
+# Subtest: invalid count text is retained for recovery and never truncated into another number
+ok 15 - invalid count text is retained for recovery and never truncated into another number
+  ---
+  duration_ms: 0.308056
+  type: 'test'
+  ...
+# Subtest: server payload strips local status and preserves integer-cent totals and Toast/Z workbook semantics
+ok 16 - server payload strips local status and preserves integer-cent totals and Toast/Z workbook semantics
+  ---
+  duration_ms: 0.331108
+  type: 'test'
+  ...
+# Subtest: each bill and coin amount converts to an exact whole count and synchronizes in both directions
+ok 17 - each bill and coin amount converts to an exact whole count and synchronizes in both directions
+  ---
+  duration_ms: 0.543976
+  type: 'test'
+  ...
+# Subtest: nonmultiples and malformed amounts remain recoverable until corrected, without fractional bills
+ok 18 - nonmultiples and malformed amounts remain recoverable until corrected, without fractional bills
+  ---
+  duration_ms: 0.376514
+  type: 'test'
+  ...
+# Subtest: amount metadata stays local while found cash survives wire serialization and old drafts still load
+ok 19 - amount metadata stays local while found cash survives wire serialization and old drafts still load
+  ---
+  duration_ms: 0.334485
+  type: 'test'
+  ...
+# Subtest: item ids are unique and fit the Worker pattern
+ok 20 - item ids are unique and fit the Worker pattern
+  ---
+  duration_ms: 1.095406
+  type: 'test'
+  ...
+# Subtest: amounts parse whole numbers and fractions only
+ok 21 - amounts parse whole numbers and fractions only
+  ---
+  duration_ms: 0.280745
+  type: 'test'
+  ...
+# Subtest: orders top up to Use, matching the paper sheets
+ok 22 - orders top up to Use, matching the paper sheets
+  ---
+  duration_ms: 0.204171
+  type: 'test'
+  ...
+# Subtest: orders group by supplier and skip blanks
+ok 23 - orders group by supplier and skip blanks
+  ---
+  duration_ms: 0.880005
+  type: 'test'
+  ...
+# Subtest: supplier filter keeps rows shared between suppliers
+ok 24 - supplier filter keeps rows shared between suppliers
+  ---
+  duration_ms: 0.826044
+  type: 'test'
+  ...
+# Subtest: orders carry the ordered check-off
+ok 25 - orders carry the ordered check-off
+  ---
+  duration_ms: 0.249927
+  type: 'test'
+  ...
+# Subtest: new item ids are readable and never collide
+ok 26 - new item ids are readable and never collide
+  ---
+  duration_ms: 0.175969
+  type: 'test'
+  ...
+# Subtest: edited lists are checked before saving
+ok 27 - edited lists are checked before saving
+  ---
+  duration_ms: 0.29446
+  type: 'test'
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 629.371899

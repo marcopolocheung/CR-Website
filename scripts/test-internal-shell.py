@@ -155,6 +155,7 @@ with sync_playwright() as p:
             # Existing cash handoff refuses to lock if device persistence fails.
             page.evaluate('() => {window.shellOriginalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new DOMException("Synthetic quota","QuotaExceededError")}}')
             page.locator('[data-shell-lock]').click();expect(page.locator('#am-0-10000')).to_have_value('3');expect(page.locator('[data-shell-lock]')).to_be_enabled()
+            page.locator('[data-cash-context]').evaluate('(e) => e.open = true')
             expect(page.get_by_text('Draft storage is unavailable.',exact=False)).to_be_visible()
             page.evaluate('() => {Storage.prototype.setItem=window.shellOriginalSet}')
             page.locator('[data-shell-lock]').click();expect(page.locator('#cashout-code')).to_be_visible();expect(page.locator('[data-shell-lock]')).to_be_disabled()

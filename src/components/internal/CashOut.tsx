@@ -1,4 +1,7 @@
 'use client'
+import { internalThemeClassName } from './ui/Theme'
+import { Icon } from './ui/Icon'
+import styles from './cash-workspace.module.css'
 import { useWorkspaceVisible } from './WorkspaceVisibility'
 import { useManagerSession } from './ManagerSession'
 import { managerSession } from '@/lib/internal-tools/manager-session'
@@ -51,9 +54,9 @@ const inputClass =
 
 function Money({ cents, signed }: { cents: number | null; signed?: boolean }) {
   const { t: tr } = useInternalLanguage()
-  if (cents === null) return <span className="font-mono font-semibold text-gray-400" title={tr('cash.missingFigure')}>—</span>
+  if (cents === null) return <span data-cash-money className="font-mono font-semibold text-gray-400" title={tr('cash.missingFigure')}>—</span>
   const color = !signed || cents === 0 ? 'text-gray-900' : cents < 0 ? 'text-red-600' : 'text-green-700'
-  return <span className={`font-mono font-semibold ${color}`}>{signed && cents > 0 ? '+' : ''}{formatCents(cents)}</span>
+  return <span data-cash-money className={`font-mono font-semibold ${color}`}>{signed && cents > 0 ? '+' : ''}{formatCents(cents)}</span>
 }
 
 /** Manager code gate. Same token as the scheduler demo; kept in memory only, never stored. */
@@ -178,9 +181,11 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
     else requestAnimationFrame(() => focusField('draft-preparer'))
   }
   useShellTask('cash', { context: token && context ? `${STORE_LABELS[store]} · ${date}` : null, onLock: token ? () => leave(true) : undefined, lockLabel: active ? 'drafts.handoff' : 'shell.lock' })
-  return <div>
+  return <div className={`${internalThemeClassName} ${styles.workspace}`}>
     {!token && visible && <CodeGate onUnlock={onUnlock} />}
     <div hidden={!token}>
+    <details open={!active} className={styles.context} data-cash-context>
+    <summary>{t(active ? 'cash.focus.context' : 'cash.focus.setup')}</summary>
     <div className="mb-4 flex flex-wrap items-end gap-3">
       <div className="min-w-0 max-w-full"><label htmlFor="cashout-store" className="mb-1 block text-sm font-medium text-gray-700">{t('common.store')}</label>
         <select id="cashout-store" value={store} disabled={!!active} onChange={event => setStore(event.target.value as CashoutStore)} className={inputClass}>
@@ -207,7 +212,7 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
           <button type="button" onClick={() => downloadDraftSource(JSON.stringify(activeRef.current, null, 2))} className="min-h-11 px-3 py-2 text-sm text-red-700 underline">{t('drafts.downloadCurrent')}</button>
         </div>
       </div>
-      <CashOutSheet key={active.id} token={token} onLocked={onLocked} draft={active} persist={persist} onChooseDate={day => { void transitions.change(() => leave(false, day)) }} />
+
     </> : <>
       {!context && <EmptyState message={{ key: 'imports.pickDate' }} />}
       {context && <DraftChooser context={context} preparer={preparer} createPayload={emptySheet} validate={isCashoutDraftSheet} onOpen={open} />}
@@ -217,6 +222,8 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
         <button type="button" onClick={() => downloadDraftSource(legacy)} className="min-h-11 px-3 py-2 text-sm text-red-700 underline">{t('drafts.downloadSource')}</button>
       </div>}
     </>}
+    </details>
+    {active && <CashOutSheet key={active.id} token={token} onLocked={onLocked} draft={active} persist={persist} onChooseDate={day => { void transitions.change(() => leave(false, day)) }} />}
     {confirmation.dialog}
     </div>
   </div>
@@ -237,7 +244,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
   const [saveState, setSaveState] = useState<SaveState>('unsaved')
   const [deviceSaved,setDeviceSaved] = useState(false)
   const [activeCount, setActiveCount] = useState<{ shift: Shift; index: number; denomination: number } | null>(null)
-  const [activeDrawer, setActiveDrawer] = useState<{ shift: Shift; index: number } | null>(null)
+  const [activeDrawer, setActiveDrawer] = useState<{ shift: Shift; index: number } | null>({ shift: 'am', index: 0 })
   const [keypadOpen, setKeypadOpen] = useState(false)
   const saving = useRef(new SingleFlight<void>())
   useNavigationProtection({ dirty: saveState !== 'server', deviceSaved, busy: saveState === 'sending', checkpoint: () => persist(latestSheet.current) })
@@ -290,12 +297,22 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
       return { key: 'cash.loaded', params: { store, date: day } }
     })
 
+  const focusEntry = (id: string) => {
+    const target = /^(am|pm)-(\d+)-/.exec(id)
+    if (target) setActiveDrawer({ shift: target[1] as Shift, index: Number(target[2]) })
+    requestAnimationFrame(() => focusField(id))
+  }
+  const chooseDrawer = (shift: Shift, index: number, focus = false) => {
+    setActiveDrawer({ shift, index }); setActiveCount(null); setKeypadOpen(false)
+    if (focus) requestAnimationFrame(() => focusField(`${shift}-${index}-name`))
+  }
+
   const saveDay = () => saving.current.run(() => run(async () => {
     if (!token) return
     const invalid = (['am', 'pm'] as const).flatMap(shift => sheet[shift].flatMap((cashier, index) =>
       DENOMINATIONS.flatMap((d, denomination) => parseCountInput(countInput(cashier, denomination)) === null ? [`${shift}-${index}-${d}`]
         : parseDenominationAmount(amountInput(cashier, denomination), d) === null ? [`${shift}-${index}-${d}-amount`] : [])))
-    if (invalid.length) { setKeypadOpen(false); focusField(invalid[0]); return { key: 'cash.fixCounts' } }
+    if (invalid.length) { setKeypadOpen(false); focusEntry(invalid[0]); return { key: 'cash.fixCounts' } }
     if (parseCashAmount(sheet.extraMoney ?? '') === null) { setKeypadOpen(false); focusField('extra-money'); return { key: 'cash.invalidExtraMoney' } }
     const stillCurrent = () => mounted.current && currentEdit.current.store === store && currentEdit.current.date === date && latestSheet.current === sheet
     setSaveState('sending')
@@ -352,7 +369,9 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
 
   const day = dayTotals(sheet.am, sheet.pm, sheet.zReport, sheet.extraMoney)
   const invalidExtraMoney = parseCashAmount(sheet.extraMoney ?? '') === null
-  const selectedCashier = activeDrawer ? sheet[activeDrawer.shift][activeDrawer.index] : null
+  const visibleDrawer = activeDrawer && sheet[activeDrawer.shift][activeDrawer.index] ? activeDrawer
+    : sheet.am.length ? { shift: 'am' as const, index: 0 } : sheet.pm.length ? { shift: 'pm' as const, index: 0 } : null
+  const selectedCashier = visibleDrawer ? sheet[visibleDrawer.shift][visibleDrawer.index] : null
   const countCashier = activeCount ? sheet[activeCount.shift][activeCount.index] : null
   const countFields = (['am','pm'] as const).flatMap(shift => sheet[shift].flatMap((_, index) => DENOMINATIONS.map((_, denomination) => ({ shift, index, denomination }))))
   const selectedIndex = activeCount ? countFields.findIndex(field => field.shift === activeCount.shift && field.index === activeCount.index && field.denomination === activeCount.denomination) : -1
@@ -367,54 +386,32 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
 
   return (
     <div id="cashout-editor">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-900">{tr('cash.title')}</h2>
-        <div className="flex gap-2 print:hidden">
-          <button onClick={() => window.print()} className="min-h-11 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50">
-            {tr('common.print')}
-          </button>
-          <button
-            onClick={async () => { if (await confirmation.ask({ key: 'cash.clearConfirm' }, true)) { setKeypadOpen(false); setActiveCount(null); setActiveDrawer(null); setSheet(emptySheet()) } }}
-            className="min-h-11 px-4 py-2 rounded-lg border border-red-300 text-red-700 text-sm font-medium hover:bg-red-50"
-          >
-            {tr('cash.clear')}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-end gap-3 mb-8 print:mb-4">
-        <div className="flex gap-2 print:hidden">
-          <button
-            onClick={() => loadDay(date)}
-            disabled={busy || !date}
-            className="min-h-11 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
-          >
-            {tr('cash.load')}
-          </button>
-          <button
-            id="cashout-save"
-            onClick={saveDay}
-            disabled={busy || !date}
-            className="min-h-11 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-          >
-            {tr('cash.save')}
-          </button>
-        </div>
-        <SaveFeedback state={saveState} message={busy && saveState !== 'sending' ? { key: 'common.loading' } : status} />
-      </div>
-
-      <EntryWorkspace finishId="cashout-save" summary={<>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-gray-600">{store} · {date}</p>
-            {selectedCashier && activeDrawer ? <>
-              <p className="break-words text-sm font-medium">{tr('cash.countContext', { shift: activeDrawer.shift.toUpperCase(), name: selectedCashier.name || tr('cash.cashierPlaceholder', { number: activeDrawer.index + 1 }) })}</p>
-              <Row label={tr('cash.drawer')}><Money cents={cashierTotals(selectedCashier).drawer} /></Row>
-            </> : <Row label={tr('cash.dayDeposit')}><Money cents={day.deposit} /></Row>}
+      <div className={styles.heading}>
+        <h2>{tr('cash.focus.entry')}</h2>
+        <details className={styles.tools} data-cash-tools>
+          <summary>{tr('cash.focus.tools')}</summary>
+          <div className={styles.toolActions}>
+            <button type="button" onClick={() => window.print()}><Icon name="print" />{tr('common.print')}</button>
+            <button type="button" disabled={busy || !date} onClick={() => loadDay(date)}>{tr('cash.load')}</button>
+            <button type="button" onClick={async () => { if (await confirmation.ask({ key: 'cash.clearConfirm' }, true)) { setKeypadOpen(false); setActiveCount(null); setActiveDrawer(null); setSheet(emptySheet()) } }}><Icon name="close" />{tr('cash.clear')}</button>
           </div>
+        </details>
+      </div>
+      <EntryWorkspace appearance="paper" helpMode="details" finishId="cashout-save" summary={<>
+        <div className={styles.finishRow} data-day-summary>
+          <div><span>{tr('cash.dayDeposit')}</span><strong><Money cents={day.deposit} /></strong></div>
+          <button id="cashout-save" type="button" onClick={saveDay} disabled={busy || !date} className={styles.save}><Icon name="check" />{tr('cash.save')}</button>
+        </div>
+        {selectedCashier && visibleDrawer && <div className={styles.summaryDrawer} data-drawer-summary>
+          <span>{tr('cash.countContext', { shift: visibleDrawer.shift.toUpperCase(), name: selectedCashier.name || tr('cash.cashierPlaceholder', { number: visibleDrawer.index + 1 }) })}</span>
+          <span>{tr('cash.drawer')} <Money cents={cashierTotals(selectedCashier).drawer} /></span>
+          <span>{tr('cash.turnIn', { amount: formatCents(FLOAT_CENTS) })} <Money cents={cashierTotals(selectedCashier).turnIn} /></span>
+        </div>}
+        <div className={styles.feedbackRow}>
+          <SaveFeedback appearance="paper" state={saveState} message={busy && saveState !== 'sending' ? { key: 'common.loading' } : status} />
           <button type="button" disabled={!countFields.length} aria-expanded={keypadOpen}
-            onClick={() => { if (keypadOpen) closeKeypad(); else { if (!activeCount && countFields[0]) selectCount(countFields[0]); setKeypadOpen(true) } }}
-            className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium disabled:opacity-50">{tr('cash.keypad')}</button>
+            onClick={() => { if (keypadOpen) closeKeypad(); else { if (!activeCount && visibleDrawer) selectCount({ ...visibleDrawer, denomination: 0 }); setKeypadOpen(true) } }}
+            className={styles.keypadButton}><Icon name="cash" />{tr('cash.keypad')}</button>
         </div>
         {keypadOpen && activeCount && countCashier && <CountKeypad
           label={tr('cash.countFor', { amount: formatCents(DENOMINATIONS[activeCount.denomination]) })}
@@ -424,32 +421,42 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
           onNext={selectedIndex >= 0 && selectedIndex < countFields.length - 1 ? () => selectCount(countFields[selectedIndex + 1]) : null}
           onClose={closeKeypad} />}
       </>}>
-      <p id="cash-count-help" className="mb-4 text-sm text-gray-600 print:hidden">{tr('cash.countHelp')}</p>
-      {invalidCounts && <p role="alert" className="mb-4 text-sm font-medium text-red-700">{tr('cash.fixCounts')}</p>}
+      <div className={styles.drawerPicker} role="tablist" aria-label={tr('cash.focus.drawers')}>
+        {(['am', 'pm'] as const).map(shift => <div key={shift} className={styles.shiftChoices}>
+          <span>{shift.toUpperCase()}</span>
+          {sheet[shift].map((cashier, index) => <button key={index} type="button" role="tab"
+            id={`select-${shift}-${index}`} data-drawer-select={`${shift}-${index}`} aria-controls={`cash-drawer-${shift}-${index}`}
+            aria-selected={visibleDrawer?.shift === shift && visibleDrawer.index === index}
+            tabIndex={visibleDrawer?.shift === shift && visibleDrawer.index === index ? 0 : -1}
+            onKeyDown={event => {
+              const drawers = (['am', 'pm'] as const).flatMap(s => sheet[s].map((_, i) => ({ shift: s, index: i })))
+              const at = drawers.findIndex(d => d.shift === shift && d.index === index)
+              const next = event.key === 'ArrowRight' ? (at + 1) % drawers.length : event.key === 'ArrowLeft' ? (at + drawers.length - 1) % drawers.length : event.key === 'Home' ? 0 : event.key === 'End' ? drawers.length - 1 : null
+              if (next === null) return
+              event.preventDefault(); chooseDrawer(drawers[next].shift, drawers[next].index)
+              requestAnimationFrame(() => focusField(`select-${drawers[next].shift}-${drawers[next].index}`))
+            }}
+            onClick={() => chooseDrawer(shift, index)}>{shift.toUpperCase()} · {cashier.name || tr('cash.cashierPlaceholder', { number: index + 1 })}</button>)}
+          <button id={`${shift}-add-cashier`} type="button" onClick={() => { const index = sheet[shift].length; setSheet(s => ({ ...s, [shift]: [...s[shift], newCashier()] })); chooseDrawer(shift, index, true) }} aria-label={tr('cash.focus.addDrawer', { shift: shift.toUpperCase() })}>{tr('cash.addCashier')}</button>
+        </div>)}
+      </div>
+      <p id="cash-count-help" className={styles.countHelp}>{tr('cash.focus.alternatives')}</p>
+      <details className={styles.help}><summary>{tr('cash.focus.help')}</summary><p>{tr('cash.countHelp')}</p></details>
+      {invalidCounts && <p role="alert" className="mb-4 text-sm font-medium text-red-700"><Icon name="warning" />{tr('cash.fixCounts')}</p>}
       {(['am', 'pm'] as const).map(shift => {
         const totals = shiftTotals(sheet[shift])
         return (
-          <section key={shift} className="mb-10">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xl font-semibold text-gray-900">{tr('cash.shift', { shift: shift.toUpperCase() })}</h2>
-              <button
-                id={`${shift}-add-cashier`}
-                onClick={() => { const index = sheet[shift].length; setSheet(s => ({ ...s, [shift]: [...s[shift], newCashier()] })); requestAnimationFrame(() => focusField(`${shift}-${index}-name`)) }}
-                className="min-h-11 px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 print:hidden"
-              >
-                {tr('cash.addCashier')}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <section key={shift} className={styles.shiftSection}>
+            <h2 className={styles.printOnly}>{tr('cash.shift', { shift: shift.toUpperCase() })}</h2>
+            <div className={styles.drawerGrid}>
               {sheet[shift].map((c, idx) => {
                 const t = cashierTotals(c)
                 const id = `${shift}-${idx}`
                 return (
-                  <div key={idx} data-cashier-card={id} role="group" aria-label={tr('cash.countContext', { shift: shift.toUpperCase(), name: c.name || tr('cash.cashierPlaceholder', { number: idx + 1 }) })} onFocusCapture={event => {
+                  <div key={idx} id={`cash-drawer-${id}`} data-inactive={visibleDrawer?.shift !== shift || visibleDrawer.index !== idx ? true : undefined} data-active-drawer={visibleDrawer?.shift === shift && visibleDrawer.index === idx ? id : undefined} data-cashier-card={id} role="tabpanel" aria-labelledby={`select-${id}`} aria-label={tr('cash.countContext', { shift: shift.toUpperCase(), name: c.name || tr('cash.cashierPlaceholder', { number: idx + 1 }) })} onFocusCapture={event => {
                     setActiveDrawer({ shift, index: idx })
                     if (event.target instanceof HTMLInputElement && !event.target.hasAttribute('data-count-input')) { setActiveCount(null); setKeypadOpen(false) }
-                  }} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 break-inside-avoid">
+                  }} className={styles.drawer}>
                     <div className="flex gap-2 mb-3">
                       <input
                         data-entry-field
@@ -465,12 +472,11 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                         aria-label={tr('cash.removeCashier')}
                         className="min-h-11 min-w-11 px-3 text-gray-400 hover:text-red-600 print:hidden"
                       >
-                        ✕
+                        <Icon name="close" />
                       </button>
                     </div>
 
                     <div className="mb-3 border-b border-gray-200 pb-2 print:hidden">
-                      <Row label={tr('cash.drawer')}><Money cents={t.drawer} /></Row>
                       <p className="text-xs text-gray-600">{tr('cash.countProgress', { number: c.countInputs?.filter(value => typeof value === 'string' && value !== '' && parseCountInput(value) !== null).length ?? 0, total: DENOMINATIONS.length })}</p>
                       {(!c.countInputs || c.countInputs.some(value => value === null)) && <p className="mt-1 text-xs text-amber-900">{tr('cash.legacyCountState')}</p>}
                     </div>
@@ -494,7 +500,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                             <td className="py-0.5 pr-2 text-gray-700 w-16">
                               <label htmlFor={`${id}-${d}`}>{formatCents(d)}</label>
                             </td>
-                            <td className="py-0.5 pr-2">
+                            <td data-entry-label={tr('cash.count')} className="py-0.5 pr-2">
                               <input
                                 data-entry-field
                                 data-count-input
@@ -513,9 +519,9 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                                 onChange={e => setCount(shift, idx, di, e.target.value)}
                                 className="min-h-11 w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-base text-right focus:outline-none focus:ring-2 focus:ring-red-500 print:min-h-0 print:text-sm"
                               />
-                              {invalid && <p id={`${id}-${d}-error`} className="mt-1 text-xs text-red-700">{tr('cash.invalidCount')}</p>}
+                              {invalid && <p id={`${id}-${d}-error`} className="mt-1 text-xs text-red-700"><Icon name="warning" />{tr('cash.invalidCount')}</p>}
                             </td>
-                            <td className="py-0.5 text-right w-28">
+                            <td data-entry-label={tr('cash.amount')} className="py-0.5 text-right w-28">
                               <input
                                 data-entry-field
                                 id={`${id}-${d}-amount`}
@@ -532,7 +538,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                                 onChange={e => setAmount(shift, idx, di, e.target.value)}
                                 className="min-h-11 w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-base text-right focus:outline-none focus:ring-2 focus:ring-red-500 print:hidden"
                               />
-                              {invalidAmount && <p id={`${id}-${d}-amount-error`} className="mt-1 text-xs text-red-700 print:hidden">{tr('cash.invalidAmount', { amount: formatCents(d) })}</p>}
+                              {invalidAmount && <p id={`${id}-${d}-amount-error`} className="mt-1 text-xs text-red-700 print:hidden"><Icon name="warning" />{tr('cash.invalidAmount', { amount: formatCents(d) })}</p>}
                               <span className="hidden print:inline">{formatCents(d * c.counts[di])}</span>
                             </td>
                           </tr>
@@ -565,7 +571,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
               })}
             </div>
 
-            <div className="mt-4 bg-gray-50 rounded-xl border border-gray-200 p-4 max-w-sm ml-auto">
+            <div className={styles.printOnly}>
               <Row label={tr('cash.shiftDeposit', { shift: shift.toUpperCase() })}><Money cents={totals.deposit} /></Row>
               <Row label={tr('cash.shiftOverShort', { shift: shift.toUpperCase() })}><Money cents={totals.overShort} signed /></Row>
             </div>
@@ -573,7 +579,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
         )
       })}
 
-      <section className="bg-white rounded-xl border-2 border-gray-300 shadow-sm p-6 max-w-md ml-auto break-inside-avoid">
+      <section className={styles.daySummary} data-cash-day-fields>
         <h2 className="text-xl font-semibold text-gray-900 mb-3">{tr('cash.dayTotal')}</h2>
         <Row label={tr('cash.actualDeposit')}><Money cents={day.deposit} /></Row>
         <Row label={tr('cash.cashierDifference')}><Money cents={day.overShort} signed /></Row>
@@ -614,7 +620,8 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
       </EntryWorkspace>
 
       {confirmation.dialog}
-      <section className="mt-10 print:hidden">
+      <details className={`${styles.history} print:hidden`} data-cash-history>
+        <summary>{tr('cash.focus.history')}</summary>
         <h2 className="text-xl font-semibold text-gray-900 mb-3">{tr('cash.history', { store: STORE_LABELS[store] })}</h2>
         {history.length === 0 ? (
           <EmptyState message={{ key: 'cash.empty' }} />
@@ -649,7 +656,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
             </table>
           </div>
         )}
-      </section>
+      </details>
     </div>
   )
 }

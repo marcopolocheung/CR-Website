@@ -110,3 +110,12 @@ Evidence specific to this task: the three task scenarios above must pass against
 - I/L/E/V: done/done/pending/pending. Status implemented, not complete. Nothing deployed.
 - Pending activation: REL-03 deploys the regenerated `dashboard.js` (paste or wrangler) to non-production then production and repeats Scenario 2 with a tampered PUT against each, recording environment/operator/time. REL-04 is listed but no frontend change is needed. Rollback: paste the previous `dashboard.js`; stored day documents keep the same shape either way.
 - Next owner/action: unassigned. CASH-08 remains blocked on UX-07/DEC-03; CASH-04/05/06 stay deferred.
+
+
+## Overhaul Step 06 — November 13, 2026
+
+The [Step 06 checkpoint](../checkpoints/step-06.md) records focused one-drawer entry,
+all-denomination Count/Amount compatibility, fixed per-drawer arithmetic, reachable
+Save, recovery and complete paper output. This review changes no financial model,
+API contract or Worker activation. Physical touch/software keyboard and live-service
+verification remain separate gates; existing task milestones are not retroactively changed.

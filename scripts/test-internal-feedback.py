@@ -7,6 +7,14 @@ from playwright.sync_api import sync_playwright, expect
 
 base = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:3017'
 assert urlparse(base).hostname in ('127.0.0.1', 'localhost'), 'Local server required'
+
+def open_cash_detail(page, name):
+    """Use the named secondary disclosure before exercising its original action."""
+    detail = page.locator('[data-cash-' + name + ']')
+    if detail.get_attribute('open') is None:
+        detail.locator(':scope > summary').click()
+    expect(detail).to_have_attribute('open', '')
+
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     context = browser.new_context(viewport={'width': 768, 'height': 1024}, has_touch=True)
@@ -55,6 +63,7 @@ with sync_playwright() as p:
     expect(feedback).to_have_attribute('data-save-state', 'device')
     expect(feedback).to_contain_text('Saved on this device')
     page.get_by_label('Cashier name', exact=True).first.fill('Original cashier')
+    open_cash_detail(page, 'tools')
     clear = page.get_by_role('button', name='Clear sheet', exact=True)
     clear.click()
     dialog = page.get_by_role('dialog')
@@ -109,6 +118,7 @@ with sync_playwright() as p:
     expect(feedback).to_contain_text('No se pudo actualizar el historial')
     mode['history_fail'] = False
     # A change of record context invalidates the last acknowledged indicator.
+    open_cash_detail(page, 'context')
     page.get_by_role('button', name='Elegir otro borrador', exact=True).click()
     if page.get_by_role('dialog').is_visible():
         page.get_by_role('dialog').get_by_role('button', name='Confirmar', exact=True).click()

@@ -62,7 +62,7 @@ export default function Bookkeeping() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">{tr('nav.bookkeeping')}</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-4">{tr(tab === 'cash-out' ? 'cash.focus.title' : 'nav.bookkeeping')}</h1>
       <div role="tablist" aria-label={tr('bookkeeping.tools')} className="flex flex-wrap gap-1 border-b border-gray-200 mb-6 print:hidden">
         {TABS.map(t => (
           <button

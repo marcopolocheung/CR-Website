@@ -103,3 +103,12 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - I/L/E/V: done/done/not_applicable/not_applicable. No publication, Worker deployment, remote migration, production write, staff test or live verification. Financial policies/calculations and current API wire shapes are unchanged; English print/workbook compatibility is covered by the language regression.
 - Recovery: original/new draft keys and local recovery downloads remain available; no automatic deletion, guessed context or token persistence. Rollback reverts scoped UI/reader changes while preserving those keys. Existing server last-save-wins guarantees remain explicit.
 - Next owner/action: Codex continues UX-06 for shared navigation/retry/conflict protection; retain the established draft/context invariants and separate backend capability activation.
+
+
+## Overhaul Step 06 — November 13, 2026
+
+The [Step 06 checkpoint](../checkpoints/step-06.md) records focused one-drawer entry,
+all-denomination Count/Amount compatibility, fixed per-drawer arithmetic, reachable
+Save, recovery and complete paper output. This review changes no financial model,
+API contract or Worker activation. Physical touch/software keyboard and live-service
+verification remain separate gates; existing task milestones are not retroactively changed.

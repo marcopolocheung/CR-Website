@@ -10,6 +10,14 @@ base = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:3017'
 assert urlparse(base).hostname in ('127.0.0.1', 'localhost')
 token = 'synthetic-draft-test-token'
 legacy = '{"am":[],"pm":[],"zReport":"123.45"}'
+
+def open_cash_detail(page, name):
+    """Use the named secondary disclosure before exercising its original action."""
+    detail = page.locator('[data-cash-' + name + ']')
+    if detail.get_attribute('open') is None:
+        detail.locator(':scope > summary').click()
+    expect(detail).to_have_attribute('open', '')
+
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     context = browser.new_context(viewport={'width':768,'height':1024},has_touch=True)
@@ -50,6 +58,7 @@ with sync_playwright() as p:
     first=drafts()[0]
     assert first['value']['context']=={'task':'cash-out','storeId':'CR2','businessDate':'2026-10-20'}
     assert first['value']['preparer']=='Preparer A' and first['value']['knownServerRevision'] is None
+    open_cash_detail(page, 'context')
     page.get_by_role('button',name='Choose another draft',exact=True).click()
     if page.get_by_role('dialog').is_visible():
         page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
@@ -58,6 +67,7 @@ with sync_playwright() as p:
     page.locator('#draft-preparer').fill('Preparer B');page.get_by_role('button',name='Start new draft',exact=True).click()
     expect(page.get_by_label('Cashier name',exact=True).first).to_have_value('')
     page.get_by_label('Cashier name',exact=True).first.fill('Independent B')
+    open_cash_detail(page, 'context')
     page.get_by_role('button',name='Choose another draft',exact=True).click()
     if page.get_by_role('dialog').is_visible():
         page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
@@ -84,6 +94,7 @@ with sync_playwright() as p:
     future=json.dumps({**first['value'],'id':'future-fixture','schemaVersion':99})
     page.evaluate('([k,v])=>localStorage.setItem(k,v)',[corrupt_key,'{readable broken source'])
     page.evaluate('([k,v])=>localStorage.setItem(k,v)',[future_key,future])
+    open_cash_detail(page, 'context')
     page.get_by_role('button',name='Choose another draft',exact=True).click()
     if page.get_by_role('dialog').is_visible():
         page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
@@ -96,6 +107,7 @@ with sync_playwright() as p:
     page.locator('#draft-preparer').fill('After corruption')
     page.get_by_role('button',name='Start new draft',exact=True).click()
     page.get_by_role('button',name='Español',exact=True).tap()
+    open_cash_detail(page, 'context')
     expect(page.get_by_text('Borrador de trabajo · CR2 · 2026-10-20 · After corruption',exact=True)).to_be_visible()
     page.get_by_label('Nombre del cajero',exact=True).first.fill('Conservar tras fallo')
     # Denied writes retain work; handoff must not silently discard it or claim it was saved.
@@ -106,6 +118,7 @@ with sync_playwright() as p:
     expect(page.locator('#cashout-editor')).to_be_visible()
     expect(page.locator('#am-0-toast')).to_have_value('456.78')
     with page.expect_download() as current_download:
+        open_cash_detail(page, 'context')
         page.get_by_role('button',name='Descargar esta copia de trabajo',exact=True).click()
     with open(current_download.value.path(),encoding='utf-8') as f: copy=json.load(f)
     assert copy['payload']['am'][0]['toast']=='456.78' and copy['preparer']=='After corruption'

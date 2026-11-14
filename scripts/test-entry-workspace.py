@@ -13,6 +13,14 @@ args = parser.parse_args()
 base = args.base
 assert urlparse(base).hostname in ('127.0.0.1', 'localhost')
 TOKEN = 'synthetic-entry-token'
+
+def open_cash_detail(page, name):
+    """Use the named secondary disclosure before exercising its original action."""
+    detail = page.locator('[data-cash-' + name + ']')
+    if detail.get_attribute('open') is None:
+        detail.locator(':scope > summary').click()
+    expect(detail).to_have_attribute('open', '')
+
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     context = browser.new_context(viewport={'width': 768, 'height': 1024}, has_touch=True)
@@ -49,6 +57,7 @@ with sync_playwright() as p:
     page.keyboard.press('Enter')
     expect(page.locator('#cashout-save')).to_be_focused()
     assert not writes, 'Entry must not submit a cash-out'
+    open_cash_detail(page, 'tools')
     page.get_by_role('button', name='Clear sheet', exact=True).click()
     expect(page.get_by_role('dialog')).to_be_visible()
     page.keyboard.press('Escape')
@@ -60,7 +69,7 @@ with sync_playwright() as p:
     expect(page.get_by_role('tab', name='Daily sales report', exact=True)).to_be_focused()
     page.locator('#sc-first').fill('Retained tab input')
     page.get_by_role('tab', name='Daily sales report', exact=True).focus()
-    page.keyboard.press('End'); expect(page.get_by_role('tablist').get_by_role('tab').last).to_be_focused()
+    page.keyboard.press('End'); expect(page.locator('#tab-sales').locator('..').get_by_role('tab').last).to_be_focused()
     page.keyboard.press('Home'); expect(page.get_by_role('tab', name='Cash out', exact=True)).to_be_focused()
     expect(name).to_have_value('Keyboard cashier')
     page.get_by_role('tab', name='Daily sales report', exact=True).tap()
@@ -78,6 +87,7 @@ with sync_playwright() as p:
       Object.defineProperty(window, 'visualViewport', {configurable: true, value: viewport});
       window.visualViewport.dispatchEvent(new Event('resize'));
     }''')
+    page.locator('[data-drawer-select="pm-0"]').click()
     page.locator('#pm-0-1').focus()
     page.wait_for_function('''() => {
       const box = document.activeElement.getBoundingClientRect();
@@ -89,11 +99,12 @@ with sync_playwright() as p:
     }''')
     # Frequent controls and count fields have 44px touch targets. No drag gesture is required.
     assert page.locator('#pm-0-1').bounding_box()['height'] >= 44
-    for locator in [page.get_by_role('button', name='+ Agregar cajero', exact=True).first,
-                    page.get_by_role('button', name='Eliminar cajero', exact=True).first,
+    for locator in [page.locator('#am-add-cashier'),
+                    page.locator('[data-active-drawer]').get_by_role('button', name='Eliminar cajero', exact=True),
                     page.get_by_role('tab', name='Cierre de caja', exact=True)]:
         assert locator.bounding_box()['height'] >= 44
     page.set_viewport_size({'width': 390, 'height': 844})
+    page.locator('[data-drawer-select="am-0"]').click()
     page.locator('#am-0-10000').focus()
     assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'Horizontal page overflow'
     page.screenshot(path='/tmp/ux-04-phone.png', full_page=True)
