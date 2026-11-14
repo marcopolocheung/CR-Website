@@ -6,6 +6,7 @@ import type { WeeklyStaffingTemplate } from '../../src/lib/scheduler/types'
 import { historyPage, historyRecord, saveHistory } from './import-history'
 import { directoryRecord, saveDirectory } from './import-directory'
 import { fetchToastCash, toastConfigured, ToastError, type ToastStore } from './toast'
+import { fetchToastSales, salesCacheTtl } from './toast-sales'
 import { digitalFormPerson, isDigitalForm, isDigitalFormType, type DigitalFormDoc } from '../../src/lib/digital-forms'
 interface KVNamespace {
   get(key: string): Promise<string | null>
@@ -1249,6 +1250,26 @@ export default {
       } catch (caught) {
         const code = caught instanceof ToastError ? caught.code : 'toast_unavailable'
         console.error('toast cash fill failed', code, caught instanceof Error ? caught.message : '')
+        return json({ error: code }, code === 'toast_unconfigured' ? 503 : 502, request, env, noStore)
+      }
+    }
+
+    // Toast sales summary for one store's business day (Reports page). Finished days are cached in KV.
+    const toastSalesMatch = path.match(/^\/api\/toast\/sales\/(CR3|CR2)\/(\d{4}-\d{2}-\d{2})$/)
+    if (toastSalesMatch && request.method === 'GET') {
+      const [, store, date] = toastSalesMatch as unknown as [string, ToastStore, string]
+      if (Number.isNaN(Date.parse(date))) return json({ error: 'not_found' }, 404, request, env)
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (!toastConfigured(env)) return json({ error: 'toast_unconfigured' }, 503, request, env, noStore)
+      if (salesCacheTtl(date) === null) return json({ error: 'invalid_date' }, 400, request, env, noStore)
+      try {
+        const day = await fetchToastSales(env, store, date)
+        return json({ store, date, ...day }, 200, request, env, noStore)
+      } catch (caught) {
+        const code = caught instanceof ToastError ? caught.code : 'toast_unavailable'
+        console.error('toast sales failed', code, caught instanceof Error ? caught.message : '')
         return json({ error: code }, code === 'toast_unconfigured' ? 503 : 502, request, env, noStore)
       }
     }

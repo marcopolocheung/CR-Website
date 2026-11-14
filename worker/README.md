@@ -149,6 +149,24 @@ Until all four required values are set the route answers `503
 toast_unconfigured` and the page tells managers to type the figures in. Toast
 trouble answers `502 toast_auth` or `502 toast_unavailable`.
 
+## Toast sales (`GET /api/toast/sales/{CR3|CR2}/{YYYY-MM-DD}`)
+
+The Reports page's **Sales from Toast** section calls this once per store per
+day (up to 30 days, four at a time). It uses the same manager token and Toast
+settings as the cash fill and returns one business day's totals in cents:
+net sales (Toast check amounts: after discounts, before tax and tips), gross
+(= net + discounts), orders, an AM/PM split by when each order was opened (4 PM
+store time), a Lunch/Dinner split by the meal periods configured in Toast
+(orders without one are "other"), discounts by name, and voids by reason
+(voided items, items on voided checks/orders; voided items never count as
+sales). Deleted orders are ignored.
+
+Caching keeps the Worker within free-tier request limits: a day older than
+yesterday is stored in KV for 40 days (`toast:sales:v1:{store}:{date}`);
+yesterday and today for 10 minutes. Meal-period and void-reason names are
+cached for a day (`toast:config:v1:{store}`). A date that hasn't started in San
+Antonio answers `400 invalid_date`. Errors match the cash fill route.
+
 ## Deploy option A: dashboard paste (what you already did)
 
 1. Open Workers & Pages → `chinarose-schedule-api` → Edit code.
