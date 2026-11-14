@@ -1,0 +1,15 @@
+PASS scenario: cancel cash context transition
+PASS scenario: shared access and retained work
+PASS scenario: history
+PASS scenario: incomplete import handoff
+PASS scenario: manual lock refuses failed storage
+PASS scenario: manual lock saves and leaves
+PASS scenario: authorization expiry and explicit retry
+PASS scenario: active-only print
+PASS scenario: language and enlarged layout
+PASS scenario: fresh-session boundary
+PASS scenario: inventory context and catalog recovery
+PASS scenario: import forbidden expiry
+PASS scenario: late response generation
+PASS scenario: scheduler boundary
+PASS Step 04: 14 scenarios; 4 screenshots; 0 page errors/external attempts; synthetic loopback APIs only

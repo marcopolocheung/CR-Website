@@ -106,3 +106,12 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - Milestones: done/done/not_applicable/not_applicable. No deployment/publication/live assertion. Physical tablet keyboards and staff acceptance remain REL-05/06. Blank fields preserve current financial meaning and do not introduce a submission policy; local entry status is not uploaded.
 - Rollback: revert the UI/helper change while retaining every draft/source key; extended sources can require recovery download in older readers. Restore through a compatible reader rather than deleting them. Failed server requests preserve values and can be retried.
 - Original delivery returned to the user for DEC-02. The subsequent [notebook decision](../cashout-rules.md) confirms always $100 per drawer, makes CASH-03 ready and defers operational CASH-04/05/06. No subsequent code task is claimed by this decision PR; existing PRs remain unmerged.
+
+
+## Overhaul Step 06 — November 13, 2026
+
+The [Step 06 checkpoint](../checkpoints/step-06.md) records focused one-drawer entry,
+all-denomination Count/Amount compatibility, fixed per-drawer arithmetic, reachable
+Save, recovery and complete paper output. This review changes no financial model,
+API contract or Worker activation. Physical touch/software keyboard and live-service
+verification remain separate gates; existing task milestones are not retroactively changed.

@@ -1,0 +1,322 @@
+{
+  "baseCommit": "bbb18dc87ea082d0e2ba252a3b20661c3ce88a8e",
+  "sourceFilesSha256": {
+    "src/components/internal/SalesReview.tsx": "ddb0be4f9ae4a617874fe2d1f70cde7cfe4b7cda7daacab4727b953d86ec7bfd",
+    "src/components/internal/ManagerSession.tsx": "2d70ff153e3a962d21868cb75e15156b5f850e0a6b7e77401e09685a7064e54d",
+    "src/components/internal/ReportsWorkspace.tsx": "5205492e408cf1d3fc8bf78770f11a2f8d3fea14ef3f45d3dce3b27d69bfb4c1",
+    "src/components/internal/ImportRecovery.tsx": "5f83e0da47ddc9a9dd48a168a291ff3ae095521ca43a41529f21229e94360bd6",
+    "src/components/internal/SalesConverter.tsx": "4a94ae41282a4af482762a73016262a6e386df9decdd8ef1622469b3710a3261",
+    "src/components/internal/NavigationProtection.tsx": "e6b9d04c57eab58472c9ff0a5478e6fd9a7d7d4f0ddb82415bc55530732f4dbe",
+    "src/components/internal/ImportHistory.tsx": "924a822285b3bc404cf084d015586d3d72d04a48af45424343ff6d14d7e3029b",
+    "src/components/internal/DashboardWorkspace.tsx": "8805d523b15b9aebae0bad07a2186da7d993abb0012fc7ebbb155b4e368e630d",
+    "src/components/internal/InventoryWorkspace.tsx": "e33ea0a02a2c3aaf166ad48a109fd063b173cbdd8805a4c73582b4f0977ff1b5",
+    "src/components/internal/HoursReview.tsx": "6560bd6d1cb54edb813e940b72bcbae4bbf11cf897bca173fa17d806dee90c82",
+    "src/components/internal/FormDraftWorkspace.tsx": "e51112b2b8f845e7f8aaf66ac362ca8b106fbaac66d803c83236336e859d5f20",
+    "src/components/internal/Dashboard.tsx": "ed54a28b2a2c9edaf8bbd2cc738fe91270c17ecd2b7622dca53e1ba17af77612",
+    "src/components/internal/DraftChooser.tsx": "5c3daa5404949d16a8a5b35c77aa4db4377e4ef342c2a1ffb90c4efe45f6a51a",
+    "src/components/internal/ScheduleIdentityMapping.tsx": "d17db2c69f9d078c421403573b0e5bb231b7112f41be90bc71d3f96bf03aee32",
+    "src/components/internal/WriteUps.tsx": "54a5303f58ca2ef7fb765de60f0de00694ab2575b9b7fffd12d37f6a7a037bdf",
+    "src/components/internal/Bookkeeping.tsx": "01a14282038243aaa5733e5c82ca981f17735dadfd16785d84eba626cfba3884",
+    "src/components/internal/TaskLinks.tsx": "edc731a6911c7849839b68519a548edf5c06dd02209483734e8e1b8012e829bf",
+    "src/components/internal/FormsWorkspace.tsx": "15206aa4cea39f40244e22125906bd79bbb99c9f0806f972a49b277ae0966f4c",
+    "src/components/internal/Inventory.tsx": "74c74486b7f940eae506040c42e64afe3f4e19dd3cc381bb1a4d5741297addbf",
+    "src/components/internal/InternalLanguage.tsx": "59e7b4f357cbef7c20e221dcfed350ffe60de73980d484ce63300d5cfcb2161f",
+    "src/components/internal/RecoveryPanel.tsx": "8e60721b9ad0282be5ba0cbf17381187c0d88aefd98e2f0543ff8b6a46a72951",
+    "src/components/internal/QRGenerator.tsx": "5475470153bc5a16893621e3c5c0601683af95e411b15ba48ffd72e73519f2f4",
+    "src/components/internal/BookkeepingWorkspace.tsx": "6ebea97e912397f7b33f28cbb9baa35684e9a6b8d27de44ea1b2e63d404223b9",
+    "src/components/internal/WorkspaceHost.tsx": "4839830c1ca8438c5f880fe785c0cbe943ec013d8bf68bc84ed8c53f45856e4a",
+    "src/components/internal/ShellTask.tsx": "6bc0fd53552a2f1675aaae0bd33f535bf76547e6921c348add72a83c307c4d23",
+    "src/components/internal/InternalShell.tsx": "b6433237c894b6b90ce925cf1d5f443ba6c83f0237d51e16bcba00fbf21fff45",
+    "src/components/internal/CashOut.tsx": "f893d4869f797954998eb021b1ee94947bde9e3f25d21d5984c554bbd9063dd9",
+    "src/components/internal/ScheduledActualReport.tsx": "656d628999edd398033d232d0e26222702c803e4f4fee5edcf76932d57b02f8b",
+    "src/components/internal/SourceFileInput.tsx": "3ed7b76ecef7e587d2e956949d4775c98043a75433181d20509d89bc5aacc057",
+    "src/components/internal/Feedback.tsx": "a37c6ab1ebdf32d0d3ae0fa456759ae60de0164faabbe40c074cb52de1fba8c1",
+    "src/components/internal/CountKeypad.tsx": "484fbedfc960516545229513cc3a86e7c9b3426120139cc0b43868082efd7d16",
+    "src/components/internal/HoursConverter.tsx": "13528af60455f74e77f1caf88472003737cd157b68508740aae45159935efde3",
+    "src/components/internal/DigitalForm.tsx": "16baae7b7b2ad14a2ba41c95c049f0039de32c437c022d98281e31b34ac2c6f7",
+    "src/components/internal/EmployeeMapping.tsx": "bb1372b96e69071663610ff71d27717b83fe9842cfe5bb079e02cbbcb9a3b6dd",
+    "src/components/internal/CashReports.tsx": "b5f2df1b97f95e0eea8a02e8062a526593b20b7f05f40fcc0a6b5992486d6f03",
+    "src/components/internal/EntryWorkspace.tsx": "ce770fd66395c964665cd23c395f659a599a3e90e896f79de41ea73379c63b2d",
+    "src/components/internal/cash-workspace.module.css": "89ce1413b34b50bcb1960707d9191f5e12bb3393a1e5221ae1974e8981bdef2f",
+    "src/components/internal/task-links.module.css": "b328be7cd95d668025baf7748c3edc42a8bb634caa4da012631e547c8c5a12cf",
+    "src/components/internal/shell.module.css": "770f9570d792218ba9946c41caf3947e9e856ba49dcc4c2c122c1f4d8e8c6a6c",
+    "src/app/(order-shell)/internal/page.tsx": "93a7ab57886d4b18c07f652614a0c00116ea2068862b090d3abdd5527fb552e9",
+    "src/app/(order-shell)/internal/ui-gallery/page.tsx": "5a8590773e616b82d1b1d24eff529c6a3e364d75c42d3ca32602009e0cc49f48",
+    "src/app/(order-shell)/internal/bookkeeping/page.tsx": "aa3ddaa4976742bbe668521446aa8b5340fb509efc1b9047cd10de99e5ed9ce4",
+    "src/app/(order-shell)/internal/qr-generator/page.tsx": "cbf981f475bd5db55c260f53eebde5e559fad56b47af281ad72ba3aef10d95c7",
+    "src/app/(order-shell)/internal/reports/page.tsx": "61dbe499bf520dc7f2d4e667ce63da4758c59b18c33e88ccd1bbb2fd2eb169d3",
+    "src/app/(order-shell)/internal/inventory/page.tsx": "5184d0781e14aeabfff4837651a3f0719defb907c29d8fa150d081a0c248454b",
+    "src/app/(order-shell)/internal/forms/page.tsx": "3ea9c8f8ac05b84f7355b480d4e5199dbefd7bc1cb569adeefd025f41d10f128",
+    "src/lib/internal-tools/i18n/en.ts": "d2acec740775fae405efb8ca16532eb117d8961f5918df343d569a70c7cd0b5e",
+    "src/lib/internal-tools/i18n/es.ts": "9dc8ddec1b13e9e8c3b3b25e5060b3e31d56e9cb4d6903d4172f36b260ced455",
+    "scripts/test-internal-home-reports.py": "c7ac46dc49fd070646189d10d3e4abbc807efc2762ff3dd81a5c07d54c73ddc6"
+  },
+  "browser": "158.0.8127.18",
+  "frontend": "http://127.0.0.1:3041",
+  "api": "http://127.0.0.1:8787 (intercepted)",
+  "scenarios": [
+    {
+      "scenario": "blank Home",
+      "observed": "Five named Cash/Inventory/Schedule/Reports/Forms task starts are available without a manager gate, charts, invented work signals or API reads"
+    },
+    {
+      "scenario": "task launch keyboard and pointer",
+      "observed": "All five Home links activate with pointer and Enter; each reaches its actual tool/adapter and has a way Home"
+    },
+    {
+      "scenario": "Reports locked hub",
+      "observed": "New Reports destination exposes three existing import/comparison links while protected cash history requires the shared manager unlock"
+    },
+    {
+      "scenario": "active destination reselect",
+      "observed": "Pointer reselecting Home and keyboard reselecting Reports preserve the same document, manager memory session and report values without another history read"
+    },
+    {
+      "scenario": "independent report values",
+      "observed": "Three fixture store-days across two dates retain $1,000 total, $500 per saved date, +$2 net difference and $300 AM/$400 PM/$700 combined on the shared date"
+    },
+    {
+      "scenario": "report routes and access",
+      "observed": "Reports always opens the hub; all legacy import destinations remain discoverable, protected values stay reachable, and Home adds no history reads after unlock"
+    },
+    {
+      "scenario": "Reports empty",
+      "observed": "Reports distinguishes empty history while Home remains a usable task launcher without a fabricated complete/empty-work claim"
+    },
+    {
+      "scenario": "Reports failure",
+      "observed": "Reports distinguishes failure history while Home remains a usable task launcher without a fabricated complete/empty-work claim"
+    },
+    {
+      "scenario": "cash form and File retention",
+      "observed": "Home/Reports/import round trips preserve exact CR2 cash count, CR3 narrative, selected hours date range and original browser File with one verified memory session"
+    },
+    {
+      "scenario": "language responsive and print",
+      "observed": "EN/ES retains data; Home reflows at 768/375/320px and 200% text; phone Reports remains contained; printing includes only active Home/Reports, preserving report values and excluding retained editors/shell"
+    },
+    {
+      "scenario": "direct aliases and compatibility",
+      "observed": "Home/Reports slash and HTML aliases plus old cash/sales/hours/comparison deep links land correctly; shell Reports consistently points to new hub"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "home-blank-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "52d6847c02ed132fa19df61215ec4c4194383cd33a8fc7ab6565ad781c1818aa"
+    },
+    {
+      "file": "reports-locked-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "ac07cf1e5613f56db7ca453e4c9124f77f8b7bf89b3c05253355f1a55ab07dcb"
+    },
+    {
+      "file": "reports-populated-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "23d3d7e0e4a1f364bced64d5aabd4ea8591e303b5cbb64140411d5dfac7fd163"
+    },
+    {
+      "file": "reports-empty-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "72fd7acaf0c97694574e9423cb21da1a23a4887a0491c702f4f180a4a2506916"
+    },
+    {
+      "file": "reports-failure-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "6e8d732021aaaa191c8d5e315f8e5294d2364baa9fe8175263356855759397bc"
+    },
+    {
+      "file": "home-spanish-phone.png",
+      "viewport": {
+        "width": 375,
+        "height": 1000
+      },
+      "sha256": "3f6d542b5d578dd70a3e101e3b5e2ed53295dc7fdeef29ac3a8b619f4939f74a"
+    },
+    {
+      "file": "home-spanish-enlarged.png",
+      "viewport": {
+        "width": 320,
+        "height": 1000
+      },
+      "sha256": "e2131af22dbd8a145fa19a35450e917261dce7e5e9706570c37398a373e653fd"
+    },
+    {
+      "file": "reports-spanish-phone.png",
+      "viewport": {
+        "width": 320,
+        "height": 1000
+      },
+      "sha256": "3e6e9d06de06eeedafa4da1ddc19288d297866cd489a5e921f0a6513446a48c8"
+    },
+    {
+      "file": "reports-spanish-enlarged.png",
+      "viewport": {
+        "width": 320,
+        "height": 1000
+      },
+      "sha256": "f0204921c53101534d27dc28d3985132ab40db195e81cb5561608cfe1e0d5230"
+    }
+  ],
+  "pageErrors": [],
+  "externalAttempts": [],
+  "apiRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/writeups"
+    },
+    {
+      "method": "GET",
+      "path": "/api/forms"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/writeups"
+    },
+    {
+      "method": "GET",
+      "path": "/api/forms"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    }
+  ],
+  "limits": [
+    "Synthetic local API responses, not production persistence/activation",
+    "Physical touch/software keyboard and full accessibility remain unverified",
+    "Passive REA attach does not replay prior Playwright actions"
+  ]
+}

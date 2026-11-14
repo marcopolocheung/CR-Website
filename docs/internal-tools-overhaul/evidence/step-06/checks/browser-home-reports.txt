@@ -1,0 +1,12 @@
+PASS scenario: blank Home
+PASS scenario: task launch keyboard and pointer
+PASS scenario: Reports locked hub
+PASS scenario: active destination reselect
+PASS scenario: independent report values
+PASS scenario: report routes and access
+PASS scenario: Reports empty
+PASS scenario: Reports failure
+PASS scenario: cash form and File retention
+PASS scenario: language responsive and print
+PASS scenario: direct aliases and compatibility
+PASS Step05: 11 scenarios; 9 screenshots; 0 browser errors/external attempts; synthetic GET/OPTIONS only

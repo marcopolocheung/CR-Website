@@ -1,0 +1,56 @@
+
+> chinarose@0.0.2 recovery:test
+> node --import jiti/register --test src/lib/internal-tools/recovery.test.ts
+
+TAP version 13
+# Subtest: one in-flight operation coalesces repeated submissions and snapshots its original data
+ok 1 - one in-flight operation coalesces repeated submissions and snapshots its original data
+  ---
+  duration_ms: 2.133647
+  type: 'test'
+  ...
+# Subtest: offline/timeout and authorization failures retain payload and identity through retry/checkpoint
+ok 2 - offline/timeout and authorization failures retain payload and identity through retry/checkpoint
+  ---
+  duration_ms: 0.91519
+  type: 'test'
+  ...
+# Subtest: uncertain operations cannot be changed/reused with new content or another target
+ok 3 - uncertain operations cannot be changed/reused with new content or another target
+  ---
+  duration_ms: 0.963241
+  type: 'test'
+  ...
+# Subtest: conflict reload/copy preserves local input and original base until explicit server selection
+ok 4 - conflict reload/copy preserves local input and original base until explicit server selection
+  ---
+  duration_ms: 0.626871
+  type: 'test'
+  ...
+# Subtest: legacy/unavailable capability and malformed server snapshots fail closed without clearing input
+ok 5 - legacy/unavailable capability and malformed server snapshots fail closed without clearing input
+  ---
+  duration_ms: 0.424443
+  type: 'test'
+  ...
+# Subtest: single-flight guard resets after failure and allows a deliberate later retry
+ok 6 - single-flight guard resets after failure and allows a deliberate later retry
+  ---
+  duration_ms: 0.180959
+  type: 'test'
+  ...
+# Subtest: inventory comparison uses stable IDs and retains raw units/names in either language
+ok 7 - inventory comparison uses stable IDs and retains raw units/names in either language
+  ---
+  duration_ms: 0.492601
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 532.366984

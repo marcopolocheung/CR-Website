@@ -1,0 +1,27 @@
+[
+  {
+    "suite": "cashout-entry",
+    "exitCode": 0,
+    "log": "browser-cashout-entry.txt"
+  },
+  {
+    "suite": "cashout-context",
+    "exitCode": 0,
+    "log": "browser-cashout-context.txt"
+  },
+  {
+    "suite": "entry-workspace",
+    "exitCode": 0,
+    "log": "browser-entry-workspace.txt"
+  },
+  {
+    "suite": "internal-feedback",
+    "exitCode": 0,
+    "log": "browser-internal-feedback.txt"
+  },
+  {
+    "suite": "internal-drafts",
+    "exitCode": 0,
+    "log": "browser-internal-drafts.txt"
+  }
+]

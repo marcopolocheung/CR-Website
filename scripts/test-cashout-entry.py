@@ -16,6 +16,14 @@ args = parser.parse_args()
 base = args.base
 assert urlparse(base).hostname in ('127.0.0.1', 'localhost')
 TOKEN = 'synthetic-guided-count-token'
+
+def open_cash_detail(page, name):
+    """Use the named secondary disclosure before exercising its original action."""
+    detail = page.locator('[data-cash-' + name + ']')
+    if detail.get_attribute('open') is None:
+        detail.locator(':scope > summary').click()
+    expect(detail).to_have_attribute('open', '')
+
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     context = browser.new_context(viewport={'width':768, 'height':1024}, has_touch=True)
@@ -115,6 +123,7 @@ with sync_playwright() as p:
     expect(page.locator('#am-0-25')).to_have_value('3')
     page.locator('#am-0-25-amount').fill('')
     page.locator('#am-0-5000-amount').fill('100.00')
+    open_cash_detail(page, 'context')
     page.get_by_role('button', name='Choose another draft', exact=True).click()
     if page.get_by_role('dialog').is_visible():
         page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
@@ -159,6 +168,7 @@ with sync_playwright() as p:
     page.set_viewport_size({'width':1280, 'height':900})
     page.locator('#am-0-10000').fill('3'); page.locator('#am-0-5000').fill('0')
     page.locator('#am-0-toast').fill('199.75')
+    page.locator('[data-drawer-select="pm-0"]').click()
     page.locator('#pm-0-name').fill('PM cashier')
     page.locator('#pm-0-5000').fill('2'); page.locator('#pm-0-toast').fill('0')
     page.locator('#z-report').fill('201')
@@ -206,6 +216,7 @@ with sync_playwright() as p:
     expect(page.get_by_role('button', name='Teclado de conteo', exact=True)).to_be_visible()
     page.get_by_role('button', name='English', exact=True).click()
     # Loading server data preserves financial values without guessing device entry completeness.
+    open_cash_detail(page, 'tools')
     page.get_by_role('button', name='Load saved', exact=True).click()
     page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     expect(am).to_contain_text('original entry status is unknown')
@@ -226,6 +237,7 @@ with sync_playwright() as p:
     page.evaluate('() => { Storage.prototype.setItem=function(){throw new DOMException("denied","SecurityError")} }')
     page.locator('#am-0-10000').fill('2.5')
     expect(page.locator('[data-save-state]')).to_have_attribute('data-save-state','failed')
+    open_cash_detail(page, 'context')
     page.get_by_role('button', name='Choose another draft', exact=True).click()
     if page.get_by_role('dialog').is_visible():
         page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()

@@ -11,6 +11,14 @@ assert urlparse(base).hostname in ('127.0.0.1','localhost')
 TOKEN='synthetic-cash-context-token'
 legacy={'am':[{'name':'Original legacy cashier','counts':[3]+[0]*10,'toast':'125.50'}],'pm':[],'zReport':'600.25'}
 raw=json.dumps(legacy,ensure_ascii=False)
+
+def open_cash_detail(page, name):
+    """Use the named secondary disclosure before exercising its original action."""
+    detail = page.locator('[data-cash-' + name + ']')
+    if detail.get_attribute('open') is None:
+        detail.locator(':scope > summary').click()
+    expect(detail).to_have_attribute('open', '')
+
 with sync_playwright() as p:
     browser=p.chromium.launch(headless=True)
     context=browser.new_context(viewport={'width':768,'height':1024},has_touch=True)
@@ -45,6 +53,7 @@ with sync_playwright() as p:
         page.get_by_role('button',name='Start new draft',exact=True).click()
         expect(page.get_by_label('Cashier name',exact=True).first).to_be_visible()
     def leave():
+        open_cash_detail(page, 'context')
         page.get_by_role('button',name='Choose another draft',exact=True).click()
         if page.get_by_role('dialog').is_visible():
             page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
@@ -107,6 +116,7 @@ with sync_playwright() as p:
     mode['hold_day']=True
     choose('CR2','2026-10-20','Late request source')
     source_row('CR2-2026-10-20').get_by_role('button',name='Resume as a copy',exact=True).click()
+    open_cash_detail(page, 'tools')
     page.get_by_role('button',name='Load saved',exact=True).click()
     expect(page.locator('[data-save-state]')).to_contain_text('Loading')
     assert pending
@@ -118,6 +128,7 @@ with sync_playwright() as p:
     expect(page.get_by_role('dialog')).not_to_be_visible()
     expect(page.get_by_label('Cashier name',exact=True).first).to_have_value('Keep after late 200')
     # A late 401 belongs to the old editor and cannot lock the new one.
+    open_cash_detail(page, 'tools')
     page.get_by_role('button',name='Load saved',exact=True).click()
     expect(page.locator('[data-save-state]')).to_contain_text('Loading')
     assert pending
@@ -131,6 +142,7 @@ with sync_playwright() as p:
     page.evaluate('() => { Storage.prototype.setItem=function(){throw new DOMException("denied","SecurityError")} }')
     page.get_by_label('Cashier name',exact=True).first.fill('Retain after denied storage')
     expect(page.locator('[data-save-state]')).to_have_attribute('data-save-state','failed')
+    open_cash_detail(page, 'context')
     page.get_by_role('button',name='Choose another draft',exact=True).click()
     if page.get_by_role('dialog').is_visible():
         page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()

@@ -98,3 +98,23 @@ explicit empty state; failed reads have an alert/retry and do not masquerade as
 empty data. No backend, parser, retention or business formula changed. Cross-tool
 work signals remain Step 17. Re-selecting an identical active internal link is a
 no-op to avoid reloading the memory-only session; changed hashes remain native.
+
+
+## Step 06: focused cash workspace
+
+Cash keeps the original store/date draft reader, in-memory manager session,
+Bookkeeping aliases and mounted host. Its active setup/draft/export controls now
+live in named context details; print/load/clear and saved-day lookup are secondary.
+The drawer selector shows one AM/PM editor at a time without unmounting others.
+All drawers print. Screen-only inactive state deliberately uses CSS/data attributes,
+not HTML `hidden`, whose Tailwind preflight important rule would suppress paper output.
+
+Count/Amount, raw invalid entry, legacy unknown-status metadata, per-drawer $100,
+Extra money and saved-day/serialization adapters are unchanged. The existing
+EntryWorkspace gets an opt-in collapsed keyboard-help mode; other consumers keep
+the inline default. Cash caps its sticky summary at half the measured visual viewport
+and adapts denomination rows at small widths; financial values stay unbroken.
+
+The selector, validation-focus reveal and keypad Previous/Next share the active
+drawer state. Removing/changing focus never grants access or changes record context.
+This is presentation work; enhanced saved lookup/history remains Step 07.

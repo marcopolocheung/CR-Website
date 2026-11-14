@@ -5,11 +5,12 @@ import { useInternalLanguage } from './InternalLanguage'
 import styles from './ui/ui.module.css'
 
 /** Opt-in field navigation. Tab stays native; Enter never saves or wraps the entry. */
-export default function EntryWorkspace({ children, summary, finishId, appearance = 'legacy' }: {
+export default function EntryWorkspace({ children, summary, finishId, appearance = 'legacy', helpMode = 'inline' }: {
   children: ReactNode
   summary: ReactNode
   finishId: string
   appearance?: 'legacy' | 'paper'
+  helpMode?: 'inline' | 'details'
 }) {
   const { t } = useInternalLanguage()
   const workspace = useRef<HTMLDivElement>(null)
@@ -65,7 +66,7 @@ export default function EntryWorkspace({ children, summary, finishId, appearance
     className={appearance === 'paper' ? styles.entry : '[&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-offset-2 [&_button]:focus-visible:outline-red-700 [&_input]:scroll-my-24'}>
     <div ref={summaryRef} data-entry-summary className={`${appearance === 'paper' ? styles.entrySummary : 'border-y border-gray-200 bg-white px-3 py-2'} sticky top-[var(--internal-banner-height,0px)] z-10 mb-4 max-h-[calc(var(--entry-viewport-height,100dvh)_-_var(--internal-banner-height,0px)_-_1rem)] overflow-y-auto print:hidden`}>
       {summary}
-      <p className="mt-1 text-xs text-gray-600">{t('entry.help')}</p>
+      {helpMode === 'inline' ? <p className="mt-1 text-xs text-gray-600">{t('entry.help')}</p> : <details className="text-xs print:hidden"><summary>{t('cash.focus.keyboardHelp')}</summary><p>{t('entry.help')}</p></details>}
     </div>
     {children}
   </div>

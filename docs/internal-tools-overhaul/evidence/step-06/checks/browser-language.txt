@@ -1,0 +1,2 @@
+PASS UX-01: dictionary integration, keyboard/touch, mid-edit switch, mounted tabs/files, localized late/save/failure states, confirmation cancellation, denied preference storage, print recovery, tablet layout, and credential isolation
+External network guard: 0 blocked attempts

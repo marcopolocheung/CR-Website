@@ -1,0 +1,18 @@
+{
+  "scripts/test-cashout-context.py": "2b7ae1c416516506594001d7c35fdf36a33e58d647e18f5736fad0938eafc4e1",
+  "scripts/test-cashout-entry.py": "65c7378fe0192161f006aa75b8ce87e33628323764d4bfed30e55733c8737ccd",
+  "scripts/test-entry-workspace.py": "7b3a37a8e061c7a1f83dba3138009f2d7b5ef1abe40f08cd96491ad8f2481437",
+  "scripts/test-internal-drafts.py": "c34b6de0fed5d69cf65251e73eba356fd3bea00e7640ba074da1f2d974d03739",
+  "scripts/test-internal-feedback.py": "7bde18648cd2b46ea2838db2defe5b02e6b3e1890be94c447ba78a497ef60806",
+  "scripts/test-internal-language.py": "96dacc624bb717484266397c0284f382d0baa9d7cb2b4793055d3d79b8a9554b",
+  "scripts/test-internal-session.py": "f565f4095e1751104a628c3aea6e63e1062c006d395fbd017921388d3b50c4a6",
+  "scripts/test-internal-shell.py": "1e99a0653f7730737ab20d4beb51684de0369954ad1a27ebd2ec17fb8e194603",
+  "src/components/internal/Bookkeeping.tsx": "01a14282038243aaa5733e5c82ca981f17735dadfd16785d84eba626cfba3884",
+  "src/components/internal/CashOut.tsx": "f893d4869f797954998eb021b1ee94947bde9e3f25d21d5984c554bbd9063dd9",
+  "src/components/internal/EntryWorkspace.tsx": "ce770fd66395c964665cd23c395f659a599a3e90e896f79de41ea73379c63b2d",
+  "src/components/internal/SHELL.md": "8a6f7b0290b0519255ea2f4be964f2ea60383cc08115f984165dc6c6b3566379",
+  "src/lib/internal-tools/i18n/en.ts": "d2acec740775fae405efb8ca16532eb117d8961f5918df343d569a70c7cd0b5e",
+  "src/lib/internal-tools/i18n/es.ts": "9dc8ddec1b13e9e8c3b3b25e5060b3e31d56e9cb4d6903d4172f36b260ced455",
+  "scripts/test-cashout-focused.py": "61531c35b5433ac1bd9dd5b13e421a0ac530dc4d2d09a8dda22f847181c7948d",
+  "src/components/internal/cash-workspace.module.css": "89ce1413b34b50bcb1960707d9191f5e12bb3393a1e5221ae1974e8981bdef2f"
+}

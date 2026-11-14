@@ -67,6 +67,7 @@ def run():
         page.locator('#cashout-date').fill('2026-10-20')
         page.locator('#draft-preparer').fill('Original preparer label')
         page.get_by_role('button', name='Empezar un borrador nuevo', exact=True).click()
+        page.locator('[data-cash-history]').evaluate('(e) => e.open = true')
         expect(page.get_by_text('Aún no hay días guardados.', exact=True)).to_be_visible()
         page.get_by_label('Nombre del cajero', exact=True).first.fill('Nombre original')
         page.locator('#am-0-10000').fill('3')
@@ -128,6 +129,7 @@ def run():
             dialogs.append(dialog.message)
             dialog.dismiss()
         page.on('dialog', dismiss)
+        page.locator('[data-cash-tools]').evaluate('(e) => e.open = true')
         page.get_by_role('button', name='Borrar hoja', exact=True).click()
         if page.get_by_role('dialog').is_visible():
             expect(page.get_by_role('dialog')).to_contain_text('¿Borrar')

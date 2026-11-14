@@ -1,5 +1,16 @@
 import type en from './en'
 const es: Record<keyof typeof en, string> = {
+  "cash.focus.title": "Conteo de caja",
+  "cash.focus.entry": "Contar una caja",
+  "cash.focus.setup": "Tienda, fecha y borrador",
+  "cash.focus.context": "Borrador y contexto",
+  "cash.focus.tools": "Imprimir y acciones de la hoja",
+  "cash.focus.drawers": "Cajas de AM y PM",
+  "cash.focus.addDrawer": "Agregar caja de {shift}",
+  "cash.focus.alternatives": "Ingrese una Cantidad o un Importe ($) por denominación. Ambos se sincronizan. En blanco significa sin ingresar; escriba 0 para registrar cero.",
+  "cash.focus.help": "Ayuda para contar",
+  "cash.focus.keyboardHelp": "Ayuda del teclado",
+  "cash.focus.history": "Días guardados",
   "home.title": "Inicio",
   "home.context": "Elegir una tarea",
   "home.cash": "Conteo de caja",

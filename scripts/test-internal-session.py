@@ -140,6 +140,7 @@ with sync_playwright() as p:
     ctx, page, mode = workspace()
     visit(page, '/internal/bookkeeping')
     unlock(page); start_cash(page)
+    page.locator('[data-cash-context]').evaluate('(e) => e.open = true')
     page.get_by_role('button', name='Choose another draft', exact=True).click()
     expect(page.get_by_role('dialog')).to_be_visible()
     page.keyboard.press('Escape')

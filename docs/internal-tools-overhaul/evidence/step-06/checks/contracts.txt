@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: dates validate calendar dates independently of timezone or business-day policy
+ok 1 - dates validate calendar dates independently of timezone or business-day policy
+  ---
+  duration_ms: 0.795135
+  type: 'test'
+  ...
+# Subtest: money, revision, and identity reject coercion and preserve missing versus zero
+ok 2 - money, revision, and identity reject coercion and preserve missing versus zero
+  ---
+  duration_ms: 0.208639
+  type: 'test'
+  ...
+# Subtest: legacy restaurant query preserves all explicit station/store mappings and defaults
+ok 3 - legacy restaurant query preserves all explicit station/store mappings and defaults
+  ---
+  duration_ms: 0.109224
+  type: 'test'
+  ...
+# Subtest: capability detection fails closed, distinguishes unavailable, and requires atomic/idempotent writes
+ok 4 - capability detection fails closed, distinguishes unavailable, and requires atomic/idempotent writes
+  ---
+  duration_ms: 0.505895
+  type: 'test'
+  ...
+# Subtest: legacy fixtures round-trip intact without claiming stronger persistence guarantees
+ok 5 - legacy fixtures round-trip intact without claiming stronger persistence guarantees
+  ---
+  duration_ms: 0.382535
+  type: 'test'
+  ...
+# Subtest: errors and policy gates remain language independent and preserve rejected input
+ok 6 - errors and policy gates remain language independent and preserve rejected input
+  ---
+  duration_ms: 0.265636
+  type: 'test'
+  ...
+# Subtest: English/Spanish dictionaries have identical keys, nonempty text and matching placeholders
+ok 7 - English/Spanish dictionaries have identical keys, nonempty text and matching placeholders
+  ---
+  duration_ms: 2.711599
+  type: 'test'
+  ...
+# Subtest: missing keys and parameters stay visible; original input is never translated or coerced
+ok 8 - missing keys and parameters stay visible; original input is never translated or coerced
+  ---
+  duration_ms: 0.239347
+  type: 'test'
+  ...
+# Subtest: legacy failures map to stable translation keys without exposing arbitrary server text
+ok 9 - legacy failures map to stable translation keys without exposing arbitrary server text
+  ---
+  duration_ms: 0.202829
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 272.510584

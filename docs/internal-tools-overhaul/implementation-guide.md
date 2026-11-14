@@ -49,8 +49,8 @@ Backend activation is not established by source presence. Some historical task d
 | 02 | Shared visual primitives and icon family | Reviewed and merged ([PR #175](https://github.com/marcopolocheung/CR-Website/pull/175); [checkpoint](checkpoints/step-02.md)) |
 | 03 | Internal navigation and shell | Reviewed and merged ([PR #176](https://github.com/marcopolocheung/CR-Website/pull/176); [checkpoint](checkpoints/step-03.md)) |
 | 04 | Shared context, access lifecycle and draft-safe navigation | Reviewed and merged ([PR #177](https://github.com/marcopolocheung/CR-Website/pull/177); [checkpoint](checkpoints/step-04.md)) |
-| 05 | Task-oriented Home and separate Reports destination | [Locally verified; owner review pending](checkpoints/step-05.md) |
-| 06 | Focused cash entry | Not started |
+| 05 | Task-oriented Home and separate Reports destination | Reviewed and merged ([PR #178](https://github.com/marcopolocheung/CR-Website/pull/178); [checkpoint](checkpoints/step-05.md)) |
+| 06 | Focused cash entry | [Locally verified; owner/device review pending](checkpoints/step-06.md) |
 | 07 | Saved cash lookup and clear save/history behavior | Not started |
 | 08 | Staged sales import | Not started |
 | 09 | Staged hours import and identity review | Not started |
