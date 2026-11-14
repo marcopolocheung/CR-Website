@@ -18,7 +18,7 @@ def run():
         context = browser.new_context(viewport={'width': 768, 'height': 1024}, has_touch=True)
         page = context.new_page()
         errors, requests, saves = [], [], []
-        mode = {'fail': False, 'hold': False}
+        mode = {'fail': False, 'hold': False, 'doc': None}
         pending = []
         page.on('pageerror', lambda error: errors.append(str(error)))
         def api(route):
@@ -35,10 +35,13 @@ def run():
                 route.fulfill(status=200, json={'ok': True}, headers=headers)
             elif request.method == 'PUT':
                 saves.append({'url': request.url, 'body': request.post_data_json})
+                mode['doc'] = {**request.post_data_json,'store':'CR2','date':'2026-10-20','updatedAt':'2026-10-24T20:00:00.000Z'}
                 if mode['hold']:
                     pending.append((route, headers))
                 else:
                     route.fulfill(status=200, json={'ok': True}, headers=headers)
+            elif urlparse(request.url).path.count('/') == 4:
+                route.fulfill(status=200 if mode['doc'] else 404,json=mode['doc'] or {'error':'not_found'},headers=headers)
             else:
                 route.fulfill(status=200, json={'days': []}, headers=headers)
         context.route('http://127.0.0.1:8787/**', api)
@@ -67,8 +70,7 @@ def run():
         page.locator('#cashout-date').fill('2026-10-20')
         page.locator('#draft-preparer').fill('Original preparer label')
         page.get_by_role('button', name='Empezar un borrador nuevo', exact=True).click()
-        page.locator('[data-cash-history]').evaluate('(e) => e.open = true')
-        expect(page.get_by_text('Aún no hay días guardados.', exact=True)).to_be_visible()
+        expect(page.get_by_role('link',name='Días de caja guardados',exact=True)).to_be_visible()
         page.get_by_label('Nombre del cajero', exact=True).first.fill('Nombre original')
         page.locator('#am-0-10000').fill('3')
         page.locator('#am-0-toast').fill('123.45')
@@ -115,9 +117,9 @@ def run():
         expect(page.locator('#am-0-toast')).to_have_value('123.45')
         mode['fail'] = True
         page.get_by_role('button', name='Guardar día', exact=True).click()
-        expect(page.get_by_role('status')).to_contain_text('No se pudo conectar')
+        expect(page.get_by_role('status')).to_contain_text('Se bloqueó el reemplazo')
         page.get_by_role('button', name='English', exact=True).click()
-        expect(page.get_by_role('status')).to_contain_text('Could not reach')
+        expect(page.get_by_role('status')).to_contain_text('Replacement is blocked')
         expect(page.locator('#am-0-toast')).to_have_value('123.45')
         mode['fail'] = False
         page.get_by_role('button', name='Español', exact=True).tap()

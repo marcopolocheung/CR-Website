@@ -33,6 +33,8 @@ with sync_playwright() as p:
                 route.fulfill(status=409,json={'error':'conflict','rev':2},headers=headers);return
             mode['list_rev']+=1;mode['list']=req.post_data_json['sheets']
             route.fulfill(status=200,json={'rev':mode['list_rev']},headers=headers);return
+        if path.startswith('/api/cashout/') and req.method=='GET' and path.count('/')==4:
+            route.fulfill(status=401 if mode['cash_write']=='auth' else 404,json={'error':'unauthorized' if mode['cash_write']=='auth' else 'not_found'},headers=headers);return
         if path.startswith('/api/cashout/') and req.method=='PUT':
             puts.append(req.post_data_json)
             if mode['cash_write']=='auth': route.fulfill(status=401,json={'error':'unauthorized'},headers=headers);return

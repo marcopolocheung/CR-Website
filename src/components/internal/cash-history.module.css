@@ -1,0 +1,17 @@
+.workspace { min-width: 0; color: var(--cr-black); font-family: var(--cr-body); }
+.workspace h1 { font: 700 clamp(36px, 5vw, 48px)/1.1 var(--cr-display); margin-bottom: 16px; }
+.workspace h2 { font: 700 28px/1.2 var(--cr-display); margin: 16px 0; }
+.workspace p { margin-block: 12px; max-width: 80ch; overflow-wrap: anywhere; }
+.workspace a { color: var(--cr-accent-ink); text-decoration: underline; display: inline-flex; align-items: center; min-height: 44px; }
+.filters { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; margin-block: 20px; }
+.filters > div { flex: 1 1 180px; min-width: 0; max-width: 100%; }
+.filters label { display: block; margin-bottom: 8px; font-weight: 600; }
+.filters input, .filters select { min-width: 0; width: 100%; max-width: 100%; min-height: 48px; padding: 8px; border: 1px solid var(--cr-control); }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 16px; }
+.edit { background: var(--cr-accent-wash); border: 1px solid var(--cr-accent-ink); padding: 16px; max-width: 720px; }
+.table { overflow-x: auto; margin-bottom: 24px; }
+.table table { min-width: 620px; width: 100%; text-align: left; background: white; border: 1px solid var(--cr-control); }
+.table th, .table td { padding: 12px; border-bottom: 1px solid var(--cr-line); }
+.table td:nth-child(2) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.workspace :is(a,select,input,button):focus-visible { outline: 3px solid var(--cr-black); outline-offset: 3px; }
+@media print { .workspace h1 { display: none; } }

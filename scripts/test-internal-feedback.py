@@ -19,7 +19,7 @@ with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     context = browser.new_context(viewport={'width': 768, 'height': 1024}, has_touch=True)
     page = context.new_page()
-    mode = {'hold': False, 'fail': False, 'history_fail': False}
+    mode = {'hold': False, 'fail': False, 'history_fail': False, 'doc': None}
     pending, errors = [], []
     page.on('pageerror', lambda error: errors.append(str(error)))
     def api(route):
@@ -32,12 +32,19 @@ with sync_playwright() as p:
         elif '/api/auth/verify' in req.url:
             route.fulfill(status=200, json={'ok': True}, headers=headers)
         elif req.method == 'PUT':
+            if not mode['fail']:
+                parts = urlparse(req.url).path.split('/')
+                mode['doc'] = {**req.post_data_json,'store':parts[3],'date':parts[4],'updatedAt':'2026-11-14T20:00:00.000Z'}
             if mode['fail']:
                 route.abort('failed')
             elif mode['hold']:
                 pending.append((route, headers))
             else:
                 route.fulfill(status=200, json={'ok': True}, headers=headers)
+        elif urlparse(req.url).path.count('/') == 4:
+            doc = mode['doc']
+            found = doc and doc['date'] == urlparse(req.url).path.split('/')[4]
+            route.fulfill(status=200 if found else 404,json=doc if found else {'error':'not_found'},headers=headers)
         elif mode['history_fail']:
             route.fulfill(status=503, json={'error': 'unavailable'}, headers=headers)
         else:
@@ -111,9 +118,15 @@ with sync_playwright() as p:
     expect(feedback).to_have_attribute('data-save-state', 'device')
     expect(page.get_by_label('Nombre del cajero', exact=True).first).to_have_value('Newer unsaved cashier')
     page.get_by_role('button', name='Guardar día', exact=True).click()
+    expect(page.locator('[data-cash-comparison]:visible')).to_be_visible()
+    page.get_by_role('button',name='Revisar reemplazo',exact=True).click()
+    dialog.get_by_role('button',name='Confirmar',exact=True).click()
     expect(feedback).to_have_attribute('data-save-state', 'server')
     mode['history_fail'] = True
     page.get_by_role('button', name='Guardar día', exact=True).click()
+    expect(page.locator('[data-cash-comparison]:visible')).to_be_visible()
+    page.get_by_role('button',name='Revisar reemplazo',exact=True).click()
+    dialog.get_by_role('button',name='Confirmar',exact=True).click()
     expect(feedback).to_have_attribute('data-save-state', 'server')
     expect(feedback).to_contain_text('No se pudo actualizar el historial')
     mode['history_fail'] = False
@@ -128,7 +141,7 @@ with sync_playwright() as p:
     mode['fail'] = True
     page.get_by_role('button', name='Guardar día', exact=True).click()
     expect(feedback).to_have_attribute('data-save-state', 'waiting')
-    expect(feedback).to_contain_text('No se pudo conectar')
+    expect(feedback).to_contain_text('El resultado del guardado es incierto')
     mode['fail'] = False
     # Device failures remain distinct and retain the visible edit.
     page.evaluate("() => { Storage.prototype.setItem = function() { throw new DOMException('quota', 'QuotaExceededError') } }")

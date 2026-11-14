@@ -1,4 +1,7 @@
 'use client'
+import { useCashSave } from './useCashSave'
+import type { SavedCashoutRecord } from '@/lib/cashout-record'
+import { useCashCopyTransition } from './CashCopyTransition'
 import { internalThemeClassName } from './ui/Theme'
 import { Icon } from './ui/Icon'
 import styles from './cash-workspace.module.css'
@@ -9,16 +12,15 @@ import { useWorkTransitions } from './NavigationProtection'
 
 import { useShellAvailable, useShellTask } from './ShellTask'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useId } from 'react'
 import type { FormEvent, SetStateAction } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
-import { LabeledInput, EmptyState, SaveFeedback, focusField, useConfirmation, type SaveState } from './Feedback'
+import { LabeledInput, EmptyState, SaveFeedback, focusField, useConfirmation } from './Feedback'
 import DraftChooser, { downloadDraftSource } from './DraftChooser'
 import { newDraft, saveDraft, type Draft, type DraftContext } from '@/lib/internal-tools/drafts'
-import { isCashoutDraftSheet, readUnassignedCashout, cashoutServerSheet, changeCount, changeAmount, countInput, amountInput, parseCountInput, parseDenominationAmount, type CashoutDraftCashier, type CashoutDraftSheet } from '@/lib/internal-tools/cashout-draft'
+import { isCashoutDraftSheet, readUnassignedCashout, changeCount, changeAmount, countInput, amountInput, parseCountInput, parseDenominationAmount, type CashoutDraftCashier, type CashoutDraftSheet } from '@/lib/internal-tools/cashout-draft'
 import { businessDate } from '@/lib/internal-tools/contracts'
 import { useNavigationProtection } from './NavigationProtection'
-import { SingleFlight } from '@/lib/internal-tools/recovery'
 import EntryWorkspace from './EntryWorkspace'
 import CountKeypad from './CountKeypad'
 import { errorKey, type Message } from '@/lib/internal-tools/i18n'
@@ -33,10 +35,6 @@ import {
 } from '@/lib/cashout'
 import {
   CASHOUT_STORES,
-  fetchCashoutDay,
-  fetchCashoutHistory,
-  saveCashoutDay,
-  type CashoutDay,
   type CashoutStore,
 } from '@/lib/cashout-store'
 import { StoreAuthError, verifyWriteToken } from '@/lib/schedule-store'
@@ -150,6 +148,12 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
     } catch { setStorageFailed(true); return false }
   }, [])
   const open = (draft: Draft<Sheet>) => { if (draft.context.task !== 'cash-out' || !draft.context.businessDate) return; setStore(draft.context.storeId); setDate(draft.context.businessDate); setLastSavedAt(null); activeRef.current = draft; setActive(draft); persist(draft.payload) }
+  const copyTransition = useCashCopyTransition()
+  useEffect(() => {
+    if (!copyTransition.pending || !token) return
+    open(copyTransition.pending)
+    copyTransition.consume(copyTransition.pending.id)
+  }, [copyTransition.pending, copyTransition.consume, token]) // Explicitly approved copy; ordinary browsing never enters here.
   const assignLegacy = async () => {
     if (!context || legacy === null || !preparer.trim()) return
     const sourceStillCurrent = () => {
@@ -170,7 +174,7 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
   }
   const session = useManagerSession()
   const transitions = useWorkTransitions()
-  useNavigationProtection({ dirty: false, deviceSaved: !storageFailed, checkpoint: () => !activeRef.current || persist(activeRef.current.payload), leave: () => { activeRef.current = null; setActive(null); requestAnimationFrame(() => { const gate = document.querySelector<HTMLInputElement>('[data-internal-workspace]:not([hidden]) #cashout-code'); gate?.focus() }) } })
+  useNavigationProtection({ scope: 'cash', dirty: false, deviceSaved: !storageFailed, checkpoint: () => !activeRef.current || persist(activeRef.current.payload), leave: () => { activeRef.current = null; setActive(null); requestAnimationFrame(() => { const gate = document.querySelector<HTMLInputElement>('[data-internal-workspace]:not([hidden]) #cashout-code'); gate?.focus() }) } })
   const leave = (lock = false, nextDate?: string) => {
     const current = activeRef.current
     if (current && !persist(current.payload)) return
@@ -184,6 +188,7 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
   return <div className={`${internalThemeClassName} ${styles.workspace}`}>
     {!token && visible && <CodeGate onUnlock={onUnlock} />}
     <div hidden={!token}>
+    <a className="inline-flex min-h-11 items-center underline print:hidden" href={`${(process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '')}/internal/cash-history`}>{t('cash.lookup.title')}</a>
     <details open={!active} className={styles.context} data-cash-context>
     <summary>{t(active ? 'cash.focus.context' : 'cash.focus.setup')}</summary>
     <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -223,80 +228,28 @@ function CashOutWorkspace({ token, onUnlock, onLocked }: { token: string; onUnlo
       </div>}
     </>}
     </details>
-    {active && <CashOutSheet key={active.id} token={token} onLocked={onLocked} draft={active} persist={persist} onChooseDate={day => { void transitions.change(() => leave(false, day)) }} />}
+    {active && <CashOutSheet key={active.id} token={token} onLocked={onLocked} draft={active} persist={persist} />}
     {confirmation.dialog}
     </div>
   </div>
 }
 
-function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token: string; onLocked: () => void; draft: Draft<Sheet>; persist: (payload: Sheet) => boolean; onChooseDate: (day: string) => void }) {
-  const visible = useWorkspaceVisible()
+function CashOutSheet({ token, onLocked, draft, persist, readOnly = false }: { token: string; onLocked: () => void; draft: Draft<Sheet>; persist: (payload: Sheet) => boolean; readOnly?: boolean }) {
   const { t: tr } = useInternalLanguage()
   const [sheet, setSheetState] = useState<Sheet>(() => draft.payload)
   const latestSheet = useRef(sheet)
-  const mounted = useRef(true)
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const store = draft.context.storeId
   const date = draft.context.businessDate! // Opened only from the exact cash-out day context above.
-  const [history, setHistory] = useState<CashoutDay[]>([])
-  const [status, setStatus] = useState<Message | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [saveState, setSaveState] = useState<SaveState>('unsaved')
+  const save = useCashSave(draft,latestSheet,token,onLocked,readOnly)
+  const { state: saveState, status, busy } = save
+  const uniqueId = useId().replace(/:/g,'')
+  const idPrefix = readOnly ? `saved-${uniqueId}-` : ''
   const [deviceSaved,setDeviceSaved] = useState(false)
   const [activeCount, setActiveCount] = useState<{ shift: Shift; index: number; denomination: number } | null>(null)
   const [activeDrawer, setActiveDrawer] = useState<{ shift: Shift; index: number } | null>({ shift: 'am', index: 0 })
   const [keypadOpen, setKeypadOpen] = useState(false)
-  const saving = useRef(new SingleFlight<void>())
-  useNavigationProtection({ dirty: saveState !== 'server', deviceSaved, busy: saveState === 'sending', checkpoint: () => persist(latestSheet.current) })
+  useNavigationProtection({ scope: readOnly ? undefined : 'cash', dirty: !readOnly && saveState !== 'server', deviceSaved, busy: !readOnly && busy, checkpoint: () => readOnly || persist(latestSheet.current) })
   const confirmation = useConfirmation()
-  const tokenRef = useRef(token); tokenRef.current = token
-  const currentEdit = useRef({ store, date, sheet })
-  currentEdit.current = { store, date, sheet }
-
-  const run = useCallback(
-    async (task: () => Promise<Message | void>) => {
-      setBusy(true)
-      setStatus(null)
-      try {
-        const message = await task()
-        if (mounted.current && tokenRef.current === token && message) setStatus(message)
-      } catch (caught) {
-        if (!mounted.current || tokenRef.current !== token) return
-        if (caught instanceof StoreAuthError) onLocked()
-        else setStatus({ key: errorKey(caught) })
-      } finally {
-        if (mounted.current) setBusy(false)
-      }
-    },
-    [onLocked, token],
-  )
-
-  const refreshHistory = useCallback(
-    () => { if (!token || !visible) return Promise.resolve(); return run(async () => {
-      const days = await fetchCashoutHistory(store, today(), token)
-      if (mounted.current && currentEdit.current.store === store) setHistory(days)
-    }) },
-    [run, store, token, visible],
-  )
-
-  useEffect(() => {
-    refreshHistory()
-  }, [refreshHistory])
-
-  const loadDay = (day: string) =>
-    run(async () => {
-      if (day !== date) { onChooseDate(day); return }
-      const saved = await fetchCashoutDay(store, day, token)
-      if (!mounted.current) return
-      if (!saved) return { key: 'cash.notSaved', params: { store, date: day } }
-      if (!await confirmation.ask({ key: 'cash.replaceConfirm', params: { store, date: day } }, true)) return
-      setKeypadOpen(false)
-      setActiveCount(null)
-      setActiveDrawer(null)
-      setSheet(saved)
-      return { key: 'cash.loaded', params: { store, date: day } }
-    })
-
   const focusEntry = (id: string) => {
     const target = /^(am|pm)-(\d+)-/.exec(id)
     if (target) setActiveDrawer({ shift: target[1] as Shift, index: Number(target[2]) })
@@ -307,47 +260,30 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
     if (focus) requestAnimationFrame(() => focusField(`${shift}-${index}-name`))
   }
 
-  const saveDay = () => saving.current.run(() => run(async () => {
-    if (!token) return
+  const saveDay = () => {
+    const sheet = latestSheet.current
     const invalid = (['am', 'pm'] as const).flatMap(shift => sheet[shift].flatMap((cashier, index) =>
       DENOMINATIONS.flatMap((d, denomination) => parseCountInput(countInput(cashier, denomination)) === null ? [`${shift}-${index}-${d}`]
         : parseDenominationAmount(amountInput(cashier, denomination), d) === null ? [`${shift}-${index}-${d}-amount`] : [])))
-    if (invalid.length) { setKeypadOpen(false); focusEntry(invalid[0]); return { key: 'cash.fixCounts' } }
-    if (parseCashAmount(sheet.extraMoney ?? '') === null) { setKeypadOpen(false); focusField('extra-money'); return { key: 'cash.invalidExtraMoney' } }
-    const stillCurrent = () => mounted.current && currentEdit.current.store === store && currentEdit.current.date === date && latestSheet.current === sheet
-    setSaveState('sending')
-    try {
-      await saveCashoutDay(store, date, { sheet: cashoutServerSheet(sheet), totals: dayTotals(sheet.am, sheet.pm, sheet.zReport, sheet.extraMoney) }, token)
-    } catch (caught) {
-      const key = errorKey(caught)
-      if (stillCurrent()) setSaveState(key === 'errors.conflict' ? 'conflict' : key === 'errors.unavailable' ? 'waiting' : 'failed')
-      throw caught
-    }
-    if (stillCurrent()) setSaveState('server')
-    try {
-      const days = await fetchCashoutHistory(store, today(), token)
-      if (mounted.current && currentEdit.current.store === store) setHistory(days)
-    }
-    catch { return { key: stillCurrent() ? 'cash.savedHistoryUnavailable' : 'cash.earlierVersionSaved', params: { store, date } } }
-    return { key: stillCurrent() ? 'cash.saved' : 'cash.earlierVersionSaved', params: { store, date } }
-  }))
+    if (invalid.length) { setKeypadOpen(false); focusEntry(invalid[0]); return }
+    if (parseCashAmount(sheet.extraMoney ?? '') === null) { setKeypadOpen(false); focusField('extra-money'); return }
+    void save.save()
+  }
 
   const saveOnDevice = useCallback((payload: Sheet) => {
     const saved = persist(payload)
     setDeviceSaved(saved)
-    if (saved) {
-      setSaveState('device')
-      setStatus(previous => previous && ['cash.saved', 'cash.savedHistoryUnavailable', 'cash.earlierVersionSaved'].includes(previous.key) ? null : previous)
-    } else { setSaveState('failed'); setStatus({ key: 'feedback.storageFailed' }) }
-  }, [persist])
+    save.edited(saved)
+  }, [persist,save.edited])
   const setSheet = useCallback((update: SetStateAction<Sheet>) => {
+    if (readOnly) return
     const next = typeof update === 'function' ? update(latestSheet.current) : update
     latestSheet.current = next
     setSheetState(next)
     // Update the working copy before a context/handoff action can unmount this editor.
     saveOnDevice(next)
-  }, [saveOnDevice])
-  useEffect(() => { saveOnDevice(latestSheet.current) }, [saveOnDevice])
+  }, [saveOnDevice,readOnly])
+  useEffect(() => { if (!readOnly) saveOnDevice(latestSheet.current) }, [saveOnDevice,readOnly])
 
   const updateCashier = (shift: Shift, idx: number, patch: Partial<CashoutDraftCashier>) =>
     setSheet(s => ({ ...s, [shift]: s[shift].map((c, i) => (i === idx ? { ...c, ...patch } : c)) }))
@@ -382,22 +318,23 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
   }
   const invalidCounts = (['am','pm'] as const).some(shift => sheet[shift].some(c => DENOMINATIONS.some((d, i) => parseCountInput(countInput(c, i)) === null || parseDenominationAmount(amountInput(c, i), d) === null)))
 
-  useEffect(() => { document.querySelector<HTMLInputElement>('#cashout-editor input:not([disabled])')?.focus() }, [])
+  useEffect(() => { if (!readOnly) document.querySelector<HTMLInputElement>('#cashout-editor input:not([disabled])')?.focus() }, [readOnly])
 
   return (
-    <div id="cashout-editor">
-      <div className={styles.heading}>
+    <div id={readOnly ? `${idPrefix}sheet` : "cashout-editor"} data-cash-readonly={readOnly || undefined}>
+      {!readOnly && <div className={styles.heading}>
         <h2>{tr('cash.focus.entry')}</h2>
         <details className={styles.tools} data-cash-tools>
           <summary>{tr('cash.focus.tools')}</summary>
           <div className={styles.toolActions}>
             <button type="button" onClick={() => window.print()}><Icon name="print" />{tr('common.print')}</button>
-            <button type="button" disabled={busy || !date} onClick={() => loadDay(date)}>{tr('cash.load')}</button>
+            <a href={`${(process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '')}/internal/cash-history?store=${store}&date=${date}`}>{tr('cash.load')}</a>
             <button type="button" onClick={async () => { if (await confirmation.ask({ key: 'cash.clearConfirm' }, true)) { setKeypadOpen(false); setActiveCount(null); setActiveDrawer(null); setSheet(emptySheet()) } }}><Icon name="close" />{tr('cash.clear')}</button>
           </div>
         </details>
-      </div>
-      <EntryWorkspace appearance="paper" helpMode="details" finishId="cashout-save" summary={<>
+      </div>}
+      {!readOnly && <p className="print:hidden">{tr('cash.lookup.concurrent')}</p>}
+      <EntryWorkspace appearance="paper" helpMode="details" finishId="cashout-save" summary={!readOnly && <>
         <div className={styles.finishRow} data-day-summary>
           <div><span>{tr('cash.dayDeposit')}</span><strong><Money cents={day.deposit} /></strong></div>
           <button id="cashout-save" type="button" onClick={saveDay} disabled={busy || !date} className={styles.save}><Icon name="check" />{tr('cash.save')}</button>
@@ -421,7 +358,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
           onNext={selectedIndex >= 0 && selectedIndex < countFields.length - 1 ? () => selectCount(countFields[selectedIndex + 1]) : null}
           onClose={closeKeypad} />}
       </>}>
-      <div className={styles.drawerPicker} role="tablist" aria-label={tr('cash.focus.drawers')}>
+      {!readOnly && <div className={styles.drawerPicker} role="tablist" aria-label={tr('cash.focus.drawers')}>
         {(['am', 'pm'] as const).map(shift => <div key={shift} className={styles.shiftChoices}>
           <span>{shift.toUpperCase()}</span>
           {sheet[shift].map((cashier, index) => <button key={index} type="button" role="tab"
@@ -439,9 +376,9 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
             onClick={() => chooseDrawer(shift, index)}>{shift.toUpperCase()} · {cashier.name || tr('cash.cashierPlaceholder', { number: index + 1 })}</button>)}
           <button id={`${shift}-add-cashier`} type="button" onClick={() => { const index = sheet[shift].length; setSheet(s => ({ ...s, [shift]: [...s[shift], newCashier()] })); chooseDrawer(shift, index, true) }} aria-label={tr('cash.focus.addDrawer', { shift: shift.toUpperCase() })}>{tr('cash.addCashier')}</button>
         </div>)}
-      </div>
-      <p id="cash-count-help" className={styles.countHelp}>{tr('cash.focus.alternatives')}</p>
-      <details className={styles.help}><summary>{tr('cash.focus.help')}</summary><p>{tr('cash.countHelp')}</p></details>
+      </div>}
+      {!readOnly && <><p id="cash-count-help" className={styles.countHelp}>{tr('cash.focus.alternatives')}</p>
+      <details className={styles.help}><summary>{tr('cash.focus.help')}</summary><p>{tr('cash.countHelp')}</p></details></>}
       {invalidCounts && <p role="alert" className="mb-4 text-sm font-medium text-red-700"><Icon name="warning" />{tr('cash.fixCounts')}</p>}
       {(['am', 'pm'] as const).map(shift => {
         const totals = shiftTotals(sheet[shift])
@@ -451,14 +388,14 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
             <div className={styles.drawerGrid}>
               {sheet[shift].map((c, idx) => {
                 const t = cashierTotals(c)
-                const id = `${shift}-${idx}`
+                const id = `${idPrefix}${shift}-${idx}`
                 return (
-                  <div key={idx} id={`cash-drawer-${id}`} data-inactive={visibleDrawer?.shift !== shift || visibleDrawer.index !== idx ? true : undefined} data-active-drawer={visibleDrawer?.shift === shift && visibleDrawer.index === idx ? id : undefined} data-cashier-card={id} role="tabpanel" aria-labelledby={`select-${id}`} aria-label={tr('cash.countContext', { shift: shift.toUpperCase(), name: c.name || tr('cash.cashierPlaceholder', { number: idx + 1 }) })} onFocusCapture={event => {
+                  <div key={idx} id={`cash-drawer-${id}`} data-inactive={!readOnly && (visibleDrawer?.shift !== shift || visibleDrawer.index !== idx) ? true : undefined} data-active-drawer={visibleDrawer?.shift === shift && visibleDrawer.index === idx ? id : undefined} data-cashier-card={id} role={readOnly ? undefined : "tabpanel"} aria-labelledby={readOnly ? undefined : `select-${id}`} aria-label={tr('cash.countContext', { shift: shift.toUpperCase(), name: c.name || tr('cash.cashierPlaceholder', { number: idx + 1 }) })} onFocusCapture={event => {
                     setActiveDrawer({ shift, index: idx })
                     if (event.target instanceof HTMLInputElement && !event.target.hasAttribute('data-count-input')) { setActiveCount(null); setKeypadOpen(false) }
                   }} className={styles.drawer}>
                     <div className="flex gap-2 mb-3">
-                      <input
+                      <input readOnly={readOnly}
                         data-entry-field
                         id={`${id}-name`}
                         aria-label={tr('cash.cashierName')}
@@ -467,18 +404,18 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                         onChange={e => updateCashier(shift, idx, { name: e.target.value })}
                         className={inputClass}
                       />
-                      <button
+                      {!readOnly && <button
                         onClick={() => removeCashier(shift, idx)}
                         aria-label={tr('cash.removeCashier')}
                         className="min-h-11 min-w-11 px-3 text-gray-400 hover:text-red-600 print:hidden"
                       >
                         <Icon name="close" />
-                      </button>
+                      </button>}
                     </div>
 
                     <div className="mb-3 border-b border-gray-200 pb-2 print:hidden">
-                      <p className="text-xs text-gray-600">{tr('cash.countProgress', { number: c.countInputs?.filter(value => typeof value === 'string' && value !== '' && parseCountInput(value) !== null).length ?? 0, total: DENOMINATIONS.length })}</p>
-                      {(!c.countInputs || c.countInputs.some(value => value === null)) && <p className="mt-1 text-xs text-amber-900">{tr('cash.legacyCountState')}</p>}
+                      {!readOnly && <p className="text-xs text-gray-600">{tr('cash.countProgress', { number: c.countInputs?.filter(value => typeof value === 'string' && value !== '' && parseCountInput(value) !== null).length ?? 0, total: DENOMINATIONS.length })}</p>}
+                      {(!c.countInputs || c.countInputs.some(value => value === null)) && <p className="mt-1 text-xs text-amber-900">{tr(readOnly ? 'cash.lookup.unknownCounts' : 'cash.legacyCountState')}</p>}
                     </div>
 
                     <table className="w-full table-fixed text-sm mb-3">
@@ -501,7 +438,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                               <label htmlFor={`${id}-${d}`}>{formatCents(d)}</label>
                             </td>
                             <td data-entry-label={tr('cash.count')} className="py-0.5 pr-2">
-                              <input
+                              <input readOnly={readOnly}
                                 data-entry-field
                                 data-count-input
                                 id={`${id}-${d}`}
@@ -512,7 +449,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                                 autoComplete="off"
                                 spellCheck={false}
                                 aria-invalid={invalid || undefined}
-                                aria-describedby={`cash-count-help${invalid ? ` ${id}-${d}-error` : ''}`}
+                                aria-describedby={`${readOnly ? '' : 'cash-count-help'}${invalid ? ` ${id}-${d}-error` : ''}`}
                                 value={value}
                                 placeholder="—"
                                 onFocus={() => selectCount({ shift, index: idx, denomination: di })}
@@ -522,7 +459,7 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                               {invalid && <p id={`${id}-${d}-error`} className="mt-1 text-xs text-red-700"><Icon name="warning" />{tr('cash.invalidCount')}</p>}
                             </td>
                             <td data-entry-label={tr('cash.amount')} className="py-0.5 text-right w-28">
-                              <input
+                              <input readOnly={readOnly}
                                 data-entry-field
                                 id={`${id}-${d}-amount`}
                                 aria-label={tr('cash.amountFor', { amount: formatCents(d) })}
@@ -532,9 +469,9 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                                 autoComplete="off"
                                 spellCheck={false}
                                 aria-invalid={invalidAmount || undefined}
-                                aria-describedby={`cash-count-help${invalidAmount ? ` ${id}-${d}-amount-error` : ''}`}
+                                aria-describedby={`${readOnly ? '' : 'cash-count-help'}${invalidAmount ? ` ${id}-${d}-amount-error` : ''}`}
                                 value={amount}
-                                placeholder="0.00"
+                                placeholder={readOnly ? "—" : "0.00"}
                                 onChange={e => setAmount(shift, idx, di, e.target.value)}
                                 className="min-h-11 w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-base text-right focus:outline-none focus:ring-2 focus:ring-red-500 print:hidden"
                               />
@@ -549,14 +486,14 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
                     <label htmlFor={`${id}-toast`} className="block text-sm font-medium text-gray-700 mb-1">
                       {tr('cash.toast')}
                     </label>
-                    <input
+                    <input readOnly={readOnly}
                       data-entry-field
                       id={`${id}-toast`}
                       type="number"
                       inputMode="decimal"
                       step="0.01"
                       value={c.toast}
-                      placeholder="0.00"
+                      placeholder={readOnly ? "—" : "0.00"}
                       onChange={e => updateCashier(shift, idx, { toast: e.target.value })}
                       className={`${inputClass} mb-3`}
                     />
@@ -583,80 +520,71 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
         <h2 className="text-xl font-semibold text-gray-900 mb-3">{tr('cash.dayTotal')}</h2>
         <Row label={tr('cash.actualDeposit')}><Money cents={day.deposit} /></Row>
         <Row label={tr('cash.cashierDifference')}><Money cents={day.overShort} signed /></Row>
-        <label htmlFor="z-report" className="block text-sm font-medium text-gray-700 mt-3 mb-1">
+        <label htmlFor={`${idPrefix}z-report`} className="block text-sm font-medium text-gray-700 mt-3 mb-1">
           {tr('cash.zExpected')}
         </label>
-        <input
+        <input readOnly={readOnly}
           data-entry-field
-          id="z-report"
+          id={`${idPrefix}z-report`}
           type="number"
           inputMode="decimal"
           step="0.01"
           value={sheet.zReport}
-          placeholder="0.00"
+          placeholder={readOnly ? "—" : "0.00"}
           onChange={e => setSheet(s => ({ ...s, zReport: e.target.value }))}
           className={`${inputClass} mb-3`}
         />
-        <label htmlFor="extra-money" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor={`${idPrefix}extra-money`} className="block text-sm font-medium text-gray-700 mb-1">
           {tr('cash.extraMoney')}
         </label>
-        <input
+        <input readOnly={readOnly}
           data-entry-field
-          id="extra-money"
+          id={`${idPrefix}extra-money`}
           type="text"
           inputMode="decimal"
           autoComplete="off"
           value={sheet.extraMoney ?? ''}
-          placeholder="0.00"
+          placeholder={readOnly ? "—" : "0.00"}
           aria-invalid={invalidExtraMoney || undefined}
-          aria-describedby={`extra-money-help${invalidExtraMoney ? ' extra-money-error' : ''}`}
+          aria-describedby={`${idPrefix}extra-money-help${invalidExtraMoney ? ` ${idPrefix}extra-money-error` : ''}`}
           onChange={e => setSheet(s => ({ ...s, extraMoney: e.target.value }))}
           className={inputClass}
         />
-        <p id="extra-money-help" className="mt-1 mb-3 text-xs text-gray-600">{tr('cash.extraMoneyHelp')}</p>
+        <p id={`${idPrefix}extra-money-help`} className="mt-1 mb-3 text-xs text-gray-600">{tr('cash.extraMoneyHelp')}</p>
         {invalidExtraMoney && <p id="extra-money-error" role="alert" className="mb-3 text-sm text-red-700">{tr('cash.invalidExtraMoney')}</p>}
         <Row label={tr('cash.zDifference')}><Money cents={day.zOverShort} signed /></Row>
       </section>
       </EntryWorkspace>
 
       {confirmation.dialog}
-      <details className={`${styles.history} print:hidden`} data-cash-history>
-        <summary>{tr('cash.focus.history')}</summary>
-        <h2 className="text-xl font-semibold text-gray-900 mb-3">{tr('cash.history', { store: STORE_LABELS[store] })}</h2>
-        {history.length === 0 ? (
-          <EmptyState message={{ key: 'cash.empty' }} />
-        ) : (
-          <div className="overflow-x-auto bg-white rounded-xl border border-gray-200">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-600">
-                <tr>
-                  {[tr('common.date'), tr('cash.shiftDeposit', { shift: 'AM' }), tr('cash.shiftDeposit', { shift: 'PM' }), tr('cash.shiftOverShort', { shift: 'AM' }), tr('cash.shiftOverShort', { shift: 'PM' }), tr('cash.dayDeposit'), tr('cash.dayDifference'), tr('cash.vsZ')].map(h => (
-                    <th key={h} scope="col" className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {history.map(h => (
-                  <tr key={h.date} className="border-t border-gray-100">
-                    <td className="px-3 py-2">
-                      <button onClick={() => loadDay(h.date)} disabled={busy} className="min-h-11 px-2 text-red-700 underline hover:text-red-900 focus-visible:outline-2 focus-visible:outline-red-700">
-                        {h.date}
-                      </button>
-                    </td>
-                    <td className="px-3 py-2"><Money cents={h.totals.amDeposit} /></td>
-                    <td className="px-3 py-2"><Money cents={h.totals.pmDeposit} /></td>
-                    <td className="px-3 py-2"><Money cents={h.totals.amOverShort} signed /></td>
-                    <td className="px-3 py-2"><Money cents={h.totals.pmOverShort} signed /></td>
-                    <td className="px-3 py-2"><Money cents={h.totals.deposit} /></td>
-                    <td className="px-3 py-2"><Money cents={h.totals.overShort} signed /></td>
-                    <td className="px-3 py-2"><Money cents={h.totals.zOverShort} signed /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </details>
+      {!readOnly && <>
+        {save.dialog}
+        {save.recoveryIssue && <div role="alert" className="my-4 print:hidden"><p>{tr('cash.lookup.recoveryBlocked')}</p>
+          {save.recoveryRaw !== null && <button type="button" className="min-h-11 underline" onClick={() => downloadDraftSource(save.recoveryRaw!)}>{tr('drafts.downloadSource')}</button>}
+        </div>}
+        {save.comparison && <section className="my-6 print:hidden" data-cash-comparison>
+          <h2>{tr('cash.lookup.comparison')}</h2>
+          <button type="button" className={styles.save} disabled={busy} onClick={() => void save.save(true)}>{tr('cash.lookup.reviewReplacement')}</button>
+          <p>{tr('cash.lookup.retainedDraft')}</p>
+          <details><summary>{tr('cash.lookup.frozen')}</summary><SavedCashDetail sheet={save.comparison.attempt} store={store} date={date} /></details>
+          <SavedCashDetail record={save.comparison.saved} />
+        </section>}
+      </>}
     </div>
   )
+}
+
+/** Step 06 content and arithmetic, with every drawer visible and no editing/persistence. */
+export function SavedCashDetail({ record, sheet = record?.sheet, store = record?.store, date = record?.date }: { record?: SavedCashoutRecord; sheet?: Sheet; store?: CashoutStore; date?: string }) {
+  const { t } = useInternalLanguage()
+  if (!sheet || !store || !date) return null
+  const draft: Draft<Sheet> = { schemaVersion: 1, id: 'readonly', sourceId: null, preparer: '', createdAt: '', updatedAt: '', knownServerRevision: null,
+    context: { task: 'cash-out', storeId: store, businessDate: businessDate(date)! }, payload: sheet }
+  return <section className={`${internalThemeClassName} ${styles.workspace}`} data-saved-cash-detail>
+    <h2>{store} · {date}</h2>
+    {record && <p className="print:hidden">{t('cash.lookup.readOnly')}</p>}
+    {record && <p>{t('cash.lookup.savedAt', { time: record.updatedAt })}</p>}
+    <CashOutSheet key={record?.fingerprint ?? JSON.stringify(sheet)} token="" onLocked={() => {}} draft={draft} persist={() => true} readOnly />
+    {record && <p>{t('cash.lookup.storedTotals', { deposit: formatCents(record.totals.deposit), difference: record.totals.overShort === null ? '—' : formatCents(record.totals.overShort), z: record.totals.zOverShort === null ? '—' : formatCents(record.totals.zOverShort) })}</p>}
+  </section>
 }

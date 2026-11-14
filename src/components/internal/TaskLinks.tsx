@@ -11,6 +11,7 @@ const home: { href: string; label: TranslationKey; icon: IconName }[] = [
   { href: '/internal/forms', label: 'shell.forms', icon: 'form' },
 ]
 const reports: typeof home = [
+  { href: '/internal/cash-history', label: 'cash.lookup.title', icon: 'cash' },
   { href: '/internal/bookkeeping#sales', label: 'bookkeeping.sales', icon: 'report' },
   { href: '/internal/bookkeeping#hours', label: 'bookkeeping.hours', icon: 'clock' },
   { href: '/internal/bookkeeping#comparison', label: 'comparison.title', icon: 'calendar' },

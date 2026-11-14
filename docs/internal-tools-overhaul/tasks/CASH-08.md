@@ -115,3 +115,9 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Blockers: DEC-03 retention and UX-07 (including DEC-07 output approval). DATA-05 local implementation is available. No deferred cash workflow is a prerequisite.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+
+## Step 07 bounded lookup checkpoint — November 14, 2026
+
+[Step 07](../checkpoints/step-07.md) adds a separate retained saved-day lookup, validated current-store/day links, read-only reuse of the Step 06 cash sheet, explicit draft-safe copy editing, read-before-write replacement review and frozen uncertain-attempt read-back recovery. Local synthetic tests cover the legacy HTTP contract; no Worker, retention policy, migration or deployment changes are included.
+
+This is a bounded frontend checkpoint, not completion of this broader brief. CASH-08's milestones and acceptance checkboxes remain open: the legacy KV service still expires records 31 days after saving, has no durable revisions, and permits concurrent overwrites. Comparison fingerprints are not server revisions; read-before-write and matching read-back are not atomic conflict protection or server-side idempotency. Step 07b and all activation/live gates remain separate.

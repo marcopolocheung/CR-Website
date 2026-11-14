@@ -1,0 +1,11 @@
+PASS scenario: focused blank and explicit zero
+PASS scenario: full denomination and correction coverage
+PASS scenario: independent two-drawer and Extra money arithmetic
+PASS scenario: drawer lifecycle and negative turn-in
+PASS scenario: keyboard and keypad continuity
+PASS scenario: offline authorization and failed storage recovery
+PASS scenario: English paper from Spanish focused UI
+PASS scenario: late save and drawer switch
+PASS scenario: reload and explicit resume
+PASS scenario: responsive language and short viewport
+PASS Step06: 10 scenarios; 6 screenshots; 0 browser errors/external attempts; synthetic loopback APIs only
