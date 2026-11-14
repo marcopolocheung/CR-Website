@@ -18,7 +18,7 @@ const STORE_LABELS: Record<Store, string> = { CR3: 'CR3 · W Military', CR2: 'CR
 const RANGES = [7, 14, 30] as const
 // Categorical slots 1-3 and 7/4 of the dataviz reference palette, validated with its script (light surface).
 // Contrast WARNs on orange/aqua/yellow are relieved by the tables, which carry every value.
-const PART_COLORS: Record<SalesPartKey, string> = { am: '#2a78d6', pm: '#eb6834', lunch: '#2a78d6', dinner: '#eb6834', other: '#1baf7a' }
+const PART_COLORS: Record<SalesPartKey, string> = { lunch: '#2a78d6', dinner: '#eb6834', other: '#1baf7a' }
 const DISCOUNT = '#6250d6'
 const VOID = '#eda100'
 // Stores take the unused categorical slots 5 (magenta) and 6 (green) so no color means two things; validated with the
@@ -30,7 +30,7 @@ const today = () => new Date().toLocaleDateString('en-CA')
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const money = (cents: number) => usd.format(cents / 100)
 const percent = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 })
-const partValue = (day: SalesDay, key: SalesPartKey) => (key === 'am' || key === 'pm' ? day.shift[key] : day.service[key])
+const partValue = (day: SalesDay, key: SalesPartKey) => day.service[key]
 
 /** Toast sales for the Reports page. Shown once the shared manager code is entered (Cash reports holds the gate). */
 export default function SalesReports() {
@@ -51,8 +51,8 @@ function SalesBoard({ token, onLocked }: { token: string; onLocked: () => void }
   const [retry, setRetry] = useState(0)
 
   const stores = useMemo<Store[]>(() => (store === 'all' ? [...STORES] : [store]), [store])
-  // "By store" only means something with both stores shown; one store falls back to AM/PM (the choice is remembered).
-  const shownSplit: SalesSplitKind = split === 'store' && store !== 'all' ? 'shift' : split
+  // "By store" only means something with both stores shown; one store shows Lunch/Dinner (the choice is remembered).
+  const shownSplit: SalesSplitKind = store === 'all' ? split : 'service'
   const dates = useMemo(() => datesEnding(now, range), [now, range])
 
   useEffect(() => {
@@ -81,7 +81,7 @@ function SalesBoard({ token, onLocked }: { token: string; onLocked: () => void }
         <h2 id="sales-heading" className="text-xl font-semibold text-gray-900 mr-auto">{t('sales.title')}</h2>
         <Segmented label={t('common.store')} value={store} onChange={setStore} options={[['all', t('dashboard.bothStores')], ...STORES.map(s => [s, STORE_LABELS[s]] as const)]} />
         <Segmented label={t('dashboard.range')} value={range} onChange={setRange} options={RANGES.map(r => [r, t('dashboard.days', { number: r })] as const)} />
-        <Segmented label={t('sales.split')} value={shownSplit} onChange={setSplit} options={[...(store === 'all' ? [['store', t('sales.byStore')] as const] : []), ['shift', t('sales.byShift')], ['service', t('sales.byService')]]} />
+        {store === 'all' && <Segmented label={t('sales.split')} value={shownSplit} onChange={setSplit} options={[['store', t('sales.byStore')], ['service', t('sales.byService')]]} />}
       </div>
       <p className="mb-4 max-w-3xl text-xs text-gray-600">{t('sales.help')}</p>
     </>
@@ -114,7 +114,7 @@ function SalesBoard({ token, onLocked }: { token: string; onLocked: () => void }
   // The pieces each net sales bar is stacked from: the stores, or the AM/PM or meal-period parts.
   const pieces: { key: string; label: string; color: string; net: number; orders: number; rowNet: (r: SalesRow) => number }[] = shownSplit === 'store'
     ? stores.map(s => ({ key: s, label: s, color: STORE_COLORS[s], net: perStore[s].net, orders: perStore[s].orders, rowNet: r => r.byStore[s]?.net ?? 0 }))
-    : splitParts(total, shownSplit).map(p => ({ key: p.key, label: partLabel(p.key), color: PART_COLORS[p.key], net: p.net, orders: p.orders, rowNet: r => (r.day ? partValue(r.day, p.key).net : 0) }))
+    : splitParts(total).map(p => ({ key: p.key, label: partLabel(p.key), color: PART_COLORS[p.key], net: p.net, orders: p.orders, rowNet: r => (r.day ? partValue(r.day, p.key).net : 0) }))
   const legend = pieces.map(p => [p.label, p.color] as [string, string])
   const storeLegend = stores.map(s => [s, STORE_COLORS[s]] as [string, string])
   /** Discounts or voids per day, stacked CR3 + CR2 (shown when both stores are selected). */

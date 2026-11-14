@@ -11,9 +11,9 @@ export type SalesDay = {
   discountsByName: { name: string; count: number; amount: number }[]
   voidsByReason: { name: string; items: number; amount: number }[]
 }
-/** How net sales bars are stacked: by store (both stores shown), AM/PM, or Toast meal period. */
-export type SalesSplitKind = 'store' | 'shift' | 'service'
-export type SalesPartKey = 'am' | 'pm' | 'lunch' | 'dinner' | 'other'
+/** How net sales bars are stacked: by store (both stores shown) or Toast meal period. The Worker still sends `shift` (AM/PM); Reports doesn't show it. */
+export type SalesSplitKind = 'store' | 'service'
+export type SalesPartKey = 'lunch' | 'dinner' | 'other'
 
 export const emptySalesDay = (): SalesDay => ({
   net: 0, gross: 0, discounts: 0, orders: 0,
@@ -86,8 +86,7 @@ export function storeTotals(rows: SalesRow[], stores: readonly string[]): Record
 }
 
 /** The pieces a day splits into for the chosen split. Orders without a Toast meal period show only if there are any. */
-export function splitParts(day: SalesDay, kind: Exclude<SalesSplitKind, 'store'>): { key: SalesPartKey; net: number; orders: number }[] {
-  if (kind === 'shift') return [{ key: 'am', ...day.shift.am }, { key: 'pm', ...day.shift.pm }]
+export function splitParts(day: SalesDay): { key: SalesPartKey; net: number; orders: number }[] {
   const parts: { key: SalesPartKey; net: number; orders: number }[] = [{ key: 'lunch', ...day.service.lunch }, { key: 'dinner', ...day.service.dinner }]
   if (day.service.other.orders || day.service.other.net) parts.push({ key: 'other', ...day.service.other })
   return parts

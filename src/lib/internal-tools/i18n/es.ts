@@ -653,11 +653,8 @@ const es: Record<keyof typeof en, string> = {
   "formDrafts.saveAnother": "Editar como amonestación nueva",
   'sales.title': 'Ventas de Toast',
   'sales.split': 'Dividir',
-  'sales.byShift': 'AM / PM',
   'sales.byService': 'Almuerzo / Cena',
   'sales.byStore': 'Por tienda',
-  'sales.part.am': 'AM',
-  'sales.part.pm': 'PM',
   'sales.part.lunch': 'Almuerzo',
   'sales.part.dinner': 'Cena',
   'sales.part.other': 'Sin periodo de comida',
@@ -690,6 +687,6 @@ const es: Record<keyof typeof en, string> = {
   'sales.failed': 'No se pudieron obtener las ventas de Toast.',
   'sales.today': 'hasta ahora hoy',
   'sales.oneStore': 'solo una tienda',
-  'sales.help': 'Las ventas netas son después de descuentos y antes de impuestos y propinas. AM/PM usa la hora en que se abrió cada orden (antes o después de las 4 PM). Almuerzo/Cena usa los periodos de comida configurados en Toast. Los artículos anulados nunca cuentan como ventas.',
+  'sales.help': 'Las ventas netas son después de descuentos y antes de impuestos y propinas. Almuerzo/Cena usa los periodos de comida configurados en Toast. Los artículos anulados nunca cuentan como ventas.',
 }
 export default es

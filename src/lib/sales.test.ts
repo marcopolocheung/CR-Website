@@ -62,12 +62,11 @@ test('rows keep each store apart, and store totals add up to the combined total'
   assert.deepEqual(storeTotals(salesRows(['2026-11-14'], ['CR2'], loaded), ['CR2']).CR2, emptySalesDay())
 })
 
-test('split parts follow the chosen split; meal periods include orders Toast left without one only when there are any', () => {
+test('meal-period parts include orders Toast left without one only when there are any', () => {
   const d = day(1000, { shift: { am: { net: 400, orders: 1 }, pm: { net: 600, orders: 2 } }, service: { lunch: { net: 300, orders: 1 }, dinner: { net: 700, orders: 2 }, other: { net: 0, orders: 0 } } })
-  assert.deepEqual(splitParts(d, 'shift').map(p => [p.key, p.net]), [['am', 400], ['pm', 600]])
-  assert.deepEqual(splitParts(d, 'service').map(p => [p.key, p.net]), [['lunch', 300], ['dinner', 700]])
+  assert.deepEqual(splitParts(d).map(p => [p.key, p.net]), [['lunch', 300], ['dinner', 700]])
   const withOther = { ...d, service: { ...d.service, other: { net: 5, orders: 1 } } }
-  assert.deepEqual(splitParts(withOther, 'service').map(p => p.key), ['lunch', 'dinner', 'other'])
+  assert.deepEqual(splitParts(withOther).map(p => p.key), ['lunch', 'dinner', 'other'])
 })
 
 test('fetchSalesDay names why a day could not load', async () => {
