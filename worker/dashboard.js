@@ -1305,7 +1305,41 @@ var en = {
   "formDrafts.intro": "Your work saves on this device as you type, so a reload or closed tab does not lose it. It is only on the server after you press Save.",
   "formDrafts.saved": "Saved to the server. This copy stays on the device for reference.",
   "formDrafts.alreadySaved": "This draft was already saved as a write-up. Saving again creates a second, separate write-up.",
-  "formDrafts.saveAnother": "Edit as a new write-up"
+  "formDrafts.saveAnother": "Edit as a new write-up",
+  "sales.title": "Sales from Toast",
+  "sales.split": "Split",
+  "sales.byShift": "AM / PM",
+  "sales.byService": "Lunch / Dinner",
+  "sales.part.am": "AM",
+  "sales.part.pm": "PM",
+  "sales.part.lunch": "Lunch",
+  "sales.part.dinner": "Dinner",
+  "sales.part.other": "No meal period",
+  "sales.net": "Net sales",
+  "sales.grossNote": "{amount} before discounts",
+  "sales.orders": "Orders",
+  "sales.averageNote": "Average order {amount}",
+  "sales.discounts": "Discounts",
+  "sales.discountShare": "{percent} of sales before discounts",
+  "sales.voids": "Voids",
+  "sales.voidNote": "{items} items \xB7 {orders} whole orders",
+  "sales.dailyNet": "Net sales per day",
+  "sales.dailyLosses": "Discounts and voids per day",
+  "sales.splitTotals": "Split totals",
+  "sales.share": "Share",
+  "sales.byDay": "Sales by day",
+  "sales.discountsByName": "Discounts by name",
+  "sales.voidsByReason": "Voids by reason",
+  "sales.timesUsed": "Times used",
+  "sales.items": "Items",
+  "sales.amount": "Amount",
+  "sales.none": "None in this period.",
+  "sales.loading": "Getting sales from Toast\u2026 {loaded} of {total} days",
+  "sales.unconfigured": "Toast is not connected on the server yet, so sales cannot be shown.",
+  "sales.failed": "Could not get sales from Toast.",
+  "sales.today": "so far today",
+  "sales.oneStore": "one store only",
+  "sales.help": "Net sales are after discounts and before tax and tips. AM/PM uses when each order was opened (before or after 4 PM). Lunch/Dinner uses the meal periods set up in Toast. Voided items never count as sales."
 };
 var en_default = en;
 
@@ -1616,9 +1650,8 @@ async function getToastToken(env, fetcher = fetch, now = Date.now(), forceLogin 
   return token;
 }
 __name(getToastToken, "getToastToken");
-async function fetchToastCash(env, store, date, fetcher = fetch) {
+async function toastClient(env, store, fetcher = fetch) {
   const restaurant = store === "CR2" ? env.TOAST_GUID_CR2 : env.TOAST_GUID_CR3;
-  const businessDate2 = date.replaceAll("-", "");
   let token = await getToastToken(env, fetcher);
   let retried = false;
   const get = /* @__PURE__ */ __name(async (path) => {
@@ -1639,18 +1672,153 @@ async function fetchToastCash(env, store, date, fetcher = fetch) {
       return response.json();
     }
   }, "get");
-  const orders = [];
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const batch = await get(`/orders/v2/ordersBulk?businessDate=${businessDate2}&pageSize=${PAGE_SIZE}&page=${page}`);
-    if (!Array.isArray(batch)) throw new ToastError("toast_unavailable", "Unexpected orders response from Toast.");
-    orders.push(...batch);
-    if (batch.length < PAGE_SIZE) break;
-  }
+  const orders = /* @__PURE__ */ __name(async (date) => {
+    const businessDate2 = date.replaceAll("-", "");
+    const all = [];
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const batch = await get(`/orders/v2/ordersBulk?businessDate=${businessDate2}&pageSize=${PAGE_SIZE}&page=${page}`);
+      if (!Array.isArray(batch)) throw new ToastError("toast_unavailable", "Unexpected orders response from Toast.");
+      all.push(...batch);
+      if (batch.length < PAGE_SIZE) break;
+    }
+    return all;
+  }, "orders");
+  return { get, orders };
+}
+__name(toastClient, "toastClient");
+async function fetchToastCash(env, store, date, fetcher = fetch) {
+  const { get, orders: dayOrders } = await toastClient(env, store, fetcher);
+  const businessDate2 = date.replaceAll("-", "");
+  const orders = await dayOrders(date);
   const entries = await get(`/cashmgmt/v1/entries?businessDate=${businessDate2}`);
   const employees = await get("/labor/v1/employees");
   return summarizeToastCash({ orders, entries: Array.isArray(entries) ? entries : [], employees: Array.isArray(employees) ? employees : [] });
 }
 __name(fetchToastCash, "fetchToastCash");
+
+// src/toast-sales.ts
+var SALES_KEY_VERSION = "v1";
+var FINISHED_DAY_TTL = 40 * 86400;
+var RECENT_DAY_TTL = 600;
+var CONFIG_TTL = 86400;
+var NO_REASON = "No reason given";
+var cents2 = /* @__PURE__ */ __name((dollars) => typeof dollars === "number" && Number.isFinite(dollars) ? Math.round(dollars * 100) : 0, "cents");
+var localHourFormat = new Intl.DateTimeFormat("en-US", { timeZone: STORE_TIME_ZONE2, hour: "2-digit", hourCycle: "h23" });
+function localHour(toastDate) {
+  if (!toastDate) return null;
+  const ms = Date.parse(toastDate.replace(/([+-]\d{2})(\d{2})$/, "$1:$2"));
+  return Number.isNaN(ms) ? null : Number(localHourFormat.format(ms));
+}
+__name(localHour, "localHour");
+function summarizeToastSales(rawOrders, config) {
+  const orders = rawOrders;
+  const serviceKind = /* @__PURE__ */ new Map();
+  for (const s of config.services) {
+    const name = s.name?.trim().toLowerCase();
+    if (s.guid && (name === "lunch" || name === "dinner")) serviceKind.set(s.guid, name);
+  }
+  const reasons = new Map(config.voidReasons.filter((r) => r.guid && r.name).map((r) => [r.guid, r.name.trim()]));
+  const day = {
+    net: 0,
+    gross: 0,
+    discounts: 0,
+    orders: 0,
+    shift: { am: { net: 0, orders: 0 }, pm: { net: 0, orders: 0 } },
+    service: { lunch: { net: 0, orders: 0 }, dinner: { net: 0, orders: 0 }, other: { net: 0, orders: 0 } },
+    voids: { items: 0, amount: 0, orders: 0 },
+    discountsByName: [],
+    voidsByReason: []
+  };
+  const discountNames = /* @__PURE__ */ new Map();
+  const voidReasons = /* @__PURE__ */ new Map();
+  const addDiscount = /* @__PURE__ */ __name((d) => {
+    const amount = cents2(d.discountAmount);
+    const name = d.name?.trim() || "Discount";
+    const row = discountNames.get(name) ?? { count: 0, amount: 0 };
+    row.count += 1;
+    row.amount += amount;
+    discountNames.set(name, row);
+    day.discounts += amount;
+  }, "addDiscount");
+  for (const order of orders) {
+    if (order.deleted) continue;
+    if (order.voided) day.voids.orders += 1;
+    let orderNet = 0;
+    let sold = false;
+    for (const check of order.checks ?? []) {
+      if (check.deleted) continue;
+      const checkVoided = !!(order.voided || check.voided);
+      for (const s of check.selections ?? []) {
+        if (checkVoided || s.voided) {
+          const reason = s.voidReason?.guid && reasons.get(s.voidReason.guid) || NO_REASON;
+          const row = voidReasons.get(reason) ?? { items: 0, amount: 0 };
+          const amount = cents2(s.preDiscountPrice ?? s.price);
+          row.items += 1;
+          row.amount += amount;
+          voidReasons.set(reason, row);
+          day.voids.items += 1;
+          day.voids.amount += amount;
+        } else {
+          for (const d of s.appliedDiscounts ?? []) addDiscount(d);
+        }
+      }
+      if (checkVoided) continue;
+      for (const d of check.appliedDiscounts ?? []) addDiscount(d);
+      orderNet += cents2(check.amount);
+      sold = true;
+    }
+    if (!sold) continue;
+    day.orders += 1;
+    day.net += orderNet;
+    const shift = (localHour(order.openedDate) ?? 0) < PM_STARTS_AT_HOUR ? day.shift.am : day.shift.pm;
+    shift.net += orderNet;
+    shift.orders += 1;
+    const kind = order.restaurantService?.guid && serviceKind.get(order.restaurantService.guid) || "other";
+    day.service[kind].net += orderNet;
+    day.service[kind].orders += 1;
+  }
+  day.gross = day.net + day.discounts;
+  day.discountsByName = [...discountNames].map(([name, r]) => ({ name, ...r })).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+  day.voidsByReason = [...voidReasons].map(([name, r]) => ({ name, ...r })).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+  return day;
+}
+__name(summarizeToastSales, "summarizeToastSales");
+var localDate = new Intl.DateTimeFormat("en-CA", { timeZone: STORE_TIME_ZONE2, year: "numeric", month: "2-digit", day: "2-digit" });
+function salesCacheTtl(date, now = Date.now()) {
+  const today = localDate.format(now);
+  if (date > today) return null;
+  const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 864e5).toISOString().slice(0, 10);
+  return date >= yesterday ? RECENT_DAY_TTL : FINISHED_DAY_TTL;
+}
+__name(salesCacheTtl, "salesCacheTtl");
+async function fetchToastSales(env, store, date, fetcher = fetch, now = Date.now()) {
+  const ttl = salesCacheTtl(date, now);
+  if (ttl === null) throw new ToastError("toast_unavailable", "That business day has not started yet.");
+  const key2 = `toast:sales:${SALES_KEY_VERSION}:${store}:${date}`;
+  try {
+    const cached = JSON.parse(await env.SCHEDULES.get(key2) ?? "null");
+    if (cached && typeof cached.net === "number") return { ...cached, cached: true };
+  } catch {
+  }
+  const { get, orders } = await toastClient(env, store, fetcher);
+  const configKey = `toast:config:${SALES_KEY_VERSION}:${store}`;
+  let config = null;
+  try {
+    config = JSON.parse(await env.SCHEDULES.get(configKey) ?? "null");
+  } catch {
+    config = null;
+  }
+  if (!config || !Array.isArray(config.services) || !Array.isArray(config.voidReasons)) {
+    const [services, voidReasons] = await Promise.all([get("/config/v2/restaurantServices"), get("/config/v2/voidReasons")]);
+    const names = /* @__PURE__ */ __name((rows) => Array.isArray(rows) ? rows.map((r) => ({ guid: r.guid, name: r.name })) : [], "names");
+    config = { services: names(services), voidReasons: names(voidReasons) };
+    await env.SCHEDULES.put(configKey, JSON.stringify(config), { expirationTtl: CONFIG_TTL });
+  }
+  const day = summarizeToastSales(await orders(date), config);
+  await env.SCHEDULES.put(key2, JSON.stringify(day), { expirationTtl: ttl });
+  return { ...day, cached: false };
+}
+__name(fetchToastSales, "fetchToastSales");
 
 // ../src/lib/digital-forms.ts
 var f = /* @__PURE__ */ __name((key2, label2, kind, options) => ({ key: key2, label: label2, kind, options, required: ["employee", "incidentDate", "description", "periodEnd", "presentRate", "proposedRate", "effectiveDate"].includes(key2) }), "f");
@@ -2658,6 +2826,24 @@ var index_default = {
       } catch (caught) {
         const code = caught instanceof ToastError ? caught.code : "toast_unavailable";
         console.error("toast cash fill failed", code, caught instanceof Error ? caught.message : "");
+        return json({ error: code }, code === "toast_unconfigured" ? 503 : 502, request, env, noStore);
+      }
+    }
+    const toastSalesMatch = path.match(/^\/api\/toast\/sales\/(CR3|CR2)\/(\d{4}-\d{2}-\d{2})$/);
+    if (toastSalesMatch && request.method === "GET") {
+      const [, store, date] = toastSalesMatch;
+      if (Number.isNaN(Date.parse(date))) return json({ error: "not_found" }, 404, request, env);
+      const denied = await managerAuthError(request, env);
+      if (denied) return denied;
+      const noStore = { "Cache-Control": "no-store" };
+      if (!toastConfigured(env)) return json({ error: "toast_unconfigured" }, 503, request, env, noStore);
+      if (salesCacheTtl(date) === null) return json({ error: "invalid_date" }, 400, request, env, noStore);
+      try {
+        const day = await fetchToastSales(env, store, date);
+        return json({ store, date, ...day }, 200, request, env, noStore);
+      } catch (caught) {
+        const code = caught instanceof ToastError ? caught.code : "toast_unavailable";
+        console.error("toast sales failed", code, caught instanceof Error ? caught.message : "");
         return json({ error: code }, code === "toast_unconfigured" ? 503 : 502, request, env, noStore);
       }
     }

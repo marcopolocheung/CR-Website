@@ -1367,3 +1367,47 @@ test('Toast cash fill returns cashier totals and never echoes Toast credentials'
     globalThis.fetch = realFetch
   }
 })
+
+test('Toast sales need the manager code and Toast setup, and reject bad or future dates', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(request('GET', '/api/toast/sales/CR3/2026-11-10'), env)).status, 401)
+  const unconfigured = await handler.fetch(authed('GET', '/api/toast/sales/CR3/2026-11-10'), env)
+  assert.equal(unconfigured.status, 503)
+  assert.deepEqual(await unconfigured.json(), { error: 'toast_unconfigured' })
+  const configured = { ...env, TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  assert.equal((await handler.fetch(authed('GET', '/api/toast/sales/CR9/2026-11-10'), configured)).status, 404)
+  assert.equal((await handler.fetch(authed('GET', '/api/toast/sales/CR3/2026-13-45'), configured)).status, 404)
+  assert.equal((await handler.fetch(authed('POST', '/api/toast/sales/CR3/2026-11-10'), configured)).status, 404)
+  const future = await handler.fetch(authed('GET', '/api/toast/sales/CR3/2099-01-01'), configured)
+  assert.equal(future.status, 400)
+  assert.deepEqual(await future.json(), { error: 'invalid_date' })
+})
+
+test('Toast sales return a day summary without Toast credentials, then serve it from the cache', async () => {
+  const env = { ...mockEnv(), TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'super-secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  const realFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    const href = String(url)
+    calls += 1
+    if (href.endsWith('/authentication/v1/authentication/login')) return Response.json({ token: { accessToken: 'tok-value', expiresIn: 86400 } })
+    if (href.includes('ordersBulk')) return Response.json([{ openedDate: '2026-11-10T18:00:00.000+0000', restaurantService: { guid: 's1' }, checks: [{ amount: 25, selections: [] }] }])
+    if (href.includes('restaurantServices')) return Response.json([{ guid: 's1', name: 'Lunch' }])
+    return Response.json([])
+  }) as typeof fetch
+  try {
+    const response = await handler.fetch(authed('GET', '/api/toast/sales/CR2/2026-11-10'), env)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('Cache-Control'), 'no-store')
+    const text = await response.text()
+    assert.doesNotMatch(text, /super-secret|tok-value/)
+    const body = JSON.parse(text) as { store: string; date: string; net: number; cached: boolean; service: { lunch: { net: number } } }
+    assert.deepEqual([body.store, body.date, body.net, body.service.lunch.net, body.cached], ['CR2', '2026-11-10', 2500, 2500, false])
+    const before = calls
+    const again = (await (await handler.fetch(authed('GET', '/api/toast/sales/CR2/2026-11-10'), env)).json()) as { cached: boolean; net: number }
+    assert.deepEqual([again.cached, again.net], [true, 2500])
+    assert.equal(calls, before)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})

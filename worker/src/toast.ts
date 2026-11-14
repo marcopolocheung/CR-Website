@@ -18,7 +18,7 @@ export interface ToastEnv {
   TOAST_GUID_CR3?: string
 }
 
-type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
+export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
 
 const DEFAULT_HOST = 'https://ws-api.toasttab.com'
 const TOKEN_KEY = 'toast:token'
@@ -172,10 +172,9 @@ export async function getToastToken(env: ToastEnv, fetcher: Fetcher = fetch, now
   return token
 }
 
-/** Pulls one business day for one store and summarizes it. `date` is YYYY-MM-DD. */
-export async function fetchToastCash(env: ToastEnv, store: ToastStore, date: string, fetcher: Fetcher = fetch): Promise<ToastCashSummary> {
+/** Authorized GET for one store's Toast location, retrying once with a fresh login if the token was revoked. */
+export async function toastClient(env: ToastEnv, store: ToastStore, fetcher: Fetcher = fetch) {
   const restaurant = store === 'CR2' ? env.TOAST_GUID_CR2 : env.TOAST_GUID_CR3
-  const businessDate = date.replaceAll('-', '')
   let token = await getToastToken(env, fetcher)
   let retried = false
 
@@ -199,13 +198,27 @@ export async function fetchToastCash(env: ToastEnv, store: ToastStore, date: str
     }
   }
 
-  const orders: Order[] = []
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const batch = await get(`/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=${PAGE_SIZE}&page=${page}`)
-    if (!Array.isArray(batch)) throw new ToastError('toast_unavailable', 'Unexpected orders response from Toast.')
-    orders.push(...(batch as Order[]))
-    if (batch.length < PAGE_SIZE) break
+  /** Every order for one business day (`date` is YYYY-MM-DD), following Toast's pages. */
+  const orders = async (date: string): Promise<unknown[]> => {
+    const businessDate = date.replaceAll('-', '')
+    const all: unknown[] = []
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const batch = await get(`/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=${PAGE_SIZE}&page=${page}`)
+      if (!Array.isArray(batch)) throw new ToastError('toast_unavailable', 'Unexpected orders response from Toast.')
+      all.push(...batch)
+      if (batch.length < PAGE_SIZE) break
+    }
+    return all
   }
+
+  return { get, orders }
+}
+
+/** Pulls one business day for one store and summarizes it. `date` is YYYY-MM-DD. */
+export async function fetchToastCash(env: ToastEnv, store: ToastStore, date: string, fetcher: Fetcher = fetch): Promise<ToastCashSummary> {
+  const { get, orders: dayOrders } = await toastClient(env, store, fetcher)
+  const businessDate = date.replaceAll('-', '')
+  const orders = await dayOrders(date)
   const entries = await get(`/cashmgmt/v1/entries?businessDate=${businessDate}`)
   const employees = await get('/labor/v1/employees')
   return summarizeToastCash({ orders, entries: Array.isArray(entries) ? entries : [], employees: Array.isArray(employees) ? employees : [] })

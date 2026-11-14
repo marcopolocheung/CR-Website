@@ -1,5 +1,6 @@
 'use client'
 import CashReports from './CashReports'
+import SalesReports from './SalesReports'
 import TaskLinks from './TaskLinks'
 import { useInternalLanguage } from './InternalLanguage'
 import { internalThemeClassName } from './ui/Theme'
@@ -9,6 +10,7 @@ export default function ReportsWorkspace() {
   return <div className={`${internalThemeClassName} ${styles.workspace}`}>
     <h1 className={styles.title}>{t('shell.reports')}</h1>
     <TaskLinks kind="reports" />
+    <SalesReports />
     <CashReports />
   </div>
 }
