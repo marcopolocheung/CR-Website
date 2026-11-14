@@ -45,7 +45,7 @@ function SalesBoard({ token, onLocked }: { token: string; onLocked: () => void }
   const [loaded, setLoaded] = useState<Record<string, SalesDay>>({})
   const loadedRef = useRef(loaded)
   loadedRef.current = loaded
-  const [problem, setProblem] = useState<'unconfigured' | 'failed' | null>(null)
+  const [problem, setProblem] = useState<'unconfigured' | 'outdated' | 'failed' | null>(null)
   const [retry, setRetry] = useState(0)
 
   const stores = useMemo<Store[]>(() => (store === 'all' ? [...STORES] : [store]), [store])
@@ -94,8 +94,8 @@ function SalesBoard({ token, onLocked }: { token: string; onLocked: () => void }
       <section aria-labelledby="sales-heading" className="mb-10">
         {header}
         <div role="alert" className="border-2 border-red-800 bg-white p-4">
-          <p className="flex items-center gap-2"><Icon name="warning" />{t(problem === 'unconfigured' ? 'sales.unconfigured' : 'sales.failed')}</p>
-          {problem === 'failed' && <button type="button" className="min-h-11 underline" onClick={() => setRetry(value => value + 1)}>{t('reports.retry')}</button>}
+          <p className="flex items-center gap-2"><Icon name="warning" />{t(`sales.${problem}`)}</p>
+          {problem !== 'unconfigured' && <button type="button" className="min-h-11 underline" onClick={() => setRetry(value => value + 1)}>{t('reports.retry')}</button>}
         </div>
       </section>
     )

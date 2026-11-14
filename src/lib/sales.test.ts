@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { fetchSalesDay, SalesUnavailableError } from './sales-store'
+import { StoreAuthError } from './schedule-store'
 import { emptySalesDay, sumSalesDays, salesRows, splitParts, runLimited, type SalesDay } from './sales'
 
 test('runLimited keeps at most the limit in flight and stops after a failure', async () => {
@@ -54,4 +56,25 @@ test('split parts follow the chosen split; meal periods include orders Toast lef
   assert.deepEqual(splitParts(d, 'service').map(p => [p.key, p.net]), [['lunch', 300], ['dinner', 700]])
   const withOther = { ...d, service: { ...d.service, other: { net: 5, orders: 1 } } }
   assert.deepEqual(splitParts(withOther, 'service').map(p => p.key), ['lunch', 'dinner', 'other'])
+})
+
+test('fetchSalesDay names why a day could not load', async () => {
+  const original = globalThis.fetch
+  const answer = async (status: number, payload: unknown) => {
+    globalThis.fetch = (async () => ({ status, async json() { return payload } })) as unknown as typeof fetch
+    try { await fetchSalesDay('CR3', '2026-11-13', 'code'); return 'ok' } catch (caught) {
+      if (caught instanceof SalesUnavailableError) return caught.reason
+      return caught instanceof StoreAuthError ? 'auth' : 'other'
+    }
+  }
+  try {
+    assert.equal(await answer(200, { ...emptySalesDay(), net: 0 }), 'ok')
+    assert.equal(await answer(401, { error: 'unauthorized' }), 'auth')
+    assert.equal(await answer(503, { error: 'toast_unconfigured' }), 'unconfigured')
+    // A Worker deployed before the sales route existed answers 404 for the whole path.
+    assert.equal(await answer(404, { error: 'not_found' }), 'outdated')
+    assert.equal(await answer(502, { error: 'toast_unavailable' }), 'failed')
+  } finally {
+    globalThis.fetch = original
+  }
 })

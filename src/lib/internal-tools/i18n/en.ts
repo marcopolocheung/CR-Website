@@ -635,6 +635,7 @@ const en = {
   'sales.none': 'None in this period.',
   'sales.loading': 'Getting sales from Toast… {loaded} of {total} days',
   'sales.unconfigured': 'Toast is not connected on the server yet, so sales cannot be shown.',
+  'sales.outdated': 'The server has not been updated for sales yet. Deploy the latest Worker, then try again.',
   'sales.failed': 'Could not get sales from Toast.',
   'sales.today': 'so far today',
   'sales.oneStore': 'one store only',
