@@ -36,9 +36,12 @@ import {
   fetchCashoutDay,
   fetchCashoutHistory,
   saveCashoutDay,
+  fetchToastCash,
+  ToastFillError,
   type CashoutDay,
   type CashoutStore,
 } from '@/lib/cashout-store'
+import { applyToastFill } from '@/lib/cashout-toast'
 import { StoreAuthError, verifyWriteToken } from '@/lib/schedule-store'
 
 type Shift = 'am' | 'pm'
@@ -297,6 +300,25 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
       return { key: 'cash.loaded', params: { store, date: day } }
     })
 
+  const fillFromToast = () =>
+    run(async (): Promise<Message | void> => {
+      const hasToastFigures = [...sheet.am, ...sheet.pm].some(c => c.toast.trim()) || sheet.zReport.trim() !== ''
+      if (hasToastFigures && !await confirmation.ask({ key: 'cash.toastReplaceConfirm' }, false, { key: 'cash.toastReplace' })) return
+      let fill
+      try {
+        fill = await fetchToastCash(store, date, token)
+      } catch (caught) {
+        if (caught instanceof ToastFillError) return { key: caught.reason === 'unconfigured' ? 'cash.toastUnconfigured' : 'cash.toastFailed' }
+        throw caught
+      }
+      if (!mounted.current || currentEdit.current.store !== store || currentEdit.current.date !== date) return
+      if (!fill.am.length && !fill.pm.length) return { key: 'cash.toastEmpty', params: { store, date } }
+      // Apply to the latest sheet so anything typed while Toast answered is kept.
+      const result = applyToastFill(latestSheet.current, fill, newCashier)
+      setSheet(result.sheet)
+      return { key: 'cash.toastFilled', params: { filled: result.filled, added: result.added } }
+    })
+
   const focusEntry = (id: string) => {
     const target = /^(am|pm)-(\d+)-/.exec(id)
     if (target) setActiveDrawer({ shift: target[1] as Shift, index: Number(target[2]) })
@@ -388,6 +410,9 @@ function CashOutSheet({ token, onLocked, draft, persist, onChooseDate }: { token
     <div id="cashout-editor">
       <div className={styles.heading}>
         <h2>{tr('cash.focus.entry')}</h2>
+        <button type="button" data-toast-fill onClick={fillFromToast} disabled={busy || !date} className={styles.toastFill}>
+          <Icon name="cash" />{tr(busy ? 'cash.toastFilling' : 'cash.toastFill')}
+        </button>
         <details className={styles.tools} data-cash-tools>
           <summary>{tr('cash.focus.tools')}</summary>
           <div className={styles.toolActions}>

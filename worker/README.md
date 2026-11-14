@@ -118,6 +118,37 @@ the manager token also still authorizes crew writes. The password is typed into
 the crew editor, checked against `GET /api/staff/verify`, and kept only in
 memory for that page view.
 
+## Toast cash fill (`GET /api/toast/cash/{CR3|CR2}/{YYYY-MM-DD}`)
+
+The cash-out sheet's **Fill from Toast** button calls this route. It needs the
+manager token, reads one business day from Toast's read-only Standard API
+access, and returns only totals: each cashier's cash payments (AM if most of
+their cash came in before 4 PM store time, else PM) and the day's Z report
+expected cash = cash payments − cash refunds + cash in − cash out − pay outs −
+tip outs. Voided payments and voided/deleted orders are left out. Raw orders,
+the Toast secret and the Toast access token never reach the browser. The
+24-hour Toast token is cached in KV under `toast:token`.
+
+Set these on the Worker (dashboard: Worker → Settings → Variables). The client
+ID and secret must be **secrets**; the location GUIDs are not secret:
+
+| Name | Value |
+| --- | --- |
+| `TOAST_CLIENT_ID` | Toast Web → Integrations → Toast API access → Manage credentials |
+| `TOAST_CLIENT_SECRET` | same credential set (secret) |
+| `TOAST_GUID_CR2` | SW Military location GUID |
+| `TOAST_GUID_CR3` | W Military location GUID |
+| `TOAST_API_HOSTNAME` | optional; defaults to `https://ws-api.toasttab.com` |
+
+```sh
+wrangler secret put TOAST_CLIENT_ID --config worker/wrangler.toml
+wrangler secret put TOAST_CLIENT_SECRET --config worker/wrangler.toml
+```
+
+Until all four required values are set the route answers `503
+toast_unconfigured` and the page tells managers to type the figures in. Toast
+trouble answers `502 toast_auth` or `502 toast_unavailable`.
+
 ## Deploy option A: dashboard paste (what you already did)
 
 1. Open Workers & Pages → `chinarose-schedule-api` → Edit code.
