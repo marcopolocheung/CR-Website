@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { BackNavigation } from '@/components/BackNavigation'
 import { useManagerSession } from './ManagerSession'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
@@ -80,6 +81,7 @@ export default function InternalShell({ children, themeClassName }: { children: 
     <header ref={header} className={`${themeClassName} ${styles.header}`} data-internal-banner data-shell-chrome>
       <Link className={styles.brand} href={`${base}/internal`}>CHINA ROSE <span>/ {t('shell.identity')}</span></Link>
       <div className={styles.controls}>
+        <BackNavigation inline label={t('navigation.back')} fallbackHref={section === 'dashboard' ? '/' : '/internal'} />
         <LanguageControls appearance="shell" />
         <Button onClick={() => setHelp(true)} aria-haspopup="dialog">{t('shell.help')}</Button>
         <Button icon="lock" data-shell-lock disabled={!session.token} onClick={session.lock}
