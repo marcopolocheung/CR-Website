@@ -1,5 +1,6 @@
 import type en from './en'
 const es: Record<keyof typeof en, string> = {
+  'navigation.back': 'Volver',
   "cash.focus.title": "Conteo de caja",
   "cash.focus.entry": "Contar una caja",
   "cash.focus.setup": "Tienda, fecha y borrador",

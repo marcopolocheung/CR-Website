@@ -72,6 +72,7 @@ export default function NavigationProtection({ children }: { children: React.Rea
       if (!(anchor instanceof HTMLAnchorElement) || anchor.hasAttribute('download') || (anchor.target && anchor.target !== '_self')) return
       const target = new URL(anchor.href,location.href)
       if (!['http:','https:'].includes(target.protocol)) return
+      const navigateBack = anchor.dataset.historyBack === 'true'
       if (target.origin === location.origin && target.pathname === location.pathname && target.search === location.search) {
         // Re-selecting the active task must not reload the memory-only session.
         if (target.hash === location.hash) { event.preventDefault(); event.stopImmediatePropagation() }
@@ -81,7 +82,8 @@ export default function NavigationProtection({ children }: { children: React.Rea
       const base = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '')
       if (target.origin === location.origin && (normalized === `${base}/internal` || normalized.startsWith(`${base}/internal/`))) {
         event.preventDefault(); event.stopImmediatePropagation()
-        router.push(normalized.slice(base.length) + target.search + target.hash)
+        if (navigateBack) router.back()
+        else router.push(normalized.slice(base.length) + target.search + target.hash)
         return
       }
       const entries = pending()
@@ -92,7 +94,11 @@ export default function NavigationProtection({ children }: { children: React.Rea
       const message: Message = { key: entries.every(w => w.deviceSaved) ? 'navigation.leaveDraft' : 'navigation.leaveUnsaved' }
       void confirmation.ask(message,true,{key:'navigation.leave'}).then(answer => {
         prompting.current = false
-        if (answer) { leaving.current = true; window.location.assign(target.href) }
+        if (answer) {
+          leaving.current = true
+          if (navigateBack) router.back()
+          else window.location.assign(target.href)
+        }
       })
     }
     if (hasDirty) window.addEventListener('beforeunload',unload)

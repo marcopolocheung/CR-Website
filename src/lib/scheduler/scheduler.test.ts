@@ -574,7 +574,9 @@ test('Stef is a manager who can cover every role in validation and generation', 
     }
     assert.ok(isEmployeeQualified(stef, target), role)
     assert.deepEqual(validateSchedule({ employees: [stef], slots: [target], assignments: [assignment(target, stef.id)] }), [], role)
-    const template = Object.fromEntries(DAYS.map((day) => [day, day === 'Monday' ? [target] : []])) as WeeklyStaffingTemplate
+    const template: WeeklyStaffingTemplate = {
+      Sunday: [], Monday: [target], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [],
+    }
     const result = generateSchedule({ employees: [stef], template })
     assert.equal(result.status, 'FEASIBLE', role)
     assert.equal(result.assignments[0]?.employeeId, stef.id, role)

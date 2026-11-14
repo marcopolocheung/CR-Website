@@ -1,4 +1,5 @@
 const en = {
+  'navigation.back': 'Back',
   "cash.focus.title": "Cash count",
   "cash.focus.entry": "Count a drawer",
   "cash.focus.setup": "Store, date and draft",

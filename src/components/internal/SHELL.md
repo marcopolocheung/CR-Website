@@ -7,6 +7,14 @@ fonts/tokens; existing work surfaces keep their current typography and entry UI.
 Chrome disappears in print. The desktop header/rail are sticky; the phone/tablet
 header scrolls away so existing sticky entry summaries have room for the keyboard.
 
+The header's translated Back control uses the previous browser entry, so a move
+from Inventory to Cash returns to Inventory without remounting its working copy.
+Direct links fall back to internal Home (or the public home from internal Home).
+Back departures to another root layout pass through the existing unsaved-work
+confirmation. Public, order and scheduler pages share the same Back control.
+History metadata stores only navigation URLs, preserves Next's history state,
+and uses optional same-tab session storage to bridge full root-layout loads.
+
 Cash/Reports links reuse `/internal/bookkeeping#cash-out` and `#sales`. Once in
 Bookkeeping they preserve the exact current pathname, including slash and `.html`
 variants, to avoid remounting input/File objects. Old #hours/#comparison tabs,
