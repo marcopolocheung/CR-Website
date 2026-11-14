@@ -118,6 +118,76 @@ the manager token also still authorizes crew writes. The password is typed into
 the crew editor, checked against `GET /api/staff/verify`, and kept only in
 memory for that page view.
 
+## Toast cash fill (`GET /api/toast/cash/{CR3|CR2}/{YYYY-MM-DD}`)
+
+The cash-out sheet's **Fill from Toast** button calls this route. It needs the
+manager token, reads one business day from Toast's read-only Standard API
+access, and returns only totals: each cashier's cash payments (AM if most of
+their cash came in before 4 PM store time, else PM) and the day's Z report
+expected cash = cash payments − cash refunds + cash in − cash out − pay outs −
+tip outs. Voided payments and voided/deleted orders are left out. Raw orders,
+the Toast secret and the Toast access token never reach the browser. The
+24-hour Toast token is cached in KV under `toast:token`.
+
+Set these on the Worker (dashboard: Worker → Settings → Variables). The client
+ID and secret must be **secrets**; the location GUIDs are not secret:
+
+| Name | Value |
+| --- | --- |
+| `TOAST_CLIENT_ID` | Toast Web → Integrations → Toast API access → Manage credentials |
+| `TOAST_CLIENT_SECRET` | same credential set (secret) |
+| `TOAST_GUID_CR2` | SW Military location GUID |
+| `TOAST_GUID_CR3` | W Military location GUID |
+| `TOAST_API_HOSTNAME` | optional; defaults to `https://ws-api.toasttab.com` |
+
+```sh
+wrangler secret put TOAST_CLIENT_ID --config worker/wrangler.toml
+wrangler secret put TOAST_CLIENT_SECRET --config worker/wrangler.toml
+```
+
+Until all four required values are set the route answers `503
+toast_unconfigured` and the page tells managers to type the figures in. Toast
+trouble answers `502 toast_auth` or `502 toast_unavailable`.
+
+## Toast sales (`GET /api/toast/sales/{CR3|CR2}/{YYYY-MM-DD}`)
+
+The Reports page's **Sales from Toast** section first asks for every cached
+day in one range request (below), then calls this route only for the days still
+missing, two at a time. It uses the same manager token and Toast
+settings as the cash fill and returns one business day's totals in cents:
+net sales (Toast check amounts: after discounts, before tax and tips), gross
+(= net + discounts), orders, an AM/PM split by when each order was opened (4 PM
+store time), a Lunch/Dinner split by the meal periods configured in Toast
+(orders without one are "other"), discounts by name, and voids by reason
+(voided items, items on voided checks/orders; voided items never count as
+sales). Deleted orders are ignored.
+
+Caching keeps the Worker within free-tier request limits: a day older than
+yesterday is stored in KV for 40 days (`toast:sales:v1:{store}:{date}`);
+yesterday and today for 10 minutes. Meal-period and void-reason names are
+cached for a day (`toast:config:v1:{store}`). A date that hasn't started in San
+Antonio answers `400 invalid_date`. Errors match the cash fill route, plus
+`503 toast_busy` when Toast keeps rate-limiting (the Worker waits up to 2 s for
+Toast's `Retry-After` and retries once first).
+
+### Cached range (`GET /api/toast/sales/{CR3|CR2}?from=YYYY-MM-DD&to=YYYY-MM-DD`)
+
+Manager token required. Returns `{ store, days: { [date]: summary }, missing:
+[date…] }` from KV only, so it never calls Toast and answers quickly. Up to 31
+days; a backwards, longer or malformed range answers `400 invalid_range`.
+
+### Hourly cache warm (cron)
+
+The Worker's `scheduled` handler fills the newest finished days (older than
+yesterday, last 30 days, both stores) that aren't cached yet, **two per run** so
+each run stays within free-plan fetch and CPU limits. A cold cache fills in
+about 30 hours; after that each run usually finds nothing to do. It skips itself
+until the Toast settings are present.
+
+Activation for dashboard deploys: Worker → Settings → Triggers → Cron Triggers →
+Add → `0 * * * *` (hourly). `wrangler.toml` declares the same schedule for
+wrangler deploys.
+
 ## Deploy option A: dashboard paste (what you already did)
 
 1. Open Workers & Pages → `chinarose-schedule-api` → Edit code.

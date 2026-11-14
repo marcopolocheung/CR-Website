@@ -35,8 +35,11 @@ import {
 } from '@/lib/cashout'
 import {
   CASHOUT_STORES,
+  fetchToastCash,
+  ToastFillError,
   type CashoutStore,
 } from '@/lib/cashout-store'
+import { applyToastFill } from '@/lib/cashout-toast'
 import { StoreAuthError, verifyWriteToken } from '@/lib/schedule-store'
 
 type Shift = 'am' | 'pm'
@@ -250,6 +253,47 @@ function CashOutSheet({ token, onLocked, draft, persist, readOnly = false }: { t
   const [keypadOpen, setKeypadOpen] = useState(false)
   useNavigationProtection({ scope: readOnly ? undefined : 'cash', dirty: !readOnly && saveState !== 'server', deviceSaved, busy: !readOnly && busy, checkpoint: () => readOnly || persist(latestSheet.current) })
   const confirmation = useConfirmation()
+  // Fill from Toast (#181) keeps its own busy flag and message so it never mixes with Step 07's save state.
+  // The editor is keyed by draft, so a store/date change remounts it; `mounted` and the token guard late answers.
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  const tokenRef = useRef(token); tokenRef.current = token
+  const [toastBusy, setToastBusy] = useState(false)
+  const [toastStatus, setToastStatus] = useState<Message | null>(null)
+  const fillFromToast = async () => {
+    if (readOnly || toastBusy) return
+    setToastBusy(true)
+    setToastStatus(null)
+    const current = () => mounted.current && tokenRef.current === token
+    try {
+      const sheet = latestSheet.current
+      const hasToastFigures = [...sheet.am, ...sheet.pm].some(c => c.toast.trim()) || sheet.zReport.trim() !== ''
+      if (hasToastFigures && !await confirmation.ask({ key: 'cash.toastReplaceConfirm' }, false, { key: 'cash.toastReplace' })) return
+      let fill
+      try {
+        fill = await fetchToastCash(store, date, token)
+      } catch (caught) {
+        if (caught instanceof ToastFillError) {
+          if (current()) setToastStatus({ key: caught.reason === 'unconfigured' ? 'cash.toastUnconfigured' : 'cash.toastFailed' })
+          return
+        }
+        throw caught
+      }
+      if (!current()) return
+      if (!fill.am.length && !fill.pm.length) { setToastStatus({ key: 'cash.toastEmpty', params: { store, date } }); return }
+      // Apply to the latest sheet so anything typed while Toast answered is kept.
+      const result = applyToastFill(latestSheet.current, fill, newCashier)
+      setSheet(result.sheet)
+      setToastStatus({ key: 'cash.toastFilled', params: { filled: result.filled, added: result.added } })
+    } catch (caught) {
+      if (!current()) return
+      if (caught instanceof StoreAuthError) onLocked()
+      else setToastStatus({ key: errorKey(caught) })
+    } finally {
+      if (mounted.current) setToastBusy(false)
+    }
+  }
+
   const focusEntry = (id: string) => {
     const target = /^(am|pm)-(\d+)-/.exec(id)
     if (target) setActiveDrawer({ shift: target[1] as Shift, index: Number(target[2]) })
@@ -324,6 +368,9 @@ function CashOutSheet({ token, onLocked, draft, persist, readOnly = false }: { t
     <div id={readOnly ? `${idPrefix}sheet` : "cashout-editor"} data-cash-readonly={readOnly || undefined}>
       {!readOnly && <div className={styles.heading}>
         <h2>{tr('cash.focus.entry')}</h2>
+        <button type="button" data-toast-fill onClick={() => void fillFromToast()} disabled={busy || toastBusy || !date} className={styles.toastFill}>
+          <Icon name="cash" />{tr(toastBusy ? 'cash.toastFilling' : 'cash.toastFill')}
+        </button>
         <details className={styles.tools} data-cash-tools>
           <summary>{tr('cash.focus.tools')}</summary>
           <div className={styles.toolActions}>
@@ -333,6 +380,7 @@ function CashOutSheet({ token, onLocked, draft, persist, readOnly = false }: { t
           </div>
         </details>
       </div>}
+      {!readOnly && toastStatus && <p role="status" data-toast-status className="print:hidden">{tr(toastStatus.key, toastStatus.params)}</p>}
       {!readOnly && <p className="print:hidden">{tr('cash.lookup.concurrent')}</p>}
       <EntryWorkspace appearance="paper" helpMode="details" finishId="cashout-save" summary={!readOnly && <>
         <div className={styles.finishRow} data-day-summary>

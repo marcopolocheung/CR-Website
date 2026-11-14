@@ -5,6 +5,8 @@ import { publishedHours, weeksInPeriod } from '../../src/lib/converter/published
 import type { WeeklyStaffingTemplate } from '../../src/lib/scheduler/types'
 import { historyPage, historyRecord, saveHistory } from './import-history'
 import { directoryRecord, saveDirectory } from './import-directory'
+import { fetchToastCash, toastConfigured, ToastError, type ToastStore } from './toast'
+import { fetchToastSales, readCachedSales, salesCacheTtl, salesDateRange, warmToastSales } from './toast-sales'
 import { digitalFormPerson, isDigitalForm, isDigitalFormType, type DigitalFormDoc } from '../../src/lib/digital-forms'
 interface KVNamespace {
   get(key: string): Promise<string | null>
@@ -26,6 +28,12 @@ interface Env {
   SCHEDULE_WRITE_TOKEN?: string
   /** Password that unlocks crew editing on schedule-only stations. Grants no other write. */
   STAFF_EDIT_PASSWORD?: string
+  /** Toast read-only API access. Client ID/secret are Worker secrets; GUIDs and host are plain vars. */
+  TOAST_API_HOSTNAME?: string
+  TOAST_CLIENT_ID?: string
+  TOAST_CLIENT_SECRET?: string
+  TOAST_GUID_CR2?: string
+  TOAST_GUID_CR3?: string
 }
 
 export type StoredWeek = {
@@ -1227,6 +1235,60 @@ export default {
       return json({ updatedAt: doc.updatedAt, ...(doc.sheet.extraMoney === undefined ? {} : { extraMoney: doc.sheet.extraMoney }) }, 200, request, env)
     }
 
+    // Toast cash figures for the cash-out sheet. Read-only; the Toast secret and token stay in the Worker.
+    const toastCashMatch = path.match(/^\/api\/toast\/cash\/(CR3|CR2)\/(\d{4}-\d{2}-\d{2})$/)
+    if (toastCashMatch && request.method === 'GET') {
+      const [, store, date] = toastCashMatch as unknown as [string, ToastStore, string]
+      if (Number.isNaN(Date.parse(date))) return json({ error: 'not_found' }, 404, request, env)
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (!toastConfigured(env)) return json({ error: 'toast_unconfigured' }, 503, request, env, noStore)
+      try {
+        const summary = await fetchToastCash(env, store, date)
+        return json({ store, date, ...summary, fetchedAt: new Date().toISOString() }, 200, request, env, noStore)
+      } catch (caught) {
+        const code = caught instanceof ToastError ? caught.code : 'toast_unavailable'
+        console.error('toast cash fill failed', code, caught instanceof Error ? caught.message : '')
+        return json({ error: code }, code === 'toast_unconfigured' ? 503 : 502, request, env, noStore)
+      }
+    }
+
+    // Toast sales summary for one store's business day (Reports page). Finished days are cached in KV.
+    const toastSalesMatch = path.match(/^\/api\/toast\/sales\/(CR3|CR2)\/(\d{4}-\d{2}-\d{2})$/)
+    if (toastSalesMatch && request.method === 'GET') {
+      const [, store, date] = toastSalesMatch as unknown as [string, ToastStore, string]
+      if (Number.isNaN(Date.parse(date))) return json({ error: 'not_found' }, 404, request, env)
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (!toastConfigured(env)) return json({ error: 'toast_unconfigured' }, 503, request, env, noStore)
+      if (salesCacheTtl(date) === null) return json({ error: 'invalid_date' }, 400, request, env, noStore)
+      try {
+        const day = await fetchToastSales(env, store, date)
+        return json({ store, date, ...day }, 200, request, env, noStore)
+      } catch (caught) {
+        const code = caught instanceof ToastError ? caught.code : 'toast_unavailable'
+        console.error('toast sales failed', code, caught instanceof Error ? caught.message : '')
+        return json({ error: code }, code === 'toast_unconfigured' || code === 'toast_busy' ? 503 : 502, request, env, noStore)
+      }
+    }
+
+    // Every cached Toast sales day in a range (Reports loads these in one request). Never calls Toast.
+    const toastSalesRangeMatch = path.match(/^\/api\/toast\/sales\/(CR3|CR2)$/)
+    if (toastSalesRangeMatch && request.method === 'GET') {
+      const store = toastSalesRangeMatch[1] as ToastStore
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (!toastConfigured(env)) return json({ error: 'toast_unconfigured' }, 503, request, env, noStore)
+      const from = url.searchParams.get('from') ?? ''
+      const to = url.searchParams.get('to') ?? ''
+      const dates = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) ? salesDateRange(from, to) : null
+      if (!dates) return json({ error: 'invalid_range' }, 400, request, env, noStore)
+      return json({ store, ...(await readCachedSales(env, store, dates)) }, 200, request, env, noStore)
+    }
+
     // Inventory item list: manager token for reads and writes, rev-checked so two editors cannot clobber each other.
     const inventoryListMatch = path.match(/^\/api\/inventory\/(CR3)\/list$/)
     if (inventoryListMatch && (request.method === 'GET' || request.method === 'PUT')) {
@@ -1874,5 +1936,11 @@ export default {
     }
 
     return json({ error: 'not_found' }, 404, request, env)
+  },
+
+  /** Hourly cron (Worker → Triggers): keep finished Toast sales days cached so Reports never waits on Toast. */
+  async scheduled(_event: unknown, env: Env, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<void> {
+    if (!toastConfigured(env)) return
+    ctx.waitUntil(warmToastSales(env).catch(caught => console.error('toast sales warm crashed', caught instanceof Error ? caught.message : '')))
   },
 }

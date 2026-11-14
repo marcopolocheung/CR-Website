@@ -5,6 +5,7 @@ import { canonicalJson } from './internal-tools/json'
 import type { CashoutLink } from './converter/sales-context'
 import { getScheduleApiBase, StoreAuthError, StoreUnavailableError } from './schedule-store'
 import { parseCashAmount, type CashoutSheet, type dayTotals } from './cashout'
+import type { ToastCashFill } from './cashout-toast'
 export type { CashoutSheet } from './cashout'
 
 /**
@@ -58,6 +59,25 @@ export async function saveCashoutDay(
   throw errorFor(status)
 }
 
+/** Toast fill could not run: `unconfigured` until the Worker has Toast secrets, else Toast/network trouble. */
+export class ToastFillError extends Error {
+  constructor(readonly reason: 'unconfigured' | 'failed') {
+    super(`Toast fill ${reason}`)
+    this.name = 'ToastFillError'
+  }
+}
+
+/** Toast cash figures for one store/day, summarized by the Worker (`/api/toast/cash/{store}/{date}`). */
+export async function fetchToastCash(store: CashoutStore, date: string, token: string): Promise<ToastCashFill> {
+  const { status, body } = await requestJson(`/api/toast/cash/${store}/${date}`, token, undefined, 'Could not reach Toast.')
+  if (status === 200 && body && typeof body === 'object' && Array.isArray((body as ToastCashFill).am) && Array.isArray((body as ToastCashFill).pm)) {
+    return body as ToastCashFill
+  }
+  if (status === 401) throw new StoreAuthError()
+  if (status === 503 && (body as { error?: string } | null)?.error === 'toast_unconfigured') throw new ToastFillError('unconfigured')
+  throw new ToastFillError('failed')
+}
+
 function errorFor(status: number): Error {
   if (status === 401) return new StoreAuthError()
   if (status === 429) return new StoreUnavailableError('Too many wrong codes. Wait a bit and try again.')
@@ -67,15 +87,25 @@ function errorFor(status: number): Error {
 }
 
 /** Manager-token request to the Worker. Shared with the write-up store. */
+/** The server took longer than the request's time limit (no HTTP status to report). */
+export class RequestTimeoutError extends StoreUnavailableError {
+  constructor(message: string) {
+    super(message)
+    this.name = 'RequestTimeoutError'
+  }
+}
+
 export async function requestJson(
   path: string,
   token: string,
   init?: RequestInit,
   unreachable = 'Could not reach the cash-out store.',
+  timeoutMs = 10000,
 ): Promise<{ status: number; body: unknown }> {
   const checkSession = managerSession.capture(token)
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 10000)
+  let timedOut = false
+  const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
   try {
     const response = await fetch(`${getScheduleApiBase()}${path}`, {
       ...init,
@@ -93,7 +123,7 @@ export async function requestJson(
     return { status: response.status, body }
   } catch (caught) {
     if (caught instanceof SessionChangedError) throw caught
-    throw new StoreUnavailableError(unreachable)
+    throw timedOut ? new RequestTimeoutError(unreachable) : new StoreUnavailableError(unreachable)
   } finally {
     clearTimeout(timer)
   }

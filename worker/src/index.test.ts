@@ -1326,3 +1326,132 @@ test('existing write-ups can be deleted without affecting other records', async 
   const list = await (await handler.fetch(authed('GET', '/api/writeups'), env)).json() as { writeUps: { id: string }[] }
   assert.deepEqual(list.writeUps.map(row => row.id), [otherId])
 })
+
+test('Toast cash fill needs the manager code, Toast setup and a valid store/date', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(request('GET', '/api/toast/cash/CR3/2026-11-13'), env)).status, 401)
+  const unconfigured = await handler.fetch(authed('GET', '/api/toast/cash/CR3/2026-11-13'), env)
+  assert.equal(unconfigured.status, 503)
+  assert.deepEqual(await unconfigured.json(), { error: 'toast_unconfigured' })
+  const configured = { ...env, TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  assert.equal((await handler.fetch(authed('GET', '/api/toast/cash/CR9/2026-11-13'), configured)).status, 404)
+  assert.equal((await handler.fetch(authed('GET', '/api/toast/cash/CR3/2026-13-45'), configured)).status, 404)
+  assert.equal((await handler.fetch(authed('PUT', '/api/toast/cash/CR3/2026-11-13'), configured)).status, 404)
+})
+
+test('Toast cash fill returns cashier totals and never echoes Toast credentials', async () => {
+  const env = { ...mockEnv(), TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'super-secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  const realFetch = globalThis.fetch
+  const seen: string[] = []
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    const href = String(url)
+    seen.push(href)
+    if (href.endsWith('/authentication/v1/authentication/login')) return Response.json({ token: { accessToken: 'tok-value', expiresIn: 86400 } })
+    if (href.includes('ordersBulk')) return Response.json([{ checks: [{ payments: [{ type: 'CASH', paymentStatus: 'CAPTURED', refundStatus: 'NONE', amount: 12.34, paidDate: '2026-11-13T17:00:00.000+0000', server: { guid: 'e1' } }] }] }])
+    if (href.includes('/labor/v1/employees')) return Response.json([{ guid: 'e1', firstName: 'Ana', lastName: 'L' }])
+    return Response.json([])
+  }) as typeof fetch
+  try {
+    const response = await handler.fetch(authed('GET', '/api/toast/cash/CR3/2026-11-13'), env)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('Cache-Control'), 'no-store')
+    const text = await response.text()
+    assert.doesNotMatch(text, /super-secret|tok-value/)
+    const body = JSON.parse(text) as { store: string; date: string; am: { name: string; cents: number }[]; z: { expected: number } }
+    assert.equal(body.store, 'CR3')
+    assert.equal(body.date, '2026-11-13')
+    assert.deepEqual(body.am.map(c => [c.name, c.cents]), [['Ana', 1234]])
+    assert.equal(body.z.expected, 1234)
+    assert.ok(seen.some(href => href.includes('businessDate=20261113')))
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
+test('Toast sales need the manager code and Toast setup, and reject bad or future dates', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(request('GET', '/api/toast/sales/CR3/2026-11-10'), env)).status, 401)
+  const unconfigured = await handler.fetch(authed('GET', '/api/toast/sales/CR3/2026-11-10'), env)
+  assert.equal(unconfigured.status, 503)
+  assert.deepEqual(await unconfigured.json(), { error: 'toast_unconfigured' })
+  const configured = { ...env, TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  assert.equal((await handler.fetch(authed('GET', '/api/toast/sales/CR9/2026-11-10'), configured)).status, 404)
+  assert.equal((await handler.fetch(authed('GET', '/api/toast/sales/CR3/2026-13-45'), configured)).status, 404)
+  assert.equal((await handler.fetch(authed('POST', '/api/toast/sales/CR3/2026-11-10'), configured)).status, 404)
+  const future = await handler.fetch(authed('GET', '/api/toast/sales/CR3/2099-01-01'), configured)
+  assert.equal(future.status, 400)
+  assert.deepEqual(await future.json(), { error: 'invalid_date' })
+})
+
+test('Toast sales range needs the manager code, checks the range, and returns only cached days', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(request('GET', '/api/toast/sales/CR3?from=2026-11-01&to=2026-11-10'), env)).status, 401)
+  assert.equal((await handler.fetch(authed('GET', '/api/toast/sales/CR3?from=2026-11-01&to=2026-11-10'), env)).status, 503)
+  const configured = { ...env, TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  for (const query of ['', '?from=2026-11-10&to=2026-11-01', '?from=2026-09-01&to=2026-11-01', '?from=nope&to=2026-11-01']) {
+    const bad = await handler.fetch(authed('GET', `/api/toast/sales/CR3${query}`), configured)
+    assert.equal(bad.status, 400)
+  }
+  await configured.SCHEDULES.put('toast:sales:v1:CR3:2026-11-09', JSON.stringify({ net: 4200 }))
+  const realFetch = globalThis.fetch
+  let toastCalls = 0
+  globalThis.fetch = (async () => { toastCalls += 1; return Response.json([]) }) as typeof fetch
+  try {
+    const response = await handler.fetch(authed('GET', '/api/toast/sales/CR3?from=2026-11-08&to=2026-11-10'), configured)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('Cache-Control'), 'no-store')
+    assert.deepEqual(await response.json(), { store: 'CR3', days: { '2026-11-09': { net: 4200 } }, missing: ['2026-11-08', '2026-11-10'] })
+    assert.equal(toastCalls, 0)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
+test('the hourly cron warms Toast sales only when Toast is configured', async () => {
+  const pending: Promise<unknown>[] = []
+  const ctx = { waitUntil(promise: Promise<unknown>) { pending.push(promise) } }
+  await handler.scheduled({}, mockEnv(), ctx)
+  assert.equal(pending.length, 0)
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    if (String(url).endsWith('/authentication/v1/authentication/login')) return Response.json({ token: { accessToken: 't', expiresIn: 86400 } })
+    return Response.json([])
+  }) as typeof fetch
+  try {
+    const env = { ...mockEnv(), TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+    await handler.scheduled({}, env, ctx)
+    assert.equal(pending.length, 1)
+    await Promise.all(pending)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
+test('Toast sales return a day summary without Toast credentials, then serve it from the cache', async () => {
+  const env = { ...mockEnv(), TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'super-secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  const realFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    const href = String(url)
+    calls += 1
+    if (href.endsWith('/authentication/v1/authentication/login')) return Response.json({ token: { accessToken: 'tok-value', expiresIn: 86400 } })
+    if (href.includes('ordersBulk')) return Response.json([{ openedDate: '2026-11-10T18:00:00.000+0000', restaurantService: { guid: 's1' }, checks: [{ amount: 25, selections: [] }] }])
+    if (href.includes('restaurantServices')) return Response.json([{ guid: 's1', name: 'Lunch' }])
+    return Response.json([])
+  }) as typeof fetch
+  try {
+    const response = await handler.fetch(authed('GET', '/api/toast/sales/CR2/2026-11-10'), env)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('Cache-Control'), 'no-store')
+    const text = await response.text()
+    assert.doesNotMatch(text, /super-secret|tok-value/)
+    const body = JSON.parse(text) as { store: string; date: string; net: number; cached: boolean; service: { lunch: { net: number } } }
+    assert.deepEqual([body.store, body.date, body.net, body.service.lunch.net, body.cached], ['CR2', '2026-11-10', 2500, 2500, false])
+    const before = calls
+    const again = (await (await handler.fetch(authed('GET', '/api/toast/sales/CR2/2026-11-10'), env)).json()) as { cached: boolean; net: number }
+    assert.deepEqual([again.cached, again.net], [true, 2500])
+    assert.equal(calls, before)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})

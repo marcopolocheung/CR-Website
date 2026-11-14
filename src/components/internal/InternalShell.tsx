@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import { BackNavigation } from '@/components/BackNavigation'
 import { useManagerSession } from './ManagerSession'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import { LanguageControls, useInternalLanguage } from './InternalLanguage'
 import { useShellTasks } from './ShellTask'
+import { preloadSales, salesCache } from '@/lib/sales-cache'
 import { MovingNavigation } from './ui/MovingNavigation'
 import { Button } from './ui/controls'
 import type { IconName } from './ui/Icon'
@@ -41,6 +43,11 @@ export default function InternalShell({ children, themeClassName }: { children: 
     : pathname.endsWith('/qr-generator') ? 'qr' : pathname.endsWith('/ui-gallery') ? 'gallery' : 'dashboard'
   const taskId = pathname.endsWith('/cash-history') ? 'cash-history' : section === 'reports' && pathname.endsWith('/bookkeeping') ? hash : section
   const session = useManagerSession()
+  // Start loading Toast sales as soon as the manager code is entered on any internal page, so Reports opens ready.
+  useEffect(() => {
+    if (session.token) preloadSales(session.token)
+    else salesCache.clear()
+  }, [session.token])
   const tasks = useShellTasks()
   const metadata = tasks[taskId]
   const access = (section === 'cash' ? metadata : undefined) ?? tasks[section === 'reports' ? 'bookkeeping' : section]
@@ -80,6 +87,7 @@ export default function InternalShell({ children, themeClassName }: { children: 
     <header ref={header} className={`${themeClassName} ${styles.header}`} data-internal-banner data-shell-chrome>
       <Link className={styles.brand} href={`${base}/internal`}>CHINA ROSE <span>/ {t('shell.identity')}</span></Link>
       <div className={styles.controls}>
+        <BackNavigation inline label={t('navigation.back')} fallbackHref={section === 'dashboard' ? '/' : '/internal'} />
         <LanguageControls appearance="shell" />
         <Button onClick={() => setHelp(true)} aria-haspopup="dialog">{t('shell.help')}</Button>
         <Button icon="lock" data-shell-lock disabled={!session.token} onClick={session.lock}

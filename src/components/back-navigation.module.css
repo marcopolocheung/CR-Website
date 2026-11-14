@@ -1,0 +1,6 @@
+.bar { padding: .5rem 1rem; background: white; color: #991b1b; }
+.inline { display: inline-flex; }
+.link { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: .5rem .75rem; border: 1px solid currentColor; border-radius: .25rem; color: inherit; font-size: .875rem; font-weight: 600; text-decoration: none; }
+.link:hover { text-decoration: underline; }
+.link:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+@media print { .bar, .inline { display: none; } }
