@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { fetchSalesDay, SalesUnavailableError } from './sales-store'
+import { fetchSalesDay, fetchSalesRange, SalesUnavailableError } from './sales-store'
+import { RequestTimeoutError, requestJson } from './cashout-store'
 import { StoreAuthError } from './schedule-store'
 import { emptySalesDay, sumSalesDays, salesRows, splitParts, runLimited, type SalesDay } from './sales'
 
@@ -73,7 +74,40 @@ test('fetchSalesDay names why a day could not load', async () => {
     assert.equal(await answer(503, { error: 'toast_unconfigured' }), 'unconfigured')
     // A Worker deployed before the sales route existed answers 404 for the whole path.
     assert.equal(await answer(404, { error: 'not_found' }), 'outdated')
+    assert.equal(await answer(503, { error: 'toast_busy' }), 'busy')
     assert.equal(await answer(502, { error: 'toast_unavailable' }), 'failed')
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('requestJson reports a timeout separately from other network trouble', async () => {
+  const original = globalThis.fetch
+  try {
+    globalThis.fetch = ((_url: unknown, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    })) as typeof fetch
+    await assert.rejects(requestJson('/slow', 'code', undefined, 'Could not reach Toast.', 5), RequestTimeoutError)
+    globalThis.fetch = (async () => { throw new TypeError('offline') }) as typeof fetch
+    await assert.rejects(requestJson('/down', 'code'), (caught: unknown) => caught instanceof Error && !(caught instanceof RequestTimeoutError))
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('fetchSalesRange returns cached days, or null so an older or troubled Worker falls back to day requests', async () => {
+  const original = globalThis.fetch
+  const answer = (status: number, payload: unknown) => {
+    globalThis.fetch = (async () => ({ status, async json() { return payload } })) as unknown as typeof fetch
+    return fetchSalesRange('CR3', '2026-11-01', '2026-11-03', 'code')
+  }
+  try {
+    const day = { ...emptySalesDay(), net: 500 }
+    assert.deepEqual(await answer(200, { store: 'CR3', days: { '2026-11-02': day }, missing: ['2026-11-01', '2026-11-03'] }), { days: { '2026-11-02': day }, missing: ['2026-11-01', '2026-11-03'] })
+    assert.equal(await answer(404, { error: 'not_found' }), null)
+    assert.equal(await answer(500, null), null)
+    await assert.rejects(answer(401, { error: 'unauthorized' }), StoreAuthError)
+    await assert.rejects(answer(503, { error: 'toast_unconfigured' }), (caught: unknown) => caught instanceof SalesUnavailableError && caught.reason === 'unconfigured')
   } finally {
     globalThis.fetch = original
   }

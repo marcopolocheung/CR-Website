@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { summarizeToastSales, fetchToastSales, salesCacheTtl } from './toast-sales'
+import { summarizeToastSales, fetchToastSales, salesCacheTtl, salesDateRange, readCachedSales, warmToastSales } from './toast-sales'
 import type { ToastEnv } from './toast'
 
 // Toast sends UTC; the stores are on America/Chicago (CST = UTC-6 in November).
@@ -85,4 +85,60 @@ test('fetchToastSales caches a finished day so the second view makes no Toast ca
   // Meal-period and void-reason names are cached too, so another day only fetches orders.
   await fetchToastSales(env, 'CR3', '2026-11-09', fetcher, now)
   assert.deepEqual(calls.slice(toastCalls).map(u => new URL(u).pathname), ['/orders/v2/ordersBulk'])
+})
+
+function toastFetcher(calls: string[], failOn?: string) {
+  return async (url: string) => {
+    calls.push(url)
+    if (url.endsWith('/authentication/v1/authentication/login')) return Response.json({ token: { accessToken: 't', expiresIn: 86400 } })
+    if (url.includes('ordersBulk')) {
+      if (failOn && url.includes(`businessDate=${failOn}`)) return new Response('down', { status: 500 })
+      return Response.json([order(12, 'svc-l', [check(12.5)])])
+    }
+    if (url.includes('/config/v2/restaurantServices')) return Response.json(config.services)
+    if (url.includes('/config/v2/voidReasons')) return Response.json(config.voidReasons)
+    return Response.json([])
+  }
+}
+const toastEnv = (kv = mockKv()): ToastEnv => ({ SCHEDULES: kv, TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 's', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' })
+const businessDates = (calls: string[]) => calls.filter(u => u.includes('ordersBulk')).map(u => new URL(u).searchParams.get('businessDate'))
+
+test('salesDateRange lists each date and rejects backwards or over-long ranges', () => {
+  assert.deepEqual(salesDateRange('2026-10-30', '2026-11-02'), ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02'])
+  assert.equal(salesDateRange('2026-11-02', '2026-11-01'), null)
+  assert.equal(salesDateRange('2026-10-01', '2026-11-01')?.length, undefined) // 32 days
+  assert.equal(salesDateRange('2026-10-02', '2026-11-01')?.length, 31)
+})
+
+test('the cron warms the newest uncached finished days for both stores, a couple per run, skipping cached days', async () => {
+  const env = toastEnv()
+  const now = Date.UTC(2026, 10, 14, 18) // Nov 14 in San Antonio: finished days are Nov 12 and earlier
+  await fetchToastSales(env, 'CR3', '2026-11-12', toastFetcher([]), now)
+  const calls: string[] = []
+  const first = await warmToastSales(env, now, toastFetcher(calls))
+  assert.deepEqual(first, { warmed: ['CR2:2026-11-12', 'CR3:2026-11-11'], failed: null })
+  assert.deepEqual(businessDates(calls), ['20261112', '20261111'])
+  const second = await warmToastSales(env, now, toastFetcher([]))
+  assert.deepEqual(second.warmed, ['CR2:2026-11-11', 'CR3:2026-11-10'])
+  // Yesterday and today are never warmed (they keep changing).
+  assert.ok(!businessDates(calls).some(d => d === '20261113' || d === '20261114'))
+})
+
+test('a Toast failure stops the cron run and the next run retries that day first', async () => {
+  const env = toastEnv()
+  const now = Date.UTC(2026, 10, 14, 18)
+  const result = await warmToastSales(env, now, toastFetcher([], '20261112'))
+  assert.deepEqual(result, { warmed: [], failed: 'CR3:2026-11-12' })
+  const calls: string[] = []
+  assert.deepEqual((await warmToastSales(env, now, toastFetcher(calls))).warmed, ['CR3:2026-11-12', 'CR2:2026-11-12'])
+})
+
+test('readCachedSales returns cached days and lists the rest as missing without calling Toast', async () => {
+  const env = toastEnv()
+  const now = Date.UTC(2026, 10, 14, 18)
+  await fetchToastSales(env, 'CR2', '2026-11-10', toastFetcher([]), now)
+  const { days, missing } = await readCachedSales(env, 'CR2', ['2026-11-09', '2026-11-10', '2026-11-11'])
+  assert.deepEqual(Object.keys(days), ['2026-11-10'])
+  assert.equal(days['2026-11-10'].net, 1250)
+  assert.deepEqual(missing, ['2026-11-09', '2026-11-11'])
 })

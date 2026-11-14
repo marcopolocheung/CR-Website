@@ -79,15 +79,25 @@ function errorFor(status: number): Error {
 }
 
 /** Manager-token request to the Worker. Shared with the write-up store. */
+/** The server took longer than the request's time limit (no HTTP status to report). */
+export class RequestTimeoutError extends StoreUnavailableError {
+  constructor(message: string) {
+    super(message)
+    this.name = 'RequestTimeoutError'
+  }
+}
+
 export async function requestJson(
   path: string,
   token: string,
   init?: RequestInit,
   unreachable = 'Could not reach the cash-out store.',
+  timeoutMs = 10000,
 ): Promise<{ status: number; body: unknown }> {
   const checkSession = managerSession.capture(token)
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 10000)
+  let timedOut = false
+  const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
   try {
     const response = await fetch(`${getScheduleApiBase()}${path}`, {
       ...init,
@@ -105,7 +115,7 @@ export async function requestJson(
     return { status: response.status, body }
   } catch (caught) {
     if (caught instanceof SessionChangedError) throw caught
-    throw new StoreUnavailableError(unreachable)
+    throw timedOut ? new RequestTimeoutError(unreachable) : new StoreUnavailableError(unreachable)
   } finally {
     clearTimeout(timer)
   }

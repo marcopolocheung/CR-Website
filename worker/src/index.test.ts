@@ -1383,6 +1383,50 @@ test('Toast sales need the manager code and Toast setup, and reject bad or futur
   assert.deepEqual(await future.json(), { error: 'invalid_date' })
 })
 
+test('Toast sales range needs the manager code, checks the range, and returns only cached days', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(request('GET', '/api/toast/sales/CR3?from=2026-11-01&to=2026-11-10'), env)).status, 401)
+  assert.equal((await handler.fetch(authed('GET', '/api/toast/sales/CR3?from=2026-11-01&to=2026-11-10'), env)).status, 503)
+  const configured = { ...env, TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  for (const query of ['', '?from=2026-11-10&to=2026-11-01', '?from=2026-09-01&to=2026-11-01', '?from=nope&to=2026-11-01']) {
+    const bad = await handler.fetch(authed('GET', `/api/toast/sales/CR3${query}`), configured)
+    assert.equal(bad.status, 400)
+  }
+  await configured.SCHEDULES.put('toast:sales:v1:CR3:2026-11-09', JSON.stringify({ net: 4200 }))
+  const realFetch = globalThis.fetch
+  let toastCalls = 0
+  globalThis.fetch = (async () => { toastCalls += 1; return Response.json([]) }) as typeof fetch
+  try {
+    const response = await handler.fetch(authed('GET', '/api/toast/sales/CR3?from=2026-11-08&to=2026-11-10'), configured)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('Cache-Control'), 'no-store')
+    assert.deepEqual(await response.json(), { store: 'CR3', days: { '2026-11-09': { net: 4200 } }, missing: ['2026-11-08', '2026-11-10'] })
+    assert.equal(toastCalls, 0)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
+test('the hourly cron warms Toast sales only when Toast is configured', async () => {
+  const pending: Promise<unknown>[] = []
+  const ctx = { waitUntil(promise: Promise<unknown>) { pending.push(promise) } }
+  await handler.scheduled({}, mockEnv(), ctx)
+  assert.equal(pending.length, 0)
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    if (String(url).endsWith('/authentication/v1/authentication/login')) return Response.json({ token: { accessToken: 't', expiresIn: 86400 } })
+    return Response.json([])
+  }) as typeof fetch
+  try {
+    const env = { ...mockEnv(), TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+    await handler.scheduled({}, env, ctx)
+    assert.equal(pending.length, 1)
+    await Promise.all(pending)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
 test('Toast sales return a day summary without Toast credentials, then serve it from the cache', async () => {
   const env = { ...mockEnv(), TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'super-secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
   const realFetch = globalThis.fetch

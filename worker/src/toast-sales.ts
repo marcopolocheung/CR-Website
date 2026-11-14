@@ -4,8 +4,10 @@
  * One request = one store's business day. Finished days are cached in KV so a
  * 30-day view only asks Toast for days it has never seen; yesterday and today are
  * cached for 10 minutes because late voids and open checks still change them.
+ * An hourly cron (`warmToastSales`) fills finished days ahead of time, and the
+ * range read (`readCachedSales`) hands the page every cached day in one request.
  */
-import { PM_STARTS_AT_HOUR, STORE_TIME_ZONE, ToastError, toastClient, type Fetcher, type ToastEnv, type ToastStore } from './toast'
+import { PM_STARTS_AT_HOUR, STORE_TIME_ZONE, TOAST_STORES, ToastError, toastClient, type Fetcher, type ToastEnv, type ToastStore } from './toast'
 
 export type SalesSplit = { net: number; orders: number }
 /** All money is integer cents. */
@@ -34,6 +36,13 @@ const FINISHED_DAY_TTL = 40 * 86400
 const RECENT_DAY_TTL = 600
 const CONFIG_TTL = 86400
 const NO_REASON = 'No reason given'
+/** Finished days the cron keeps ready (the Reports page shows up to 30). */
+const WARM_DAYS = 30
+/** Uncached days the cron asks Toast for per run, to stay inside free-plan fetch and CPU limits. */
+const WARM_PER_RUN = 2
+const DAY_MS = 86400000
+
+const salesKey = (store: ToastStore, date: string) => `toast:sales:${SALES_KEY_VERSION}:${store}:${date}`
 
 const cents = (dollars: unknown) => (typeof dollars === 'number' && Number.isFinite(dollars) ? Math.round(dollars * 100) : 0)
 
@@ -123,21 +132,76 @@ const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: STORE_TIME_ZONE, 
 export function salesCacheTtl(date: string, now = Date.now()): number | null {
   const today = localDate.format(now)
   if (date > today) return null
-  const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
-  return date >= yesterday ? RECENT_DAY_TTL : FINISHED_DAY_TTL
+  return date >= daysBefore(today, 1) ? RECENT_DAY_TTL : FINISHED_DAY_TTL
+}
+
+const daysBefore = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) - n * DAY_MS).toISOString().slice(0, 10)
+
+async function readCached(env: ToastEnv, store: ToastStore, date: string): Promise<ToastSalesDay | null> {
+  try {
+    const cached = JSON.parse((await env.SCHEDULES.get(salesKey(store, date))) ?? 'null') as ToastSalesDay | null
+    return cached && typeof cached.net === 'number' ? cached : null
+  } catch {
+    // A corrupt entry just means asking Toast again.
+    return null
+  }
+}
+
+/** Every date from `from` to `to` (YYYY-MM-DD, inclusive), or null when the range is backwards or over `max` days. */
+export function salesDateRange(from: string, to: string, max = 31): string[] | null {
+  const start = Date.parse(`${from}T00:00:00Z`)
+  const end = Date.parse(`${to}T00:00:00Z`)
+  if (Number.isNaN(start) || Number.isNaN(end) || start > end) return null
+  const count = (end - start) / DAY_MS + 1
+  if (count > max) return null
+  return Array.from({ length: count }, (_, i) => new Date(start + i * DAY_MS).toISOString().slice(0, 10))
+}
+
+/** Cached days only (never calls Toast): what the page can show at once, and which dates it still has to ask for. */
+export async function readCachedSales(env: ToastEnv, store: ToastStore, dates: string[]): Promise<{ days: Record<string, ToastSalesDay>; missing: string[] }> {
+  const found = await Promise.all(dates.map(date => readCached(env, store, date)))
+  const days: Record<string, ToastSalesDay> = {}
+  const missing: string[] = []
+  dates.forEach((date, i) => {
+    const day = found[i]
+    if (day) days[date] = day
+    else missing.push(date)
+  })
+  return { days, missing }
+}
+
+/**
+ * Cron: fill the newest finished days that aren't cached yet (both stores), a couple per run.
+ * A Toast failure stops the run; the next run starts again from the newest missing day.
+ */
+export async function warmToastSales(env: ToastEnv, now = Date.now(), fetcher: Fetcher = fetch, limit = WARM_PER_RUN): Promise<{ warmed: string[]; failed: string | null }> {
+  const today = localDate.format(now)
+  const warmed: string[] = []
+  for (let back = 2; back < 2 + WARM_DAYS; back += 1) {
+    const date = daysBefore(today, back)
+    for (const store of TOAST_STORES) {
+      if (warmed.length >= limit) return { warmed, failed: null }
+      if (await readCached(env, store, date)) continue
+      try {
+        await fetchToastSales(env, store, date, fetcher, now)
+        warmed.push(`${store}:${date}`)
+      } catch (caught) {
+        const code = caught instanceof ToastError ? caught.code : 'toast_unavailable'
+        console.error('toast sales warm failed', store, date, code)
+        return { warmed, failed: `${store}:${date}` }
+      }
+    }
+  }
+  return { warmed, failed: null }
 }
 
 /** One store's business day, from the KV cache when possible. `date` is YYYY-MM-DD. */
 export async function fetchToastSales(env: ToastEnv, store: ToastStore, date: string, fetcher: Fetcher = fetch, now = Date.now()): Promise<ToastSalesDay & { cached: boolean }> {
   const ttl = salesCacheTtl(date, now)
   if (ttl === null) throw new ToastError('toast_unavailable', 'That business day has not started yet.')
-  const key = `toast:sales:${SALES_KEY_VERSION}:${store}:${date}`
-  try {
-    const cached = JSON.parse((await env.SCHEDULES.get(key)) ?? 'null') as ToastSalesDay | null
-    if (cached && typeof cached.net === 'number') return { ...cached, cached: true }
-  } catch {
-    // A corrupt entry just means asking Toast again.
-  }
+  const key = salesKey(store, date)
+  const cached = await readCached(env, store, date)
+  if (cached) return { ...cached, cached: true }
 
   const { get, orders } = await toastClient(env, store, fetcher)
   const configKey = `toast:config:${SALES_KEY_VERSION}:${store}`

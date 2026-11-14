@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { summarizeToastCash, getToastToken, fetchToastCash, type ToastEnv } from './toast'
+import { summarizeToastCash, getToastToken, fetchToastCash, toastClient, ToastError, type ToastEnv } from './toast'
 
 // Toast sends times in UTC; the stores are in America/Chicago (CST = UTC-6 in November).
 const at = (localHour: number, minute = 0) => new Date(Date.UTC(2026, 10, 13, localHour + 6, minute)).toISOString().replace('Z', '+0000')
@@ -136,4 +136,21 @@ test('fetchToastCash pages through orders for the store location and business da
   const headers = new Headers(orderCalls[0].init?.headers)
   assert.equal(headers.get('Toast-Restaurant-External-ID'), 'guid-cr2')
   assert.equal(headers.get('Authorization'), 'Bearer tok-1')
+})
+
+test('a Toast 429 waits Retry-After (capped) and retries once, then reports toast_busy', async () => {
+  const waits: number[] = []
+  let limited = 1
+  const fetcher = async (url: string) => {
+    if (url.endsWith('/authentication/v1/authentication/login')) return Response.json({ token: { accessToken: 'tok-1', expiresIn: 86400 } })
+    if (limited-- > 0) return new Response('slow down', { status: 429, headers: { 'Retry-After': '30' } })
+    return Response.json([{ guid: 'ok' }])
+  }
+  const client = await toastClient(toastEnv(), 'CR3', fetcher, async ms => { waits.push(ms) })
+  assert.deepEqual(await client.get('/config/v2/voidReasons'), [{ guid: 'ok' }])
+  assert.deepEqual(waits, [2000])
+
+  limited = 5
+  await assert.rejects(client.get('/config/v2/voidReasons'), (caught: unknown) => caught instanceof ToastError && caught.code === 'toast_busy')
+  assert.deepEqual(waits, [2000, 2000])
 })

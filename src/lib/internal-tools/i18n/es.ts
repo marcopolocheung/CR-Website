@@ -637,6 +637,8 @@ const es: Record<keyof typeof en, string> = {
   'sales.loading': 'Obteniendo ventas de Toast… {loaded} de {total} días',
   'sales.unconfigured': 'Toast aún no está conectado en el servidor, así que no se pueden mostrar las ventas.',
   'sales.outdated': 'El servidor aún no está actualizado para las ventas. Publique el Worker más reciente y vuelva a intentarlo.',
+  'sales.busy': 'Toast está ocupado en este momento. Vuelva a intentarlo en un minuto.',
+  'sales.timeout': 'Toast tardó demasiado en responder. Vuelva a intentarlo; los días que ya cargaron se conservan.',
   'sales.failed': 'No se pudieron obtener las ventas de Toast.',
   'sales.today': 'hasta ahora hoy',
   'sales.oneStore': 'solo una tienda',

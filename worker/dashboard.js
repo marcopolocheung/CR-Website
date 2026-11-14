@@ -1336,6 +1336,9 @@ var en = {
   "sales.none": "None in this period.",
   "sales.loading": "Getting sales from Toast\u2026 {loaded} of {total} days",
   "sales.unconfigured": "Toast is not connected on the server yet, so sales cannot be shown.",
+  "sales.outdated": "The server has not been updated for sales yet. Deploy the latest Worker, then try again.",
+  "sales.busy": "Toast is busy right now. Try again in a minute.",
+  "sales.timeout": "Toast took too long to answer. Try again; days that finished loading are kept.",
   "sales.failed": "Could not get sales from Toast.",
   "sales.today": "so far today",
   "sales.oneStore": "one store only",
@@ -1529,6 +1532,9 @@ async function saveDirectory(db, store, raw) {
 __name(saveDirectory, "saveDirectory");
 
 // src/toast.ts
+var TOAST_STORES = ["CR3", "CR2"];
+var sleep = /* @__PURE__ */ __name((ms) => new Promise((resolve) => setTimeout(resolve, ms)), "sleep");
+var MAX_RATE_LIMIT_WAIT_MS = 2e3;
 var DEFAULT_HOST = "https://ws-api.toasttab.com";
 var TOKEN_KEY = "toast:token";
 var TOKEN_MARGIN_MS = 10 * 60 * 1e3;
@@ -1650,11 +1656,12 @@ async function getToastToken(env, fetcher = fetch, now = Date.now(), forceLogin 
   return token;
 }
 __name(getToastToken, "getToastToken");
-async function toastClient(env, store, fetcher = fetch) {
+async function toastClient(env, store, fetcher = fetch, wait = sleep) {
   const restaurant = store === "CR2" ? env.TOAST_GUID_CR2 : env.TOAST_GUID_CR3;
   let token = await getToastToken(env, fetcher);
   let retried = false;
   const get = /* @__PURE__ */ __name(async (path) => {
+    let waited = false;
     for (; ; ) {
       let response;
       try {
@@ -1665,6 +1672,13 @@ async function toastClient(env, store, fetcher = fetch) {
       if (response.status === 401 && !retried) {
         retried = true;
         token = await getToastToken(env, fetcher, Date.now(), true);
+        continue;
+      }
+      if (response.status === 429) {
+        if (waited) throw new ToastError("toast_busy", "Toast is rate-limiting requests.");
+        waited = true;
+        const seconds = Number(response.headers.get("Retry-After"));
+        await wait(Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds * 1e3, MAX_RATE_LIMIT_WAIT_MS) : 1e3);
         continue;
       }
       if (response.status === 401 || response.status === 403) throw new ToastError("toast_auth", "Toast refused this request.");
@@ -1702,6 +1716,10 @@ var FINISHED_DAY_TTL = 40 * 86400;
 var RECENT_DAY_TTL = 600;
 var CONFIG_TTL = 86400;
 var NO_REASON = "No reason given";
+var WARM_DAYS = 30;
+var WARM_PER_RUN = 2;
+var DAY_MS2 = 864e5;
+var salesKey = /* @__PURE__ */ __name((store, date) => `toast:sales:${SALES_KEY_VERSION}:${store}:${date}`, "salesKey");
 var cents2 = /* @__PURE__ */ __name((dollars) => typeof dollars === "number" && Number.isFinite(dollars) ? Math.round(dollars * 100) : 0, "cents");
 var localHourFormat = new Intl.DateTimeFormat("en-US", { timeZone: STORE_TIME_ZONE2, hour: "2-digit", hourCycle: "h23" });
 function localHour(toastDate) {
@@ -1787,19 +1805,67 @@ var localDate = new Intl.DateTimeFormat("en-CA", { timeZone: STORE_TIME_ZONE2, y
 function salesCacheTtl(date, now = Date.now()) {
   const today = localDate.format(now);
   if (date > today) return null;
-  const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 864e5).toISOString().slice(0, 10);
-  return date >= yesterday ? RECENT_DAY_TTL : FINISHED_DAY_TTL;
+  return date >= daysBefore(today, 1) ? RECENT_DAY_TTL : FINISHED_DAY_TTL;
 }
 __name(salesCacheTtl, "salesCacheTtl");
+var daysBefore = /* @__PURE__ */ __name((date, n) => new Date(Date.parse(`${date}T00:00:00Z`) - n * DAY_MS2).toISOString().slice(0, 10), "daysBefore");
+async function readCached(env, store, date) {
+  try {
+    const cached = JSON.parse(await env.SCHEDULES.get(salesKey(store, date)) ?? "null");
+    return cached && typeof cached.net === "number" ? cached : null;
+  } catch {
+    return null;
+  }
+}
+__name(readCached, "readCached");
+function salesDateRange(from, to, max = 31) {
+  const start = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${to}T00:00:00Z`);
+  if (Number.isNaN(start) || Number.isNaN(end) || start > end) return null;
+  const count = (end - start) / DAY_MS2 + 1;
+  if (count > max) return null;
+  return Array.from({ length: count }, (_, i) => new Date(start + i * DAY_MS2).toISOString().slice(0, 10));
+}
+__name(salesDateRange, "salesDateRange");
+async function readCachedSales(env, store, dates) {
+  const found = await Promise.all(dates.map((date) => readCached(env, store, date)));
+  const days = {};
+  const missing = [];
+  dates.forEach((date, i) => {
+    const day = found[i];
+    if (day) days[date] = day;
+    else missing.push(date);
+  });
+  return { days, missing };
+}
+__name(readCachedSales, "readCachedSales");
+async function warmToastSales(env, now = Date.now(), fetcher = fetch, limit = WARM_PER_RUN) {
+  const today = localDate.format(now);
+  const warmed = [];
+  for (let back = 2; back < 2 + WARM_DAYS; back += 1) {
+    const date = daysBefore(today, back);
+    for (const store of TOAST_STORES) {
+      if (warmed.length >= limit) return { warmed, failed: null };
+      if (await readCached(env, store, date)) continue;
+      try {
+        await fetchToastSales(env, store, date, fetcher, now);
+        warmed.push(`${store}:${date}`);
+      } catch (caught) {
+        const code = caught instanceof ToastError ? caught.code : "toast_unavailable";
+        console.error("toast sales warm failed", store, date, code);
+        return { warmed, failed: `${store}:${date}` };
+      }
+    }
+  }
+  return { warmed, failed: null };
+}
+__name(warmToastSales, "warmToastSales");
 async function fetchToastSales(env, store, date, fetcher = fetch, now = Date.now()) {
   const ttl = salesCacheTtl(date, now);
   if (ttl === null) throw new ToastError("toast_unavailable", "That business day has not started yet.");
-  const key2 = `toast:sales:${SALES_KEY_VERSION}:${store}:${date}`;
-  try {
-    const cached = JSON.parse(await env.SCHEDULES.get(key2) ?? "null");
-    if (cached && typeof cached.net === "number") return { ...cached, cached: true };
-  } catch {
-  }
+  const key2 = salesKey(store, date);
+  const cached = await readCached(env, store, date);
+  if (cached) return { ...cached, cached: true };
   const { get, orders } = await toastClient(env, store, fetcher);
   const configKey = `toast:config:${SALES_KEY_VERSION}:${store}`;
   let config = null;
@@ -2844,8 +2910,21 @@ var index_default = {
       } catch (caught) {
         const code = caught instanceof ToastError ? caught.code : "toast_unavailable";
         console.error("toast sales failed", code, caught instanceof Error ? caught.message : "");
-        return json({ error: code }, code === "toast_unconfigured" ? 503 : 502, request, env, noStore);
+        return json({ error: code }, code === "toast_unconfigured" || code === "toast_busy" ? 503 : 502, request, env, noStore);
       }
+    }
+    const toastSalesRangeMatch = path.match(/^\/api\/toast\/sales\/(CR3|CR2)$/);
+    if (toastSalesRangeMatch && request.method === "GET") {
+      const store = toastSalesRangeMatch[1];
+      const denied = await managerAuthError(request, env);
+      if (denied) return denied;
+      const noStore = { "Cache-Control": "no-store" };
+      if (!toastConfigured(env)) return json({ error: "toast_unconfigured" }, 503, request, env, noStore);
+      const from = url.searchParams.get("from") ?? "";
+      const to = url.searchParams.get("to") ?? "";
+      const dates = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) ? salesDateRange(from, to) : null;
+      if (!dates) return json({ error: "invalid_range" }, 400, request, env, noStore);
+      return json({ store, ...await readCachedSales(env, store, dates) }, 200, request, env, noStore);
     }
     const inventoryListMatch = path.match(/^\/api\/inventory\/(CR3)\/list$/);
     if (inventoryListMatch && (request.method === "GET" || request.method === "PUT")) {
@@ -3461,6 +3540,11 @@ var index_default = {
       }
     }
     return json({ error: "not_found" }, 404, request, env);
+  },
+  /** Hourly cron (Worker → Triggers): keep finished Toast sales days cached so Reports never waits on Toast. */
+  async scheduled(_event, env, ctx) {
+    if (!toastConfigured(env)) return;
+    ctx.waitUntil(warmToastSales(env).catch((caught) => console.error("toast sales warm crashed", caught instanceof Error ? caught.message : "")));
   }
 };
 export {
