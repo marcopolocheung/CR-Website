@@ -43,12 +43,12 @@ The CR03 Kitchen shift rules are fixed in code (`seedKitchenTemplateCR03`) and i
 - **"Any shift"** people (Jay, Jeremy, Robert, Jorge, Jeremiah) are modeled as available the whole day (9:00-23:00).
 - **Jeffery starts at 6:00am**, before the sheet's 9:00am AM window; his hours are encoded as written (Sun 8:00-1:30, Mon & Wed-Sat 6:00-1:30, Tue off).
 - **Alfredo** works Mon-Fri 10:15am-4pm only; he can fill the lunch F.R. Cook spot (10:15am-4pm) but not the 9:00am required lunch spots.
-- **Stef** "one day off only, any 6 days" → max 6 days; "one day double shift only" → `maxDoublesPerWeek: 1`. His "main post: shadow" is not modeled — the model has no per-person role preference, so shadow is just an optional PM spot.
-- **Jeremy** "when Stef is off, he is the shadow" is conditional and is not encoded as a rule; shadow ships as an optional PM spot either of them can take. In practice Stef takes Shadow most days and Jeremy covers it on Stef's off day.
+- **Stef** is a Manager and can cover any role, replacing the sheet's Line Cook / Shadow qualifications. "One day off only, any 6 days" → max 6 days; "one day double shift only" → `maxDoublesPerWeek: 1`. Availability and shift-specific restrictions still apply to managers.
+- **Jeremy** "when Stef is off, he is the shadow" is conditional and is not encoded as a rule; Shadow ships as an optional PM spot either of them can take when available.
 - **Meat Prep is implied by M/V Prep**: a Meat / Veggie Prep worker can cover Meat Prep, but a meat-prep-only worker (Cris) cannot cover M/V Prep. Cris takes Meat Prep on the days he is not already on the required Dishwasher spot.
 - **Eddie** "AM shift only" is encoded as the lunch window (9am-4pm). He is not scheduled into the dinner shift.
 - **Optional spots** are auto-filled when someone valid is free; a spot nobody can cover stays open (yellow) and does not block the week.
 - The sheet's AM (9-4) and PM (4-11) windows drive the required lunch/dinner crews; the lunch Cook slot is 9am-4pm (Sun 10:15am-4pm) and the dinner Cook slot is 4pm-11pm.
 - Sheet typo: "Monday to Saturday PM : 4 am to 11 pm" is read as 4pm-11pm.
 - No employee incompatibilities are stated for the CR03 crew.
-- **Publishing still needs the manager write token.** If CR3 users should publish without it, that needs a separate station-scoped token. 
+- **Publishing still needs the manager write token.** If CR3 users should publish without it, that needs a separate station-scoped token.

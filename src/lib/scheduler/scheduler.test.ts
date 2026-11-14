@@ -475,7 +475,7 @@ test('kitchen pages offer kitchen posts only — no dining posts', () => {
   assert.ok(rolesForRestaurant('CR2-kitchen').includes('manager'))
   assert.ok(rolesForRestaurant('CR3-kitchen').includes('mv-prep'))
   assert.ok(rolesForRestaurant('CR3-kitchen').includes('meat-prep'))
-  assert.ok(!rolesForRestaurant('CR3-kitchen').includes('manager'))
+  assert.ok(rolesForRestaurant('CR3-kitchen').includes('manager'))
   assert.deepEqual(rolesForRestaurant('CR3-diningroom'), ['server', 'cashier', 'lead', 'manager'])
 })
 
@@ -539,7 +539,7 @@ test('CR03 crew carries the sheet’s post qualifications and double limits', ()
   const byId = new Map(employees.map((employee) => [employee.id, employee]))
   assert.deepEqual(byId.get('muk')?.roles, ['cook'])
   assert.deepEqual(byId.get('alfredo')?.roles, ['fried-rice'])
-  assert.ok(byId.get('stef')?.roles.includes('shadow'))
+  assert.deepEqual(byId.get('stef')?.roles, ['manager'])
   assert.ok(byId.get('cris')?.roles.includes('meat-prep'))
   // Per-person double caps from the sheet.
   assert.equal(byId.get('stef')?.maxDoublesPerWeek, 1)
@@ -561,6 +561,35 @@ test('CR03 crew carries the sheet’s post qualifications and double limits', ()
     assert.equal(Object.keys(hire?.recurringAvailability ?? {}).length, 7)
     assert.deepEqual(hire?.recurringAvailability.Monday, [{ start: minutes(9), end: minutes(23) }])
   }
+})
+
+test('Stef is a manager who can cover every role in validation and generation', () => {
+  const stef = structuredClone(seedKitchenEmployeesCR03.find((employee) => employee.id === 'stef')!)
+  assert.deepEqual(stef.roles, ['manager'])
+  const roles = new Set([...rolesForRestaurant('CR3-kitchen'), ...rolesForRestaurant('CR3-diningroom'), 'custom-post'])
+  for (const role of roles) {
+    const target: StaffingSlot = {
+      id: `manager-${role}`, day: 'Monday', period: 'PM', role, label: role,
+      start: minutes(16), end: minutes(23), required: true,
+    }
+    assert.ok(isEmployeeQualified(stef, target), role)
+    assert.deepEqual(validateSchedule({ employees: [stef], slots: [target], assignments: [assignment(target, stef.id)] }), [], role)
+    const template = Object.fromEntries(DAYS.map((day) => [day, day === 'Monday' ? [target] : []])) as WeeklyStaffingTemplate
+    const result = generateSchedule({ employees: [stef], template })
+    assert.equal(result.status, 'FEASIBLE', role)
+    assert.equal(result.assignments[0]?.employeeId, stef.id, role)
+  }
+})
+
+test('manager coverage still respects availability and shift-specific role restrictions', () => {
+  const stef = structuredClone(seedKitchenEmployeesCR03.find((employee) => employee.id === 'stef')!)
+  const target = expandTemplate(seedKitchenTemplateCR03).find((slot) => slot.day === 'Monday' && slot.role === 'cook' && slot.period === 'AM')!
+  const violations = validateSchedule({ employees: [stef], slots: [target], assignments: [assignment(target, stef.id)] })
+  assert.ok(violations.some((violation) => violation.code === 'unavailable_employee'))
+  assert.ok(!violations.some((violation) => violation.code === 'unqualified_employee'))
+  stef.shiftRoles = [{ day: 'Monday', period: 'AM', role: 'dishwasher' }]
+  assert.equal(isEmployeeQualified(stef, target), false)
+  assert.equal(isEmployeeQualified(stef, { ...target, role: 'dishwasher' }), true)
 })
 
 test('M/V prep qualification implies meat prep, but not the reverse', () => {
