@@ -11,9 +11,9 @@
 .heading h2 { font-family: var(--cr-display); font-size: 32px; font-weight: 700; }
 .tools { min-width: 0; }
 .toolActions { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
-.toolActions button, .keypadButton, .save, .shiftChoices button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: 1px solid var(--cr-control); background: white; padding: 8px 12px; font-size: 16px; }
+.toolActions button, .toastFill, .keypadButton, .save, .shiftChoices button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: 1px solid var(--cr-control); background: white; padding: 8px 12px; font-size: 16px; }
 .save { background: var(--cr-red); color: white; border-color: var(--cr-red); font-weight: 600; flex-shrink: 0; }
-.save:disabled, .toolActions button:disabled { opacity: .55; }
+.save:disabled, .toastFill:disabled, .toolActions button:disabled { opacity: .55; }
 .finishRow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
 .finishRow > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; min-width: 0; }
 .finishRow strong { font-size: 24px; font-variant-numeric: tabular-nums; }

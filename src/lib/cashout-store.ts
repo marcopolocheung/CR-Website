@@ -3,6 +3,7 @@ import { canonicalJson } from './internal-tools/json'
 import type { CashoutLink } from './converter/sales-context'
 import { getScheduleApiBase, StoreAuthError, StoreUnavailableError } from './schedule-store'
 import { parseCashAmount, type CashoutSheet, type dayTotals } from './cashout'
+import type { ToastCashFill } from './cashout-toast'
 export type { CashoutSheet } from './cashout'
 
 /**
@@ -48,6 +49,25 @@ export async function saveCashoutDay(
     return
   }
   throw errorFor(status)
+}
+
+/** Toast fill could not run: `unconfigured` until the Worker has Toast secrets, else Toast/network trouble. */
+export class ToastFillError extends Error {
+  constructor(readonly reason: 'unconfigured' | 'failed') {
+    super(`Toast fill ${reason}`)
+    this.name = 'ToastFillError'
+  }
+}
+
+/** Toast cash figures for one store/day, summarized by the Worker (`/api/toast/cash/{store}/{date}`). */
+export async function fetchToastCash(store: CashoutStore, date: string, token: string): Promise<ToastCashFill> {
+  const { status, body } = await requestJson(`/api/toast/cash/${store}/${date}`, token, undefined, 'Could not reach Toast.')
+  if (status === 200 && body && typeof body === 'object' && Array.isArray((body as ToastCashFill).am) && Array.isArray((body as ToastCashFill).pm)) {
+    return body as ToastCashFill
+  }
+  if (status === 401) throw new StoreAuthError()
+  if (status === 503 && (body as { error?: string } | null)?.error === 'toast_unconfigured') throw new ToastFillError('unconfigured')
+  throw new ToastFillError('failed')
 }
 
 function errorFor(status: number): Error {

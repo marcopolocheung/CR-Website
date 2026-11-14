@@ -1326,3 +1326,44 @@ test('existing write-ups can be deleted without affecting other records', async 
   const list = await (await handler.fetch(authed('GET', '/api/writeups'), env)).json() as { writeUps: { id: string }[] }
   assert.deepEqual(list.writeUps.map(row => row.id), [otherId])
 })
+
+test('Toast cash fill needs the manager code, Toast setup and a valid store/date', async () => {
+  const env = mockEnv()
+  assert.equal((await handler.fetch(request('GET', '/api/toast/cash/CR3/2026-11-13'), env)).status, 401)
+  const unconfigured = await handler.fetch(authed('GET', '/api/toast/cash/CR3/2026-11-13'), env)
+  assert.equal(unconfigured.status, 503)
+  assert.deepEqual(await unconfigured.json(), { error: 'toast_unconfigured' })
+  const configured = { ...env, TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  assert.equal((await handler.fetch(authed('GET', '/api/toast/cash/CR9/2026-11-13'), configured)).status, 404)
+  assert.equal((await handler.fetch(authed('GET', '/api/toast/cash/CR3/2026-13-45'), configured)).status, 404)
+  assert.equal((await handler.fetch(authed('PUT', '/api/toast/cash/CR3/2026-11-13'), configured)).status, 404)
+})
+
+test('Toast cash fill returns cashier totals and never echoes Toast credentials', async () => {
+  const env = { ...mockEnv(), TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'super-secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  const realFetch = globalThis.fetch
+  const seen: string[] = []
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    const href = String(url)
+    seen.push(href)
+    if (href.endsWith('/authentication/v1/authentication/login')) return Response.json({ token: { accessToken: 'tok-value', expiresIn: 86400 } })
+    if (href.includes('ordersBulk')) return Response.json([{ checks: [{ payments: [{ type: 'CASH', paymentStatus: 'CAPTURED', refundStatus: 'NONE', amount: 12.34, paidDate: '2026-11-13T17:00:00.000+0000', server: { guid: 'e1' } }] }] }])
+    if (href.includes('/labor/v1/employees')) return Response.json([{ guid: 'e1', firstName: 'Ana', lastName: 'L' }])
+    return Response.json([])
+  }) as typeof fetch
+  try {
+    const response = await handler.fetch(authed('GET', '/api/toast/cash/CR3/2026-11-13'), env)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('Cache-Control'), 'no-store')
+    const text = await response.text()
+    assert.doesNotMatch(text, /super-secret|tok-value/)
+    const body = JSON.parse(text) as { store: string; date: string; am: { name: string; cents: number }[]; z: { expected: number } }
+    assert.equal(body.store, 'CR3')
+    assert.equal(body.date, '2026-11-13')
+    assert.deepEqual(body.am.map(c => [c.name, c.cents]), [['Ana', 1234]])
+    assert.equal(body.z.expected, 1234)
+    assert.ok(seen.some(href => href.includes('businessDate=20261113')))
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
