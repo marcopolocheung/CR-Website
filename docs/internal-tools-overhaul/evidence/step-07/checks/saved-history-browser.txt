@@ -1,0 +1,17 @@
+PASS scenario: browse and cancel preserve active draft bytes, raw Count/Amount, selected drawer
+PASS scenario: retained lookup filters and record survive a visit to the cash editor
+PASS scenario: hidden editor checkpoint denied leaves prior editor and payload intact
+PASS scenario: explicit copy creates new device draft for exact destination with unknown server entry metadata
+PASS scenario: changed baseline review, cancel, explicit replacement, successful read-back
+PASS scenario: acknowledgment remains saved when history refresh fails
+PASS scenario: CR3 direct link and empty vs missing vs failed vs malformed with filters retained
+PASS scenario: invalid direct parameters do not select or fetch a fallback record
+PASS scenario: direct-link copy creates exact CR3 draft when no cash editor was mounted
+PASS scenario: lost acknowledgment matches read-back after reload without another PUT
+PASS scenario: divergent retry blocks on read failure, preserves both copies, confirms frozen replacement and retains newer input
+PASS scenario: missing read-back allows explicit frozen retry; edits during request stay unsaved
+PASS scenario: malformed preflight blocks replacement and retains draft
+PASS scenario: out-of-order exact record response cannot replace selected store/day
+PASS scenario: out-of-order window response cannot replace the current lookup
+PASS scenario: EN/ES, keyboard exact opening, 375px and 320px enlarged layout, English full-drawer print
+PASS 16 scenarios; 4 screenshots; no page errors or external requests

@@ -80,7 +80,7 @@ with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, args=['--remote-debugging-port=9336'] if args.rea else [])
     def workspace(width=1440, touch=False):
         ctx = browser.new_context(viewport={'width': width, 'height': 1000}, has_touch=touch, service_workers='block')
-        mode = {'cash_write': 'success', 'verify_count': 0, 'held': [], 'put_count': 0, 'inventory_auth': False, 'list_rev': 7, 'import_auth': False}
+        mode = {'cash_write': 'success', 'verify_count': 0, 'held': [], 'put_count': 0, 'inventory_auth': False, 'list_rev': 7, 'import_auth': False, 'cash_doc': None}
         def route(r):
             req = r.request
             u = urlsplit(req.url)
@@ -104,8 +104,12 @@ with sync_playwright() as p:
                     if mode['cash_write'] == 'hold':
                         mode['held'].append((r, cors)); return
                     if mode['cash_write'] == 'auth': status, body = 401, {'error': 'unauthorized'}
-                    else: body = {'ok': True, 'extraMoney': req.post_data_json['sheet'].get('extraMoney', '')}
-                else: status, body = (404, {'error': 'not_found'}) if u.path.count('/') == 4 else (200, {'days': []})
+                    else:
+                        mode['cash_doc'] = {**req.post_data_json,'store':u.path.split('/')[3],'date':u.path.split('/')[4],'updatedAt':'2026-11-14T20:00:00.000Z'}
+                        body = {'ok': True, 'extraMoney': req.post_data_json['sheet'].get('extraMoney', '')}
+                elif u.path.count('/') == 4:
+                    status,body = (401,{'error':'unauthorized'}) if mode['cash_write'] == 'auth' else (200,mode['cash_doc']) if mode['cash_doc'] else (404,{'error':'not_found'})
+                else: body = {'days':[]}
             elif u.path == '/api/inventory/CR3/list':
                 status, body = (401, {'error': 'unauthorized'}) if mode['inventory_auth'] else (200, {'rev': mode['list_rev'], 'sheets': INVENTORY})
             elif u.path == '/api/inventory/CR3': body = {'days': []}
@@ -243,7 +247,7 @@ with sync_playwright() as p:
     expect(visible(page, '#am-0-name')).to_have_value('Expiry retained without storage')
     expect(visible(page, '#am-0-10000')).to_have_value('3')
     expect(visible(page, '#cashout-save')).to_be_enabled()
-    assert mode['put_count'] == 1, 'Unlock must not automatically replay the failed save'
+    assert mode['put_count'] == 0, 'Rejected preflight and unlock must not send a write'
     restore_storage(page)
     visible(page, '#cashout-save').click()
     expect(visible(page, '[data-save-state]')).to_have_attribute('data-save-state', 'server')

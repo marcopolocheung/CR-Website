@@ -1,0 +1,301 @@
+{
+  "baseCommit": "68810bff7ecac761bc85ca41f06d3de22f39f03e",
+  "sourceFilesSha256": {
+    "src/components/internal/SalesReview.tsx": "ddb0be4f9ae4a617874fe2d1f70cde7cfe4b7cda7daacab4727b953d86ec7bfd",
+    "src/components/internal/ManagerSession.tsx": "2d70ff153e3a962d21868cb75e15156b5f850e0a6b7e77401e09685a7064e54d",
+    "src/components/internal/ReportsWorkspace.tsx": "5205492e408cf1d3fc8bf78770f11a2f8d3fea14ef3f45d3dce3b27d69bfb4c1",
+    "src/components/internal/ImportRecovery.tsx": "5f83e0da47ddc9a9dd48a168a291ff3ae095521ca43a41529f21229e94360bd6",
+    "src/components/internal/SalesConverter.tsx": "4a94ae41282a4af482762a73016262a6e386df9decdd8ef1622469b3710a3261",
+    "src/components/internal/NavigationProtection.tsx": "5860841e5f58b3d7b2577e608cb3f6c3d16f6f11c4a44a0fff85ca24acbbd4d6",
+    "src/components/internal/ImportHistory.tsx": "924a822285b3bc404cf084d015586d3d72d04a48af45424343ff6d14d7e3029b",
+    "src/components/internal/DashboardWorkspace.tsx": "8805d523b15b9aebae0bad07a2186da7d993abb0012fc7ebbb155b4e368e630d",
+    "src/components/internal/InventoryWorkspace.tsx": "e33ea0a02a2c3aaf166ad48a109fd063b173cbdd8805a4c73582b4f0977ff1b5",
+    "src/components/internal/HoursReview.tsx": "6560bd6d1cb54edb813e940b72bcbae4bbf11cf897bca173fa17d806dee90c82",
+    "src/components/internal/FormDraftWorkspace.tsx": "e51112b2b8f845e7f8aaf66ac362ca8b106fbaac66d803c83236336e859d5f20",
+    "src/components/internal/Dashboard.tsx": "ed54a28b2a2c9edaf8bbd2cc738fe91270c17ecd2b7622dca53e1ba17af77612",
+    "src/components/internal/DraftChooser.tsx": "5c3daa5404949d16a8a5b35c77aa4db4377e4ef342c2a1ffb90c4efe45f6a51a",
+    "src/components/internal/ScheduleIdentityMapping.tsx": "d17db2c69f9d078c421403573b0e5bb231b7112f41be90bc71d3f96bf03aee32",
+    "src/components/internal/CashHistory.tsx": "f8a0a22b66a567636617f2c9cbbfdcc8d456dd95d8a8c58dcd813cf1f38109eb",
+    "src/components/internal/WriteUps.tsx": "54a5303f58ca2ef7fb765de60f0de00694ab2575b9b7fffd12d37f6a7a037bdf",
+    "src/components/internal/Bookkeeping.tsx": "01a14282038243aaa5733e5c82ca981f17735dadfd16785d84eba626cfba3884",
+    "src/components/internal/TaskLinks.tsx": "fbd75856b20c6707c0e4a1283e8cff303c4389cb7cc1668c4d5b14321f2df0b0",
+    "src/components/internal/FormsWorkspace.tsx": "15206aa4cea39f40244e22125906bd79bbb99c9f0806f972a49b277ae0966f4c",
+    "src/components/internal/Inventory.tsx": "74c74486b7f940eae506040c42e64afe3f4e19dd3cc381bb1a4d5741297addbf",
+    "src/components/internal/CashCopyTransition.tsx": "52696a1be8494f5d7dfe4ce95c001a86a1c98f265c48efc6b43c09ca8dc29c05",
+    "src/components/internal/InternalLanguage.tsx": "59e7b4f357cbef7c20e221dcfed350ffe60de73980d484ce63300d5cfcb2161f",
+    "src/components/internal/RecoveryPanel.tsx": "8e60721b9ad0282be5ba0cbf17381187c0d88aefd98e2f0543ff8b6a46a72951",
+    "src/components/internal/QRGenerator.tsx": "5475470153bc5a16893621e3c5c0601683af95e411b15ba48ffd72e73519f2f4",
+    "src/components/internal/BookkeepingWorkspace.tsx": "6ebea97e912397f7b33f28cbb9baa35684e9a6b8d27de44ea1b2e63d404223b9",
+    "src/components/internal/WorkspaceHost.tsx": "3dca4dbd4d7214771250fa23b28aadca5344e98c5f42b05e13bdffdd806a5790",
+    "src/components/internal/ShellTask.tsx": "6bc0fd53552a2f1675aaae0bd33f535bf76547e6921c348add72a83c307c4d23",
+    "src/components/internal/InternalShell.tsx": "176281812290aca144a1467c3b82a7cd4f027d5cec89e0784aae310ebe429080",
+    "src/components/internal/CashOut.tsx": "f8cc9db0d0b1134142e56a9eac52245a950884123ade1891df1fca00a76a2df0",
+    "src/components/internal/ScheduledActualReport.tsx": "656d628999edd398033d232d0e26222702c803e4f4fee5edcf76932d57b02f8b",
+    "src/components/internal/SourceFileInput.tsx": "3ed7b76ecef7e587d2e956949d4775c98043a75433181d20509d89bc5aacc057",
+    "src/components/internal/Feedback.tsx": "a37c6ab1ebdf32d0d3ae0fa456759ae60de0164faabbe40c074cb52de1fba8c1",
+    "src/components/internal/CountKeypad.tsx": "484fbedfc960516545229513cc3a86e7c9b3426120139cc0b43868082efd7d16",
+    "src/components/internal/HoursConverter.tsx": "13528af60455f74e77f1caf88472003737cd157b68508740aae45159935efde3",
+    "src/components/internal/DigitalForm.tsx": "16baae7b7b2ad14a2ba41c95c049f0039de32c437c022d98281e31b34ac2c6f7",
+    "src/components/internal/EmployeeMapping.tsx": "bb1372b96e69071663610ff71d27717b83fe9842cfe5bb079e02cbbcb9a3b6dd",
+    "src/components/internal/CashReports.tsx": "b5f2df1b97f95e0eea8a02e8062a526593b20b7f05f40fcc0a6b5992486d6f03",
+    "src/components/internal/EntryWorkspace.tsx": "ce770fd66395c964665cd23c395f659a599a3e90e896f79de41ea73379c63b2d",
+    "src/components/internal/cash-workspace.module.css": "aa17310aad894b5981c43da41fbd602c6e413f070620f263f817c8074a401003",
+    "src/components/internal/task-links.module.css": "b328be7cd95d668025baf7748c3edc42a8bb634caa4da012631e547c8c5a12cf",
+    "src/components/internal/shell.module.css": "770f9570d792218ba9946c41caf3947e9e856ba49dcc4c2c122c1f4d8e8c6a6c",
+    "src/components/internal/cash-history.module.css": "c96cb94c8c8b58a80c76984cf3fdda421a14e8dedc75538f828577ba9e619b72",
+    "src/lib/cashout.ts": "be35d83b1c21f62ac51b239a69f40f7a6b8088b00157613b635842ad28b01ae6",
+    "src/lib/internal-tools/cashout-draft.ts": "d33a42b29a105f1452a06bc758268642d3d4d73d1aaae45b59b14987082bd224",
+    "src/lib/internal-tools/i18n/en.ts": "7982c5b27518666b9e98865bfdefc21b4c876f71d385971e8dce07012a3aa8e4",
+    "src/lib/internal-tools/i18n/es.ts": "09f0c06ec22aa9d140c532ec1a609548c97550f9286d947e92204093f31e021e",
+    "scripts/test-cashout-focused.py": "c2b8cbc24a850cf72a9d7d2b4753b67e1906330a17c141810c6c92ba630c3bf6"
+  },
+  "browser": "158.0.8127.18",
+  "frontend": "http://127.0.0.1:3042",
+  "api": "http://127.0.0.1:8787 (intercepted)",
+  "scenarios": [
+    {
+      "scenario": "focused blank and explicit zero",
+      "observed": "One AM drawer visible while PM remains mounted; zero denomination changes progress and blank restores untouched state; blank Toast is unavailable while entered zero produces real negative comparison; secondary controls start collapsed"
+    },
+    {
+      "scenario": "full denomination and correction coverage",
+      "observed": "All eleven Count/Amount alternatives synchronize exact values; one of each totals $186.91/$86.91 turn-in; invalid scientific count and nonmultiple $20 amount stay editable and Save reveals/focuses the invalid inactive drawer without a request"
+    },
+    {
+      "scenario": "independent two-drawer and Extra money arithmetic",
+      "observed": "Each $300 drawer keeps its own $100 and turns in $200; two give $400; $20 Extra money raises only day/Z to $420 while drawer/shift Toast comparisons stay zero; blank Z differs from real zero; wire model has no device entry metadata"
+    },
+    {
+      "scenario": "drawer lifecycle and negative turn-in",
+      "observed": "Keyboard selector, added drawer focus/removal and removal of last PM preserve remaining values; one $300 drawer gives $200; reducing it to $50 preserves negative $50 turn-in in UI and service payload"
+    },
+    {
+      "scenario": "keyboard and keypad continuity",
+      "observed": "Native Enter moves through visible name/Count/Amount inputs without submitting; optional keypad Next crosses AM\u2192PM, selects the corresponding drawer and Escape returns exact field focus"
+    },
+    {
+      "scenario": "offline authorization and failed storage recovery",
+      "observed": "Forced 401 hides protected focused workspace despite denied storage; unlock restores same drawer, name and count; offline save retains input and explicit retry succeeds"
+    },
+    {
+      "scenario": "English paper from Spanish focused UI",
+      "observed": "Spanish language switch preserves active drawer; printed paper retains all AM/PM drawer names, full denominations and money while focused controls/shell/keypad stay off paper"
+    },
+    {
+      "scenario": "late save and drawer switch",
+      "observed": "A delayed save retains its submitted three-count snapshot while a later four-count edit and drawer switch survive; current work is not mislabeled server-saved"
+    },
+    {
+      "scenario": "reload and explicit resume",
+      "observed": "Reload clears memory access; explicit labelled resume restores name, actual zero count, Amount-derived count two and still-blank denominations without treating remembered preparer as authentication"
+    },
+    {
+      "scenario": "responsive language and short viewport",
+      "observed": "English/Spanish focused workspace retains entry at 768/375/320px and 200% text; keypad buttons meet 44px, Close/Save remain reachable and a panned keyboard-sized VisualViewport leaves space for the focused count below the half-height summary; reduced motion removes shell slide"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "focused-blank-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "e78f4c749ddb97b75aa659af5200b5de4d597ff17054c124a887b62a07d77ec2"
+    },
+    {
+      "file": "focused-two-drawers-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "b5848f2e8397def8c8ecb47ab1f9d23ee0370413623998b384d3c2bed149ae63"
+    },
+    {
+      "file": "focused-spanish-phone.png",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "sha256": "fd00885ec0e6d0bd01b38e487ba9c5403ed5a78cc37e6bbc70fdd0527fc95ebb"
+    },
+    {
+      "file": "focused-spanish-enlarged.png",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "sha256": "b00989eec83efcf1ad5a5e91c776465535065721c811c8ce20c2a75a5ed4ca2a"
+    },
+    {
+      "file": "focused-spanish-keypad-short-viewport.png",
+      "viewport": {
+        "width": 768,
+        "height": 430
+      },
+      "sha256": "c58b2164dc240519ddeae60b77485ac184e321748adf497b39b2cbba88caaf8b"
+    },
+    {
+      "file": "focused-reduced-visual-viewport.png",
+      "viewport": {
+        "width": 768,
+        "height": 900
+      },
+      "sha256": "2d20a83b263c56e54589cc5c2567c20a8b572026b7002fe8dabc97cad6d7cdc1"
+    }
+  ],
+  "pageErrors": [],
+  "externalAttempts": [],
+  "apiRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    }
+  ],
+  "limits": [
+    "Synthetic local API responses, not production persistence/activation",
+    "Physical touch/software keyboard and full accessibility unverified",
+    "Emulated short viewport is not a native keyboard observation",
+    "Passive REA attach does not replay prior Playwright actions"
+  ]
+}

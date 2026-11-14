@@ -8,7 +8,8 @@ const Bookkeeping = dynamic(() => import('./BookkeepingWorkspace'))
 const Inventory = dynamic(() => import('./InventoryWorkspace'))
 const Forms = dynamic(() => import('./FormsWorkspace'))
 const Reports = dynamic(() => import('./ReportsWorkspace'))
-const tools = { reports: Reports, dashboard: Dashboard, bookkeeping: Bookkeeping, inventory: Inventory, forms: Forms }
+const CashHistory = dynamic(() => import('./CashHistory'))
+const tools = { 'cash-history': CashHistory, reports: Reports, dashboard: Dashboard, bookkeeping: Bookkeeping, inventory: Inventory, forms: Forms }
 type Tool = keyof typeof tools
 export default function WorkspaceHost({ children }: { children: ReactNode }) {
   const path = usePathname().replace(/\.html$/, '').replace(/\/$/, '')

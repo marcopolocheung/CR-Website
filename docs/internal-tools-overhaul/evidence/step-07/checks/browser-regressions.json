@@ -1,0 +1,42 @@
+[
+  {
+    "suite": "test-cashout-entry",
+    "exit": 0
+  },
+  {
+    "suite": "test-cashout-context",
+    "exit": 0
+  },
+  {
+    "suite": "test-entry-workspace",
+    "exit": 0
+  },
+  {
+    "suite": "test-internal-drafts",
+    "exit": 0
+  },
+  {
+    "suite": "test-internal-language",
+    "exit": 0
+  },
+  {
+    "suite": "test-internal-recovery",
+    "exit": 0
+  },
+  {
+    "suite": "test-internal-feedback",
+    "exit": 0
+  },
+  {
+    "suite": "test-internal-session",
+    "exit": 0
+  },
+  {
+    "suite": "test-internal-home-reports",
+    "exit": 0
+  },
+  {
+    "suite": "test-internal-shell",
+    "exit": 0
+  }
+]

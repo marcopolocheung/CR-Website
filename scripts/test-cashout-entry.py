@@ -217,8 +217,12 @@ with sync_playwright() as p:
     page.get_by_role('button', name='English', exact=True).click()
     # Loading server data preserves financial values without guessing device entry completeness.
     open_cash_detail(page, 'tools')
-    page.get_by_role('button', name='Load saved', exact=True).click()
-    page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
+    page.get_by_role('link', name='Load saved', exact=True).click()
+    expect(page.locator('[data-lookup-detail] [data-saved-cash-detail]')).to_be_visible()
+    page.get_by_role('button',name='Edit a copy',exact=True).click()
+    page.locator('#cash-copy-preparer').fill('Saved copy fixture')
+    page.get_by_role('button',name='Create device draft',exact=True).click()
+    page.get_by_role('dialog').get_by_role('button',name='Confirm',exact=True).click()
     expect(am).to_contain_text('original entry status is unknown')
     expect(page.locator('#am-0-10000')).to_have_value('3')
     expect(page.locator('#am-0-10000-amount')).to_have_value('300.00')
@@ -228,10 +232,16 @@ with sync_playwright() as p:
     expect(am).to_contain_text('original entry status is unknown')
     mode['offline'] = True
     page.get_by_role('button', name='Save day', exact=True).click()
+    expect(page.locator('[data-cash-comparison]:visible')).to_be_visible()
+    page.get_by_role('button',name='Review replacement',exact=True).click()
+    page.get_by_role('dialog').get_by_role('button',name='Confirm',exact=True).click()
     expect(page.locator('[data-save-state]')).to_have_attribute('data-save-state','waiting')
     expect(page.locator('#am-0-10000')).to_have_value('4')
     mode['offline'] = False
     page.get_by_role('button', name='Save day', exact=True).click()
+    expect(page.locator('[data-cash-comparison]:visible')).to_be_visible()
+    page.get_by_role('button',name='Review replacement',exact=True).click()
+    page.get_by_role('dialog').get_by_role('button',name='Confirm',exact=True).click()
     expect(page.locator('[data-save-state]')).to_have_attribute('data-save-state','server')
     # Storage denial keeps raw count text visible and blocks destructive handoff.
     page.evaluate('() => { Storage.prototype.setItem=function(){throw new DOMException("denied","SecurityError")} }')

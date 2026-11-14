@@ -11,7 +11,7 @@ import { useInternalLanguage } from './InternalLanguage'
 import type { Message } from '@/lib/internal-tools/i18n'
 
 import { checkpointWork, type Work } from '@/lib/internal-tools/work-transitions'
-const Transitions = createContext({ handoff: async (_done: () => void) => {}, change: async (_done: () => void) => {} })
+const Transitions = createContext({ handoff: async (_done: () => void) => {}, change: async (_done: () => void) => {}, changeScoped: async (_scope: string, _done: () => boolean, _message: Message): Promise<boolean> => false })
 export function useWorkTransitions() { return useContext(Transitions) }
 const Context = createContext<(id: string, read: () => Work) => () => void>(() => () => {})
 export function useNavigationProtection(work: Work) {
@@ -57,7 +57,22 @@ export default function NavigationProtection({ children }: { children: React.Rea
       setBlocked(false); done()
     } finally { running.current = false }
   }, [confirmation.ask])
-  const transitions = useMemo(() => ({ handoff, change }), [handoff, change])
+  // A scoped replacement includes retained editors even when their workspace is hidden.
+  const changeScoped = useCallback(async (scope: string, done: () => boolean, message: Message): Promise<boolean> => {
+    if (running.current) return false
+    running.current = true
+    try {
+      const generation = managerSession.getSnapshot().generation
+      const entries = () => [...work.current.values()].map(read => read()).filter(entry => entry.scope === scope)
+      if (entries().some(entry => entry.busy)) { setBlocked(true); return false }
+      if (!await confirmation.ask(message, true)) return false
+      if (generation !== managerSession.getSnapshot().generation) return false
+      if (!checkpointWork(entries())) { setBlocked(true); return false }
+      setBlocked(false)
+      return done()
+    } finally { running.current = false }
+  }, [confirmation.ask])
+  const transitions = useMemo(() => ({ handoff, change, changeScoped }), [handoff, change, changeScoped])
   const leaving = useRef(false)
   const prompting = useRef(false)
   useEffect(() => {

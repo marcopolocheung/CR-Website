@@ -8,6 +8,8 @@ The [Step 01 checkpoint](checkpoints/step-01.md) records the November 11 current
 
 Cash scope: [DEC-02 is approved](cashout-rules.md) for a bookkeeping notebook with a fixed $100 per drawer. CASH-03 is implemented locally (server recalculation, awaiting deploy); CASH-04/05/06 operational workflows are deferred. CASH-08 ordinary saves/history uses DATA-05 and is independent of those deferred workflows.
 
+Step 07 frontend lookup/save recovery is [implemented and verified locally](checkpoints/step-07.md) for staged review. CASH-08's broader milestones below stay open: durable revisions, approved retention and atomic writes remain Step 07b/backend gates.
+
 Individual briefs are canonical. Update the brief and this summary together when claiming, changing a gate, or handing off. Current implementation and evidence are recorded in the canonical briefs; external/live work remains separately gated. P0 establishes safety/compatibility or early workflow foundations; P1 completes core workflows; P2 follows core adoption. Priority is not a dependency.
 
 Milestones: I = implementation, L = local verification, E = external activation, V = live verification. P = pending; NA = not applicable; use done only with linked evidence in the brief. A CODE_ONLY completion does not claim frontend publication; REL-04 owns shared publication.
