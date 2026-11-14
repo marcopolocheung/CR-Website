@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useManagerSession } from './ManagerSession'
 import { useWorkspaceVisible } from './WorkspaceVisibility'
 import { useInternalLanguage } from './InternalLanguage'
@@ -8,10 +8,11 @@ import { Card, Columns, Segmented, Tile, shortDate } from './ReportCharts'
 import type { TranslationKey } from '@/lib/internal-tools/i18n'
 import { datesEnding } from '@/lib/dashboard'
 import { StoreAuthError } from '@/lib/schedule-store'
-import { runLimited, salesKey, salesRows, splitParts, sumSalesDays, type SalesDay, type SalesPartKey, type SalesRow, type SalesSplitKind } from '@/lib/sales'
-import { fetchSalesDay, SalesUnavailableError } from '@/lib/sales-store'
+import { salesKey, salesRows, splitParts, sumSalesDays, type SalesDay, type SalesPartKey, type SalesRow, type SalesSplitKind } from '@/lib/sales'
+import { SalesUnavailableError, type SalesProblem } from '@/lib/sales-store'
+import { SALES_STORES, salesCache, type SalesSnapshot } from '@/lib/sales-cache'
 
-const STORES = ['CR3', 'CR2'] as const
+const STORES = SALES_STORES
 type Store = (typeof STORES)[number]
 const STORE_LABELS: Record<Store, string> = { CR3: 'CR3 · W Military', CR2: 'CR2 · SW Military' }
 const RANGES = [7, 14, 30] as const
@@ -20,8 +21,7 @@ const RANGES = [7, 14, 30] as const
 const PART_COLORS: Record<SalesPartKey, string> = { am: '#2a78d6', pm: '#eb6834', lunch: '#2a78d6', dinner: '#eb6834', other: '#1baf7a' }
 const DISCOUNT = '#6250d6'
 const VOID = '#eda100'
-/** Toast calls in flight at once; each uncached day is a few Toast requests. */
-const PARALLEL_DAYS = 4
+const NOTHING_LOADED: SalesSnapshot = {}
 
 const today = () => new Date().toLocaleDateString('en-CA')
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
@@ -42,10 +42,9 @@ function SalesBoard({ token, onLocked }: { token: string; onLocked: () => void }
   const [range, setRange] = useState<(typeof RANGES)[number]>(7)
   const [split, setSplit] = useState<SalesSplitKind>('shift')
   const [now] = useState(today)
-  const [loaded, setLoaded] = useState<Record<string, SalesDay>>({})
-  const loadedRef = useRef(loaded)
-  loadedRef.current = loaded
-  const [problem, setProblem] = useState<'unconfigured' | 'outdated' | 'failed' | null>(null)
+  // Shared with the preload in InternalShell, so days loaded on other internal pages show at once.
+  const loaded = useSyncExternalStore(salesCache.subscribe, salesCache.getSnapshot, () => NOTHING_LOADED)
+  const [problem, setProblem] = useState<SalesProblem | null>(null)
   const [retry, setRetry] = useState(0)
 
   const stores = useMemo<Store[]>(() => (store === 'all' ? [...STORES] : [store]), [store])
@@ -53,16 +52,10 @@ function SalesBoard({ token, onLocked }: { token: string; onLocked: () => void }
 
   useEffect(() => {
     if (!visible) return
-    // Days already loaded this visit are kept, so switching store or range only fetches what's new.
-    const wanted = stores.flatMap(s => dates.map(date => ({ store: s, date }))).filter(x => !loadedRef.current[salesKey(x.store, x.date)])
-    if (!wanted.length) return
+    // Loaded days are kept for the session, so switching store or range (or coming back) only fetches what's new.
     let live = true
     setProblem(null)
-    runLimited(wanted, PARALLEL_DAYS, async ({ store: s, date }) => {
-      if (!live) throw new Error('stale')
-      const day = await fetchSalesDay(s, date, token)
-      if (live) setLoaded(previous => ({ ...previous, [salesKey(s, date)]: day }))
-    }).catch(caught => {
+    salesCache.ensure(stores, dates, token).catch(caught => {
       if (!live) return
       if (caught instanceof StoreAuthError) onLocked()
       else setProblem(caught instanceof SalesUnavailableError ? caught.reason : 'failed')

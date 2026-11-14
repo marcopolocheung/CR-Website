@@ -19,6 +19,10 @@ export interface ToastEnv {
 }
 
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
+export type Sleep = (ms: number) => Promise<void>
+const sleep: Sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+/** How long to honor Toast's Retry-After on a 429 before giving up (the Worker must answer quickly). */
+const MAX_RATE_LIMIT_WAIT_MS = 2000
 
 const DEFAULT_HOST = 'https://ws-api.toasttab.com'
 const TOKEN_KEY = 'toast:token'
@@ -31,7 +35,7 @@ export const STORE_TIME_ZONE = 'America/Chicago'
 export const PM_STARTS_AT_HOUR = 16
 
 export class ToastError extends Error {
-  constructor(readonly code: 'toast_unconfigured' | 'toast_auth' | 'toast_unavailable', message: string) {
+  constructor(readonly code: 'toast_unconfigured' | 'toast_auth' | 'toast_unavailable' | 'toast_busy', message: string) {
     super(message)
     this.name = 'ToastError'
   }
@@ -172,13 +176,17 @@ export async function getToastToken(env: ToastEnv, fetcher: Fetcher = fetch, now
   return token
 }
 
-/** Authorized GET for one store's Toast location, retrying once with a fresh login if the token was revoked. */
-export async function toastClient(env: ToastEnv, store: ToastStore, fetcher: Fetcher = fetch) {
+/**
+ * Authorized GET for one store's Toast location, retrying once with a fresh login if the token was revoked
+ * and once after a short wait if Toast rate-limits the request (429 → `toast_busy` if it persists).
+ */
+export async function toastClient(env: ToastEnv, store: ToastStore, fetcher: Fetcher = fetch, wait: Sleep = sleep) {
   const restaurant = store === 'CR2' ? env.TOAST_GUID_CR2 : env.TOAST_GUID_CR3
   let token = await getToastToken(env, fetcher)
   let retried = false
 
   const get = async (path: string): Promise<unknown> => {
+    let waited = false
     for (;;) {
       let response: Response
       try {
@@ -190,6 +198,13 @@ export async function toastClient(env: ToastEnv, store: ToastStore, fetcher: Fet
       if (response.status === 401 && !retried) {
         retried = true
         token = await getToastToken(env, fetcher, Date.now(), true)
+        continue
+      }
+      if (response.status === 429) {
+        if (waited) throw new ToastError('toast_busy', 'Toast is rate-limiting requests.')
+        waited = true
+        const seconds = Number(response.headers.get('Retry-After'))
+        await wait(Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds * 1000, MAX_RATE_LIMIT_WAIT_MS) : 1000)
         continue
       }
       if (response.status === 401 || response.status === 403) throw new ToastError('toast_auth', 'Toast refused this request.')

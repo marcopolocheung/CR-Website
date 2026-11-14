@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { usePathname } from 'next/navigation'
 import { LanguageControls, useInternalLanguage } from './InternalLanguage'
 import { useShellTasks } from './ShellTask'
+import { preloadSales, salesCache } from '@/lib/sales-cache'
 import { MovingNavigation } from './ui/MovingNavigation'
 import { Button } from './ui/controls'
 import type { IconName } from './ui/Icon'
@@ -42,6 +43,11 @@ export default function InternalShell({ children, themeClassName }: { children: 
     : pathname.endsWith('/qr-generator') ? 'qr' : pathname.endsWith('/ui-gallery') ? 'gallery' : 'dashboard'
   const taskId = section === 'reports' && pathname.endsWith('/bookkeeping') ? hash : section
   const session = useManagerSession()
+  // Start loading Toast sales as soon as the manager code is entered on any internal page, so Reports opens ready.
+  useEffect(() => {
+    if (session.token) preloadSales(session.token)
+    else salesCache.clear()
+  }, [session.token])
   const tasks = useShellTasks()
   const metadata = tasks[taskId]
   const access = (section === 'cash' ? metadata : undefined) ?? tasks[section === 'reports' ? 'bookkeeping' : section]

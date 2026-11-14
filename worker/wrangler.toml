@@ -14,3 +14,8 @@ id = "REPLACE_WITH_YOUR_NAMESPACE_ID"
 # Hardcoded for now to the demo value "test" in worker/src/index.ts; override it
 # with a Worker secret (wrangler secret put STAFF_EDIT_PASSWORD) for anything
 # beyond the demo.
+
+# Hourly: cache finished Toast sales days ahead of time (warmToastSales). Dashboard
+# deploys set the same schedule under Worker → Settings → Triggers → Cron.
+[triggers]
+crons = ["0 * * * *"]
