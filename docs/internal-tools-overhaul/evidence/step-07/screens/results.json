@@ -1,0 +1,589 @@
+{
+  "base": "http://127.0.0.1:3042",
+  "synthetic_api": "http://127.0.0.1:8787",
+  "scenarios": [
+    {
+      "scenario": "browse and cancel preserve active draft bytes, raw Count/Amount, selected drawer",
+      "observed": {
+        "am": [
+          {
+            "name": "Unchanged draft",
+            "counts": [
+              3,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "countInputs": [
+              "3",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              ""
+            ],
+            "toast": "",
+            "amountInputs": [
+              "300.00",
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null
+            ]
+          }
+        ],
+        "pm": [
+          {
+            "name": "",
+            "counts": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "countInputs": [
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "0"
+            ],
+            "toast": ""
+          }
+        ],
+        "zReport": "",
+        "extraMoney": ""
+      }
+    },
+    {
+      "scenario": "retained lookup filters and record survive a visit to the cash editor",
+      "observed": true
+    },
+    {
+      "scenario": "hidden editor checkpoint denied leaves prior editor and payload intact",
+      "observed": true
+    },
+    {
+      "scenario": "explicit copy creates new device draft for exact destination with unknown server entry metadata",
+      "observed": true
+    },
+    {
+      "scenario": "changed baseline review, cancel, explicit replacement, successful read-back",
+      "observed": true
+    },
+    {
+      "scenario": "acknowledgment remains saved when history refresh fails",
+      "observed": true
+    },
+    {
+      "scenario": "CR3 direct link and empty vs missing vs failed vs malformed with filters retained",
+      "observed": true
+    },
+    {
+      "scenario": "invalid direct parameters do not select or fetch a fallback record",
+      "observed": true
+    },
+    {
+      "scenario": "direct-link copy creates exact CR3 draft when no cash editor was mounted",
+      "observed": true
+    },
+    {
+      "scenario": "lost acknowledgment matches read-back after reload without another PUT",
+      "observed": true
+    },
+    {
+      "scenario": "divergent retry blocks on read failure, preserves both copies, confirms frozen replacement and retains newer input",
+      "observed": true
+    },
+    {
+      "scenario": "missing read-back allows explicit frozen retry; edits during request stay unsaved",
+      "observed": true
+    },
+    {
+      "scenario": "malformed preflight blocks replacement and retains draft",
+      "observed": true
+    },
+    {
+      "scenario": "out-of-order exact record response cannot replace selected store/day",
+      "observed": true
+    },
+    {
+      "scenario": "out-of-order window response cannot replace the current lookup",
+      "observed": true
+    },
+    {
+      "scenario": "EN/ES, keyboard exact opening, 375px and 320px enlarged layout, English full-drawer print",
+      "observed": {
+        "pdf": "saved-all-drawers.pdf"
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "saved-day-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "b8c796ea6d471a2518aee1ab676f3b9e81f67a2b97b9cba11432fec17fc8e160"
+    },
+    {
+      "file": "changed-baseline-comparison.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "e0020aa90e12b088379133b5e3b0e7d1c56775a1f269545c0570905c60a2095f"
+    },
+    {
+      "file": "saved-day-spanish-phone.png",
+      "viewport": {
+        "width": 375,
+        "height": 1000
+      },
+      "sha256": "8b9b0e490f579a380e7abf2e0183aa3f7692f363aab9b6375c020c1d995c7187"
+    },
+    {
+      "file": "saved-day-spanish-enlarged.png",
+      "viewport": {
+        "width": 320,
+        "height": 1000
+      },
+      "sha256": "eaab02e3a5b9bc374e01307baf7f2b144a7fb93c8b376a27cdba21419c00df60"
+    }
+  ],
+  "page_errors": [],
+  "external_attempts": [],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/verify",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3/2026-10-01",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3/2026-10-01",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3/2026-10-01",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "PUT",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-13",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3/2026-11-12",
+      "query": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-13"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3",
+      "query": "to=2026-11-14"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3/2026-11-12",
+      "query": ""
+    }
+  ],
+  "limitations": [
+    "Synthetic loopback service only; no live persistence, retention or atomic conflict claim.",
+    "Headless device sizes do not verify physical touch or software keyboard."
+  ]
+}

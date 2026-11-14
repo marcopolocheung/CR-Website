@@ -116,7 +116,7 @@ with sync_playwright() as p:
                     else:
                         mode['doc'] = {**req.post_data_json, 'store': 'CR2', 'date': DATE, 'updatedAt': '2026-11-13T20:00:00.000Z'}
                         body = {'ok': True, 'extraMoney': req.post_data_json['sheet'].get('extraMoney', '')}
-                elif u.path.count('/') == 4: status, body = (200, mode['doc']) if mode['doc'] else (404, {'error': 'not_found'})
+                elif u.path.count('/') == 4: status, body = (401, {}) if mode['write'] == 'auth' else (200, mode['doc']) if mode['doc'] else (404, {'error': 'not_found'})
                 else: body = {'days': []}
             elif u.path == '/api/writeups': body = {'writeUps': []}
             elif u.path == '/api/forms': body = {'forms': []}
@@ -132,8 +132,14 @@ with sync_playwright() as p:
         assert response is None or response.status == 200
         expect(page.locator('[data-shell-ready=true]')).to_be_visible()
         page.wait_for_load_state('networkidle')
-    def save(page, mode):
+    def request_save(page, mode):
         visible(page, '#cashout-save').click()
+        if mode['doc'] and mode['write'] != 'auth':
+            expect(visible(page,'[data-cash-comparison]')).to_be_visible()
+            page.get_by_role('button', name='Review replacement', exact=True).click()
+            accept(page)
+    def save(page, mode):
+        request_save(page, mode)
         expect(visible(page, '[data-save-state]')).to_have_attribute('data-save-state', 'server')
         return mode['writes'][-1]
 
@@ -144,7 +150,7 @@ with sync_playwright() as p:
     assert card(page, 'pm-0').count() == 1, 'Inactive drawer must stay mounted'
     expect(page.get_by_role('button', name='Print', exact=True)).not_to_be_visible()
     expect(page.get_by_role('button', name='Clear sheet', exact=True)).not_to_be_visible()
-    for selector in ('[data-cash-context]', '[data-cash-tools]', '[data-cash-history]'):
+    for selector in ('[data-cash-context]', '[data-cash-tools]'):
         assert not page.locator(selector).evaluate('e => e.open'), selector
     shot(page, 'focused-blank-desktop')
     visible(page, '#am-0-name').fill('Focused AM cashier')
@@ -264,7 +270,7 @@ with sync_playwright() as p:
     select_drawer(page, 'pm-0')
     expect(visible(page, '#pm-0-name')).to_have_value('Retained through denied storage and expiry')
     restore_storage(page)
-    mode['write'] = 'offline'; visible(page, '#cashout-save').click()
+    mode['write'] = 'offline'; request_save(page, mode)
     expect(visible(page, '[data-save-state]')).to_have_attribute('data-save-state', 'waiting')
     expect(visible(page, '#pm-0-10000')).to_have_value('3')
     mode['write'] = 'success'; save(page, mode)
@@ -292,7 +298,7 @@ with sync_playwright() as p:
     visit(page); unlock(page); choose(page, 'Focused late response fixture')
     visible(page, '#am-0-name').fill('Late response retained cashier')
     visible(page, '#am-0-10000').fill('3')
-    mode['write'] = 'hold'; visible(page, '#cashout-save').click()
+    mode['write'] = 'hold'; request_save(page, mode)
     page.wait_for_timeout(100); assert len(mode['held']) == 1
     visible(page, '#am-0-10000').fill('4')
     select_drawer(page, 'pm-0')

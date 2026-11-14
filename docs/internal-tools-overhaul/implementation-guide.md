@@ -51,7 +51,7 @@ Backend activation is not established by source presence. Some historical task d
 | 04 | Shared context, access lifecycle and draft-safe navigation | Reviewed and merged ([PR #177](https://github.com/marcopolocheung/CR-Website/pull/177); [checkpoint](checkpoints/step-04.md)) |
 | 05 | Task-oriented Home and separate Reports destination | Reviewed and merged ([PR #178](https://github.com/marcopolocheung/CR-Website/pull/178); [checkpoint](checkpoints/step-05.md)) |
 | 06 | Focused cash entry | [Locally verified; owner/device review pending](checkpoints/step-06.md) |
-| 07 | Saved cash lookup and clear save/history behavior | Not started |
+| 07 | Saved cash lookup and clear save/history behavior | Implemented locally; [checkpoint](checkpoints/step-07.md), owner review pending. Legacy 31-day expiry/concurrent overwrites retained; 07b not started. |
 | 08 | Staged sales import | Not started |
 | 09 | Staged hours import and identity review | Not started |
 | 10 | Shared import history and readable comparison reports | Not started |

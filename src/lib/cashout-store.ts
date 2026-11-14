@@ -1,3 +1,5 @@
+import { readCashoutRecord, readCashoutHistory, isCashoutStore } from './cashout-record'
+import { businessDate } from './internal-tools/contracts'
 import { managerSession, SessionChangedError } from './internal-tools/manager-session'
 import { canonicalJson } from './internal-tools/json'
 import type { CashoutLink } from './converter/sales-context'
@@ -16,18 +18,24 @@ export type CashoutTotals = ReturnType<typeof dayTotals>
 export type CashoutDay = { date: string; totals: CashoutTotals; updatedAt: string }
 
 export async function fetchCashoutDay(store: CashoutStore, date: string, token: string): Promise<CashoutSheet | null> {
+  return (await fetchSavedCashoutRecord(store, date, token))?.sheet ?? null
+}
+
+export async function fetchSavedCashoutRecord(store: CashoutStore, date: string, token: string) {
+  if (!isCashoutStore(store) || !businessDate(date)) throw new StoreUnavailableError('Invalid saved cash context.')
   const { status, body } = await requestJson(`/api/cashout/${store}/${date}`, token)
   if (status === 404) return null
-  if (status === 200 && body && typeof body === 'object' && 'sheet' in body) return (body as { sheet: CashoutSheet }).sheet
-  throw errorFor(status)
+  if (status !== 200) throw errorFor(status)
+  try { return await readCashoutRecord(body, store, date) }
+  catch { throw new StoreUnavailableError('Saved cash-out context is unavailable.') }
 }
 
 export async function fetchCashoutHistory(store: CashoutStore, to: string, token: string): Promise<CashoutDay[]> {
+  if (!isCashoutStore(store) || !businessDate(to)) throw new StoreUnavailableError('Invalid saved cash context.')
   const { status, body } = await requestJson(`/api/cashout/${store}?to=${to}`, token)
-  if (status === 200 && body && typeof body === 'object' && Array.isArray((body as { days?: unknown }).days)) {
-    return (body as { days: CashoutDay[] }).days
-  }
-  throw errorFor(status)
+  if (status !== 200) throw errorFor(status)
+  try { return readCashoutHistory(body, to) }
+  catch { throw new StoreUnavailableError('Saved cash-out history is unavailable.') }
 }
 
 export async function saveCashoutDay(

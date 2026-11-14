@@ -65,3 +65,9 @@
   .drawer td[data-entry-label]::before { content: attr(data-entry-label); display: block; font-size: .875em; margin-bottom: 4px; }
  }
 }
+
+.workspace [data-cash-readonly] [data-entry-summary] { display: none; }
+.workspace [data-cash-readonly] input { background: white; color: var(--cr-black); border-color: var(--cr-line); }
+.workspace [data-cash-readonly] .drawerGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 12px; }
+.workspace [data-cash-readonly] .printOnly { display: block; }
+.toolActions a { min-height: 48px; display: inline-flex; align-items: center; text-decoration: underline; padding: 8px 12px; }

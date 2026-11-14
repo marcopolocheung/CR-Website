@@ -1,0 +1,2 @@
+PASS CASH-01: explicit bilingual legacy assignment/cancel, all CR2/CR3 × two-date reloads, rapid context switches, late 200/401 guards, storage denial retention and malformed-source recovery
+External network guard: 0 blocked attempts
