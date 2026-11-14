@@ -3,7 +3,7 @@ import test from 'node:test'
 import { fetchSalesDay, fetchSalesRange, SalesUnavailableError } from './sales-store'
 import { RequestTimeoutError, requestJson } from './cashout-store'
 import { StoreAuthError } from './schedule-store'
-import { emptySalesDay, sumSalesDays, salesRows, splitParts, runLimited, type SalesDay } from './sales'
+import { emptySalesDay, sumSalesDays, salesRows, splitParts, storeTotals, runLimited, type SalesDay } from './sales'
 
 test('runLimited keeps at most the limit in flight and stops after a failure', async () => {
   let running = 0
@@ -49,6 +49,17 @@ test('rows combine the chosen stores per date and mark dates still missing a sto
   assert.deepEqual(rows.map(r => [r.date, r.day?.net ?? null, r.stores]), [['2026-11-12', 1500, 2], ['2026-11-13', 700, 1]])
   const none = salesRows(['2026-11-14'], ['CR3'], loaded)
   assert.equal(none[0].day, null)
+})
+
+test('rows keep each store apart, and store totals add up to the combined total', () => {
+  const loaded = { 'CR3:2026-11-12': day(1000), 'CR2:2026-11-12': day(500), 'CR3:2026-11-13': day(700) }
+  const rows = salesRows(['2026-11-12', '2026-11-13'], ['CR3', 'CR2'], loaded)
+  assert.deepEqual(rows.map(r => Object.fromEntries(Object.entries(r.byStore).map(([s, d]) => [s, d.net]))), [{ CR3: 1000, CR2: 500 }, { CR3: 700 }])
+  const totals = storeTotals(rows, ['CR3', 'CR2'])
+  assert.equal(totals.CR3.net, 1700)
+  assert.equal(totals.CR2.net, 500)
+  assert.equal(totals.CR3.net + totals.CR2.net, sumSalesDays(rows.flatMap(r => (r.day ? [r.day] : []))).net)
+  assert.deepEqual(storeTotals(salesRows(['2026-11-14'], ['CR2'], loaded), ['CR2']).CR2, emptySalesDay())
 })
 
 test('split parts follow the chosen split; meal periods include orders Toast left without one only when there are any', () => {

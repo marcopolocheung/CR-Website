@@ -11,7 +11,8 @@ export type SalesDay = {
   discountsByName: { name: string; count: number; amount: number }[]
   voidsByReason: { name: string; items: number; amount: number }[]
 }
-export type SalesSplitKind = 'shift' | 'service'
+/** How net sales bars are stacked: by store (both stores shown), AM/PM, or Toast meal period. */
+export type SalesSplitKind = 'store' | 'shift' | 'service'
 export type SalesPartKey = 'am' | 'pm' | 'lunch' | 'dinner' | 'other'
 
 export const emptySalesDay = (): SalesDay => ({
@@ -67,17 +68,25 @@ export async function runLimited<T>(items: T[], limit: number, work: (item: T) =
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane))
 }
 
-export type SalesRow = { date: string; day: SalesDay | null; stores: number }
+/** `byStore` keeps each loaded store's own day so charts and tables can tell the stores apart. */
+export type SalesRow = { date: string; day: SalesDay | null; stores: number; byStore: Record<string, SalesDay> }
 /** One row per date, combining whichever of the chosen stores have loaded. */
 export function salesRows(dates: string[], stores: readonly string[], loaded: Record<string, SalesDay>): SalesRow[] {
   return dates.map(date => {
-    const days = stores.flatMap(store => (loaded[salesKey(store, date)] ? [loaded[salesKey(store, date)]] : []))
-    return { date, day: days.length ? sumSalesDays(days) : null, stores: days.length }
+    const byStore: Record<string, SalesDay> = {}
+    for (const store of stores) if (loaded[salesKey(store, date)]) byStore[store] = loaded[salesKey(store, date)]
+    const days = Object.values(byStore)
+    return { date, day: days.length ? sumSalesDays(days) : null, stores: days.length, byStore }
   })
 }
 
+/** Each store's totals over the rows (stores with nothing loaded get an empty day). */
+export function storeTotals(rows: SalesRow[], stores: readonly string[]): Record<string, SalesDay> {
+  return Object.fromEntries(stores.map(store => [store, sumSalesDays(rows.flatMap(r => (r.byStore[store] ? [r.byStore[store]] : [])))]))
+}
+
 /** The pieces a day splits into for the chosen split. Orders without a Toast meal period show only if there are any. */
-export function splitParts(day: SalesDay, kind: SalesSplitKind): { key: SalesPartKey; net: number; orders: number }[] {
+export function splitParts(day: SalesDay, kind: Exclude<SalesSplitKind, 'store'>): { key: SalesPartKey; net: number; orders: number }[] {
   if (kind === 'shift') return [{ key: 'am', ...day.shift.am }, { key: 'pm', ...day.shift.pm }]
   const parts: { key: SalesPartKey; net: number; orders: number }[] = [{ key: 'lunch', ...day.service.lunch }, { key: 'dinner', ...day.service.dinner }]
   if (day.service.other.orders || day.service.other.net) parts.push({ key: 'other', ...day.service.other })
