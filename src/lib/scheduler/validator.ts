@@ -55,7 +55,7 @@ export function shiftRoleFor(employee: Employee, day: DayOfWeek, period: ShiftPe
 export function isEmployeeQualified(employee: Employee, slot: StaffingSlot) {
   const onlyRole = shiftRoleFor(employee, slot.day, slot.period)
   if (onlyRole) return onlyRole === slot.role
-  if (employee.newHire) return true
+  if (employee.newHire || employee.roles.includes('manager')) return true
   if (employee.roles.includes(slot.role)) return true
   const impliedBy = IMPLIED_ROLES[slot.role]
   return impliedBy !== undefined && employee.roles.includes(impliedBy)

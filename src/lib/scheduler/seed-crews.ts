@@ -233,8 +233,8 @@ export const seedKitchenEmployeesCR03: Employee[] = [
   employee({
     id: 'stef',
     name: 'Stef',
-    roles: ['line-cook', 'shadow'],
-    // Sheet: one day off, any 6 days, 2pm-11pm; main post shadow; one double only.
+    roles: ['manager'],
+    // Manager can cover any post. One day off, any 6 days, 2pm-11pm; one double only.
     recurringAvailability: allDays([K_STEF]),
     maxDaysPerWeek: 6,
     allowDoubles: true,
