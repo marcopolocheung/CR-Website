@@ -1,5 +1,7 @@
+import { planningSpanish } from './planning'
 import type en from './en'
 const es: Record<keyof typeof en, string> = {
+  ...planningSpanish,
   "cash.lookup.storageUncertain": "No se pudo guardar en este dispositivo. El intento de guardado fijado aún no está resuelto. Mantenga esta página abierta y descargue el borrador actual antes de resolver el almacenamiento.",
   "cash.lookup.unknownCounts": "Los conteos guardados no conservan su estado original de ingreso por conteo o importe. Los conteos en cero no confirman que se haya ingresado una denominación.",
 

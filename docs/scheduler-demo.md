@@ -1,5 +1,9 @@
 # Scheduler Demo Architecture
 
+See [Planning workspace](scheduler-planning-workspace.md) for the opt-in prototype
+integration, shared move/repair transactions, request-approval behavior and browser
+verification. The underlying roster, template and publishing services are reused.
+
 The demo at `/scheduler-demo` is a static Next.js App Router page with the correctness-critical scheduling logic kept outside presentation code.
 
 The manager workspace separates **Schedule** from **Employee settings**, with a

@@ -14,6 +14,7 @@ import {
   rolesForRestaurant,
   currentWeekStart,
   formatWeekRange,
+  dateForDay,
   monthKeyForWeek,
   shiftWeek,
   summarizeSchedule,
@@ -37,10 +38,17 @@ import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForWeek, publis
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
 import { useManagerCode } from './DemoGate'
 import { DEFAULT_STATION, isStationId, type Locale } from '@/lib/internal-tools/contracts'
-import { LOCALE_STORAGE_KEY } from '@/lib/internal-tools/i18n'
+import { LOCALE_STORAGE_KEY, translate } from '@/lib/internal-tools/i18n'
 import RequestsPanel from './RequestsPanel'
 import { useScheduleRequests } from './useScheduleRequests'
-import { withApprovedRequests } from '@/lib/scheduler/requests'
+import { withApprovedRequests, type ScheduleRequest } from '@/lib/scheduler/requests'
+import { preparePlacement, reconcileAvailability, type Placement } from '@/lib/scheduler/repair'
+import { DraftJob } from '@/lib/scheduler/draft-job'
+import { AGENT_API } from '@/lib/scheduler/agent-client'
+import useDraftAdjustment from './useDraftAdjustment'
+import PlanningShell from './PlanningShell'
+import PlanningWorkspace from './PlanningWorkspace'
+import { planningWeek } from './planning-format'
 import PublishPanel from './PublishPanel'
 import SchedulerNavigation, { type SchedulerView } from './SchedulerNavigation'
 import { DragState, DropFeedback, EmployeeDraft, GenerationReport, HistorySnapshot, MovePreview, ScheduleVariant, ShiftKey, StaffSnapshot, UNDO_LIMIT, WeekAssignments, allDays, assignmentFingerprint, blankDraft, buildFixIssues, buildMovePreview, candidatesForSlot, changesSince, cloneAssignmentList, cloneEmployeeList, cloneTemplate, cloneWeeks, createEmployeeId, diagnosticLabel, emptyAssignments, formatReportTime, fullDay, gapAvailability, layoutStorageKey, onboardingStorageKey, proposeMovedAssignments, readLayoutPreference, readOnboardingDismissed, readStaffSnapshots, roleLabel, rolesInUse, scheduleVariants, snapshotStorageKey, statusForWeek, type SchedulerLayout, unassignableReason, uniqueMessages } from './helpers'
@@ -177,6 +185,14 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [tab, setTab] = useState<SchedulerView>('schedule')
   // The new layout is the default; Classic is a per-device choice for managers who prefer it.
   const [layout, setLayout] = useState<SchedulerLayout>('new')
+  const [autoAdjust, setAutoAdjust] = useState(true)
+  const [focusEmployeeId, setFocusEmployeeId] = useState<string>()
+  const [requestPrefill, setRequestPrefill] = useState<{ id: string; employeeId: string; date: string } | null>(null)
+  const [pendingApproval, setPendingApproval] = useState<{ request: ScheduleRequest; week: string; layout: SchedulerLayout } | null>(null)
+  const handledApprovals = useRef(new Set<string>())
+  const previousRequestRevision = useRef<number | null>(null)
+  const [externalAvailability, setExternalAvailability] = useState(false)
+  const generationJobs = useRef(new DraftJob())
   const rulesDisclosure = useRef<HTMLDetailsElement>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [lastReport, setLastReport] = useState<GenerationReport | null>(null)
@@ -241,6 +257,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const monthWeeks = monthKey ? weeksForMonth(monthKey) : []
 
   function setAssignments(next: ScheduleAssignment[] | ((current: ScheduleAssignment[]) => ScheduleAssignment[])) {
+    adjustment.clearReport()
     setWeeks((current) => {
       const existing = current[weekStart] ?? emptyAssignments
       return { ...current, [weekStart]: typeof next === 'function' ? next(existing) : next }
@@ -259,6 +276,43 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   )
   const requestsUnconfirmed = requestSource.phase === 'failed' || requestSource.phase === 'uncertain'
   const ruleProblems = useMemo(() => templateProblems(template), [template])
+  const t = (key: string) => translate(requestLocale, key)
+  const draftContext = JSON.stringify([restaurantId, weekStart, layout, tab, employees, template, assignments,
+    requestSource.record?.revision])
+  const currentDraftContext = useRef(draftContext)
+  currentDraftContext.current = draftContext
+  const adjustment = useDraftAdjustment({
+    input: { employees: scheduleEmployees, slots, assignments },
+    contextKey: `${draftContext}:${isGenerating}`, scope: `${restaurantId}:${weekStart}`,
+    disabled: layout !== 'workspace' || !weekStart || !rosterLoaded || !templateLoaded || !!rosterLoadError || !!templateLoadError ||
+      isGenerating || !!staffLoadError || ruleProblems.length > 0,
+    onCommit: next => commitSchedule('draft before adjustment', next),
+  })
+  useEffect(() => {
+    generationJobs.current.cancel(); setIsGenerating(false)
+    return () => generationJobs.current.cancel()
+  }, [draftContext])
+  useEffect(() => {
+    const revision = requestSource.record?.revision ?? 0
+    if (requestSource.phase !== 'ready') return
+    if (previousRequestRevision.current !== null && previousRequestRevision.current !== revision && !pendingApproval) setExternalAvailability(true)
+    previousRequestRevision.current = revision
+    if (!pendingApproval) return
+    // The request form clears its attempted-save state in its own effect.
+    // Wait for that transition before starting a job against the settled draft.
+    if (requestDirty) return
+    const { request, week, layout: originLayout } = pendingApproval
+    setPendingApproval(null)
+    const key = `${requestStation}:${request.id}:${week}`
+    if (handledApprovals.current.has(key)) return
+    handledApprovals.current.add(key)
+    if (originLayout !== 'workspace' || layout !== 'workspace' || week !== weekStart) { setExternalAvailability(true); return }
+    if (!employees.some(employee => employee.id === request.employee.sourceEmployeeId) ||
+      !slots.some(slot => slot.date && slot.date >= request.startDate && slot.date <= request.endDate)) return
+    setExternalAvailability(false)
+    void adjustment.run(input => reconcileAvailability(input, request.employee.sourceEmployeeId, request.startDate, request.endDate), autoAdjust, 'planning.approved')
+  }, [pendingApproval, requestSource.phase, requestSource.record, requestDirty, layout, weekStart])
+
   // Readiness matches the solver: optional spots (not yet hired) never block the week.
   const readinessProblems = useMemo(
     () => preflightDiagnostics(scheduleEmployees, slots.filter((slot) => slot.required)),
@@ -726,6 +780,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // week 2 (12 staff) stay independent.
   function goToWeek(nextWeekStart: string) {
     if (!nextWeekStart || nextWeekStart === weekStart) return
+    adjustment.cancel(); generationJobs.current.cancel(); setIsGenerating(false)
+    setExternalAvailability(false)
     const fromWeek = weekStart
     if (fromWeek) {
       seedWeek(nextWeekStart, rosters[fromWeek] ?? defaultRoster, templates[fromWeek] ?? defaultTemplate)
@@ -841,6 +897,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   function undoLastChange() {
+    adjustment.cancel(); adjustment.clearReport(); generationJobs.current.cancel(); setIsGenerating(false)
     const [snapshot, ...rest] = history
     if (!snapshot) return
     const target = snapshot.weekStart || weekStart
@@ -894,11 +951,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
   function openEmployeeSettings(showRules = false) {
     setTab('settings')
-    if (showRules && rulesDisclosure.current) {
-      rulesDisclosure.current.open = true
+    const disclosure = rulesDisclosure.current ?? document.getElementById('scheduler-rules') as HTMLDetailsElement | null
+    if (showRules && disclosure) {
+      disclosure.open = true
       requestAnimationFrame(() => {
-        rulesDisclosure.current?.querySelector('summary')?.focus()
-        rulesDisclosure.current?.scrollIntoView({ block: 'start' })
+        disclosure.querySelector('summary')?.focus()
+        disclosure.scrollIntoView({ block: 'start' })
       })
     } else {
       document.getElementById('scheduler-tab-settings')?.focus()
@@ -967,18 +1025,21 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   async function generate(variant: ScheduleVariant = selectedVariant) {
-    if (isGenerating) return
-    remember('previous schedule')
+    if (isGenerating || adjustment.busy) return
+    adjustment.clearReport()
+    const job = generationJobs.current.begin(draftContext)
     setSelectedVariant(variant)
     setIsGenerating(true)
     setIgnoredIssueIds([])
     setGuidedChoosing(false)
     // Let the spinner paint before the synchronous solver blocks the main thread.
     await new Promise((resolve) => setTimeout(resolve, 350))
+    if (!generationJobs.current.canCommit(job, currentDraftContext.current)) return
     let previousAssignments = assignments
     if (variant === 'similarWeek') {
       // Anchor to last week as published, not to whatever is on screen.
       const prior = await loadPriorWeek(shiftWeek(weekStart, -1)).catch(() => [])
+      if (!generationJobs.current.canCommit(job, currentDraftContext.current)) return
       if (prior.length === 0) {
         setDiagnostics(['Last week has nothing to match yet — publish it first, or pick another way to build the week.'])
         setIsGenerating(false)
@@ -996,6 +1057,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         },
       )
 
+      if (!generationJobs.current.canCommit(job, currentDraftContext.current)) return
       if (result.status === 'INFEASIBLE') {
         const messages = uniqueMessages(result.diagnostics.map((diagnostic) => diagnosticLabel(diagnostic, weekStart)))
         setDiagnostics(['The schedule could not be made with these rules.', ...messages])
@@ -1020,7 +1082,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         ...uniqueMessages(result.diagnostics.map((diagnostic) => diagnosticLabel(diagnostic, weekStart))),
       ])
       const unchanged = assignmentFingerprint(result.assignments) === assignmentFingerprint(assignments)
-      setAssignments(result.assignments)
+      commitSchedule('previous schedule', result.assignments)
       setGeneratedAssignments(cloneAssignmentList(result.assignments))
       setWeekStatus((current) => ({ ...current, [weekStart]: 'on' }))
       reportId.current += 1
@@ -1036,7 +1098,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           : message,
       })
     } finally {
-      setIsGenerating(false)
+      if (generationJobs.current.owns(job)) { generationJobs.current.finish(job); setIsGenerating(false) }
     }
   }
 
@@ -1143,10 +1205,28 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // station new — otherwise every deploy/reload flashes the new-station banner
   // with seeds while the fetch is still in flight.
   const storeLoading = !rosterLoaded || !templateLoaded
-  const storeOffline = Boolean(rosterLoadError || templateLoadError)
+  const storeOffline = Boolean(rosterLoadError || templateLoadError || staffLoadError)
   const isNewStation = !scheduleOnly && !storeLoading && defaultRosterRev === 0 && defaultTemplateRev === 0 && rosterRev === 0 && templateRev === 0
 
+  function commitSchedule(label: string, next: ScheduleAssignment[]) {
+    remember(label)
+    setLastReport(null)
+    setAssignments(cloneAssignmentList(next))
+    setIgnoredIssueIds([])
+  }
+
+  function placeInWorkspace(placement: Placement) {
+    if (adjustment.busy || isGenerating) return
+    // Already assigned here: leave both shifts and Keep marks untouched.
+    if (assignments.some(a => a.slotId === placement.slotId && a.employeeId === placement.employeeId)) return
+    void adjustment.run(input => preparePlacement(input, placement), autoAdjust)
+  }
+
   function setEmployeeAssignment(slotId: string, employeeId: string) {
+    if (adjustment.busy || isGenerating) return
+    adjustment.clearReport()
+    setLastReport(null)
+
     remember('changed one assignment')
     setDropFeedback(null)
     setAssignments((current) => {
@@ -1163,6 +1243,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   function setLocked(slotId: string, locked: boolean) {
+    if (adjustment.busy || isGenerating) return
+    adjustment.clearReport()
+    setLastReport(null)
     remember(locked ? 'kept one assignment' : 'released one kept assignment')
     setAssignments((current) =>
       current.map((assignment) => (assignment.slotId === slotId ? { ...assignment, locked } : assignment)),
@@ -1375,6 +1458,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     }
   }
 
+  function changeLayout(next: SchedulerLayout) {
+    adjustment.cancel(); generationJobs.current.cancel(); setIsGenerating(false)
+    setLayout(next)
+    try { window.localStorage.setItem(layoutStorageKey, next) } catch { /* view preference only */ }
+  }
+
   function toggleLayout() {
     setLayout((current) => {
       const next: SchedulerLayout = current === 'classic' ? 'new' : 'classic'
@@ -1389,7 +1478,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
   const requestsPanel = (
     <RequestsPanel key={requestStation} source={requestSource} employees={employees} weekStart={weekStart} token={managerCode}
-      locale={requestLocale} onLocaleChange={setRequestLocale} onDirtyChange={setRequestDirty} />
+      locale={requestLocale} onLocaleChange={setRequestLocale} onDirtyChange={setRequestDirty} prefill={requestPrefill} hideLanguage={layout === 'workspace'}
+      onApproved={request => setPendingApproval({ request, week: weekStart, layout })} />
   )
 
   const scheduleWorkspace: ScheduleWorkspaceProps = {
@@ -1412,7 +1502,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     ruleProblemCount: ruleProblems.length,
     publishState: currentPublishState,
     schedulePassing,
-    isGenerating,
+    isGenerating: isGenerating || adjustment.busy,
     activeEmployeeCount,
     selectedVariant,
     historyLength: history.length,
@@ -1440,7 +1530,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     otherWeeksWithEdits,
     confirmingClearWeek,
     confirmingReset,
-    requestsPanel,
+    requestsPanel: null,
     onMake: () => void generate(),
     onVariantChange: setSelectedVariant,
     onPublish: () => setSharing(true),
@@ -1481,6 +1571,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   const staffWorkspace: StaffWorkspaceProps = {
+    focusEmployeeId,
     employees,
     filteredEmployees,
     statsById: staffStatsById,
@@ -1553,7 +1644,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   return (
-    <div className="bg-zinc-100 text-zinc-950">
+    <PlanningShell enabled={layout === 'workspace'} locale={requestLocale} onSchedule={() => setTab('schedule')}>
+    <div className={layout === 'workspace' ? undefined : 'bg-zinc-100 text-zinc-950'} data-scheduler-content>
       <header className="border-b border-zinc-200 bg-white">
         <div className="px-4 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1561,10 +1653,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                 {restaurantName ? `${restaurantName} · Scheduler` : 'Scheduler'}
               </p>
-              <h1 className="text-2xl font-bold md:text-3xl">{layout === 'new' ? 'Weekly schedule' : 'Weekly staff schedule'}</h1>
+              <h1 className="text-2xl font-bold md:text-3xl">{layout === 'workspace' ? t('planning.title') : layout === 'new' ? 'Weekly schedule' : 'Weekly staff schedule'}</h1>
               {currentPublishState && (
                 <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600">
-                  <PublishStateBadge state={currentPublishState} />
+                  {layout === 'workspace' ? <span>{t(`planning.status.${currentPublishState}`)}</span> : <PublishStateBadge state={currentPublishState} />}
                   {otherWeeksWithEdits.length > 0 && (
                     <span>
                       {otherWeeksWithEdits.length} other week{otherWeeksWithEdits.length === 1 ? '' : 's'} with unpublished changes
@@ -1581,9 +1673,18 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 className="inline-flex items-center justify-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                 title="View the published staff schedule in a new tab"
               >
-                View schedule<span className="sr-only"> (opens in a new tab)</span>
+                {layout === 'workspace' ? t('planning.staffView') : 'View schedule'}<span className="sr-only"> (opens in a new tab)</span>
               </Link>
-              <div className="flex items-center gap-2 text-sm text-zinc-700">
+              {layout === 'workspace' && <div role="group" aria-label="English / Español" className="flex gap-2">
+                {(['en', 'es'] as const).map(locale => <button key={locale} className="min-h-11 border border-zinc-400 bg-white px-3" aria-pressed={requestLocale === locale} lang={locale}
+                  onClick={() => { setRequestLocale(locale); try { localStorage.setItem(LOCALE_STORAGE_KEY, locale) } catch { /* preference only */ } }}>{locale === 'en' ? 'English' : 'Español'}</button>)}
+              </div>}
+              <label className="flex min-h-11 items-center gap-2 text-sm">{t('planning.layout')}
+                <select aria-label={t('planning.layout')} className="min-h-11 border border-zinc-400 bg-white px-3" value={layout} onChange={e => changeLayout(e.target.value as SchedulerLayout)}>
+                  <option value="new">{t('planning.current')}</option><option value="classic">{t('planning.classic')}</option><option value="workspace">{t('planning.workspace')}</option>
+                </select>
+              </label>
+              <div hidden={layout === 'workspace'} className="flex items-center gap-2 text-sm text-zinc-700">
                 <span>Classic layout: {layout === 'classic' ? 'On' : 'Off'}</span>
                 <FlipSwitch on={layout === 'classic'} onFlip={toggleLayout} label="Use the classic layout" />
               </div>
@@ -1595,38 +1696,25 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             view={tab}
             settingsDirty={setupParts.length > 0}
             onChange={setTab}
-            labels={layout === 'new' ? { schedule: 'Schedule', settings: 'Staff & rules' } : undefined}
-            neutral={layout === 'new'}
+            labels={layout === 'workspace' ? { schedule: t('planning.schedule'), settings: t('planning.settings') } : layout === 'new' ? { schedule: 'Schedule', settings: 'Staff & rules' } : undefined}
+            neutral={layout !== 'classic'}
           />
           <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
             <div className="flex min-w-0 items-center gap-1" aria-label="Selected week">
-              <IconButton icon="chevronLeft" label="Previous week" onClick={() => goToWeek(shiftWeek(weekStart, -1))} disabled={!weekStart} />
+              <IconButton icon="chevronLeft" label={layout === 'workspace' ? t('planning.previous') : 'Previous week'} onClick={() => goToWeek(shiftWeek(weekStart, -1))} disabled={!weekStart} />
               <p className="min-w-0 px-2 text-center text-base font-semibold" aria-live="polite">
-                {weekStart ? formatWeekRange(weekStart) : 'Loading week…'}
+                {weekStart ? layout === 'workspace' ? planningWeek(weekStart, dateForDay(weekStart, 'Saturday'), requestLocale) : formatWeekRange(weekStart) : 'Loading week…'}
               </p>
-              <IconButton icon="chevronRight" label="Next week" onClick={() => goToWeek(shiftWeek(weekStart, 1))} disabled={!weekStart} />
+              <IconButton icon="chevronRight" label={layout === 'workspace' ? t('planning.next') : 'Next week'} onClick={() => goToWeek(shiftWeek(weekStart, 1))} disabled={!weekStart} />
             </div>
             {weekStart && weekStart !== currentWeekStart() && (
-              <Button onClick={() => goToWeek(currentWeekStart())} icon="reset">This week</Button>
+              <Button onClick={() => goToWeek(currentWeekStart())} icon="reset">{layout === 'workspace' ? t('planning.thisWeek') : 'This week'}</Button>
             )}
           </div>
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-none min-w-0 space-y-4 overflow-x-clip px-4 py-5">
-          {weekStart && tab === 'schedule' && <SchedulingAgent key={`${requestStation}:${weekStart}`} token={managerCode}
-            context={{ stationId: requestStation, weekStart, employees, template, assignments: assignments.filter(item => item.employeeId),
-              requests: { phase: requestSource.phase, revision: requestSource.record?.revision ?? 0, data: requestSource.record?.data ?? null } }}
-            disabled={storeLoading || storeOffline || isGenerating || ruleProblems.length > 0 || requestSource.phase !== 'ready' || requestDirty}
-            onApply={(next) => {
-              remember('schedule before assistant proposal')
-              setAssignments(cloneAssignmentList(next))
-              setGeneratedAssignments(cloneAssignmentList(next))
-              setWeekStatus(current => ({ ...current, [weekStart]: 'on' }))
-              setIgnoredIssueIds([])
-              setDiagnostics(['Assistant proposal added to the draft. Review the board, then publish when ready.'])
-            }} />}
-          {layout === 'classic' && requestsPanel}
           {storeLoading && (
             <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">
               <h2 className="text-sm font-semibold text-zinc-900">Loading your saved schedule…</h2>
@@ -1665,11 +1753,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           )}
 
           {tab === 'schedule' && sharing && weekStart && ruleProblems.length === 0 && (
-            <PublishPanel
+            <fieldset disabled={adjustment.busy || isGenerating}><PublishPanel
               weekStart={weekStart}
               weekLabel={formatWeekRange(weekStart)}
               slots={slots}
-              employees={employees}
+              employees={scheduleEmployees}
               assignments={assignments}
               visible={weekVisibility === 'on'}
               onVisibilityChange={(status) => setWeekVisibility(weekStart, status)}
@@ -1679,12 +1767,13 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               unsavedSetup={setupParts}
               onSaveSetup={() => saveSetup({ alsoRules: true })}
               onPublished={(doc) => {
+                adjustment.clearReport()
                 setPublishedWeeks((current) => ({ ...current, [weekStart]: doc }))
                 setPublishedBaselines((current) => ({ ...current, [weekStart]: assignmentFingerprint(assignments) }))
                 setLiveMonthWeeks((current) => ({ ...current, [weekStart]: doc.visible }))
                 setLayoutMismatchWeeks((current) => ({ ...current, [weekStart]: false }))
               }}
-            />
+            /></fieldset>
           )}
 
           {(setupParts.length > 0 || setupError || setupNotice) && (
@@ -1736,8 +1825,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             tabIndex={0}
             className={`space-y-4 ${tab !== 'schedule' ? 'hidden print:block' : ''}`}
           >
-          {layout === 'classic' ? (
-          <>
+          {layout === 'classic' ? <>
           <div className="print:hidden">
             <h2 className="text-xl font-semibold">Schedule</h2>
             <p className="mt-1 mb-3 text-sm text-zinc-600">Build the week, check each shift, then publish it to staff.</p>
@@ -2040,9 +2128,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               <OnboardingBanner activeEmployeeCount={activeEmployeeCount} onDismiss={dismissOnboarding} />
             </Disclosure>
           )}
-          </>
-          ) : (
-            <>
+          </> : <>
               {ruleProblems.length > 0 && (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-300 bg-red-50 p-3 print:hidden" role="alert">
                   <p className="text-sm text-red-900">Fix {ruleProblems.length} shift rule problem{ruleProblems.length === 1 ? '' : 's'} before publishing.</p>
@@ -2055,14 +2141,27 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                   <Button onClick={() => openEmployeeSettings()} icon="plus">Open staff &amp; rules</Button>
                 </div>
               )}
-              <ScheduleWorkspace {...scheduleWorkspace} />
-            </>
-          )}
+              <div hidden={layout === 'workspace'}><ScheduleWorkspace {...scheduleWorkspace} /></div>
+              <div hidden={layout !== 'workspace'}>
+                {externalAvailability && <p role="status" className="my-3 border border-amber-500 bg-amber-50 p-3">{t('planning.external')}</p>}
+                <PlanningWorkspace data={scheduleWorkspace} locale={requestLocale} auto={autoAdjust} onAuto={setAutoAdjust}
+                  busy={adjustment.busy} disabled={storeLoading || storeOffline} report={adjustment.report} error={adjustment.error}
+                  onPlace={placeInWorkspace} onAdjust={() => { setExternalAvailability(false); void adjustment.run(input => input.assignments, true) }}
+                  onRequest={(employeeId, date) => {
+                    setRequestPrefill({ id: crypto.randomUUID(), employeeId, date })
+                    requestAnimationFrame(() => document.getElementById('schedule-requests')?.scrollIntoView({ block: 'start' }))
+                  }}
+                  onEmployee={employeeId => {
+                    setFocusEmployeeId(employeeId)
+                    setStaffQuery(employees.find(e => e.id === employeeId)?.name ?? '')
+                    openEmployeeSettings()
+                  }} />
+              </div>
+          </>}
           </section>
 
           <section id="scheduler-panel-settings" role="tabpanel" aria-labelledby="scheduler-tab-settings" tabIndex={0} hidden={tab !== 'settings'} className="space-y-4 print:hidden">
-          {layout === 'classic' ? (
-          <>
+          {layout === 'classic' ? <>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold">Employee settings</h2>
@@ -2339,12 +2438,28 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               updatedAt={templateUpdatedAt}
             />
           </details>
-          </>
-          ) : (
-            <StaffWorkspace {...staffWorkspace} />
-          )}
+          </> : <StaffWorkspace {...staffWorkspace} />}
           </section>
+          {AGENT_API && <div hidden={tab !== 'schedule'} className="print:hidden">
+          <details open={layout !== 'workspace'}>
+          <summary hidden={layout !== 'workspace'} className="min-h-11 cursor-pointer py-3 font-semibold">{t('planning.assistant')}</summary>
+          {weekStart && <SchedulingAgent key={`${requestStation}:${weekStart}`} token={managerCode}
+            context={{ stationId: requestStation, weekStart, employees, template, assignments: assignments.filter(item => item.employeeId),
+              requests: { phase: requestSource.phase, revision: requestSource.record?.revision ?? 0, data: requestSource.record?.data ?? null } }}
+            disabled={storeLoading || storeOffline || isGenerating || adjustment.busy || ruleProblems.length > 0 || requestSource.phase !== 'ready' || requestDirty}
+            onApply={(next) => {
+              adjustment.clearReport()
+              commitSchedule('schedule before assistant proposal', next)
+              setGeneratedAssignments(cloneAssignmentList(next))
+              setWeekStatus(current => ({ ...current, [weekStart]: 'on' }))
+              setIgnoredIssueIds([])
+              setDiagnostics(['Assistant proposal added to the draft. Review the board, then publish when ready.'])
+            }} />}
+          </details>
+          </div>}
+          <div hidden={tab !== 'schedule'} className="print:hidden">{requestsPanel}</div>
       </main>
     </div>
+    </PlanningShell>
   )
 }

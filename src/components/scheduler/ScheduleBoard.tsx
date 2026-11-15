@@ -14,6 +14,7 @@ import {
 } from '@/lib/scheduler'
 import { DragState, DropFeedback, MovePreview, ShiftKey, SpotStatus, periodLabels, reviewLabel, roleChipClass, roleInitial, roleLabel, shiftStatus, shortTimeRange, slotBadge, spotStatus, statusMeta, unassignableReason } from './helpers'
 import { Icon } from './ui'
+import { RoleIcon } from './RoleBadge'
 export function WeeklyScheduleBoard({
   slots,
   weekStart,
@@ -171,9 +172,7 @@ export function BoardLegend({ roles }: { roles: string[] }) {
         <span className="text-zinc-500">Position:</span>
         {roles.map((role) => (
           <span key={role} className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-medium ${roleChipClass(role)}`}>
-            <span aria-hidden="true" className="font-bold">
-              {roleInitial(role)}
-            </span>
+            <RoleIcon role={role} />
             {roleLabel(role)}
           </span>
         ))}
@@ -538,7 +537,7 @@ export function AssignmentChip({
         aria-hidden="true"
         className={`inline-flex h-6 shrink-0 items-center justify-center rounded-sm border px-1 text-xs font-bold leading-none ${roleChipClass(slot.role)}`}
       >
-        {slotBadge(slot)}
+        <RoleIcon role={slot.role} />{slotBadge(slot)}
       </span>
       <span className={`truncate text-sm ${primaryTone}${isGhosted ? ' italic opacity-80' : ''}`}>
         {primaryText}
@@ -659,9 +658,7 @@ export function SlotEditor({
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium ${roleChipClass(slot.role)}`}>
-            <span aria-hidden="true" className="font-bold">
-              {roleInitial(slot.role)}
-            </span>
+            <RoleIcon role={slot.role} />
             {roleLabel(slot.role)}
           </span>
           <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-medium ${statusMeta[status].badge}`}>

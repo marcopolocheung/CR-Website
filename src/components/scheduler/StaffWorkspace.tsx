@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   DEFAULT_PRIORITY,
   formatUpdatedAt,
@@ -23,6 +23,7 @@ import { EmployeeCard, EmployeeForm, shiftRolesText } from './StaffEditor'
 import { TemplateEditor } from './RulesEditor'
 
 export type StaffWorkspaceProps = {
+  focusEmployeeId?: string
   employees: Employee[]
   filteredEmployees: Employee[]
   statsById: Map<string, ScheduleStats>
@@ -168,6 +169,15 @@ export default function StaffWorkspace(props: StaffWorkspaceProps) {
   } = props
 
   const [openEmployeeId, setOpenEmployeeId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!props.focusEmployeeId) return
+    setOpenEmployeeId(props.focusEmployeeId)
+    requestAnimationFrame(() => {
+      const row = document.getElementById(`scheduler-employee-${props.focusEmployeeId}`)
+      row?.scrollIntoView({ block: 'center' })
+      row?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })
+    })
+  }, [props.focusEmployeeId])
   const rulesDisclosure = useRef<HTMLDetailsElement>(null)
 
   function openRules() {
@@ -427,7 +437,7 @@ export default function StaffWorkspace(props: StaffWorkspaceProps) {
               const notes = staffNotes(employee)
               const expanded = openEmployeeId === employee.id
               return (
-                <li key={employee.id}>
+                <li key={employee.id} id={`scheduler-employee-${employee.id}`}>
                   <div className="flex flex-wrap items-center gap-3 p-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">

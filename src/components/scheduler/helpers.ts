@@ -481,12 +481,13 @@ export function readOnboardingDismissed() {
 
 export const layoutStorageKey = 'chinarose.scheduler.layout'
 
-export type SchedulerLayout = 'new' | 'classic'
+export type SchedulerLayout = 'new' | 'classic' | 'workspace'
 
 /** The new layout is the default; only an explicit choice of Classic opts out. */
 export function readLayoutPreference(): SchedulerLayout {
   try {
-    return window.localStorage.getItem(layoutStorageKey) === 'classic' ? 'classic' : 'new'
+    const value = window.localStorage.getItem(layoutStorageKey)
+    return value === 'classic' || value === 'workspace' ? value : 'new'
   } catch {
     return 'new'
   }
