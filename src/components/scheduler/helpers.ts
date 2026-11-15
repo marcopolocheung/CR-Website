@@ -57,6 +57,7 @@ export type HistorySnapshot = {
   employees: Employee[]
   template: WeeklyStaffingTemplate
   weeks: WeekAssignments
+  exclusions: string[]
   generatedWeeks: WeekAssignments
   weekStatus: Record<string, WeekStatus>
   diagnostics: string[]

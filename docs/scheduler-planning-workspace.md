@@ -99,3 +99,5 @@ rosters. The original `/scheduler-prototype` remains unchanged as a reference.
 record the tested implementation checkpoint.
 
 Employee colors are allocated without repeats and remain stable through moves, filtering and staff/week changes during the visit. Each assigned spot has an open/closed lock icon to toggle Keep directly. Colored role badges identify positions separately from employee colors. A drop onto the same employee’s existing assignment leaves both shifts and Undo history unchanged.
+
+**Remove from this shift** (spot menu or side panel) clears the spot, including a Keep, and marks that employee as not considered for that position on that date and shift. With Auto-adjust on, the draft is repaired in the same Undo step; with it off, the spot stays open until Adjust. Repair and Adjust skip the employee for any spot with that date/shift/role, and drop such an unkept assignment. The side panel lists excluded people with **Allow again**; deliberately placing the employee there also lifts it. Exclusions are part of the draft and Undo history, not the published payload, and **Make schedule** does not yet honor them.
