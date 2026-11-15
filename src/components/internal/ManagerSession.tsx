@@ -10,6 +10,9 @@ export default function ManagerSession({ children }: { children: ReactNode }) {
   const transitions = useWorkTransitions()
   useEffect(() => {
     managerSession.active = true
+    // Arriving from the /staff entry page: unlock with the code it already checked.
+    const handed = managerSession.takeHandoff()
+    if (handed) managerSession.unlock(handed)
     return () => { managerSession.active = false; managerSession.expire() }
   }, [])
   const unlock = useCallback((token: string) => { managerSession.unlock(token) }, [])
