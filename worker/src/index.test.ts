@@ -1383,6 +1383,46 @@ test('Toast sales need the manager code and Toast setup, and reject bad or futur
   assert.deepEqual(await future.json(), { error: 'invalid_date' })
 })
 
+test('sales codes open one store each; once set, the manager code no longer opens sales', async () => {
+  const toast = { TOAST_CLIENT_ID: 'id', TOAST_CLIENT_SECRET: 'secret', TOAST_GUID_CR2: 'g2', TOAST_GUID_CR3: 'g3' }
+  const access = async (env: ReturnType<typeof mockEnv> & Record<string, unknown>, token: string) => {
+    const response = await handler.fetch(authed('GET', '/api/toast/sales/access', undefined, token), env)
+    return response.status === 200 ? ((await response.json()) as { stores: string[] }).stores : response.status
+  }
+  // Before any sales code is set, the manager code opens both stores.
+  const before = { ...mockEnv(), ...toast }
+  assert.deepEqual(await access(before, 'manager-token'), ['CR3', 'CR2'])
+  assert.equal(await access(before, 'nope'), 401)
+
+  const env = { ...mockEnv(), ...toast, SALES_CODE_CR3: 'cr3-code', SALES_CODE_CR2: 'cr2-code' }
+  assert.deepEqual(await access(env, 'cr3-code'), ['CR3'])
+  assert.deepEqual(await access(env, 'cr2-code'), ['CR2'])
+  // The same value in both secrets opens both stores.
+  assert.deepEqual(await access({ ...env, SALES_CODE_CR2: 'cr3-code' }, 'cr3-code'), ['CR3', 'CR2'])
+  assert.equal(await access(env, 'manager-token'), 401)
+
+  await env.SCHEDULES.put('toast:sales:v1:CR3:2026-11-09', JSON.stringify({ net: 4200 }))
+  await env.SCHEDULES.put('toast:sales:v1:CR2:2026-11-09', JSON.stringify({ net: 1700 }))
+  const range = (store: string, token: string) => handler.fetch(authed('GET', `/api/toast/sales/${store}?from=2026-11-09&to=2026-11-09`, undefined, token), env)
+  const day = (store: string, token: string) => handler.fetch(authed('GET', `/api/toast/sales/${store}/2026-11-09`, undefined, token), env)
+  assert.equal((await range('CR3', 'cr3-code')).status, 200)
+  assert.equal((await day('CR3', 'cr3-code')).status, 200)
+  for (const response of [await range('CR2', 'cr3-code'), await day('CR2', 'cr3-code'), await range('CR3', 'cr2-code')]) {
+    assert.equal(response.status, 403)
+    assert.deepEqual(await response.json(), { error: 'forbidden_store' })
+  }
+  assert.equal((await range('CR3', 'manager-token')).status, 401)
+  assert.equal((await day('CR3', 'manager-token')).status, 401)
+  // The manager code still runs Fill from Toast (cash), which is a manager task.
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response('offline', { status: 503 })) as typeof fetch
+  try {
+    assert.notEqual((await handler.fetch(authed('GET', '/api/toast/cash/CR3/2026-11-09'), env)).status, 401)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
 test('Toast sales range needs the manager code, checks the range, and returns only cached days', async () => {
   const env = mockEnv()
   assert.equal((await handler.fetch(request('GET', '/api/toast/sales/CR3?from=2026-11-01&to=2026-11-10'), env)).status, 401)

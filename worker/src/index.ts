@@ -34,6 +34,9 @@ interface Env {
   TOAST_CLIENT_SECRET?: string
   TOAST_GUID_CR2?: string
   TOAST_GUID_CR3?: string
+  /** Sales codes: each opens Toast sales for one store (the same value in both opens both). Once either is set, the manager code no longer opens sales. */
+  SALES_CODE_CR3?: string
+  SALES_CODE_CR2?: string
 }
 
 export type StoredWeek = {
@@ -988,6 +991,33 @@ async function managerAuthError(request: Request, env: Env): Promise<Response | 
   return json({ error: 'unauthorized' }, 401, request, env)
 }
 
+const salesCodesSet = (env: Env) => !!(env.SALES_CODE_CR3 || env.SALES_CODE_CR2)
+
+/**
+ * Stores whose Toast sales this request may see. Each store code opens that store (one value set for both opens both).
+ * Until either sales code is set, the manager code opens both (so nothing breaks before activation).
+ */
+export function salesStoresFor(request: Request, env: Env): ToastStore[] {
+  const auth = request.headers.get('Authorization') ?? ''
+  const is = (code?: string) => !!code && auth === `Bearer ${code}`
+  const stores: ToastStore[] = []
+  if (is(env.SALES_CODE_CR3)) stores.push('CR3')
+  if (is(env.SALES_CODE_CR2)) stores.push('CR2')
+  if (!stores.length && !salesCodesSet(env) && isGoldenWriteAuthorized(request, env)) return ['CR3', 'CR2']
+  return stores
+}
+
+/** 401 for a wrong code (sharing the gate's guess budget), 403 for a code that doesn't open this store. */
+async function salesAuthError(request: Request, env: Env, store?: ToastStore): Promise<Response | null> {
+  const stores = salesStoresFor(request, env)
+  if (stores.length) return !store || stores.includes(store) ? null : json({ error: 'forbidden_store' }, 403, request, env)
+  if (!salesCodesSet(env) && goldenWriteError(env)) return json({ error: 'write_not_configured' }, 503, request, env)
+  if (!(await checkVerifyThrottle(env, clientIp(request)))) {
+    return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
+  }
+  return json({ error: 'unauthorized' }, 401, request, env)
+}
+
 function clientIp(request: Request): string {
   return request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ?? 'unknown'
 }
@@ -1259,7 +1289,7 @@ export default {
     if (toastSalesMatch && request.method === 'GET') {
       const [, store, date] = toastSalesMatch as unknown as [string, ToastStore, string]
       if (Number.isNaN(Date.parse(date))) return json({ error: 'not_found' }, 404, request, env)
-      const denied = await managerAuthError(request, env)
+      const denied = await salesAuthError(request, env, store)
       if (denied) return denied
       const noStore = { 'Cache-Control': 'no-store' }
       if (!toastConfigured(env)) return json({ error: 'toast_unconfigured' }, 503, request, env, noStore)
@@ -1274,11 +1304,18 @@ export default {
       }
     }
 
+    // Which stores a sales code opens (the Reports page asks once, when the code is entered).
+    if (path === '/api/toast/sales/access' && request.method === 'GET') {
+      const denied = await salesAuthError(request, env)
+      if (denied) return denied
+      return json({ stores: salesStoresFor(request, env) }, 200, request, env, { 'Cache-Control': 'no-store' })
+    }
+
     // Every cached Toast sales day in a range (Reports loads these in one request). Never calls Toast.
     const toastSalesRangeMatch = path.match(/^\/api\/toast\/sales\/(CR3|CR2)$/)
     if (toastSalesRangeMatch && request.method === 'GET') {
       const store = toastSalesRangeMatch[1] as ToastStore
-      const denied = await managerAuthError(request, env)
+      const denied = await salesAuthError(request, env, store)
       if (denied) return denied
       const noStore = { 'Cache-Control': 'no-store' }
       if (!toastConfigured(env)) return json({ error: 'toast_unconfigured' }, 503, request, env, noStore)

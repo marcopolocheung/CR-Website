@@ -1,15 +1,16 @@
 'use client'
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { useManagerSession } from './ManagerSession'
+import { useEffect, useMemo, useState, useSyncExternalStore, type FormEvent } from 'react'
+import { LabeledInput, focusField } from './Feedback'
 import { useWorkspaceVisible } from './WorkspaceVisibility'
 import { useInternalLanguage } from './InternalLanguage'
 import { Icon } from './ui/Icon'
 import { Card, Columns, Segmented, Tile, shortDate } from './ReportCharts'
-import type { TranslationKey } from '@/lib/internal-tools/i18n'
+import { errorKey, type Message, type TranslationKey } from '@/lib/internal-tools/i18n'
 import { datesEnding } from '@/lib/dashboard'
 import { StoreAuthError } from '@/lib/schedule-store'
 import { salesKey, salesRows, splitParts, storeTotals, sumSalesDays, type SalesDay, type SalesPartKey, type SalesRow, type SalesSplitKind } from '@/lib/sales'
-import { SalesUnavailableError, type SalesProblem } from '@/lib/sales-store'
+import { SalesUnavailableError, verifySalesCode, type SalesProblem } from '@/lib/sales-store'
+import { salesSession } from '@/lib/sales-session'
 import { SALES_STORES, salesCache, type SalesSnapshot } from '@/lib/sales-cache'
 
 const STORES = SALES_STORES
@@ -32,16 +33,62 @@ const money = (cents: number) => usd.format(cents / 100)
 const percent = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 })
 const partValue = (day: SalesDay, key: SalesPartKey) => day.service[key]
 
-/** Toast sales for the Reports page. Shown once the shared manager code is entered (Cash reports holds the gate). */
+/**
+ * Toast sales for the Reports page, behind its own sales code (separate from the manager code): a store code shows
+ * only that store, the owner code both. The Worker enforces the same rule on every sales request.
+ */
 export default function SalesReports() {
-  const { token, expire } = useManagerSession()
-  return token ? <SalesBoard token={token} onLocked={expire} /> : null
+  const session = useSyncExternalStore(salesSession.subscribe, salesSession.getSnapshot, salesSession.getSnapshot)
+  const allowed = useMemo(() => STORES.filter(s => session.stores.includes(s)), [session.stores])
+  if (!session.token || !allowed.length) return <SalesCodeGate />
+  return <SalesBoard key={session.generation} token={session.token} allowed={allowed} onLocked={() => salesSession.expire(session.generation)} />
 }
 
-function SalesBoard({ token, onLocked }: { token: string; onLocked: () => void }) {
+/** Sales code entry. The code stays in memory only and is forgotten on Lock or when leaving the internal tools. */
+function SalesCodeGate() {
+  const { t } = useInternalLanguage()
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<Message | null>(null)
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    if (!code || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const stores = await verifySalesCode(code)
+      if (!stores.length) throw new StoreAuthError()
+      salesSession.unlock(code, stores)
+    } catch (caught) {
+      setError(caught instanceof SalesUnavailableError ? { key: `sales.${caught.reason}` } : { key: errorKey(caught) })
+      focusField('sales-code')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section aria-labelledby="sales-heading" className="mb-10">
+      <form onSubmit={submit} className="max-w-md bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <h2 id="sales-heading" className="text-xl font-semibold text-gray-900 mb-2">{t('sales.title')}</h2>
+        <p className="text-sm text-gray-600 mb-4">{t('sales.codeInstructions')}</p>
+        <LabeledInput id="sales-code" label={{ key: 'sales.code' }} error={error}
+          type="password" autoComplete="off" value={code} onChange={event => setCode(event.target.value)}
+          className="min-h-11 w-full border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-red-500" />
+        <button type="submit" disabled={!code || busy}
+          className="min-h-11 mt-4 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50">
+          {t(busy ? 'cash.checking' : 'cash.unlock')}
+        </button>
+      </form>
+    </section>
+  )
+}
+
+function SalesBoard({ token, allowed, onLocked }: { token: string; allowed: Store[]; onLocked: () => void }) {
   const { locale, t } = useInternalLanguage()
   const visible = useWorkspaceVisible()
-  const [store, setStore] = useState<Store | 'all'>('all')
+  const [store, setStore] = useState<Store | 'all'>(allowed.length > 1 ? 'all' : allowed[0])
   const [range, setRange] = useState<(typeof RANGES)[number]>(7)
   const [split, setSplit] = useState<SalesSplitKind>('store')
   const [now] = useState(today)
@@ -79,9 +126,12 @@ function SalesBoard({ token, onLocked }: { token: string; onLocked: () => void }
     <>
       <div className="flex flex-wrap items-center gap-3 mb-2">
         <h2 id="sales-heading" className="text-xl font-semibold text-gray-900 mr-auto">{t('sales.title')}</h2>
-        <Segmented label={t('common.store')} value={store} onChange={setStore} options={[['all', t('dashboard.bothStores')], ...STORES.map(s => [s, STORE_LABELS[s]] as const)]} />
+        {allowed.length > 1
+          ? <Segmented label={t('common.store')} value={store} onChange={setStore} options={[['all', t('dashboard.bothStores')], ...allowed.map(s => [s, STORE_LABELS[s]] as const)]} />
+          : <span className="text-sm font-medium text-gray-700">{STORE_LABELS[allowed[0]]}</span>}
         <Segmented label={t('dashboard.range')} value={range} onChange={setRange} options={RANGES.map(r => [r, t('dashboard.days', { number: r })] as const)} />
         {store === 'all' && <Segmented label={t('sales.split')} value={shownSplit} onChange={setSplit} options={[['store', t('sales.byStore')], ['service', t('sales.byService')]]} />}
+        <button type="button" onClick={onLocked} className="inline-flex min-h-11 items-center gap-2 px-2 text-sm underline"><Icon name="close" />{t('sales.lock')}</button>
       </div>
       <p className="mb-4 max-w-3xl text-xs text-gray-600">{t('sales.help')}</p>
     </>

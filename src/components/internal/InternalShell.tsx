@@ -3,11 +3,12 @@
 import Link from 'next/link'
 import { BackNavigation } from '@/components/BackNavigation'
 import { useManagerSession } from './ManagerSession'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import { LanguageControls, useInternalLanguage } from './InternalLanguage'
 import { useShellTasks } from './ShellTask'
 import { preloadSales, salesCache } from '@/lib/sales-cache'
+import { salesSession } from '@/lib/sales-session'
 import { MovingNavigation } from './ui/MovingNavigation'
 import { Button } from './ui/controls'
 import type { IconName } from './ui/Icon'
@@ -43,11 +44,14 @@ export default function InternalShell({ children, themeClassName }: { children: 
     : pathname.endsWith('/qr-generator') ? 'qr' : pathname.endsWith('/ui-gallery') ? 'gallery' : 'dashboard'
   const taskId = pathname.endsWith('/cash-history') ? 'cash-history' : section === 'reports' && pathname.endsWith('/bookkeeping') ? hash : section
   const session = useManagerSession()
-  // Start loading Toast sales as soon as the manager code is entered on any internal page, so Reports opens ready.
+  // Start loading Toast sales for the sales code's stores as soon as it's entered, so Reports opens ready.
+  const sales = useSyncExternalStore(salesSession.subscribe, salesSession.getSnapshot, salesSession.getSnapshot)
   useEffect(() => {
-    if (session.token) preloadSales(session.token)
+    if (sales.token) preloadSales(sales.token, sales.stores)
     else salesCache.clear()
-  }, [session.token])
+  }, [sales])
+  // Leaving the internal tools forgets the sales code, like the manager code (memory only, shared computers).
+  useEffect(() => () => salesSession.expire(), [])
   const tasks = useShellTasks()
   const metadata = tasks[taskId]
   const access = (section === 'cash' ? metadata : undefined) ?? tasks[section === 'reports' ? 'bookkeeping' : section]

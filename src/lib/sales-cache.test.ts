@@ -118,9 +118,18 @@ test('clearing (lock) or a different manager code drops loaded days and late ans
 
 test('preloadSales asks for both stores over the 30-day Reports range and swallows failures', async () => {
   const h = harness({ range: 'missing', failures: { 'CR3:2026-11-14': [new SalesUnavailableError('failed')] } })
-  preloadSales('code', h.cache, '2026-11-14')
+  preloadSales('code', ['CR3', 'CR2'], h.cache, '2026-11-14')
   await new Promise(resolve => setTimeout(resolve, 20))
   assert.deepEqual(h.rangeCalls, ['CR3 2026-10-16..2026-11-14', 'CR2 2026-10-16..2026-11-14'])
   assert.ok(h.dayCalls.includes('CR3:2026-11-14'))
   assert.ok(h.dayCalls.every(k => k.slice(4) >= '2026-10-16' && k.slice(4) <= '2026-11-14'))
+})
+
+test('preloadSales only asks for the stores the sales code opens', async () => {
+  const h = harness({ range: 'missing' })
+  preloadSales('cr2-code', ['CR2'], h.cache, '2026-11-14')
+  await new Promise(resolve => setTimeout(resolve, 20))
+  assert.deepEqual(h.rangeCalls, ['CR2 2026-10-16..2026-11-14'])
+  assert.ok(h.dayCalls.length > 0 && h.dayCalls.every(k => k.startsWith('CR2:')))
+  preloadSales('none', [], h.cache, '2026-11-14')
 })
