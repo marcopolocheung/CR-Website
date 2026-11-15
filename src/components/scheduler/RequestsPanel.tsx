@@ -24,8 +24,11 @@ function formatWhen(value: string) {
     : { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 type Attempt = { previous: RequestRecord | null; data: RequestData; preparer: string; operation: string; kind: 'entry' | 'review'; id: string }
-export default function RequestsPanel({ source, employees, weekStart, token, locale, onLocaleChange, onDirtyChange }: {
+export default function RequestsPanel({ source, employees, weekStart, token, locale, onLocaleChange, onDirtyChange, prefill, onApproved, hideLanguage = false }: {
   source: ScheduleRequestsSource; employees: Employee[]; weekStart: string; token: string; locale: Locale; onLocaleChange: (locale: Locale) => void; onDirtyChange: (dirty: boolean) => void
+  prefill?: { id: string; employeeId: string; date: string } | null
+  onApproved?: (request: ScheduleRequest) => void
+  hideLanguage?: boolean
 }) {
   const t = (key: TranslationKey, params?: Record<string, string | number>) => translate(locale, key, params)
   const [open, setOpen] = useState(false)
@@ -40,8 +43,20 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
   const [error, setError] = useState<TranslationKey | null>(null), [notice, setNotice] = useState<TranslationKey | null>(null)
   const [confirmReload, setConfirmReload] = useState(false)
   const mounted = useRef(true)
+  const appliedPrefill = useRef('')
   useEffect(() => { mounted.current = true; setReceived(localTime()); setDraftId(crypto.randomUUID()); return () => { mounted.current = false } }, [])
   useEffect(() => { if (weekStart) { setStart(current => current || weekStart); setEnd(current => current || weekStart) } }, [weekStart])
+  useEffect(() => {
+    if (!prefill || appliedPrefill.current === prefill.id) return
+    appliedPrefill.current = prefill.id
+    setOpen(true)
+    // An unfinished request is never overwritten by a board shortcut.
+    if (!employeeId && !reason && !attempt) {
+      setEmployeeId(prefill.employeeId); setStart(prefill.date); setEnd(prefill.date); setKind('time-off')
+      setNotice(null)
+    } else setNotice('planning.requestDraftKept')
+    requestAnimationFrame(() => document.getElementById('schedule-requests-panel')?.querySelector<HTMLSelectElement>('select')?.focus())
+  }, [prefill])
   const dirty = !!employeeId || !!reason || Object.values(reviewReasons).some(Boolean) || !!attempt
   useEffect(() => { onDirtyChange(dirty); return () => onDirtyChange(false) }, [dirty, onDirtyChange])
   const requests = source.record?.data.requests ?? []
@@ -52,6 +67,8 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
       const saved = await putRequests(source.station, token, next.previous, next.data, next.preparer, next.operation)
       if (!mounted.current) return
       source.accept(saved); setAttempt(null); setNotice('requests.saved')
+      const reviewed = saved.data.requests.find(item => item.id === next.id)
+      if (next.kind === 'review' && reviewed?.status === 'approved') onApproved?.(reviewed)
       if (next.kind === 'entry') resetEntry()
       else setReviewReasons(current => ({ ...current, [next.id]: '' }))
     } catch (caught) {
@@ -67,6 +84,8 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
     if (!mounted.current) return
     if (latest) {
       if (attempt?.kind === 'entry' && latest.record?.data.requests.some(item => item.id === attempt.id)) resetEntry()
+      const reviewed = latest.record?.data.requests.find(item => item.id === attempt?.id)
+      if (attempt?.kind === 'review' && reviewed?.status === 'approved') onApproved?.(reviewed)
       setAttempt(null); setNotice('requests.reloaded')
     } else setError('requests.failed')
     setBusy(false)
@@ -96,7 +115,7 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
   return <section id="schedule-requests" className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm print:hidden" aria-label={t('requests.title')}>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <button type="button" className={button} aria-expanded={open} aria-controls="schedule-requests-panel" onClick={() => setOpen(value => !value)}>{t('requests.title')} · {t('requests.waiting', { count: requests.filter(item => item.status === 'pending').length })}</button>
-      <div role="group" aria-label={t('requests.language')} className="flex gap-2">{(['en', 'es'] as const).map(language => <button key={language} type="button" className={button} lang={language} aria-pressed={locale === language} onClick={() => { onLocaleChange(language); try { localStorage.setItem(LOCALE_STORAGE_KEY, language) } catch { /* optional preference */ } }}>{language === 'en' ? 'English' : 'Español'}</button>)}</div>
+      {!hideLanguage && <div role="group" aria-label={t('requests.language')} className="flex gap-2">{(['en', 'es'] as const).map(language => <button key={language} type="button" className={button} lang={language} aria-pressed={locale === language} onClick={() => { onLocaleChange(language); try { localStorage.setItem(LOCALE_STORAGE_KEY, language) } catch { /* optional preference */ } }}>{language === 'en' ? 'English' : 'Español'}</button>)}</div>}
     </div>
     <p className="mt-2 text-sm text-zinc-700" role="status">{t(source.phase === 'ready' ? 'requests.loaded' : source.phase === 'loading' ? 'requests.loading' : source.phase === 'unconfigured' ? 'requests.unconfigured' : source.phase === 'uncertain' ? 'requests.uncertain' : 'requests.failed')}</p>
     {error && <p className="mt-2 font-medium text-red-800" role="alert">{t(error)}</p>}
@@ -119,7 +138,7 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
           <label>{t('requests.received')}<input className={field} type="datetime-local" aria-label={t('requests.received')} value={received} onChange={event => setReceived(event.target.value)} required /><span className="text-xs">{t('requests.deviceTime')}</span></label>
           {kind === 'availability' && <><label>{t('requests.from')}<input className={field} type="time" value={from} onChange={event => setFrom(event.target.value)} required /></label><label>{t('requests.until')}<input className={field} type="time" value={until} onChange={event => setUntil(event.target.value)} required /></label><label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={nextDay} onChange={event => setNextDay(event.target.checked)} />{t('requests.nextDay')}</label></>}
           <label className="sm:col-span-2">{t('requests.reason')}<textarea className={field} aria-label={t('requests.reason')} value={reason} maxLength={1000} onChange={event => { setReason(event.target.value); setNotice(null) }} /></label>
-          <div className="flex items-end"><button className={button} type="submit" disabled={!preparer.trim() || !employeeId}>{t(busy ? 'requests.saving' : 'requests.savePending')}</button></div>
+          <div className="flex items-end gap-2"><button className={button} type="submit" disabled={!preparer.trim() || !employeeId}>{t(busy ? 'requests.saving' : 'requests.savePending')}</button><button className={button} type="button" onClick={() => { resetEntry(); setOpen(false) }}>{t('planning.cancel')}</button></div>
         </fieldset>
         {requests.length >= MAX_REQUESTS && <p role="alert">{t('requests.capacity')}</p>}
       </form>

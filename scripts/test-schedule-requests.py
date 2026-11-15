@@ -1,4 +1,4 @@
-"""Synthetic request-entry/review checks. Build with a loopback API override and serve out/."""
+"""Synthetic request-entry/review checks; all APIs are intercepted and external assets blocked."""
 import argparse
 import copy
 import importlib.util
@@ -23,7 +23,8 @@ class RequestStore(views.FixtureStore):
         path = urlparse(request.url).path
         if not path.startswith('/api/internal/schedule-requests/'):
             return super().route(route)
-        assert urlparse(request.url).hostname in ('localhost', '127.0.0.1'), 'Production API must never be contacted'
+        # The context intercepts every request. Respond here regardless of the
+        # compiled API hostname; no schedule-request call reaches the network.
         assert request.headers.get('authorization') == 'Bearer fixture-password'
         status = 200
         if request.method == 'PUT':
@@ -66,12 +67,12 @@ def open_page(browser, url, width=1440, station='CR3-diningroom', failure=None):
     page.get_by_role('button', name='Open the scheduler', exact=True).click()
     page.wait_for_load_state('networkidle')
     panel = page.locator('#schedule-requests')
-    panel.get_by_role('button', name='Time off and availability requests', exact=False).click()
+    panel.get_by_role('button', name='Time off requests', exact=False).click()
     return context, page, panel, store, errors
 
 def fill_entry(panel, reason='Original spoken request'):
     panel.get_by_label('Requested for', exact=True).select_option('fixture-employee')
-    panel.get_by_label('Entered by (manager label)', exact=True).fill('Entry Manager')
+    panel.get_by_label('Your name', exact=True).fill('Entry Manager')
     panel.get_by_label('Starting date', exact=True).fill('2026-10-31')
     panel.get_by_label('Ending date (inclusive)', exact=True).fill('2026-11-01')
     panel.get_by_label('Original request / reason (optional)', exact=True).fill(reason)
@@ -85,7 +86,7 @@ def check_flow(browser, url, artifacts):
     panel.get_by_role('button', name='English', exact=True).click()
     # Existing scheduler link protection includes pending request text.
     page.once('dialog', lambda dialog: dialog.dismiss())
-    page.get_by_role('link', name='Menu', exact=True).first.click()
+    page.get_by_role('link', name='Internal tools / Herramientas internas', exact=True).click()
     expect(panel.get_by_label('Original request / reason (optional)', exact=True)).to_have_value('Original spoken request')
     store.failure = 'unavailable'
     panel.get_by_role('button', name='Save pending request', exact=True).click()
@@ -96,7 +97,7 @@ def check_flow(browser, url, artifacts):
     assert store.attempts[0] == store.attempts[1], 'Retry must preserve operation ID, base, timestamps and original text'
     pending = panel.get_by_role('region', name='Pending requests', exact=True)
     expect(pending.get_by_text('Original spoken request', exact=True)).to_be_visible()
-    panel.get_by_label('Reviewed by (manager label)', exact=True).fill('Review Manager')
+    panel.get_by_label('Reviewed by', exact=True).fill('Review Manager')
     pending.get_by_label('Review reason (optional)', exact=True).fill('Reviewed carefully')
     store.failure = 'conflict'
     pending.get_by_role('button', name='Approve', exact=True).click()
@@ -148,7 +149,7 @@ def check_mobile_and_absent(browser, url, artifacts):
     context, page, panel, store, errors = open_page(browser, url, failure='unconfigured')
     expect(panel.get_by_text('Request storage is not active', exact=False)).to_be_visible()
     expect(panel.get_by_role('button', name='Save pending request', exact=True)).to_be_disabled()
-    expect(page.get_by_role('button', name='Make schedule', exact=True)).to_be_enabled()
+    expect(page.get_by_role('button', name='Make schedule', exact=True).first).to_be_enabled()
     assert not store.attempts and not errors
     context.close()
 

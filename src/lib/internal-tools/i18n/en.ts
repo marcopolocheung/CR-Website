@@ -1,4 +1,6 @@
+import { planningEnglish } from './planning'
 const en = {
+  ...planningEnglish,
   "cash.lookup.storageUncertain": "Could not save on this device. The frozen save attempt is still unresolved. Keep this page open and download your current draft before resolving storage.",
   "cash.lookup.unknownCounts": "The saved counts have no original Count/Amount entry status. Zero counts do not confirm that a denomination was entered.",
 

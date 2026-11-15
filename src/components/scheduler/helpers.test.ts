@@ -141,6 +141,8 @@ test('layout preference defaults to new, keeps a stored classic choice, and surv
     assert.equal(readLayoutPreference(), 'new')
     stored.set(layoutStorageKey, 'classic')
     assert.equal(readLayoutPreference(), 'classic')
+    stored.set(layoutStorageKey, 'workspace')
+    assert.equal(readLayoutPreference(), 'workspace')
     stored.set(layoutStorageKey, 'new')
     assert.equal(readLayoutPreference(), 'new')
   } finally {

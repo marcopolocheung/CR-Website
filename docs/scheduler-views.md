@@ -1,5 +1,9 @@
 # Focused scheduler views
 
+The opt-in [Planning workspace](scheduler-planning-workspace.md) adds the
+prototype-style board and bounded draft repair while retaining Current/Classic
+and the existing station/week, employee, request and publication contracts.
+
 Research and implementation decision, October 24, 2026.
 
 Managers reported that the scheduler was too busy and asked to separate employee
