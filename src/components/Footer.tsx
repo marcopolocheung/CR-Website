@@ -33,8 +33,8 @@ export default function Footer() {
           <h2 className="font-bold text-yellow-300 mb-2">Links</h2>
           <ul className="space-y-2">
             <li><Link href="/careers" className="hover:text-yellow-300 transition-colors">Careers</Link></li>
-            {/* Staff entry: opens the internal tools straight to the manager code screen (the code is checked there). */}
-            <li><Link href="/internal?access=manager" prefetch={false} rel="nofollow" data-internal-entry className="hover:text-yellow-300 transition-colors">Internal (staff)</Link></li>
+            {/* Staff entry: a plain page that asks for the manager code, then opens the internal tools. */}
+            <li><Link href="/staff" prefetch={false} rel="nofollow" data-internal-entry className="hover:text-yellow-300 transition-colors">Internal (staff)</Link></li>
             <li>
               <TrackedLink
                 href="tel:2106753226"

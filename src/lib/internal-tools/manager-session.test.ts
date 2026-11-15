@@ -62,3 +62,13 @@ test('a verification completing after the layout exits cannot revive access', ()
   session.active = true
   assert.equal(session.getSnapshot().token, '')
 })
+
+test('a code checked on the staff entry page is handed to the internal tools once, and only while fresh', () => {
+  const session = new ManagerSession()
+  session.handoff('entry-code', 1_000)
+  assert.equal(session.takeHandoff(2_000), 'entry-code')
+  assert.equal(session.takeHandoff(2_000), '')
+  session.handoff('stale-code', 1_000)
+  assert.equal(session.takeHandoff(1_000 + 31_000), '')
+  assert.equal(session.getSnapshot().token, '')
+})
