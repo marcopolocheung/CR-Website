@@ -1,6 +1,6 @@
 /**
- * Toast sales days kept in browser memory for the manager session, shared by the preload (started as soon as the
- * manager code is entered on any internal page) and the Reports page. Same subscribe/getSnapshot shape as
+ * Toast sales days kept in browser memory for the sales session, shared by the preload (started as soon as a sales
+ * code is entered, for the stores it opens) and the Reports page. Same subscribe/getSnapshot shape as
  * `managerSession`, so React reads it with `useSyncExternalStore`.
  */
 import { datesEnding } from './dashboard'
@@ -51,7 +51,7 @@ export class SalesCache {
   getSnapshot = () => this.snapshot
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
 
-  /** Forget everything (manager session locked, expired or changed). Answers still on the way are dropped. */
+  /** Forget everything (sales code locked, expired or changed). Answers still on the way are dropped. */
   clear = () => {
     this.generation += 1
     this.token = ''
@@ -131,7 +131,8 @@ export class SalesCache {
 
 export const salesCache = new SalesCache()
 
-/** Start loading the longest Reports view in the background. Failures are left for the Reports page to show. */
-export function preloadSales(token: string, cache = salesCache, today = defaults.today()): void {
-  void cache.ensure(SALES_STORES, datesEnding(today, SALES_PRELOAD_DAYS), token).catch(() => {})
+/** Start loading the longest Reports view for the code's stores in the background. Failures are left for Reports to show. */
+export function preloadSales(token: string, stores: readonly string[], cache = salesCache, today = defaults.today()): void {
+  if (!stores.length) return
+  void cache.ensure(stores, datesEnding(today, SALES_PRELOAD_DAYS), token).catch(() => {})
 }

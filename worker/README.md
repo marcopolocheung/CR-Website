@@ -170,9 +170,33 @@ Antonio answers `400 invalid_date`. Errors match the cash fill route, plus
 `503 toast_busy` when Toast keeps rate-limiting (the Worker waits up to 2 s for
 Toast's `Retry-After` and retries once first).
 
+### Sales codes (who can see which store)
+
+Toast sales have their own codes, separate from the manager code, so a store's
+staff can see only that store:
+
+| Worker secret | Opens |
+|---|---|
+| `SALES_CODE_CR3` | CR3 sales only |
+| `SALES_CODE_CR2` | CR2 sales only |
+
+Setting both to the same value makes that one code open both stores. Once
+**either** is set, the manager code no longer opens sales (it still
+runs cash-out and Fill from Toast). Until then the manager code opens both
+stores, so nothing breaks before activation. Every sales route checks the code
+against the store: a code for the other store gets `403 forbidden_store`; a
+wrong code gets `401` and uses the same wrong-code limit as the manager gate.
+`GET /api/toast/sales/access` returns `{ stores }` for a code; the Reports
+page asks it once when the code is entered. Codes live only in the page's
+memory and are forgotten on **Lock sales** or when leaving the internal tools.
+To remove someone's access, change that store's code.
+
+Dashboard deploys: Worker → Settings → Variables and Secrets → Add → type
+**Secret** for each code.
+
 ### Cached range (`GET /api/toast/sales/{CR3|CR2}?from=YYYY-MM-DD&to=YYYY-MM-DD`)
 
-Manager token required. Returns `{ store, days: { [date]: summary }, missing:
+Sales code for that store required. Returns `{ store, days: { [date]: summary }, missing:
 [date…] }` from KV only, so it never calls Toast and answers quickly. Up to 31
 days; a backwards, longer or malformed range answers `400 invalid_range`.
 

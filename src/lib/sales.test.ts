@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { fetchSalesDay, fetchSalesRange, SalesUnavailableError } from './sales-store'
+import { fetchSalesDay, fetchSalesRange, verifySalesCode, SalesUnavailableError } from './sales-store'
+import { SalesSession } from './sales-session'
 import { RequestTimeoutError, requestJson } from './cashout-store'
 import { StoreAuthError } from './schedule-store'
 import { emptySalesDay, sumSalesDays, salesRows, splitParts, storeTotals, runLimited, type SalesDay } from './sales'
@@ -62,12 +63,11 @@ test('rows keep each store apart, and store totals add up to the combined total'
   assert.deepEqual(storeTotals(salesRows(['2026-11-14'], ['CR2'], loaded), ['CR2']).CR2, emptySalesDay())
 })
 
-test('split parts follow the chosen split; meal periods include orders Toast left without one only when there are any', () => {
+test('meal-period parts include orders Toast left without one only when there are any', () => {
   const d = day(1000, { shift: { am: { net: 400, orders: 1 }, pm: { net: 600, orders: 2 } }, service: { lunch: { net: 300, orders: 1 }, dinner: { net: 700, orders: 2 }, other: { net: 0, orders: 0 } } })
-  assert.deepEqual(splitParts(d, 'shift').map(p => [p.key, p.net]), [['am', 400], ['pm', 600]])
-  assert.deepEqual(splitParts(d, 'service').map(p => [p.key, p.net]), [['lunch', 300], ['dinner', 700]])
+  assert.deepEqual(splitParts(d).map(p => [p.key, p.net]), [['lunch', 300], ['dinner', 700]])
   const withOther = { ...d, service: { ...d.service, other: { net: 5, orders: 1 } } }
-  assert.deepEqual(splitParts(withOther, 'service').map(p => p.key), ['lunch', 'dinner', 'other'])
+  assert.deepEqual(splitParts(withOther).map(p => p.key), ['lunch', 'dinner', 'other'])
 })
 
 test('fetchSalesDay names why a day could not load', async () => {
@@ -122,4 +122,56 @@ test('fetchSalesRange returns cached days, or null so an older or troubled Worke
   } finally {
     globalThis.fetch = original
   }
+})
+
+test('verifySalesCode returns the stores a code opens and names wrong, throttled or not-yet-supported codes', async () => {
+  const original = globalThis.fetch
+  const seen: (string | null)[] = []
+  const answer = async (status: number, payload: unknown) => {
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      seen.push(new Headers(init?.headers).get('Authorization'))
+      return { status, async json() { return payload } }
+    }) as unknown as typeof fetch
+    try { return await verifySalesCode('cr3-code') } catch (caught) {
+      if (caught instanceof SalesUnavailableError) return caught.reason
+      if (caught instanceof StoreAuthError) return 'auth'
+      return caught instanceof Error && /Too many/.test(caught.message) ? 'rate' : 'other'
+    }
+  }
+  try {
+    assert.deepEqual(await answer(200, { stores: ['CR3'] }), ['CR3'])
+    assert.deepEqual(await answer(200, { stores: ['CR3', 'CR2', 'CR9'] }), ['CR3', 'CR2'])
+    assert.equal(await answer(401, { error: 'unauthorized' }), 'auth')
+    assert.equal(await answer(429, { error: 'rate_limited' }), 'rate')
+    assert.equal(await answer(404, { error: 'not_found' }), 'outdated')
+    assert.equal(seen[0], 'Bearer cr3-code')
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('a sales code that does not open a store (403) locks sales like a wrong code', async () => {
+  const original = globalThis.fetch
+  globalThis.fetch = (async () => ({ status: 403, async json() { return { error: 'forbidden_store' } } })) as unknown as typeof fetch
+  try {
+    await assert.rejects(fetchSalesDay('CR2', '2026-11-13', 'cr3-code'), StoreAuthError)
+    await assert.rejects(fetchSalesRange('CR2', '2026-11-01', '2026-11-03', 'cr3-code'), StoreAuthError)
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('the sales session keeps its code in memory and ignores a lock from an older code', () => {
+  const session = new SalesSession()
+  let changes = 0
+  session.subscribe(() => { changes += 1 })
+  session.unlock('cr3-code', ['CR3'])
+  const first = session.getSnapshot().generation
+  session.unlock('both-code', ['CR3', 'CR2'])
+  session.expire(first)
+  assert.equal(session.getSnapshot().token, 'both-code')
+  session.expire()
+  assert.deepEqual(session.getSnapshot().stores, [])
+  assert.equal(session.getSnapshot().token, '')
+  assert.equal(changes, 3)
 })

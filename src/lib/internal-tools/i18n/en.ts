@@ -653,12 +653,12 @@ const en = {
   "formDrafts.alreadySaved": "This draft was already saved as a write-up. Saving again creates a second, separate write-up.",
   "formDrafts.saveAnother": "Edit as a new write-up",
   'sales.title': 'Sales from Toast',
+  'sales.code': 'Sales code',
+  'sales.codeInstructions': 'Enter your sales code. A store code shows that store only. The code is kept on this page until you lock it or leave.',
+  'sales.lock': 'Lock sales',
   'sales.split': 'Split',
-  'sales.byShift': 'AM / PM',
   'sales.byService': 'Lunch / Dinner',
   'sales.byStore': 'By store',
-  'sales.part.am': 'AM',
-  'sales.part.pm': 'PM',
   'sales.part.lunch': 'Lunch',
   'sales.part.dinner': 'Dinner',
   'sales.part.other': 'No meal period',
@@ -691,6 +691,6 @@ const en = {
   'sales.failed': 'Could not get sales from Toast.',
   'sales.today': 'so far today',
   'sales.oneStore': 'one store only',
-  'sales.help': 'Net sales are after discounts and before tax and tips. AM/PM uses when each order was opened (before or after 4 PM). Lunch/Dinner uses the meal periods set up in Toast. Voided items never count as sales.',
+  'sales.help': 'Net sales are after discounts and before tax and tips. Lunch/Dinner uses the meal periods set up in Toast. Voided items never count as sales.',
 } as const
 export default en

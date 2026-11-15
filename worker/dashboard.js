@@ -701,6 +701,49 @@ __name(isWorkbookOutput, "isWorkbookOutput");
 
 // ../src/lib/internal-tools/i18n/en.ts
 var en = {
+  "cash.lookup.storageUncertain": "Could not save on this device. The frozen save attempt is still unresolved. Keep this page open and download your current draft before resolving storage.",
+  "cash.lookup.unknownCounts": "The saved counts have no original Count/Amount entry status. Zero counts do not confirm that a denomination was entered.",
+  "cash.lookup.readOnly": "Saved record \xB7 read-only. Choose Edit a copy to start a new device draft.",
+  "cash.lookup.reviewRequired": "Review the saved copy and frozen attempt below. Choose Review replacement to check the current record again and confirm.",
+  "cash.lookup.title": "Saved cash days",
+  "cash.lookup.return": "Return to cash draft",
+  "cash.lookup.retention": "Lookup covers 30 dates ending on the selected date. The service expires each record 31 days after saving, regardless of its business date.",
+  "cash.lookup.linkMeaning": "Links open the current saved store/day. They do not identify an immutable historical revision.",
+  "cash.lookup.invalidLink": "Invalid saved-day link. No record was selected. Choose a valid store and date to continue.",
+  "cash.lookup.endDate": "Lookup end date",
+  "cash.lookup.exact": "Exact saved day",
+  "cash.lookup.open": "Open saved day",
+  "cash.lookup.windowAction": "Look up 30 dates",
+  "cash.lookup.window": "Saved-day lookup window",
+  "cash.lookup.windowLabel": "30 dates: {from} through {to}",
+  "cash.lookup.empty": "No saved days in this lookup window. Try another end date or an exact day.",
+  "cash.lookup.failed": "Lookup failed. Your store and dates are kept. Retry this lookup.",
+  "cash.lookup.recordFailed": "This saved day could not be read or validated. Your draft is retained. Retry this exact record.",
+  "cash.lookup.missing": "This exact saved day is unavailable. A 404 cannot tell whether it was never saved or expired after 31 days.",
+  "cash.lookup.savedTime": "Saved timestamp",
+  "cash.lookup.savedAt": "Saved at {time}",
+  "cash.lookup.editCopy": "Edit a copy",
+  "cash.lookup.destination": "Create a new device draft for {store} \xB7 {date}. The saved record stays unchanged until you explicitly save.",
+  "cash.lookup.createCopy": "Create device draft",
+  "cash.lookup.copyConfirm": "Create an editable copy for {store} \xB7 {date}? Any open cash draft, including one hidden behind lookup, must be saved on this device before its editor is replaced.",
+  "cash.lookup.copyFailed": "Copy was canceled or could not be protected on this device. The previous editor is retained. Check storage or pending work before trying again.",
+  "cash.lookup.concurrent": "The legacy service allows concurrent overwrites. Reading before saving is not atomic conflict protection or server-side idempotency.",
+  "cash.lookup.replaceConfirm": "Replace {store} \xB7 {date}, saved at {time}, with this frozen copy? Review the saved copy and retained draft before confirming. Concurrent overwrites are still possible.",
+  "cash.lookup.changedConfirm": "The saved copy of {store} \xB7 {date} differs from your baseline or uncertain attempt (saved at {time}). Both copies are retained for comparison. Review them, then explicitly confirm replacement with the frozen attempt. Concurrent overwrites are still possible.",
+  "cash.lookup.retryConfirm": "No saved record was found for {store} \xB7 {date}. Retry the frozen attempt? Any newer input stays in your draft.",
+  "cash.lookup.uncertain": "The save outcome is uncertain. Your frozen attempt is retained. Save again to read the saved day before any retry.",
+  "cash.lookup.matched": "The saved day matches the frozen attempt. No additional save was sent.",
+  "cash.lookup.earlierMatched": "The saved day matches the earlier frozen attempt. No additional save was sent. Newer input remains a device draft.",
+  "cash.lookup.recoveryBlocked": "Save recovery could not be protected on this device. No new request was sent. Keep this page open and download your draft or unreadable recovery source before resolving storage.",
+  "cash.lookup.preflightFailed": "The saved day could not be checked. Replacement is blocked; your draft is retained. Retry to read it again.",
+  "cash.lookup.readBeforeRetryFailed": "The saved day could not be checked after the uncertain attempt. No retry was sent. Both the attempt and current draft are retained.",
+  "cash.lookup.savedChanged": "The service acknowledged the save, but the current saved day differs or is unavailable. Your draft is retained. Review before saving again.",
+  "cash.lookup.comparison": "Saved copy and retained draft",
+  "cash.lookup.retainedDraft": "Your editable draft stays above. Open the frozen attempt below to compare every drawer with the saved copy.",
+  "cash.lookup.frozen": "Frozen attempt for this save",
+  "cash.lookup.storedTotals": "Stored totals \u2014 day: {deposit}; cashier difference: {difference}; Z difference: {z}.",
+  "cash.lookup.reviewReplacement": "Review replacement",
+  "navigation.back": "Back",
   "cash.focus.title": "Cash count",
   "cash.focus.entry": "Count a drawer",
   "cash.focus.setup": "Store, date and draft",
@@ -1307,11 +1350,12 @@ var en = {
   "formDrafts.alreadySaved": "This draft was already saved as a write-up. Saving again creates a second, separate write-up.",
   "formDrafts.saveAnother": "Edit as a new write-up",
   "sales.title": "Sales from Toast",
+  "sales.code": "Sales code",
+  "sales.codeInstructions": "Enter your sales code. A store code shows that store only. The code is kept on this page until you lock it or leave.",
+  "sales.lock": "Lock sales",
   "sales.split": "Split",
-  "sales.byShift": "AM / PM",
   "sales.byService": "Lunch / Dinner",
-  "sales.part.am": "AM",
-  "sales.part.pm": "PM",
+  "sales.byStore": "By store",
   "sales.part.lunch": "Lunch",
   "sales.part.dinner": "Dinner",
   "sales.part.other": "No meal period",
@@ -1320,11 +1364,13 @@ var en = {
   "sales.orders": "Orders",
   "sales.averageNote": "Average order {amount}",
   "sales.discounts": "Discounts",
-  "sales.discountShare": "{percent} of sales before discounts",
+  "sales.discountShare": "{percent} of net sales",
   "sales.voids": "Voids",
   "sales.voidNote": "{items} items \xB7 {orders} whole orders",
   "sales.dailyNet": "Net sales per day",
   "sales.dailyLosses": "Discounts and voids per day",
+  "sales.dailyDiscounts": "Discounts per day",
+  "sales.dailyVoids": "Voids per day",
   "sales.splitTotals": "Split totals",
   "sales.share": "Share",
   "sales.byDay": "Sales by day",
@@ -1342,7 +1388,7 @@ var en = {
   "sales.failed": "Could not get sales from Toast.",
   "sales.today": "so far today",
   "sales.oneStore": "one store only",
-  "sales.help": "Net sales are after discounts and before tax and tips. AM/PM uses when each order was opened (before or after 4 PM). Lunch/Dinner uses the meal periods set up in Toast. Voided items never count as sales."
+  "sales.help": "Net sales are after discounts and before tax and tips. Lunch/Dinner uses the meal periods set up in Toast. Voided items never count as sales."
 };
 var en_default = en;
 
@@ -2645,6 +2691,27 @@ async function managerAuthError(request, env) {
   return json({ error: "unauthorized" }, 401, request, env);
 }
 __name(managerAuthError, "managerAuthError");
+var salesCodesSet = /* @__PURE__ */ __name((env) => !!(env.SALES_CODE_CR3 || env.SALES_CODE_CR2), "salesCodesSet");
+function salesStoresFor(request, env) {
+  const auth = request.headers.get("Authorization") ?? "";
+  const is = /* @__PURE__ */ __name((code) => !!code && auth === `Bearer ${code}`, "is");
+  const stores = [];
+  if (is(env.SALES_CODE_CR3)) stores.push("CR3");
+  if (is(env.SALES_CODE_CR2)) stores.push("CR2");
+  if (!stores.length && !salesCodesSet(env) && isGoldenWriteAuthorized(request, env)) return ["CR3", "CR2"];
+  return stores;
+}
+__name(salesStoresFor, "salesStoresFor");
+async function salesAuthError(request, env, store) {
+  const stores = salesStoresFor(request, env);
+  if (stores.length) return !store || stores.includes(store) ? null : json({ error: "forbidden_store" }, 403, request, env);
+  if (!salesCodesSet(env) && goldenWriteError(env)) return json({ error: "write_not_configured" }, 503, request, env);
+  if (!await checkVerifyThrottle(env, clientIp(request))) {
+    return json({ error: "rate_limited" }, 429, request, env, { "Retry-After": "3600" });
+  }
+  return json({ error: "unauthorized" }, 401, request, env);
+}
+__name(salesAuthError, "salesAuthError");
 function clientIp(request) {
   return request.headers.get("CF-Connecting-IP") ?? request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ?? "unknown";
 }
@@ -2899,7 +2966,7 @@ var index_default = {
     if (toastSalesMatch && request.method === "GET") {
       const [, store, date] = toastSalesMatch;
       if (Number.isNaN(Date.parse(date))) return json({ error: "not_found" }, 404, request, env);
-      const denied = await managerAuthError(request, env);
+      const denied = await salesAuthError(request, env, store);
       if (denied) return denied;
       const noStore = { "Cache-Control": "no-store" };
       if (!toastConfigured(env)) return json({ error: "toast_unconfigured" }, 503, request, env, noStore);
@@ -2913,10 +2980,15 @@ var index_default = {
         return json({ error: code }, code === "toast_unconfigured" || code === "toast_busy" ? 503 : 502, request, env, noStore);
       }
     }
+    if (path === "/api/toast/sales/access" && request.method === "GET") {
+      const denied = await salesAuthError(request, env);
+      if (denied) return denied;
+      return json({ stores: salesStoresFor(request, env) }, 200, request, env, { "Cache-Control": "no-store" });
+    }
     const toastSalesRangeMatch = path.match(/^\/api\/toast\/sales\/(CR3|CR2)$/);
     if (toastSalesRangeMatch && request.method === "GET") {
       const store = toastSalesRangeMatch[1];
-      const denied = await managerAuthError(request, env);
+      const denied = await salesAuthError(request, env, store);
       if (denied) return denied;
       const noStore = { "Cache-Control": "no-store" };
       if (!toastConfigured(env)) return json({ error: "toast_unconfigured" }, 503, request, env, noStore);
