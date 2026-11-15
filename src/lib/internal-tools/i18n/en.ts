@@ -59,6 +59,8 @@ const en = {
   "cash.focus.history": "Saved days",
   "home.title": "Home",
   "home.context": "Choose a task",
+  "home.entryTitle": "Internal tools",
+  "home.entrySkip": "Continue without the manager code",
   "home.cash": "Cash count",
   "home.tasks": "Start a task",
   "reports.tools": "Imports and comparison reports",

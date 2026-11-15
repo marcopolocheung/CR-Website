@@ -60,6 +60,8 @@ const es: Record<keyof typeof en, string> = {
   "cash.focus.history": "Días guardados",
   "home.title": "Inicio",
   "home.context": "Elegir una tarea",
+  "home.entryTitle": "Herramientas internas",
+  "home.entrySkip": "Continuar sin el código de gerente",
   "home.cash": "Conteo de caja",
   "home.tasks": "Iniciar una tarea",
   "reports.tools": "Importaciones e informes comparativos",
