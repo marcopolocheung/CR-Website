@@ -34,3 +34,7 @@ Review the missing-ID/same-name queue, explicit UUID choices, unavailable/confli
 Recommended merge order 08 → 09 → 10 → 11. Overlap: en/es dictionaries, browser helper/validation/retention/history scenarios, guide/tracker and briefs. Stage composition and CSS remain local to the hours converter. Preserve both converters' scenario adaptations when merging.
 
 Rollback: revert this UI slice while retaining all original draft keys, snapshots, unreadable recovery bytes and server records. No API or financial/payroll migration. Owner/physical/staff review and release are pending; the approved plan authorizes continuing to Step 10 after this PR opens, with no merging or deployment.
+
+## Session-generation follow-up
+
+Review while implementing Step 10 found that a directory reload confirmation could outlive its manager session. The directory editor now captures its operation generation before confirmation, rechecks it before reading, and invalidates old operations even when the same code is entered again. Old completion cleanup cannot clear a newer operation. This same small guard is present independently in Step 10. TypeScript, loopback production build/SEO, mapping and staged-hours browser scenarios passed again; `checks/session-followup-*` retains results. Source hashes and visual evidence were refreshed. Earlier static REA describes the pre-guard build; a final passive observation records this build, without claiming static/runtime equivalence.

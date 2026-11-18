@@ -1,4 +1,5 @@
 'use client'
+import { useManagerSession } from './ManagerSession'
 import { useImportAccess } from './useImportAccess'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigationProtection } from './NavigationProtection'
@@ -11,7 +12,7 @@ import type { HoursRow } from '@/lib/converter/validation'
 import { sourceTime } from '@/lib/converter/business-date'
 import { canonicalJson } from '@/lib/internal-tools/json'
 export default function EmployeeMapping({store,rows,fingerprint,token,preparer,onRecord,onDirty}:{onDirty?:(dirty:boolean)=>void;store:StoreId;rows:HoursRow[];fingerprint:string;token:string;preparer:string;onRecord:(record:DirectoryRecord|null)=>void}){
- const failureKey = useImportAccess()
+ const failureKey = useImportAccess(), session = useManagerSession()
  const {t}=useInternalLanguage(),[record,setRecord]=useState<DirectoryRecord|null>(null),[draft,setDraft]=useState<ImportDirectory>(emptyDirectory),[loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[name,setName]=useState(''),[sharedId,setSharedId]=useState('')
  const confirmation=useConfirmation()
  useNavigationProtection({dirty:loaded&&canonicalJson(draft)!==canonicalJson(record?.data??emptyDirectory()),deviceSaved:false,busy})
@@ -21,14 +22,16 @@ export default function EmployeeMapping({store,rows,fingerprint,token,preparer,o
  const mapped=useMemo(()=>mapHours(rows,draft,store,fingerprint),[rows,draft,store,fingerprint])
  const options=useMemo(()=>mapped.filter((row,i,list)=>row.key&&list.findIndex(r=>r.key===row.key)===i),[mapped])
  useEffect(()=>{generation.current++;setBusy(false);setLoaded(false);setRecord(null);setDraft(emptyDirectory());setStatus('');return()=>{generation.current++}},[store]) // Source-context changes reset the directory editor.
- useEffect(()=>{generation.current++;setBusy(false);return()=>{generation.current++}},[token]) // Locking hides working choices without discarding them.
+ useEffect(()=>{generation.current++;working.current=false;setBusy(false);return()=>{generation.current++}},[token,session.generation]) // Locking hides working choices without discarding them.
  async function load(){
   if(working.current||!token)return
+  const version=generation.current
   if(loaded&&canonicalJson(draft)!==canonicalJson(record?.data??emptyDirectory())&&!await confirmation.ask({key:'mapping.replace'},true))return
-  const version=generation.current;working.current=true;setBusy(true);setStatus('hoursStages.directoryLoading')
+  if(version!==generation.current)return
+  working.current=true;setBusy(true);setStatus('hoursStages.directoryLoading')
   try {const saved=await getDirectory(store,token);if(version!==generation.current)return;setRecord(saved);setDraft(saved?.data??emptyDirectory());setLoaded(true);onRecord(saved);setStatus('mapping.loaded')}
   catch(e){if(version===generation.current)setStatus(failureKey(e))}
-  finally{working.current=false;if(version===generation.current)setBusy(false)}
+  finally{if(version===generation.current){working.current=false;setBusy(false)}}
  }
  async function save(){
   if(working.current||!loaded||!token||!preparer.trim())return
@@ -38,7 +41,7 @@ export default function EmployeeMapping({store,rows,fingerprint,token,preparer,o
   working.current=true;setBusy(true);setStatus('hoursStages.directorySaving')
   try{const saved=await putDirectory(store,token,record,reviewed,preparer,operation.current.id);if(version!==generation.current)return;setRecord(saved);setDraft(saved.data);onRecord(saved);setStatus('mapping.saved');operation.current=null}
   catch(e){if(version===generation.current)setStatus(failureKey(e))}
-  finally{working.current=false;if(version===generation.current)setBusy(false)}
+  finally{if(version===generation.current){working.current=false;setBusy(false)}}
  }
  function map(key:string,employeeId:string){
   const related=mapped.filter(row=>row.key===key),dates=related.map(r=>sourceTime(r.values['In Date']).date).filter(Boolean).sort()
