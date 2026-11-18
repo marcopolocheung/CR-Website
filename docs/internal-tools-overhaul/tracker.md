@@ -1,5 +1,7 @@
 # Internal-tools task tracker
 
+The [Step 11 checkpoint](checkpoints/step-11.md) records locally implemented and verified CR3 counting, filters and device-only progress. INV-01/03/10 remain pending for their wider durable-session, unit and historical-server scope. INV-02's requested global progress/filter/search slice is verified; its broader per-section reporting remains open. No external/live milestone is advanced.
+
 The [Step 03 checkpoint](checkpoints/step-03.md) records the locally verified shell/navigation slice of UX-02. Its broader context/shared-access lifecycle checklist remains for Step 04; no unrelated or external/live milestones are changed.
 
 The [Step 02 checkpoint](checkpoints/step-02.md) records opt-in shared primitives and the verified component gallery. Related UX-01/03/04 follow-ups link actual results; unrelated task milestones remain unchanged.

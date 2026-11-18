@@ -108,3 +108,9 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Blockers: Listed prerequisites are pending.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+
+## Step 11 device-only follow-up — November 18, 2026
+
+Captured catalog/date envelopes, explicit reviewed adoption, prior-byte archives, retained removed IDs and fresh new-row identities are implemented and locally verified. Historical count fields keep their stable IDs. This does not create immutable server catalog snapshots, durable sessions or historical unit guarantees; wider backend/live scenarios remain pending.
+
+Codex coordinates dictionary/package edits with an unchanged count/catalog API; no migration number is needed. [Checkpoint](../checkpoints/step-11.md) and [evidence](../evidence/step-11/README.md) record local checks, observed fixtures, output, recovery and rollback. Physical-device/staff, release and live acceptance remain unverified. Original wider task milestones above remain pending.

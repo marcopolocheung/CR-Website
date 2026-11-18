@@ -1,0 +1,211 @@
+Traceback (most recent call last):
+  File "/home/unusn/CR-step11/scripts/test-internal-shell.py", line 161, in <module>
+    page.locator('[data-shell-lock]').click();expect(page.locator('#cashout-code')).to_be_visible();expect(page.locator('[data-shell-lock]')).to_be_disabled()
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/sync_api/_generated.py", line 14844, in to_be_visible
+    self._sync(
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/_impl/_sync_base.py", line 124, in _sync
+    return task.result()
+           ^^^^^^^^^^^^^
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/_impl/assertions.py", line 869, in to_be_visible
+    await self._expect_impl(
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/_impl/assertions.py", line 122, in _expect_impl
+    _record_soft_or_raise(
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/_impl/_assertions.py", line 50, in _record_soft_or_raise
+    raise error
+AssertionError: Locator expected to be visible
+Actual value: None
+Error: element(s) not found 
+Call log:
+  - Expect "to_be_visible" locator("#cashout-code") with timeout 5000ms
+  - waiting for locator("#cashout-code")
+
+Aria snapshot:
+- link "Skip to workspace":
+  - /url: "#internal-workspace"
+- banner:
+  - link "CHINA ROSE / Internal":
+    - /url: /internal
+  - link "Back":
+    - /url: http://127.0.0.1:3046/internal/bookkeeping.html
+  - group "Language / Idioma":
+    - button "English" [pressed]
+    - button "Español"
+  - button "Help"
+  - button "Save drafts & lock"
+  - strong: Cash
+  - text: CR2 · SW Military · 2026-11-11
+- complementary:
+  - navigation "Internal navigation":
+    - link "Dashboard":
+      - /url: /internal
+    - link "Cash":
+      - /url: /internal/bookkeeping.html#cash-out
+    - link "Inventory":
+      - /url: /internal/inventory
+    - link "Schedule":
+      - /url: /scheduler-demo
+    - link "Reports":
+      - /url: /internal/reports
+    - link "Forms":
+      - /url: /internal/forms
+- heading "Cash count" [level=1]
+- tablist "Bookkeeping tools":
+  - tab "Cash out" [selected]
+  - tab "Daily sales report"
+  - tab "Employee hours"
+  - tab "Scheduled versus actual"
+- tabpanel "Cash out":
+  - link "Saved cash days":
+    - /url: /internal/cash-history
+  - group:
+    - text: Draft and context Store
+    - combobox "Store" [disabled]:
+      - option "CR3 · W Military"
+      - option "CR2 · SW Military" [selected]
+    - text: Date
+    - textbox "Date" [disabled]: 2026-11-11
+    - alert: Draft storage is unavailable. Keep this page open and download a copy before leaving.
+    - paragraph: Working draft · CR2 · 2026-11-11 · Shell fixture
+    - paragraph: "Saved on this device: 2026-11-18T23:24:36.372Z"
+    - button "Choose another draft"
+    - button "Download this working copy"
+  - heading "Count a drawer" [level=2]
+  - button "Fill from Toast"
+  - group: Print and sheet actions
+  - paragraph: The legacy service allows concurrent overwrites. Reading before saving is not atomic conflict protection or server-side idempotency.
+  - text: Day deposit
+  - strong: $100.00
+  - button "Save day"
+  - text: AM · Synthetic CR2 cashier Drawer total $300.00 Turn-in (− $100.00) $200.00
+  - status:
+    - paragraph: Saved on this device
+  - button "Count keypad"
+  - group: Keyboard help
+  - tablist "AM and PM drawers":
+    - text: AM
+    - tab "AM · Synthetic CR2 cashier" [selected]
+    - button "Add AM drawer": + Add cashier
+    - text: PM
+    - tab "PM · Cashier 1"
+    - button "Add PM drawer": + Add cashier
+  - paragraph: Enter a Count or an Amount ($) for each denomination. They stay synchronized. Blank means not entered; type 0 to record zero.
+  - group: Counting help
+  - tabpanel "AM · Synthetic CR2 cashier":
+    - textbox "Cashier name":
+      - /placeholder: Cashier 1
+      - text: Synthetic CR2 cashier
+    - button "Remove cashier"
+    - paragraph: 1 of 11 denomination counts entered on this device
+    - table:
+      - rowgroup:
+        - 'row "Denomination # bills / coins Amount ($)"':
+          - columnheader "Denomination"
+          - columnheader "# bills / coins"
+          - columnheader "Amount ($)"
+      - rowgroup:
+        - row "$100.00 3 300.00":
+          - cell "$100.00"
+          - cell "3":
+            - textbox "$100.00 denomination count":
+              - /placeholder: —
+              - text: "3"
+          - cell "300.00":
+            - textbox "$100.00 denomination amount ($)":
+              - /placeholder: "0.00"
+              - text: "300.00"
+        - row "$50.00":
+          - cell "$50.00"
+          - cell:
+            - textbox "$50.00 denomination count":
+              - /placeholder: —
+          - cell:
+            - textbox "$50.00 denomination amount ($)":
+              - /placeholder: "0.00"
+        - row "$20.00":
+          - cell "$20.00"
+          - cell:
+            - textbox "$20.00 denomination count":
+              - /placeholder: —
+          - cell:
+            - textbox "$20.00 denomination amount ($)":
+              - /placeholder: "0.00"
+        - row "$10.00":
+          - cell "$10.00"
+          - cell:
+            - textbox "$10.00 denomination count":
+              - /placeholder: —
+          - cell:
+            - textbox "$10.00 denomination amount ($)":
+              - /placeholder: "0.00"
+        - row "$5.00":
+          - cell "$5.00"
+          - cell:
+            - textbox "$5.00 denomination count":
+              - /placeholder: —
+          - cell:
+            - textbox "$5.00 denomination amount ($)":
+              - /placeholder: "0.00"
+        - row "$1.00":
+          - cell "$1.00"
+          - cell:
+            - textbox "$1.00 denomination count":
+              - /placeholder: —
+          - cell:
+            - textbox "$1.00 denomination amount ($)":
+              - /placeholder: "0.00"
+        - row "$0.50":
+          - cell "$0.50"
+          - cell:
+            - textbox "$0.50 denomination count":
+              - /placeholder: —
+          - cell:
+            - textbox "$0.50 denomination amount ($)":
+              - /placeholder: "0.00"
+        - row "$0.25":
+          - cell "$0.25"
+          - cell:
+            - textbox "$0.25 denomination count":
+              - /placeholder: —
+          - cell:
+            - textbox "$0.25 denomination amount ($)":
+              - /placeholder: "0.00"
+        - row "$0.10":
+          - cell "$0.10"
+          - cell:
+            - textbox "$0.10 denomination count":
+              - /placeholder: —
+          - cell:
+            - textbox "$0.10 denomination amount ($)":
+              - /placeholder: "0.00"
+        - row "$0.05":
+          - cell "$0.05"
+          - cell:
+            - textbox "$0.05 denomination count":
+              - /placeholder: —
+          - cell:
+            - textbox "$0.05 denomination amount ($)":
+              - /placeholder: "0.00"
+        - row "$0.01":
+          - cell "$0.01"
+          - cell:
+            - textbox "$0.01 denomination count":
+              - /placeholder: —
+          - cell:
+            - textbox "$0.01 denomination amount ($)":
+              - /placeholder: "0.00"
+    - text: Toast cash payments
+    - spinbutton "Toast cash payments"
+    - text: Drawer total $300.00 Turn-in (− $100.00) $200.00 Over / short —
+  - heading "Day total" [level=2]
+  - text: Actual deposit (AM + PM + extra) $100.00 Cashier over / short (AM + PM) — Z report expected cash
+  - spinbutton "Z report expected cash"
+  - text: Extra money ($)
+  - textbox "Extra money ($)":
+    - /placeholder: "0.00"
+  - paragraph: Money found after counting. Added to the day deposit and the comparison against Z. Enter it here only if it is not already in a drawer count.
+  - text: Over / short vs Z report —
+- alert:
+  - paragraph: Access remains unlocked. Wait for pending work to finish, or save a recoverable device copy of every open task before locking or changing context. If device storage is unavailable, keep this page open and use the task’s download/copy recovery controls.
+  - button "Close"
+- alert

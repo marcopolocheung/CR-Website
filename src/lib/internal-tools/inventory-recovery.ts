@@ -6,7 +6,7 @@ export function isInventorySheets(value: unknown): value is InventorySheet[] {
   return value.every(s => s && typeof s === 'object' && typeof s.id === 'string' && typeof s.useLabel === 'string' && typeof s.showSup === 'boolean'
     && (s.title === undefined || typeof s.title === 'string') && (s.account === undefined || typeof s.account === 'string') && Array.isArray(s.items)
     && new Set(s.items.map((i: {id?:unknown}) => i?.id)).size === s.items.length
-    && s.items.every((i: unknown) => !!i && typeof i === 'object' && ['id','name','sup','use'].every(k => typeof (i as Record<string,unknown>)[k] === 'string') && typeof (i as {gray?:unknown}).gray === 'boolean' && (!('note' in i) || typeof i.note === 'string')))
+    && s.items.every((i: unknown) => !!i && typeof i === 'object' && ['id','name','sup','use'].every(k => typeof (i as Record<string,unknown>)[k] === 'string') && typeof (i as {gray?:unknown}).gray === 'boolean' && (!('note' in i) || i.note === undefined || typeof i.note === 'string')))
 }
 export function inventoryComparison(yours: InventorySheet[], theirs: InventorySheet[], t: (key: TranslationKey) => string): ComparisonRow[] {
   const rows: ComparisonRow[] = []

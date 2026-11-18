@@ -108,3 +108,9 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Blockers: Business decision: DEC-05. Independent tasks remain available.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+
+## Step 11 device-only follow-up — November 18, 2026
+
+On hand and order override labels expose original supplier/catalog context, preserve raw fractions/text and explicitly avoid inferred units or pack conversions. This is locally verified UI clarification only; confirmed unit/pack/target policy and structured backend work remain pending.
+
+Codex coordinates dictionary/package edits with an unchanged count/catalog API; no migration number is needed. [Checkpoint](../checkpoints/step-11.md) and [evidence](../evidence/step-11/README.md) record local checks, observed fixtures, output, recovery and rollback. Physical-device/staff, release and live acceptance remain unverified. Original wider task milestones above remain pending.

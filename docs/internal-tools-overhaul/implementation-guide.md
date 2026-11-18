@@ -55,7 +55,7 @@ Backend activation is not established by source presence. Some historical task d
 | 08 | Staged sales import | Not started |
 | 09 | Staged hours import and identity review | Not started |
 | 10 | Shared import history and readable comparison reports | Not started |
-| 11 | Inventory counting and explicit progress | Not started |
+| 11 | Inventory counting and explicit progress | Locally implemented and verified; [checkpoint](checkpoints/step-11.md), device-only progress; review/release pending |
 | 12 | Order checklist, catalog and count-history separation | Not started |
 | 13 | Forms library and sectioned editors | Not started |
 | 14 | Unified manager scheduling workspace | Not started |
