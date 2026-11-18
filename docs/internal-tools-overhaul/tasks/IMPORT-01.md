@@ -110,3 +110,7 @@ No resource creation, binding change, migration execution, or Worker deployment 
 ## Claim and dependency coordination — 2026-10-24
 
 Codex completed the bounded source-validation claim. Shared package script/dictionary edits were coordinated in this single task; no Worker routes, migrations or payroll/date policies changed. Prerequisite metadata now reflects actual reuse of already completed UX-01/03/06. Owner is Codex for completed evidence; the next task remains unassigned.
+
+## Step 09 follow-up — November 18, 2026
+
+Files → Review → Report retains source-hours and identity policy. Employee totals and a focused issue queue precede raw physical rows; directory loading, unavailable, authorization and conflict states remain distinct. Stage navigation preserves choices; restoring resets only the replaced directory editor/request generation. See the [Step 09 checkpoint](../checkpoints/step-09.md). Codex coordinates shared dictionary and fixture changes. External activation, staff/device review and release remain separate; task milestone states are unchanged.

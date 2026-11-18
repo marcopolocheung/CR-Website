@@ -2,7 +2,7 @@
 import sys,csv,io,json,hashlib
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright,expect
-from import_browser_helpers import set_source
+from import_browser_helpers import set_source, hours_review, hours_stage, hours_report, hours_copies
 BASE=sys.argv[1];assert urlparse(BASE).hostname in ('127.0.0.1','localhost')
 def run():
  with sync_playwright() as p:
@@ -31,7 +31,9 @@ def run():
   s=io.StringIO();w=csv.writer(s);w.writerow(['Employee External Id','Employee','Job Title','In Date','Out Date','Total Hours','Regular Hours','Overtime Hours']);w.writerow(['e1','Synthetic worker','Cook','10/24/2026 08:00 AM','10/24/2026 04:00 PM','8','7.5','0.5']);raw=s.getvalue().encode()
   set_source(page,'#hc-file',{'name':'original.csv','mimeType':'text/csv','buffer':raw})
   history=page.locator('#panel-hours').get_by_role('region',name='Shared import history',exact=True)
-  expect(history.locator('[data-history=save]')).to_be_disabled();page.locator('#hours-reviewed').check()
+  hours_copies(page)
+  expect(history.locator('[data-history=save]')).to_be_disabled();hours_review(page);page.locator('#hours-reviewed').check()
+  hours_report(page)
   with page.expect_download():page.locator('#hc-download').tap()
   state['mode']='fail';history.locator('[data-history=save]').tap();expect(history).to_contain_text('unavailable or not configured')
   expect(page.locator('#hc-preparer')).to_have_value('Synthetic preparer');operation=state['posts'][-1]['mutation']['operationId']
@@ -48,10 +50,11 @@ def run():
   history.locator('[data-history=resume]').first.tap();page.get_by_role('dialog').locator('button').last.tap()
   expect(page.locator('#hours-reviewed')).not_to_be_checked();assert page.locator('#hc-file').evaluate('(input)=>input.files.length')==0
   page.locator('#hours-reviewed').check();context.set_offline(True)
+  hours_report(page)
   with page.expect_download() as result:page.locator('#hc-download').tap()
   assert result.value.suggested_filename=='CR3_26_1001-26_1031_EMPLOYEE_HOUR_LOG_SUMMARY.xlsx';context.set_offline(False)
   page.get_by_role('button',name='Español',exact=True).tap();assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-  page.locator('#hc-location').select_option(index=2);expect(page.locator('#panel-hours [data-history=resume]')).to_have_count(0)
+  hours_stage(page,'files');page.locator('#hc-location').select_option(index=2);expect(page.locator('#panel-hours [data-history=resume]')).to_have_count(0)
   assert 'synthetic-history-token' not in page.evaluate('JSON.stringify(localStorage)');assert not errors,errors;assert not remote,remote
   context.close();browser.close();print('PASS IMPORT-07: exact-byte fingerprint, no raw/workbook upload, failed-save same-operation retry, duplicate gate, preserved reprocess lineage, context isolation, reviewed resume/offline regeneration and Spanish phone')
 if __name__=='__main__':run()

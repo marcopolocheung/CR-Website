@@ -1,0 +1,2 @@
+PASS IMPORT-01: bilingual source validation, sheet/CSV row evidence, isolated replacement, stale reads, retained inputs, failed export/retry, duplicate submit, real workbook cells, offline hours, denied storage, keyboard/touch/phone/print
+External network guard: 0 blocked attempts
