@@ -61,7 +61,7 @@ function Money({ cents, signed }: { cents: number | null; signed?: boolean }) {
 }
 
 /** Manager code gate. Same token as the scheduler demo; kept in memory only, never stored. */
-export function CodeGate({ onUnlock, title }: { onUnlock: (token: string) => void; title?: string }) {
+export function CodeGate({ onUnlock, title, id = 'cashout-code' }: { onUnlock: (token: string) => void; title?: string; id?: string }) {
   const { t: tr } = useInternalLanguage()
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
@@ -78,7 +78,7 @@ export function CodeGate({ onUnlock, title }: { onUnlock: (token: string) => voi
       if (!managerSession.active || generation === managerSession.getSnapshot().generation) onUnlock(code)
     } catch (caught) {
       setError({ key: errorKey(caught) })
-      focusField('cashout-code')
+      focusField(id)
     } finally {
       setBusy(false)
     }
@@ -88,7 +88,7 @@ export function CodeGate({ onUnlock, title }: { onUnlock: (token: string) => voi
     <form onSubmit={submit} className="max-w-md my-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
       <h2 className="text-xl font-semibold text-gray-900 mb-2">{title ?? tr('cash.title')}</h2>
       <p className="text-sm text-gray-600 mb-4">{tr('cash.managerInstructions')}</p>
-      <LabeledInput id="cashout-code" label={{ key: 'cash.managerCode' }} error={error}
+      <LabeledInput id={id} label={{ key: 'cash.managerCode' }} error={error}
         type="password" autoComplete="off" value={code} onChange={event => setCode(event.target.value)} className={inputClass} />
       <button
         type="submit"

@@ -107,7 +107,7 @@ def run():
         # Template failure retains every file and field and never claims a download.
         page.route('**/internal/daily-sales-template.xlsx', lambda route: route.fulfill(status=503))
         download.tap()
-        expect(sales.get_by_role('status').last).to_contain_text('No se pudo generar')
+        expect(page.locator('#sc-status')).to_contain_text('No se pudo generar')
         expect(page.locator('#sc-amDeposit')).to_have_value('123.45')
         expect(page.locator('#sc-first')).to_have_value('Original preparer')
         assert len(downloads) == 0
@@ -115,7 +115,7 @@ def run():
         with page.expect_download() as saved:
             download.evaluate('(button) => { button.click(); button.click() }')
         saved.value.save_as(str(Path(temp) / 'sales.xlsx'))
-        expect(sales.get_by_role('status').last).to_contain_text('descarg')
+        expect(page.locator('#sc-status')).to_contain_text('descarg')
         assert len(downloads) == 1, 'Two immediate submits must start one export'
         expect(page.locator('#sc-first')).to_have_value('Original preparer')
         assert 'CR3' in saved.value.suggested_filename

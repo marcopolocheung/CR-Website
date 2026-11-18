@@ -1,4 +1,5 @@
 'use client'
+import { useManagerSession } from './ManagerSession'
 import { useImportAccess } from './useImportAccess'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
@@ -7,9 +8,12 @@ import { canonicalJson } from '@/lib/internal-tools/json'
 import { putDirectory, ImportApiError, type DirectoryRecord } from '@/lib/converter/import-api'
 import { emptyDirectory } from '@/lib/converter/employee-mapping'
 import type { ComparisonInput } from '@/lib/converter/scheduled-actual'
-export default function ScheduleIdentityMapping({input,token,preparer,onSaved}:{input:ComparisonInput;token:string;preparer:string;onSaved:(record:DirectoryRecord)=>void}){
- const failureKey = useImportAccess()
+export default function ScheduleIdentityMapping({input,token,preparer,onSaved,onBusy}:{onBusy?:(storeId:string,busy:boolean)=>void;input:ComparisonInput;token:string;preparer:string;onSaved:(record:DirectoryRecord)=>void}){
+ const failureKey = useImportAccess(), session = useManagerSession()
  const {t}=useInternalLanguage(),[draft,setDraft]=useState(input.directory?.data??emptyDirectory()),[busy,setBusy]=useState(false),[status,setStatus]=useState('')
+ const epoch=useRef(0),generation=useRef(session.generation);generation.current=session.generation
+ useEffect(()=>{epoch.current++;running.current=false;setBusy(false)},[session.generation])
+ useEffect(()=>{onBusy?.(input.storeId,busy);return()=>onBusy?.(input.storeId,false)},[busy,input.storeId,onBusy])
  const credential=useRef(token);credential.current=token
  const running=useRef(false),alive=useRef(true),operation=useRef<{content:string;id:string}|null>(null)
  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
@@ -21,16 +25,16 @@ export default function ScheduleIdentityMapping({input,token,preparer,onSaved}:{
   const reviewed={...draft,mappings:draft.mappings.map(mapping=>{const old=input.directory?.data.mappings.find(m=>m.id===mapping.id);return old&&canonicalJson(old)===canonicalJson(mapping)?mapping:{...mapping,reviewedBy:preparer.trim()}})}
   const content=canonicalJson({draft:reviewed,revision:input.directory?.revision??0,preparer})
   if(operation.current?.content!==content)operation.current={content,id:crypto.randomUUID()}
-  const capturedToken=token
+  const capturedToken=token,capturedGeneration=session.generation,at=epoch.current
   running.current=true;setBusy(true)
-  try{const record=await putDirectory(input.storeId,token,input.directory,reviewed,preparer,operation.current.id);if(!alive.current||capturedToken!==credential.current)return;setStatus('mapping.saved');setDraft(record.data);onSaved(record);operation.current=null}
-  catch(e){if(alive.current&&capturedToken===credential.current)setStatus(failureKey(e))}
-  finally{running.current=false;if(alive.current)setBusy(false)}
+  try{const record=await putDirectory(input.storeId,token,input.directory,reviewed,preparer,operation.current.id);if(!alive.current||capturedToken!==credential.current||capturedGeneration!==generation.current||at!==epoch.current)return;setStatus('mapping.saved');setDraft(record.data);onSaved(record);operation.current=null}
+  catch(e){if(alive.current&&capturedToken===credential.current&&capturedGeneration===generation.current&&at===epoch.current)setStatus(failureKey(e))}
+  finally{if(at===epoch.current){running.current=false;if(alive.current)setBusy(false)}}
  }
  return <section className="mt-4 rounded border p-3" aria-label={`${t('comparison.mapping')} ${input.storeId}`}><h3 className="font-semibold">{t('comparison.mapping')} · {input.storeId}</h3><p className="mt-2 text-sm">{t('comparison.mappingNote')}</p>
   <fieldset disabled={busy} className="min-w-0"><ul className="mt-3 space-y-3">{choices.map(({pub,person},index)=>{
    const existing=draft.mappings.find(m=>m.system==='scheduler'&&m.scope===pub.stationId&&m.externalId===person.key&&m.from<=pub.weekStart&&(!m.until||m.until>=pub.weekStart))
-   return <li key={`${pub.stationId}:${person.key}`} className="break-words text-sm"><label htmlFor={`schedule-map-${input.storeId}-${index}`} className="block">{pub.stationId} · {pub.weekStart} · {person.label} · #{person.index+1}</label><select id={`schedule-map-${input.storeId}-${index}`} value={existing?.employeeId??''} onChange={e=>{
+   return <li key={`${pub.stationId}:${pub.weekStart}:${person.key}`} className="break-words text-sm"><label htmlFor={`schedule-map-${input.storeId}-${index}`} className="block">{pub.stationId} · {pub.weekStart} · {person.label} · #{person.index+1}</label><select id={`schedule-map-${input.storeId}-${index}`} value={existing?.employeeId??''} onChange={e=>{
     if(!preparer.trim()){setStatus('mapping.preparer');return}
     const mappings=draft.mappings.filter(m=>m!==existing)
     if(e.target.value)mappings.push({id:existing?.id??crypto.randomUUID(),system:'scheduler',scope:pub.stationId,externalId:person.key,employeeId:e.target.value,from:pub.weekStart,until:null,reviewedBy:preparer.trim()})

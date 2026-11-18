@@ -54,7 +54,7 @@ Backend activation is not established by source presence. Some historical task d
 | 07 | Saved cash lookup and clear save/history behavior | Implemented locally; [checkpoint](checkpoints/step-07.md), owner review pending. Legacy 31-day expiry/concurrent overwrites retained; 07b not started. |
 | 08 | Staged sales import | Not started |
 | 09 | Staged hours import and identity review | Not started |
-| 10 | Shared import history and readable comparison reports | Not started |
+| 10 | Shared import history and readable comparison reports | [Locally verified; PR/device review and backend activation pending](checkpoints/step-10.md) |
 | 11 | Inventory counting and explicit progress | Not started |
 | 12 | Order checklist, catalog and count-history separation | Not started |
 | 13 | Forms library and sectioned editors | Not started |

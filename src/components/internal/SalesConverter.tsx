@@ -1,5 +1,7 @@
 'use client'
 
+import { useImportResume } from './ImportResumeTransition'
+import { checkpointImport } from '@/lib/converter/import-checkpoint'
 import { useShellTask } from './ShellTask'
 
 import { useMemo, useRef, useState } from 'react'
@@ -64,7 +66,11 @@ export default function SalesConverter({
   const cashoutRequest = useRef(0)
   const [status, setStatus] = useState<Message | null>(null)
   const [issues, setIssues] = useState<FieldIssue[]>([])
-  useNavigationProtection({ dirty: Object.values(form).some(Boolean) || Object.values(files).some(Boolean), deviceSaved })
+  useNavigationProtection({ scope: 'sales-import', busy, checkpoint: () => {
+    const dirty = Object.values(form).some(Boolean) || Object.values(files).some(Boolean) || !!review
+    if (!dirty) return true
+    try { return checkpointImport(localStorage, snapshot, `${form.firstName} ${form.lastName}`.trim()) } catch { return false }
+  }, dirty: Object.values(form).some(Boolean) || Object.values(files).some(Boolean), deviceSaved })
 
   useShellTask('sales', { context: [importStore(form.location), form.date].filter(Boolean).join(' · ') })
 
@@ -180,6 +186,8 @@ export default function SalesConverter({
     setReview(snapshot.review); setOutput(snapshot.output); setAcknowledged(false); setResumed(true); setIssues([])
     setStatus({ key: 'importRetention.resumed' })
   }
+  useImportResume('sales', restoreSnapshot)
+
   async function startNext() {
     if (busy || (Object.values(form).some(Boolean) || Object.values(files).some(Boolean) || review) && !await confirmation.ask({ key: 'importRetention.startWarning' }, true)) return
     invalidateReview()

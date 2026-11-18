@@ -1,5 +1,7 @@
 'use client'
 
+import { useImportResume } from './ImportResumeTransition'
+import { checkpointImport } from '@/lib/converter/import-checkpoint'
 import { useShellTask } from './ShellTask'
 
 import EmployeeMapping from './EmployeeMapping'
@@ -56,7 +58,11 @@ export default function HoursConverter({token = ''}: {token?: string}) {
   const confirmation = useConfirmation()
   useShellTask('hours', { context: [importStore(plant), startDate, endDate].filter(Boolean).join(' · ') })
   function invalidateOutput() { exportVersion.current++; setAcknowledged(false); setOutput(null); setDeviceSaved(false); setStatus(null) }
-  useNavigationProtection({ dirty: !!(plant || startDate || endDate || preparer || csvFile), deviceSaved })
+  useNavigationProtection({ scope: 'hours-import', busy, checkpoint: () => {
+    const dirty = !!(plant || startDate || endDate || preparer || csvFile || rows)
+    if (!dirty) return true
+    try { return checkpointImport(localStorage, snapshot, preparer) } catch { return false }
+  }, dirty: !!(plant || startDate || endDate || preparer || csvFile), deviceSaved })
 
   async function changeContext(field:'plant'|'start'|'end',value:string) {
     const choice = ++contextChoice.current
@@ -125,11 +131,13 @@ export default function HoursConverter({token = ''}: {token?: string}) {
   function restoreSnapshot(snapshot: ImportSnapshot) {
     contextChoice.current++
     if (snapshot.kind !== 'hours') return
-    generation.current++; setDeviceSaved(false); setAcknowledged(false)
+    generation.current++; exportVersion.current++; setMappingDirty(false); setDeviceSaved(false); setAcknowledged(false)
     setPlant(snapshot.metadata.location); setStartDate(snapshot.metadata.startDate); setEndDate(snapshot.metadata.endDate); setPreparer(snapshot.metadata.preparer)
     setFingerprint(snapshot.metadata.fingerprint ?? ''); setMapping(snapshot.metadata.mapping ?? null); setRows(snapshot.rows); setSourceName(snapshot.sourceName); setOutput(reviewHours(snapshot.rows, snapshot.metadata.startDate, snapshot.metadata.endDate).excluded.length ? null : snapshot.output); setCsvFile(null); setResumed(true)
     setValidation(UNCHECKED); setIssues([]); setFileReset(value => value + 1); setStatus({ key: 'importRetention.resumed' })
   }
+  useImportResume('hours', restoreSnapshot)
+
   async function startNext() {
     if (busy || (plant || startDate || endDate || preparer || csvFile || rows) && !await confirmation.ask({ key: 'importRetention.startWarning' }, true)) return
     contextChoice.current++; generation.current++; invalidateOutput(); setRows(null); setFingerprint(''); setMapping(null); setSourceName(''); setPreparer(''); setPlant(''); setStartDate(''); setEndDate(''); setCsvFile(null)
@@ -167,7 +175,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
       </fieldset>
       {resumed && <p className="mt-3 break-words text-sm text-gray-700">{tr('importRetention.resumed')} {sourceName}</p>}
       {preview && <fieldset disabled={busy} className="min-w-0"><HoursReview review={preview} identities={identities} mappingBlocked={mappingBlocked} acknowledged={acknowledged} onAcknowledge={setAcknowledged} /></fieldset>}
-      {rows && context && <fieldset disabled={busy} className="min-w-0"><EmployeeMapping key={`${plant}:${startDate}:${endDate}:${fingerprint}`} store={context.storeId} rows={rows} fingerprint={fingerprint} token={token} preparer={preparer} onRecord={acceptDirectory} onDirty={setMappingDirty} /></fieldset>}
+      {rows && context && <fieldset disabled={busy} className="min-w-0"><EmployeeMapping key={`${fileReset}:${plant}:${startDate}:${endDate}:${fingerprint}`} store={context.storeId} rows={rows} fingerprint={fingerprint} token={token} preparer={preparer} onRecord={acceptDirectory} onDirty={setMappingDirty} /></fieldset>}
       <button id="hc-download" type="button"
         onClick={handleConvertAndDownload}
         disabled={!preview || !acknowledged || !preview.validPeriod || mappingBlocked || !preview.included.length || validation.checking || busy}

@@ -105,3 +105,7 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - Milestones: I/L done; E/V not applicable. No Worker/resource/data operation, publication or staff approval. Device copies are not shared/server import history.
 - Owner/action: Codex completed this bounded task; STOP after PR creation per the user. No next task claimed. Future import date work uses the scoped delegation documented in [service session](../imports-session.md); do not merge current PRs.
 - Rollback: scoped revert plus separately authorized compatible frontend publication if live; preserve device draft keys and original source files.
+
+## Step 10 follow-up — November 18, 2026
+
+Shared history now has an exact-context destination, readable record summaries and checkpointed in-memory resume. Comparisons lead with observed totals, coverage and grouped exceptions; actual hours remain separate from schedule estimates. Historical mappings, duplicate quarantine, source evidence and English output remain compatible. See the [Step 10 checkpoint](../checkpoints/step-10.md). Codex coordinates shared dictionary/navigation/fixture edits. External activation and live/device/staff milestones are unchanged.

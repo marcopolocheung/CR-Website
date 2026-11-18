@@ -1,3 +1,4 @@
+import ImportResumeTransition from '@/components/internal/ImportResumeTransition'
 import CashCopyTransition from '@/components/internal/CashCopyTransition'
 import ManagerSession from '@/components/internal/ManagerSession'
 import WorkspaceHost from '@/components/internal/WorkspaceHost'
@@ -9,6 +10,6 @@ import { internalThemeClassName } from '@/components/internal/ui/Theme'
 
 export default function InternalLayout({ children }: { children: React.ReactNode }) {
   return <InternalLanguage banner={false}><NavigationProtection><ManagerSession><ShellTaskProvider>
-    <CashCopyTransition><InternalShell themeClassName={internalThemeClassName}><WorkspaceHost>{children}</WorkspaceHost></InternalShell></CashCopyTransition>
+    <CashCopyTransition><ImportResumeTransition><InternalShell themeClassName={internalThemeClassName}><WorkspaceHost>{children}</WorkspaceHost></InternalShell></ImportResumeTransition></CashCopyTransition>
   </ShellTaskProvider></ManagerSession></NavigationProtection></InternalLanguage>
 }
