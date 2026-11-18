@@ -24,4 +24,3 @@ Traceback (most recent call last):
 playwright._impl._errors.TimeoutError: Locator.fill: Timeout 30000ms exceeded.
 Call log:
   - waiting for locator("input[aria-label$=\" inventory\"]").first
-
