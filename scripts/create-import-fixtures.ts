@@ -16,4 +16,8 @@ const reviewBooks = salesFixtures()
 XLSX.utils.sheet_add_aoa(reviewBooks.general.Sheets['Payments summary'], [['Total', '', 1300], ['GIFT CARD', '', 50]], { origin: 'A5' })
 reviewBooks.lunch.Sheets['Sales category summary'] = XLSX.utils.aoa_to_sheet([['Sales category', 'Net sales', 'Tax amount'], ['FOOD', 500, 40], ['DRINK', 23.45, 3.19], ['Total', 500, 43.19]])
 for (const [slot, wb] of Object.entries(reviewBooks)) fixtures['review-' + slot] = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' })
+for (const [slot, wb] of Object.entries(salesFixtures())) {
+ XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Business date','Store'],['2026-10-20','CR3']]), 'Report context')
+ fixtures['context-' + slot] = XLSX.write(wb, {type:'base64',bookType:'xlsx'})
+}
 console.log(JSON.stringify(fixtures))

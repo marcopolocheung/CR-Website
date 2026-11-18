@@ -1,160 +1,108 @@
-"""IMPORT-02 local synthetic browser acceptance. No real API/data operations."""
-import base64
-import json
+"""Step 08: staged sales, real workbooks and synthetic loopback cash. No live APIs."""
+import base64, hashlib, json, subprocess, sys, tempfile
 from pathlib import Path
-import subprocess
-import sys
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
-from import_browser_helpers import set_source, confirm_replacement
-
-BASE = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:3017'
-if urlparse(BASE).hostname not in ('localhost', '127.0.0.1'):
-    raise SystemExit('Local server required')
-ROOT = Path(__file__).resolve().parent.parent
-fixtures = json.loads(subprocess.check_output(['node', '--import', 'jiti/register', 'scripts/create-import-fixtures.ts'], cwd=ROOT))
-def source(key, name):
-    return {'name': name, 'mimeType': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'buffer': base64.b64decode(fixtures[key])}
-
-def run():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(viewport={'width': 390, 'height': 844}, has_touch=True, accept_downloads=True)
-        context.add_init_script("Storage.prototype.setItem = function() { throw new DOMException('Synthetic quota', 'QuotaExceededError') }")
-        errors, production, downloads, held = [], [], [], []
-        mode = {'hold': False}
-        token = 'synthetic-import-review-token'
-        headers = {'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization,Content-Type', 'access-control-allow-methods': 'GET,PUT,POST,OPTIONS'}
-        def api(route):
-            req = route.request
-            if req.method == 'OPTIONS':
-                route.fulfill(status=204, headers=headers)
-            elif '/api/auth/verify' in req.url:
-                route.fulfill(status=200, json={'ok': True}, headers=headers)
-            elif req.url.endswith('/api/cashout/CR3/2026-10-20') and mode['hold']:
-                held.append(route)
-            else:
-                route.fulfill(status=200, json={'days': []}, headers=headers)
-        def reject(route):
-            production.append(route.request.url)
-            route.abort()
-        context.route('http://127.0.0.1:8787/**', api)
-        context.route('https://*.workers.dev/**', reject)
-        page = context.new_page()
-        page.on('pageerror', lambda error: errors.append(str(error)))
-        page.on('download', lambda download: downloads.append(download))
-        page.on('dialog', lambda dialog: dialog.dismiss())
-        page.goto(BASE + '/internal/bookkeeping/')
-        page.wait_for_load_state('networkidle')
-        page.locator('#tab-sales').tap()
-        for slot in ('general', 'lunch', 'dinner'):
-            set_source(page, '#sc-file-' + slot, source('review-' + slot, slot + '-original.xlsx'))
-            expect(page.locator('#sc-file-' + slot + '-feedback')).to_contain_text('File checks passed')
-        prepare, download = page.locator('#sc-prepare'), page.locator('#sc-download')
-        prepare.tap()
-        expect(page.locator('#sc-location')).to_be_focused()
-        expect(download).to_be_disabled()
-        page.locator('#sc-location').select_option(index=1)
-        page.locator('#sc-date').fill('2026-10-20')
-        expect(page.locator('#sc-day')).to_have_value('TUE')
-        page.locator('#sc-first').fill('Original preparer')
-        page.locator('#sc-amDeposit').fill('123.45')
-        page.locator('#sc-pmDeposit').fill('111.11')
-        prepare.focus()
-        page.keyboard.press('Enter')
-        expect(page.locator('#sales-review-title')).to_be_focused()
-        review = page.get_by_role('region', name='Figures copied to the workbook', exact=True)
-        expect(review.get_by_role('row')).to_have_count(19)
-        expect(review).to_contain_text('Revenue summary')
-        expect(review).to_contain_text('Row 2')
-        expect(review).to_contain_text('C8')
-        expect(page.locator('[data-sales-check=lunch-sales]')).to_contain_text('Difference — review required')
-        expect(page.locator('[data-sales-check=lunch-tax]')).to_contain_text('Arithmetic matches')
-        expect(page.locator('[data-sales-check=payments]')).to_contain_text('$65.44')
-        expect(page.locator('[data-sales-check=revenue-payments]')).to_contain_text('verify scope')
-        expect(page.locator('#panel-sales [role=alert]')).to_contain_text('GIFT CARD')
-        expect(download).to_be_disabled()
-        assert not downloads
-        page.get_by_role('button', name='Español', exact=True).tap()
-        expect(page.locator('[data-sales-check=lunch-sales]')).to_contain_text('requiere revisión')
-        expect(page.locator('#panel-sales')).to_contain_text('general-original.xlsx')
-        expect(page.locator('#sales-reviewed')).not_to_be_checked()
-        page.locator('#sales-context-reason').fill('Synthetic source context reviewed for this fixture')
-        page.locator('#sales-reviewed').focus()
-        page.keyboard.press('Space')
-        expect(download).to_be_enabled()
-        page.get_by_role('button', name='English', exact=True).tap()
-        expect(page.locator('#sales-reviewed')).to_be_checked()
-        # A context edit invalidates the old snapshot and acknowledgement immediately.
-        page.locator('#sc-first').fill('Edited preparer')
-        expect(page.locator('#sales-review-title')).to_have_count(0)
-        expect(download).to_be_disabled()
-        prepare.tap()
-        expect(page.locator('#sales-reviewed')).not_to_be_checked()
-        page.locator('#sales-context-reason').fill('Synthetic source context reviewed for this fixture')
-        page.locator('#sales-reviewed').tap()
-        set_source(page, '#sc-file-general', source('general', 'general-original.xlsx'))
-        expect(page.locator('#sales-review-title')).to_have_count(0)
-        expect(download).to_be_disabled()
-        expect(page.locator('#sc-file-general-feedback')).to_contain_text('File checks passed')
-        # Preparing freezes source/context, remains bilingual and starts one read set.
-        page.evaluate("""() => {
-          window.reviewReads = [];
-          const read = File.prototype.arrayBuffer;
-          File.prototype.arrayBuffer = function() { return new Promise(resolve => window.reviewReads.push(() => resolve(read.call(this)))) };
-        }""")
-        prepare.evaluate('(button) => { button.click(); button.click() }')
-        expect(page.locator('#sc-date')).to_be_disabled()
-        page.wait_for_function('window.reviewReads.length === 3')
-        assert page.evaluate('window.reviewReads.length') == 3
-        page.get_by_role('button', name='Español', exact=True).tap()
-        page.evaluate('window.reviewReads.splice(0).forEach(release => release())')
-        expect(page.locator('#sales-review-title')).to_be_focused()
-        expect(page.locator('[data-sales-check=payments]')).to_contain_text('Falta total/detalle')
-        page.evaluate('File.prototype.arrayBuffer = function() { return new Blob([this]).arrayBuffer() }')
-        # A separate screen/tab retains the prepared review and selected files.
-        page.locator('#sales-context-reason').fill('Synthetic source context reviewed for this fixture')
-        page.locator('#sales-reviewed').tap()
-        page.locator('#tab-hours').tap()
-        page.locator('#tab-sales').tap()
-        expect(page.locator('#sales-reviewed')).to_be_checked()
-        expect(page.locator('#sc-first')).to_have_value('Edited preparer')
-        page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
-        expect(page.locator('#sales-review-title')).to_have_text('Review extracted sales figures')
-        page.evaluate("window.dispatchEvent(new Event('afterprint'))")
-        expect(page.locator('#sales-review-title')).to_have_text('Revisar las cifras de ventas extraídas')
-        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Spanish review overflows phone viewport'
-        # Optional cash-out results arriving after edits must not change this review/input.
-        page.get_by_role('button', name='English', exact=True).tap()
-        page.locator('#tab-cash-out').tap()
-        page.locator('#cashout-code').fill(token)
-        page.get_by_role('button', name='Unlock', exact=True).tap()
-        expect(page.locator('#cashout-store')).to_be_visible()
-        page.wait_for_load_state('networkidle')
-        page.locator('#tab-sales').tap()
-        mode['hold'] = True
-        page.get_by_role('button', name='Fill from cash-out', exact=True).tap()
-        page.wait_for_timeout(100)
-        assert held
-        page.locator('#sc-first').fill('Latest preparer')
-        held.pop().fulfill(status=200, json={'sheet': {'am': [{'name': 'Synthetic', 'counts': [2] + [0] * 10, 'toast': '100'}], 'pm': [], 'zReport': ''}}, headers=headers)
-        expect(page.locator('#sc-amDeposit')).to_have_value('123.45')
-        expect(page.locator('#sc-first')).to_have_value('Latest preparer')
-        expect(download).to_be_disabled()
-        prepare.tap()
-        page.locator('#sales-context-reason').fill('Synthetic source context reviewed for this fixture')
-        page.locator('#sales-reviewed').tap()
-        with page.expect_download() as result:
-            download.tap()
-        assert result.value.suggested_filename == '26-1020_CR3_Daily_Sales_Report.xlsx'
-        assert len(downloads) == 1
-        expect(page.locator('#sc-first')).to_have_value('Latest preparer')
-        assert token not in page.evaluate('JSON.stringify(localStorage)')
-        assert not production, production
-        assert not errors, errors
-        context.close()
-        browser.close()
-        print('PASS IMPORT-02: source/row/cell evidence, arithmetic/coverage flags, bilingual acknowledgement, invalidation, one prepare, retained tabs/context, stale cash-out suppression, phone/print and download')
-
-if __name__ == '__main__':
-    run()
+from import_browser_helpers import set_source, sales_stage, sales_report
+BASE=sys.argv[1]; assert urlparse(BASE).hostname in ('127.0.0.1','localhost')
+ROOT=Path(__file__).resolve().parent.parent
+ART=ROOT/'docs/internal-tools-overhaul/evidence/step-08/screens'; ART.mkdir(parents=True,exist_ok=True)
+fixtures=json.loads(subprocess.check_output(['node','--import','jiti/register','scripts/create-import-fixtures.ts'],cwd=ROOT))
+def source(key,name): return {'name':name,'mimeType':'application/octet-stream','buffer':base64.b64decode(fixtures[key])}
+with sync_playwright() as p:
+ browser=p.chromium.launch(headless=True,args=['--remote-debugging-port=9338'])
+ context=browser.new_context(viewport={'width':1440,'height':1000},accept_downloads=True,reduced_motion='reduce')
+ errors=[]; external=[]; held=[]; mode={'cash':'hold'}
+ cors={'access-control-allow-origin':'*','access-control-allow-headers':'Authorization,Content-Type','access-control-allow-methods':'GET,PUT,POST,OPTIONS'}
+ def api(route):
+  req=route.request
+  if req.method=='OPTIONS':route.fulfill(status=204,headers=cors)
+  elif '/api/auth/verify' in req.url:route.fulfill(status=200,json={'ok':True},headers=cors)
+  elif req.url.endswith('/api/cashout/CR3/2026-10-20'):
+   if mode['cash']=='hold':held.append(route)
+   elif mode['cash']=='fail':route.fulfill(status=503,json={},headers=cors)
+   else:route.fulfill(status=200,json=cash,headers=cors)
+  else:route.fulfill(status=200,json={'days':[]},headers=cors)
+ cash={'store':'CR3','date':'2026-10-20','updatedAt':'2026-10-21T01:00:00Z','sheet':{'am':[],'pm':[],'zReport':''},'totals':{'amDeposit':0,'pmDeposit':23456,'amOverShort':None,'pmOverShort':0}}
+ def guard(route):
+  if urlparse(route.request.url).hostname in ('127.0.0.1','localhost'):route.continue_()
+  else:external.append(route.request.url);route.abort()
+ context.route('**/*',guard); context.route('http://127.0.0.1:8787/**',api)
+ page=context.new_page();page.on('pageerror',lambda e:errors.append(str(e)));page.on('dialog',lambda d:d.accept() if d.type=='beforeunload' else d.dismiss())
+ page.goto(BASE+'/internal/bookkeeping/#sales');page.wait_for_load_state('networkidle');page.locator('#tab-sales').click()
+ # Unknown context never gets authority from filenames; explicit selections survive consistent metadata.
+ for slot in ('general','lunch','dinner'):set_source(page,'#sc-file-'+slot,source('review-'+slot,'CR2-2020-01-01.xlsx'))
+ expect(page.locator('#sc-date')).to_have_value('');expect(page.locator('#sc-location')).to_have_value('')
+ page.locator('#sc-prepare').click();expect(page.locator('#sc-location')).to_be_focused()
+ page.locator('#sc-date').fill('2026-10-20');page.locator('#sc-location').select_option(index=1);page.locator('#sc-first').fill('Synthetic preparer')
+ page.locator('#sc-prepare').click();expect(page.locator('[data-sales-stage]')).to_be_focused()
+ expect(page.locator('[data-sales-check=lunch-sales]')).to_contain_text('Difference — review required')
+ expect(page.locator('[data-sales-check=payments]')).to_contain_text('$65.44')
+ expect(page.locator('[data-sales-check=cash-deposits]')).to_contain_text('Missing total/detail')
+ expect(page.locator('#sc-accept')).to_be_disabled()
+ page.locator('#sales-context-reason').fill('Source metadata is unknown. Manager checked CR3 business date.')
+ page.locator('#sales-reviewed').check()
+ # Actual cash edits recompute immediately; zero differs from blank, invalid raw amount blocks acceptance.
+ page.locator('#sc-amDeposit').fill('12oops');expect(page.locator('#sc-accept')).to_be_disabled()
+ page.locator('#sc-amDeposit').fill('0');page.locator('#sc-pmDeposit').fill('$234.56')
+ expect(page.locator('[data-sales-check=cash-deposits]')).to_contain_text('Difference: $0.00')
+ expect(page.locator('#sales-reviewed')).not_to_be_checked()
+ page.locator('#sales-source-details summary').click()
+ expect(page.get_by_role('region',name='Figures copied to the workbook',exact=True).get_by_role('row')).to_have_count(19)
+ expect(page.locator('#sales-figure-C5')).to_contain_text('$234.56')
+ page.locator('#sales-reviewed').check()
+ page.screenshot(path=str(ART/'review-desktop.png'),full_page=True)
+ # Back navigation retains native file objects, acknowledgement and context explanation.
+ sales_stage(page,'files');assert page.locator('#sc-file-general').evaluate('(e)=>e.files[0].name')=='CR2-2020-01-01.xlsx'
+ page.locator('#sc-file-general').set_input_files(source('bad','replacement.xlsx'))
+ page.get_by_role('dialog').locator('button').first.click()
+ assert page.locator('#sc-file-general').evaluate('(e)=>e.files[0].name')=='CR2-2020-01-01.xlsx'
+ sales_stage(page,'review');expect(page.locator('#sales-reviewed')).to_be_checked()
+ # Failed template retains values and acceptance; retry generates before an explicit download.
+ page.route('**/internal/daily-sales-template.xlsx',lambda r:r.fulfill(status=503))
+ page.locator('#sc-accept').click();expect(page.locator('#sc-status')).to_contain_text('could not be generated')
+ page.unroute('**/internal/daily-sales-template.xlsx');sales_report(page)
+ expect(page.locator('#sc-status')).to_contain_text('Report generated')
+ with page.expect_download() as downloaded:page.locator('#sc-download').click()
+ path=downloaded.value.path(); first=hashlib.sha256(Path(path).read_bytes()).hexdigest()
+ cells=json.loads(subprocess.check_output(['node','-e',"const x=require('xlsx'),w=x.readFile(process.argv[1]),s=w.Sheets.DATAINPUT;console.log(JSON.stringify(Object.fromEntries(['B1','B2','B3','C4','C5','C6','C7','C8','C9','C13','C18','C23'].map(k=>[k,s[k]?.v??null]))))",path],cwd=ROOT))
+ assert cells=={'B1':'Synthetic preparer','B2':'TUE','B3':'2026-10-20','C4':0,'C5':234.56,'C6':None,'C7':None,'C8':1234.56,'C9':234.56,'C13':1000,'C18':500,'C23':53.63},cells
+ context.set_offline(True)
+ with page.expect_download() as again:page.locator('#sc-download').click()
+ assert hashlib.sha256(Path(again.value.path()).read_bytes()).hexdigest()==first
+ context.set_offline(False)
+ # Restore/device copies covered by retention suite. Late and failed fills preserve newer cash edits.
+ page.locator('#tab-cash-out').click();page.locator('#cashout-code').fill('synthetic-stages');page.get_by_role('button',name='Unlock',exact=True).click();expect(page.locator('#cashout-store')).to_be_visible()
+ page.locator('#tab-sales').click();sales_stage(page,'review')
+ page.get_by_role('button',name='Fill from cash-out',exact=True).click();page.wait_for_timeout(100);assert held
+ page.locator('#sc-amDeposit').fill('10');held.pop().fulfill(status=200,json=cash,headers=cors)
+ expect(page.locator('#sc-amDeposit')).to_have_value('10');expect(page.locator('#sales-reviewed')).not_to_be_checked()
+ mode['cash']='fail';page.get_by_role('button',name='Fill from cash-out',exact=True).click();expect(page.locator('#sc-status')).to_contain_text('not set up')
+ expect(page.locator('#sc-amDeposit')).to_have_value('10')
+ mode['cash']='ok';page.get_by_role('button',name='Fill from cash-out',exact=True).click();expect(page.locator('#sc-amDeposit')).to_have_value('0.00');expect(page.locator('#sc-amOverShort')).to_have_value('')
+ expect(page.locator('[data-sales-check=cash-deposits]')).to_contain_text('Difference: $0.00')
+ # Metadata prefill only on blank fields; no overwrite of explicit date/store.
+ sales_stage(page,'files')
+ for slot in ('general','lunch','dinner'):set_source(page,'#sc-file-'+slot,source('context-'+slot,slot+'.xlsx'))
+ expect(page.locator('#sc-date')).to_have_value('2026-10-20')
+ page.locator('#sc-date').fill('2026-10-21');set_source(page,'#sc-file-general',source('context-general','again.xlsx'));expect(page.locator('#sc-date')).to_have_value('2026-10-21')
+ page.locator('#sc-date').fill('');set_source(page,'#sc-file-general',source('context-general','again.xlsx'));expect(page.locator('#sc-date')).to_have_value('2026-10-20')
+ page.locator('#sc-prepare').click();expect(page.locator('#sales-context-reason')).to_have_count(0)
+ # Emulated desktop/tablet/phone/enlarged Spanish, keyboard and print language.
+ for width,name in [(768,'review-tablet'),(390,'review-phone'),(320,'review-small')]:
+  page.set_viewport_size({'width':width,'height':1000})
+  if width==320:page.get_by_role('button',name='Español',exact=True).click();page.evaluate('document.documentElement.style.fontSize="32px"')
+  assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),name
+  page.screenshot(path=str(ART/(name+'.png')),full_page=True)
+ page.evaluate('document.documentElement.style.fontSize="16px"');page.set_viewport_size({'width':1440,'height':1000})
+ page.locator('#sales-reviewed').focus();page.keyboard.press('Space');expect(page.locator('#sales-reviewed')).to_be_checked()
+ page.evaluate('window.dispatchEvent(new Event("beforeprint"))');expect(page.locator('#sales-review-title')).to_have_text('Review extracted sales figures')
+ page.pdf(path=str(ART/'review-english.pdf'),format='Letter');page.evaluate('window.dispatchEvent(new Event("afterprint"))')
+ # Passive REA records the actual selected loopback page, after Playwright actions.
+ from urllib.request import urlopen
+ targets=json.load(urlopen('http://127.0.0.1:9338/json/list'));target=next(item['id'] for item in targets if item.get('url')==page.url)
+ subprocess.run(['rea-project','run','--project',str(ROOT),'--','inspect-web-page','http://127.0.0.1:9338',target,'--include-accessibility-text','--include-storage-keys','--json'],check=True,stdout=subprocess.DEVNULL)
+ assert not errors,errors;assert not external,external
+ (ART/'results.json').write_text(json.dumps({'workbook_cells':cells,'repeat_sha256':first,'page_errors':errors,'external_attempts':external,'viewports':[1440,768,390,320],'limitations':['Synthetic loopback APIs only','Physical device, staff review and live services unverified']},indent=2))
+ context.close();browser.close()
+ print('PASS Step 08 staged review: context, issues, cash, cancellation, failed template/retry, independent workbook cells, cached repeat, late/failed fills, layouts, EN/ES, keyboard and REA')

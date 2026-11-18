@@ -1,0 +1,37 @@
+External network guard: 0 blocked attempts
+Traceback (most recent call last):
+  File "/home/unusn/CR-step08/scripts/overhaul-baseline/run-existing.py", line 30, in <module>
+    runpy.run_path(str(script), run_name='__main__')
+  File "<frozen runpy>", line 286, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/unusn/CR-step08/scripts/test-internal-language.py", line 186, in <module>
+    run()
+  File "/home/unusn/CR-step08/scripts/test-internal-language.py", line 178, in run
+    page.get_by_role('button', name='Acceder', exact=True).click()
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/sync_api/_generated.py", line 11045, in click
+    self._sync(
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/_impl/_sync_base.py", line 124, in _sync
+    return task.result()
+           ^^^^^^^^^^^^^
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/_impl/locator.py", line 222, in click
+    return await self._frame.click(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/_impl/frame.py", line 587, in click
+    return await self._channel.click(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/_impl/channel_owner.py", line 387, in finish
+    raise e from None
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/_impl/channel_owner.py", line 352, in finish
+    result = await zone.run_async(lambda: awaitable)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/cr-overhaul-venv/lib/python3.12/site-packages/playwright/_impl/utils/zones.py", line 58, in run_async
+    return await func()
+           ^^^^^^^^^^^^
+playwright._impl._errors.Error: Locator.click: Error: strict mode violation: get_by_role("button", name="Acceder", exact=True) resolved to 2 elements:
+    1) <button disabled type="submit" class="min-h-11 mt-4 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50">Acceder</button> aka get_by_role("region", name="Ventas de Toast").get_by_role("button")
+    2) <button type="submit" class="min-h-11 mt-4 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50">Acceder</button> aka locator("form").filter(has_text="InformesIngrese el código de").get_by_role("button")
+
+Call log:
+  - waiting for get_by_role("button", name="Acceder", exact=True)
+

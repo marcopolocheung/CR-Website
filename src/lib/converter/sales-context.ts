@@ -34,3 +34,11 @@ export function validSalesContext(value:unknown):value is SalesContext {
  return Object.keys(v).every(k=>['policy','sources','reason','cashout'].includes(k))&&v.policy===DATE_POLICY&&typeof v.reason==='string'&&v.reason.length<=1000&&Array.isArray(v.sources)&&v.sources.length===3&&new Set(v.sources.map(s=>s.slot)).size===3&&v.sources.every(s=>['general','lunch','dinner'].includes(s.slot)&&Object.keys(s).every(k=>['slot','dates','stores','uncertain'].includes(k))&&typeof s.uncertain==='boolean'&&Array.isArray(s.dates)&&s.dates.every(d=>businessDate(d))&&Array.isArray(s.stores)&&s.stores.every(isStoreId))&&(v.cashout===null||!!v.cashout&&Object.keys(v.cashout).every(k=>['storeId','date','updatedAt','revision'].includes(k))&&isStoreId(v.cashout.storeId)&&!!businessDate(v.cashout.date)&&typeof v.cashout.updatedAt==='string'&&Number.isFinite(Date.parse(v.cashout.updatedAt))&&/^sha256:[a-f0-9]{64}$/.test(v.cashout.revision))
 }
 export {weekday}
+
+/** Content metadata only; all three valid sources must agree before suggesting context. */
+export function consistentSalesContext(context: SalesContext): { date: string; store: string } | null {
+ const first = context.sources[0]
+ if (context.sources.length !== 3 || !first || first.uncertain || first.dates.length !== 1 || first.stores.length !== 1) return null
+ return context.sources.every(source => !source.uncertain && source.dates.length === 1 && source.stores.length === 1 && source.dates[0] === first.dates[0] && source.stores[0] === first.stores[0])
+  ? { date: first.dates[0], store: first.stores[0] } : null
+}

@@ -2,14 +2,14 @@
 
 import { useShellTask } from './ShellTask'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigationProtection } from './NavigationProtection'
 import { useInternalLanguage } from './InternalLanguage'
 import { ErrorSummary, focusField, useConfirmation, type FieldIssue } from './Feedback'
 import { errorKey, type Message, type TranslationKey } from '@/lib/internal-tools/i18n'
 import { readSalesFile, sourceNumber, SourceValidationError } from '@/lib/converter/validation'
 import SourceFileInput, { UNCHECKED, type FileValidation } from './SourceFileInput'
-import { reviewSales, type SalesReview as Review } from '@/lib/converter/sales-review'
+import { reviewSales, updateSalesCash, type SalesReview as Review } from '@/lib/converter/sales-review'
 import SalesReview from './SalesReview'
 import { generateSalesOutput } from '@/lib/converter/fillTemplate'
 import { downloadWorkbookOutput, type WorkbookOutput } from '@/lib/converter/workbook-output'
@@ -17,6 +17,9 @@ import { businessDate } from '@/lib/internal-tools/contracts'
 import { importStore, type ImportSnapshot } from '@/lib/converter/import-snapshot'
 import ImportHistory from './ImportHistory'
 import ImportRecovery from './ImportRecovery'
+import { InternalTheme } from './ui/Theme'
+import { Paper, Button } from './ui/controls'
+import styles from './sales-stages.module.css'
 import type { DraftContext } from '@/lib/internal-tools/drafts'
 import type { fetchCashoutSnapshot } from '@/lib/cashout-store'
 
@@ -24,7 +27,7 @@ type FileKey = 'general' | 'lunch' | 'dinner'
 type FileMap = Record<FileKey, File | null>
 
 export const LOCATIONS = ['CHINA ROSE #3 - 7046 W MILITARY DR', 'CHINA ROSE #2 - 2535 SW MILITARY DR']
-import { weekday, salesContext, needsContextReview, type CashoutLink } from '@/lib/converter/sales-context'
+import { weekday, salesContext, consistentSalesContext, needsContextReview, type CashoutLink } from '@/lib/converter/sales-context'
 const EMPTY_FORM = {
   firstName: '', lastName: '', day: '', date: '', location: '',
   amDeposit: '', pmDeposit: '', amOverShort: '', pmOverShort: '',
@@ -46,6 +49,10 @@ export default function SalesConverter({
   loadCashout: ((location: string, date: string) => ReturnType<typeof fetchCashoutSnapshot>) | null
 }) {
   const { t: tr } = useInternalLanguage()
+  const [stage, setStage] = useState<'files' | 'review' | 'report'>('files')
+  const stageHeading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => { stageHeading.current?.focus() }, [stage])
+  const parsed = useRef<Partial<Record<FileKey, NonNullable<Awaited<ReturnType<typeof readSalesFile>>['value']>>>>({})
   const [cashoutLink, setCashoutLink] = useState<CashoutLink | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [files, setFiles] = useState<FileMap>({ general: null, lunch: null, dinner: null })
@@ -70,7 +77,21 @@ export default function SalesConverter({
 
   function invalidateReview() { editVersion.current++; setReview(null); setOutput(null); setDeviceSaved(false); setAcknowledged(false); setStatus(null) }
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const name = e.target.name
+    if (['amDeposit', 'pmDeposit', 'amOverShort', 'pmOverShort'].includes(name)) {
+      const next = { ...form, [name]: e.target.value }
+      editVersion.current++; setOutput(null); setDeviceSaved(false); setAcknowledged(false); setStatus(null); setCashoutLink(null)
+      setForm(next); setReview(current => current ? { ...updateSalesCash(current, next), context: current.context ? { ...current.context, cashout: null } : undefined } : null)
+      return
+    }
+    if (resumed && review) {
+      const next = { ...form, [name]: e.target.value, ...(name === 'date' ? { day: weekday(e.target.value) } : {}) }
+      editVersion.current++; setOutput(null); setDeviceSaved(false); setAcknowledged(false); setStatus(null); setCashoutLink(null); setIssues([])
+      setForm(next); setReview({ ...updateSalesCash(review, next), context: review.context ? { ...review.context, cashout: null, reason: ['date','location'].includes(name) ? '' : review.context.reason } : undefined })
+      return
+    }
     invalidateReview()
+    setStage('files')
     setCashoutLink(null)
     setForm({ ...form, [e.target.name]: e.target.value, ...(e.target.name === 'date' ? { day: weekday(e.target.value) } : {}) })
   }
@@ -89,16 +110,17 @@ export default function SalesConverter({
       const saved = await loadCashout(form.location, form.date)
       if (editVersion.current !== version || cashoutRequest.current !== request) return
       if (!saved) { setCashoutLink(null); return setStatus({ key: 'imports.noCashout', params: { date: form.date } }) }
-      invalidateReview()
+      editVersion.current++; setOutput(null); setAcknowledged(false); setDeviceSaved(false)
       const totals = saved.totals
       setCashoutLink(saved.link)
-      setForm(f => ({
-        ...f,
+      const next = {
+        ...form,
         amDeposit: dollars(totals.amDeposit),
         pmDeposit: dollars(totals.pmDeposit),
         amOverShort: dollars(totals.amOverShort),
         pmOverShort: dollars(totals.pmOverShort),
-      }))
+      }
+      setForm(next); setReview(current => current ? { ...updateSalesCash(current, next), context: current.context ? { ...current.context, cashout: saved.link } : undefined } : null)
       setStatus({ key: 'imports.filledCashout', params: { date: form.date } })
     } catch (err) {
       if (editVersion.current === version && cashoutRequest.current === request) setStatus({ key: errorKey(err) })
@@ -107,7 +129,7 @@ export default function SalesConverter({
 
   async function selectFile(key: FileKey, file: File) {
     invalidateReview()
-    setResumed(false)
+    setResumed(false); setStage('files'); delete parsed.current[key]
     const version = ++generation.current[key]
     setFiles(current => ({ ...current, [key]: file }))
     setStatus(null)
@@ -115,6 +137,11 @@ export default function SalesConverter({
     const result = await readSalesFile(file, key)
     if (generation.current[key] !== version) return
     setValidation(current => ({ ...current, [key]: { checking: false, valid: !!result.value, issues: result.issues } }))
+    if (result.value) parsed.current[key] = result.value
+    if (parsed.current.general && parsed.current.lunch && parsed.current.dinner) {
+      const metadata = consistentSalesContext(salesContext(Object.fromEntries((['general','lunch','dinner'] as const).map(slot => [slot, { name: '', workbook: parsed.current[slot]! }])) as Parameters<typeof salesContext>[0]))
+      if (metadata) setForm(current => ({ ...current, date: current.date || metadata.date, day: weekday(current.date || metadata.date), location: current.location || LOCATIONS.find(location => importStore(location) === metadata.store) || '' }))
+    }
   }
 
   async function handlePrepare() {
@@ -122,9 +149,6 @@ export default function SalesConverter({
     const invalid: FieldIssue[] = []
     if (!form.location) invalid.push({ fieldId: 'sc-location', message: { key: 'imports.pickLocation' } })
     if (!form.date) invalid.push({ fieldId: 'sc-date', message: { key: 'imports.pickDate' } })
-    for (const name of ['amDeposit', 'pmDeposit', 'amOverShort', 'pmOverShort'] as const) {
-      if (form[name].trim() && sourceNumber(form[name]) === null) invalid.push({ fieldId: `sc-${name}`, message: { key: name.endsWith('Deposit') ? 'importValidation.manualDeposit' : 'importValidation.manualDifference', params: { shift: name.startsWith('am') ? 'AM' : 'PM' } } })
-    }
     setIssues(invalid)
     if (invalid.length) { setStatus(null); focusField(invalid[0].fieldId); return }
     invalidateReview()
@@ -142,17 +166,19 @@ export default function SalesConverter({
         lunch: { name: files.lunch.name, workbook: results[1].value! },
         dinner: { name: files.dinner.name, workbook: results[2].value! },
       }
-      const prepared = reviewSales(sources, { ...form, day: weekday(form.date) })
+      const safeForm = { ...form, day: weekday(form.date) }
+      for (const name of ['amDeposit','pmDeposit','amOverShort','pmOverShort'] as const) if (safeForm[name].trim() && sourceNumber(safeForm[name]) === null) safeForm[name] = ''
+      const prepared = updateSalesCash(reviewSales(sources, safeForm), { ...form, day: weekday(form.date) })
       prepared.sources = prepared.sources.map((source, index) => ({ ...source, fingerprint: results[index].fingerprint }))
       setReview({ ...prepared, context: salesContext(sources, cashoutLink) })
-      setStatus({ key: 'salesReview.prepared' })
+      setStatus({ key: 'salesReview.prepared' }); setStage('review')
     } catch (err) {
       setStatus({ key: err instanceof SourceValidationError ? 'importValidation.blocked' : 'importValidation.exportFailed' })
     } finally { converting.current = false; setBusy(false) }
   }
 
-  async function handleConvert() {
-    if (converting.current || !review || !acknowledged || (needsContextReview(review.context, review.form.date, importStore(review.form.location)) && !review.context?.reason.trim())) return
+  async function handleConvert(download = false) {
+    if (converting.current || !businessDate(form.date) || !importStore(form.location) || cashIssues.length || !review || !acknowledged || (needsContextReview(review.context, review.form.date, importStore(review.form.location)) && !review.context?.reason.trim())) return
     editVersion.current++ // Ignore an earlier cash-out fill arriving during this snapshot’s export.
     converting.current = true
     setBusy(true)
@@ -160,8 +186,9 @@ export default function SalesConverter({
     try {
       const generated = output ?? await generateSalesOutput(review.metrics, review.form)
       if (!output) { setOutput(generated); setDeviceSaved(false) }
-      await downloadWorkbookOutput(generated)
-      setStatus({ key: 'imports.downloaded' })
+      setStage('report')
+      if (download) { await downloadWorkbookOutput(generated); setStatus({ key: 'salesStages.downloadStarted' }) }
+      else setStatus({ key: 'salesStages.generated' })
     } catch { setStatus({ key: 'importValidation.exportFailed' }) }
     finally { converting.current = false; setBusy(false) }
   }
@@ -170,7 +197,7 @@ export default function SalesConverter({
     const storeId = importStore(form.location), date = businessDate(form.date)
     return storeId && date ? { task: 'sales-import', storeId, businessDate: date } : null
   }, [form.location, form.date])
-  const snapshot = useMemo<ImportSnapshot | null>(() => review ? { version: 1, kind: 'sales', review, output } : null, [review, output])
+  const snapshot = useMemo<ImportSnapshot | null>(() => review && !(['amDeposit','pmDeposit','amOverShort','pmOverShort'] as const).some(name => form[name].trim() && sourceNumber(form[name]) === null) ? { version: 1, kind: 'sales', review, output } : null, [review, output, form])
   function restoreSnapshot(snapshot: ImportSnapshot) {
     if (snapshot.kind !== 'sales') return
     invalidateReview()
@@ -178,29 +205,31 @@ export default function SalesConverter({
     setCashoutLink(snapshot.review.context?.cashout ?? null); setForm({ ...snapshot.review.form, day: weekday(snapshot.review.form.date) }); setFiles({ general: null, lunch: null, dinner: null })
     setValidation({ general: UNCHECKED, lunch: UNCHECKED, dinner: UNCHECKED }); setFileReset(value => value + 1)
     setReview(snapshot.review); setOutput(snapshot.output); setAcknowledged(false); setResumed(true); setIssues([])
-    setStatus({ key: 'importRetention.resumed' })
+    parsed.current = {}; setStage('review'); setStatus({ key: 'salesStages.restored' })
   }
   async function startNext() {
     if (busy || (Object.values(form).some(Boolean) || Object.values(files).some(Boolean) || review) && !await confirmation.ask({ key: 'importRetention.startWarning' }, true)) return
     invalidateReview()
     for (const key of ['general','lunch','dinner'] as const) generation.current[key]++
-    setCashoutLink(null); setForm(EMPTY_FORM); setFiles({ general: null, lunch: null, dinner: null })
+    parsed.current = {}; setStage('files'); setCashoutLink(null); setForm(EMPTY_FORM); setFiles({ general: null, lunch: null, dinner: null })
     setValidation({ general: UNCHECKED, lunch: UNCHECKED, dinner: UNCHECKED }); setIssues([]); setResumed(false); setFileReset(value => value + 1)
     setTimeout(() => focusField('sc-first'), 0)
   }
 
+  const cashIssues = (['amDeposit', 'pmDeposit', 'amOverShort', 'pmOverShort'] as const).filter(name => form[name].trim() && sourceNumber(form[name]) === null)
+  const canAccept = !!businessDate(form.date) && !!importStore(form.location) && !!review && acknowledged && !cashIssues.length && !(needsContextReview(review.context, review.form.date, importStore(review.form.location)) && !review.context?.reason.trim())
   const ready = Object.values(validation).every(value => value.valid && !value.checking)
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 max-w-3xl">
+    <InternalTheme><Paper emphasis="active" className={styles.workspace}>
       <h2 className="text-xl font-semibold text-gray-900">{tr('bookkeeping.sales')}</h2>
-      <p className="text-sm text-gray-600 mt-1 mb-5">
-        {tr('imports.salesInstructions')}
-      </p>
-
+      <ol className={styles.stages} aria-label={tr('salesStages.label')}>
+        {(['files', 'review', 'report'] as const).map((item, index) => <li key={item}><button type="button" data-sales-go={item} aria-current={stage === item ? 'step' : undefined} disabled={busy || item === 'review' && !review || item === 'report' && (!output || !canAccept)} onClick={() => setStage(item)}>{index + 1}. {tr(`salesStages.${item}`)}</button></li>)}
+      </ol>
+      <h3 ref={stageHeading} tabIndex={-1} className="text-lg font-semibold mb-4" data-sales-stage={stage}>{tr(`salesStages.${stage}`)}</h3>
       {confirmation.dialog}
       <ErrorSummary issues={issues} />
-      <fieldset disabled={busy} className="min-w-0">
+      <fieldset hidden={stage !== 'files'} disabled={busy} className="min-w-0">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label htmlFor="sc-first" className={labelClass}>{tr('imports.firstName')}</label>
@@ -235,6 +264,9 @@ export default function SalesConverter({
         ))}
       </div>
 
+      <Button id="sc-prepare" onClick={() => { if (review) setStage('review'); else void handlePrepare() }} disabled={!review && !ready || busy} variant="primary" className="mt-4">{tr('salesReview.prepare')}</Button>
+      </fieldset>
+      <fieldset hidden={stage !== 'review'} disabled={busy} className="min-w-0">
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-gray-900">{tr('dashboard.deposits')}</h3>
         {loadCashout ? (
@@ -259,30 +291,33 @@ export default function SalesConverter({
         ] as const).map(([name, label]) => (
           <div key={name}>
             <label htmlFor={`sc-${name}`} className={labelClass}>{label}</label>
-            <input id={`sc-${name}`} aria-invalid={issues.some(issue => issue.fieldId === `sc-${name}`) || undefined} aria-describedby={issues.some(issue => issue.fieldId === `sc-${name}`) ? `sc-${name}-summary-error` : undefined} name={name} inputMode="decimal" value={form[name]} onChange={handleInput} className={inputClass} />
+            <input id={`sc-${name}`} aria-invalid={cashIssues.includes(name) || undefined} aria-describedby={issues.some(issue => issue.fieldId === `sc-${name}`) ? `sc-${name}-summary-error` : undefined} name={name} inputMode="decimal" value={form[name]} onChange={handleInput} className={inputClass} />
           </div>
         ))}
       </div>
+      {cashIssues.map(name => <p key={name} role="alert"><a href={`#sc-${name}`} onClick={event => { event.preventDefault(); focusField(`sc-${name}`) }}>{tr(name.endsWith('Deposit') ? 'importValidation.manualDeposit' : 'importValidation.manualDifference', { shift: name.startsWith('am') ? 'AM' : 'PM' })}</a></p>)}
       </fieldset>
       <p id="sc-status" role="status" className="mt-2 text-sm text-gray-700 min-h-5">{status ? tr(status.key, status.params) : null}</p>
 
-      <button id="sc-prepare" type="button" onClick={handlePrepare} disabled={!ready || busy}
-        className="mt-4 min-h-11 rounded-lg border border-red-600 px-6 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">
-        {tr('salesReview.prepare')}
-      </button>
-      {resumed && <p className="mt-3 text-sm text-gray-700">{tr('importRetention.resumed')}</p>}
-      {review && <SalesReview onReason={reason => { if (reason === review.context?.reason) return; setReview({ ...review, context: { ...(review.context ?? { policy: 'DEC-01-v1', sources: ['general','lunch','dinner'].map(slot => ({ slot, dates: [], stores: [], uncertain: true })), cashout: null }), reason } }); setOutput(null); setAcknowledged(false); setDeviceSaved(false) }} review={review} acknowledged={acknowledged} onAcknowledge={setAcknowledged} />}
-      <button id="sc-download" type="button"
-        onClick={handleConvert}
-        disabled={!review || !acknowledged || busy || (needsContextReview(review.context, review.form.date, importStore(review.form.location)) && !review.context?.reason.trim())}
-        className="mt-4 min-h-11 px-6 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {tr('imports.download')}
-      </button>
-      <button id="sc-next" type="button" disabled={busy} onClick={() => { void startNext() }} className="ml-2 mt-4 min-h-11 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">{tr('importRetention.startNext')}</button>
+      {resumed && <p className="mt-3 text-sm text-gray-700">{tr('salesStages.restored')}</p>}
+      <fieldset hidden={stage !== 'review'} disabled={busy}>{review && <SalesReview onEditContext={() => { setStage('files'); setTimeout(() => focusField('sc-location'), 0) }} onReason={reason => { if (reason === review.context?.reason) return; editVersion.current++; setReview({ ...review, context: { ...(review.context ?? { policy: 'DEC-01-v1', sources: ['general','lunch','dinner'].map(slot => ({ slot, dates: [], stores: [], uncertain: true })), cashout: null }), reason } }); setOutput(null); setAcknowledged(false); setDeviceSaved(false) }} review={review} acknowledged={acknowledged} onAcknowledge={setAcknowledged} />}</fieldset>
+      <div hidden={stage !== 'review'} className={styles.actions}>
+        <Button onClick={() => setStage('files')} disabled={busy}>{tr('salesStages.backFiles')}</Button>
+        <Button id="sc-accept" onClick={() => void handleConvert()} disabled={!canAccept || busy} variant="primary">{tr('salesStages.accept')}</Button>
+      </div>
+      <div hidden={stage !== 'report'}>
+        {output && <p className="mt-3 break-all">{output.filename}</p>}
+        <div className={styles.actions}>
+          <Button onClick={() => setStage('review')} disabled={busy}>{tr('salesStages.backReview')}</Button>
+          <Button id="sc-download" onClick={() => void handleConvert(true)} disabled={!canAccept || busy || !output} variant="primary">{tr('salesStages.download')}</Button>
+          <Button id="sc-next" disabled={busy} onClick={() => void startNext()}>{tr('importRetention.startNext')}</Button>
+        </div>
+      </div>
+      <details open={stage === 'report'}><summary>{tr('salesStages.copies')}</summary>
       <ImportHistory token={token} context={context} snapshot={snapshot} preparer={`${form.firstName} ${form.lastName}`.trim()} accepted={acknowledged} busy={busy} hasWork={!!review} onRestore={restoreSnapshot} />
       <ImportRecovery context={context} preparer={`${form.firstName} ${form.lastName}`.trim()} snapshot={snapshot}
         hasWork={Object.values(form).some(Boolean) || Object.values(files).some(Boolean) || !!review} busy={busy} onRestore={restoreSnapshot} onSaved={setDeviceSaved} />
-    </div>
+      </details>
+    </Paper></InternalTheme>
   )
 }

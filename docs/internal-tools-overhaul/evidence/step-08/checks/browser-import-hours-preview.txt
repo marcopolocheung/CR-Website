@@ -1,0 +1,2 @@
+PASS IMPORT-05: physical source rows, identity gate, overnight inclusive filtering, visible open/bad/excluded rows, unchanged source regular/overtime workbook cells, acknowledgement invalidation, Spanish phone/keyboard/touch
+External network guard: 0 blocked attempts

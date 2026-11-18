@@ -1,0 +1,29 @@
+{
+  "workbook_cells": {
+    "B1": "Synthetic preparer",
+    "B2": "TUE",
+    "B3": "2026-10-20",
+    "C4": 0,
+    "C5": 234.56,
+    "C6": null,
+    "C7": null,
+    "C8": 1234.56,
+    "C9": 234.56,
+    "C13": 1000,
+    "C18": 500,
+    "C23": 53.63
+  },
+  "repeat_sha256": "b464c2a67141a43b48dbecd834de6fd5cefbfa0dba707d7929c40331f3f7abb5",
+  "page_errors": [],
+  "external_attempts": [],
+  "viewports": [
+    1440,
+    768,
+    390,
+    320
+  ],
+  "limitations": [
+    "Synthetic loopback APIs only",
+    "Physical device, staff review and live services unverified"
+  ]
+}

@@ -229,7 +229,7 @@ with sync_playwright() as p:
     browser_version=browser.version;ctx.close();browser.close()
 assert not errors,errors
 assert not external,external
-sources=[*ROOT.glob('src/components/internal/*.tsx'),*ROOT.glob('src/components/internal/ui/*.*'),ROOT/'src/components/internal/shell.module.css',ROOT/'src/app/(order-shell)/internal/layout.tsx',ROOT/'src/app/(public)/scheduler-demo/layout.tsx',ROOT/'src/lib/internal-tools/i18n/en.ts',ROOT/'src/lib/internal-tools/i18n/es.ts',Path(__file__).resolve()]
+sources=[*ROOT.glob('src/components/internal/*.tsx'),*ROOT.glob('src/components/internal/ui/*.*'),ROOT/'src/components/internal/shell.module.css',ROOT/'src/app/(order-shell)/internal/layout.tsx',ROOT/'src/app/(order-shell)/scheduler-demo/layout.tsx',ROOT/'src/lib/internal-tools/i18n/en.ts',ROOT/'src/lib/internal-tools/i18n/es.ts',Path(__file__).resolve()]
 manifest={'baseCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'sourceFilesSha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in sources if f.suffix in ('.tsx','.ts','.css','.py')},'browser':browser_version,'frontend':args.base,'api':'http://127.0.0.1:8787 (intercepted)','scenarios':results,'screenshots':images,'pageErrors':errors,'externalAttempts':external,'apiRequests':requests}
 (args.artifacts/'results.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print(f'PASS Step 03: {len(results)} scenarios; {len(images)} screenshots; 0 page errors/external attempts; synthetic GET/OPTIONS only')
