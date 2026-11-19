@@ -457,6 +457,37 @@ def check_request_shortcut_cancel(browser, url):
     context.close()
 
 
+def check_remove_and_refill(browser, url, artifacts):
+    context, page, store, errors = open_planning(browser, url, extra_staff=20)
+    before = snapshot(page)
+    slot_id = store.slot_ids[0]
+    cell = page.locator(f'[data-planning-slot="{slot_id}"]')
+    removed = cell.get_attribute('data-employee-id')
+    cell.locator('button[aria-pressed]').click()  # A kept spot can still be removed.
+    cell.locator('button').first.click()
+    page.locator(f'#planning-menu-{slot_id}').get_by_role('button', name='Remove from this shift', exact=True).click()
+    expect(page.locator('#planning-review')).to_contain_text('Removed.')
+    expect(page.locator('#planning-review')).to_contain_text('28/28 required spots covered')
+    replacement = cell.get_attribute('data-employee-id')
+    assert replacement and replacement != removed, (removed, replacement)
+    panel = page.get_by_role('complementary', name='Edit person', exact=True)
+    excluded = panel.get_by_role('region', name='Not picked for this shift', exact=True)
+    expect(excluded.get_by_role('button', name='Allow again', exact=True)).to_have_count(1)
+    page.get_by_role('button', name='Adjust schedule', exact=True).click()
+    expect(page.locator('#planning-review')).to_contain_text('28/28 required spots covered')
+    assert cell.get_attribute('data-employee-id') != removed
+    page.screenshot(path=str(artifacts / 'planning-remove-refill.png'), full_page=True)
+    excluded.get_by_role('button', name='Allow again', exact=True).click()
+    expect(excluded).to_have_count(0)
+    page.get_by_role('button', name='Undo', exact=True).click()
+    expect(excluded).to_have_count(1)
+    page.get_by_role('button', name='Undo', exact=True).click()
+    page.get_by_role('button', name='Undo', exact=True).click()
+    assert snapshot(page) == before
+    assert not errors, errors
+    context.close()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--url', default='http://127.0.0.1:3064')
@@ -474,5 +505,6 @@ if __name__ == '__main__':
         check_request_shortcut_cancel(browser, args.url.rstrip('/'))
         check_optional_requests(browser, args.url.rstrip('/'))
         check_colors_locks_and_same_employee_drop(browser, args.url.rstrip('/'), artifacts)
+        check_remove_and_refill(browser, args.url.rstrip('/'), artifacts)
         browser.close()
     print(json.dumps({'planning': 'passed', 'production_api_access': False}))
