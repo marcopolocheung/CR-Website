@@ -42,7 +42,7 @@ import { LOCALE_STORAGE_KEY, translate } from '@/lib/internal-tools/i18n'
 import RequestsPanel from './RequestsPanel'
 import { useScheduleRequests } from './useScheduleRequests'
 import { withApprovedRequests, type ScheduleRequest } from '@/lib/scheduler/requests'
-import { preparePlacement, reconcileAvailability, type Placement } from '@/lib/scheduler/repair'
+import { exclusionKey, preparePlacement, prepareRemoval, reconcileAvailability, type Placement } from '@/lib/scheduler/repair'
 import { DraftJob } from '@/lib/scheduler/draft-job'
 import { AGENT_API } from '@/lib/scheduler/agent-client'
 import useDraftAdjustment from './useDraftAdjustment'
@@ -69,6 +69,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const scheduleOnly = isScheduleOnlyRestaurant(restaurantId)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
+  // Draft-only "don't consider here" marks (date|period|role|employee); see repair.ts exclusionKey.
+  const [exclusions, setExclusions] = useState<string[]>([])
   const [generatedWeeks, setGeneratedWeeks] = useState<WeekAssignments>({})
   const [weekStatus, setWeekStatus] = useState<Record<string, WeekStatus>>({})
   // Staff lists and shift rules are per-week. Each weekStart gets its own roster
@@ -278,15 +280,15 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const ruleProblems = useMemo(() => templateProblems(template), [template])
   const t = (key: string) => translate(requestLocale, key)
   const draftContext = JSON.stringify([restaurantId, weekStart, layout, tab, employees, template, assignments,
-    requestSource.record?.revision])
+    exclusions, requestSource.record?.revision])
   const currentDraftContext = useRef(draftContext)
   currentDraftContext.current = draftContext
   const adjustment = useDraftAdjustment({
-    input: { employees: scheduleEmployees, slots, assignments },
+    input: { employees: scheduleEmployees, slots, assignments, exclusions },
     contextKey: `${draftContext}:${isGenerating}`, scope: `${restaurantId}:${weekStart}`,
     disabled: layout !== 'workspace' || !weekStart || !rosterLoaded || !templateLoaded || !!rosterLoadError || !!templateLoadError ||
       isGenerating || !!staffLoadError || ruleProblems.length > 0,
-    onCommit: next => commitSchedule('draft before adjustment', next),
+    onCommit: (next, nextExclusions) => { commitSchedule('draft before adjustment', next); setExclusions([...nextExclusions]) },
   })
   useEffect(() => {
     generationJobs.current.cancel(); setIsGenerating(false)
@@ -887,6 +889,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         employees: cloneEmployeeList(employees),
         template: cloneTemplate(template),
         weeks: cloneWeeks(weeks),
+        exclusions: [...exclusions],
         generatedWeeks: cloneWeeks(generatedWeeks),
         weekStatus: { ...weekStatus },
         diagnostics: [...diagnostics],
@@ -909,6 +912,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     }
     if (target) setTemplates((current) => ({ ...current, [target]: cloneTemplate(snapshot.template) }))
     setWeeks(cloneWeeks(snapshot.weeks))
+    setExclusions([...snapshot.exclusions])
     setGeneratedWeeks(cloneWeeks(snapshot.generatedWeeks))
     setWeekStatus({ ...snapshot.weekStatus })
     setDiagnostics([`Undone: ${snapshot.label}.`])
@@ -1219,7 +1223,24 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     if (adjustment.busy || isGenerating) return
     // Already assigned here: leave both shifts and Keep marks untouched.
     if (assignments.some(a => a.slotId === placement.slotId && a.employeeId === placement.employeeId)) return
-    void adjustment.run(input => preparePlacement(input, placement), autoAdjust)
+    const slot = slots.find(s => s.id === placement.slotId)
+    const key = slot ? exclusionKey(slot, placement.employeeId) : ''
+    // A deliberate placement overrides an earlier "not this shift" removal.
+    void adjustment.run(input => input.exclusions?.includes(key)
+      ? { assignments: preparePlacement(input, placement), exclusions: input.exclusions.filter(k => k !== key) }
+      : preparePlacement(input, placement), autoAdjust)
+  }
+
+  function removeFromWorkspace(slotId: string) {
+    if (adjustment.busy || isGenerating) return
+    void adjustment.run(input => prepareRemoval(input, slotId), autoAdjust, 'planning.removed')
+  }
+
+  function allowInWorkspace(key: string) {
+    if (adjustment.busy || isGenerating || !exclusions.includes(key)) return
+    remember('allowed an employee back on a shift')
+    adjustment.clearReport()
+    setExclusions(current => current.filter(k => k !== key))
   }
 
   function setEmployeeAssignment(slotId: string, employeeId: string) {
@@ -2146,7 +2167,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 {externalAvailability && <p role="status" className="my-3 border border-amber-500 bg-amber-50 p-3">{t('planning.external')}</p>}
                 <PlanningWorkspace data={scheduleWorkspace} locale={requestLocale} auto={autoAdjust} onAuto={setAutoAdjust}
                   busy={adjustment.busy} disabled={storeLoading || storeOffline} report={adjustment.report} error={adjustment.error}
-                  onPlace={placeInWorkspace} onAdjust={() => { setExternalAvailability(false); void adjustment.run(input => input.assignments, true) }}
+                  onPlace={placeInWorkspace} exclusions={exclusions} onRemove={removeFromWorkspace} onAllow={allowInWorkspace} onAdjust={() => { setExternalAvailability(false); void adjustment.run(input => input.assignments, true) }}
                   onRequest={(employeeId, date) => {
                     setRequestPrefill({ id: crypto.randomUUID(), employeeId, date })
                     requestAnimationFrame(() => document.getElementById('schedule-requests')?.scrollIntoView({ block: 'start' }))

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from 
 import { DAYS, PERIODS, dateForDay, formatRoleLabel, formatTimeRange, getEmployeeAvailability } from '@/lib/scheduler'
 import { translate } from '@/lib/internal-tools/i18n'
 import type { Locale } from '@/lib/internal-tools/contracts'
-import type { Placement } from '@/lib/scheduler/repair'
+import { exclusionKey, type Placement } from '@/lib/scheduler/repair'
 import type { ScheduleWorkspaceProps } from './ScheduleWorkspace'
 import type { AdjustmentReport } from './useDraftAdjustment'
 import { MonthStrip } from './SchedulePanels'
@@ -26,9 +26,10 @@ function PeriodIcon({ period }: { period: 'AM' | 'PM' }) {
   </svg>
 }
 
-export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy, disabled, report, error, onPlace, onRequest, onEmployee, onAdjust }: {
+export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy, disabled, report, error, onPlace, exclusions, onRemove, onAllow, onRequest, onEmployee, onAdjust }: {
   data: ScheduleWorkspaceProps; locale: Locale; auto: boolean; onAuto: (value: boolean) => void; busy: boolean; disabled: boolean
   report: AdjustmentReport | null; error: string | null; onPlace: (placement: Placement) => void
+  exclusions: readonly string[]; onRemove: (slotId: string) => void; onAllow: (key: string) => void
   onRequest: (employeeId: string, date: string) => void; onEmployee: (employeeId: string) => void; onAdjust: () => void
 }) {
   const t = (key: string, params?: Record<string, string | number>) => translate(locale, key, params)
@@ -73,6 +74,7 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
   const generationReport = p.lastReport?.weekStart === p.weekStart ? p.lastReport : null
   const totalHours = p.stats.reduce((n, s) => n + s.hours, 0)
   const problems = p.violations.filter(v => v.code !== 'missing_assignment')
+  const excludedHere = slot ? p.allEmployees.map(e => ({ id: e.id, key: exclusionKey(slot, e.id) })).filter(x => exclusions.includes(x.key)) : []
   function editPerson(id: string, date: string, triggerId?: string) {
     returnFocus.current = triggerId ? document.getElementById(triggerId) : document.activeElement as HTMLElement | null
     setMenu(null); setPersonId(id); setSelectedDate(date)
@@ -146,7 +148,8 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
                       onDragStart={e => { if (a?.employeeId) startDrag(e, { employeeId: a.employeeId, fromSlotId: s.id }) }} onDragEnd={() => { drag.current = null }}
                       aria-label={`${slotLabel(s.id)}: ${name(a?.employeeId)}${a?.locked ? `, ${t('planning.keep')}` : ''}`} aria-expanded={a?.employeeId ? menu === s.id : undefined} aria-controls={menu === s.id ? `planning-menu-${s.id}` : undefined}
                       onClick={() => { if (moving) place(s.id); else { setSelected(s.id); setPersonId(null); setMenu(current => a?.employeeId && current !== s.id ? s.id : null) } }}>{name(a?.employeeId)}</button>
-                    {a?.employeeId && menu === s.id && <div id={`planning-menu-${s.id}`} className={css.personMenu} role="group" aria-label={t('planning.actions', { name: name(a.employeeId) })}><button onClick={() => editPerson(a.employeeId, s.date!, `planning-person-${s.id}`)}>{t('planning.editPerson')}</button></div>}
+                    {a?.employeeId && menu === s.id && <div id={`planning-menu-${s.id}`} className={css.personMenu} role="group" aria-label={t('planning.actions', { name: name(a.employeeId) })}><button onClick={() => editPerson(a.employeeId, s.date!, `planning-person-${s.id}`)}>{t('planning.editPerson')}</button>
+                      <button onClick={() => { setMenu(null); setSelected(s.id); onRemove(s.id) }}>{t('planning.remove')}</button></div>}
                   </div>
                   <div className={css.slotFoot}>{a?.employeeId ? <button type="button" className={css.keep}
                     aria-pressed={!!a.locked} aria-label={`${t('planning.lockPlacement')}: ${name(a.employeeId)} · ${slotLabel(s.id)}`}
@@ -173,7 +176,9 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
           <label>{t('planning.assign')}<select aria-label={t('planning.assign')} value={assignment?.employeeId ?? ''} disabled={blocked} onChange={e => updateAssignment(e.target.value)}><option value="">{t('planning.open')}</option>{p.allEmployees.filter(e => e.active).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
           {assignment?.employeeId && <><label className={css.toggle}><input type="checkbox" disabled={busy} checked={!!assignment.locked} onChange={e => p.onLock(slot.id, e.target.checked)} />{t('planning.keepPlacement')}</label>
             <button disabled={blocked} onClick={() => beginMove({ employeeId: assignment.employeeId, fromSlotId: slot.id })}>{t('planning.move', { name: name(assignment.employeeId) })}</button>
+            <button disabled={blocked} onClick={() => onRemove(slot.id)}>{t('planning.remove')}</button><p className={css.hint}>{t('planning.removeHelp')}</p>
           </>}
+          {!!excludedHere.length && <section aria-label={t('planning.excluded')}><h3>{t('planning.excluded')}</h3>{excludedHere.map(x => <p key={x.key}>{name(x.id)} <button disabled={blocked} onClick={() => onAllow(x.key)}>{t('planning.allow')}</button></p>)}</section>}
         </> : <><h2>{t('planning.choose')}</h2><p>{t('planning.help')}</p></>}
         {!!gaps.length && <section className={css.gaps}><h3>{t('planning.gaps', { count: gaps.length })}</h3>{gaps.map(s => <button key={s.id} onClick={() => { setSelected(s.id); setPersonId(null); setMenu(null) }}>{slotLabel(s.id)} →</button>)}</section>}
       </aside>

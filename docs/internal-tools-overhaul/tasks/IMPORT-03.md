@@ -106,6 +106,10 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - Owner/action: Codex completed this bounded task; STOP after PR creation per the user. No next task claimed. Future import date work uses the scoped delegation documented in [service session](../imports-session.md); do not merge current PRs.
 - Rollback: scoped revert plus separately authorized compatible frontend publication if live; preserve device draft keys and original source files.
 
+## Step 08 follow-up — November 18, 2026
+
+Files → Review → Report retains source validation, financial mapping and recovery readers. Cash reconciliation recomputes in Review; restored primitive values remain editable without uploads. Local evidence and limitations are recorded in the [Step 08 checkpoint](../checkpoints/step-08.md). Codex coordinates the dictionary/browser-fixture edits. This local follow-up does not change deployment, retention or staff-review milestones.
+
 ## Step 09 follow-up — November 18, 2026
 
 Files → Review → Report retains source-hours and identity policy. Employee totals and a focused issue queue precede raw physical rows; directory loading, unavailable, authorization and conflict states remain distinct. Stage navigation preserves choices; restoring resets only the replaced directory editor/request generation. See the [Step 09 checkpoint](../checkpoints/step-09.md). Codex coordinates shared dictionary and fixture changes. External activation, staff/device review and release remain separate; task milestone states are unchanged.

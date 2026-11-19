@@ -1,7 +1,9 @@
 """UX-03 local browser acceptance. Start Next dev with a loopback API override.
 Usage: python3 scripts/test-internal-feedback.py http://127.0.0.1:3017
 """
-import sys
+import sys, subprocess, json, base64
+from pathlib import Path
+from import_browser_helpers import set_source
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
 
@@ -96,7 +98,10 @@ with sync_playwright() as p:
     page.locator('#tab-sales').click()
     page.locator('#sc-first').fill('Original preparer')
     page.locator('#sc-date').fill('2026-10-20')
-    page.get_by_role('button', name='Fill from cash-out', exact=True).click()
+    fixtures = json.loads(subprocess.check_output(['node','--import','jiti/register','scripts/create-import-fixtures.ts'], cwd=Path(__file__).resolve().parent.parent))
+    for slot in ('general','lunch','dinner'):
+        set_source(page,'#sc-file-'+slot,{'name':slot+'.xlsx','mimeType':'application/octet-stream','buffer':base64.b64decode(fixtures[slot])})
+    page.locator('#sc-prepare').click()
     expect(page.locator('#sc-location')).to_be_focused()
     expect(page.locator('#sc-location')).to_have_attribute('aria-invalid', 'true')
     expect(page.locator('#sc-first')).to_have_value('Original preparer')

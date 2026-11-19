@@ -34,3 +34,12 @@ def hours_copies(page):
     detail=page.locator('[data-hours-copies]')
     if detail.get_attribute('open') is None:
         detail.locator(':scope > summary').click()
+
+def sales_stage(page, stage):
+    page.locator(f'[data-sales-go="{stage}"]').click()
+    expect(page.locator('[data-sales-stage]')).to_have_attribute('data-sales-stage', stage)
+
+def sales_report(page):
+    if page.locator('[data-sales-stage]').count() and page.locator('[data-sales-stage]').get_attribute('data-sales-stage') != 'report':
+        page.locator('#sc-accept').click()
+        expect(page.locator('[data-sales-stage]')).to_have_attribute('data-sales-stage', 'report')
