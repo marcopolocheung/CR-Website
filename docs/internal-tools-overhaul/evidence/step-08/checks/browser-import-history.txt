@@ -1,0 +1,2 @@
+PASS IMPORT-07: exact-byte fingerprint, no raw/workbook upload, failed-save same-operation retry, duplicate gate, preserved reprocess lineage, context isolation, reviewed resume/offline regeneration and Spanish phone
+External network guard: 0 blocked attempts

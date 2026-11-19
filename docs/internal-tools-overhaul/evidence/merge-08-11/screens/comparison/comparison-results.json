@@ -1,0 +1,15 @@
+{
+  "page_errors": [],
+  "external_attempts": [],
+  "checks": [
+    "independent 48/34/14 hours",
+    "explicit OFF zero",
+    "missing and hidden publications unavailable",
+    "incomplete two-store coverage",
+    "duplicate quarantine",
+    "failed reload retains report",
+    "stale requested context",
+    "locked private report",
+    "EN/ES print and viewports"
+  ]
+}

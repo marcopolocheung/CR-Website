@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "store": "CR3",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": ""
+    },
+    {
+      "store": "CR3",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": "more-fixture"
+    },
+    {
+      "store": "CR3",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": ""
+    },
+    {
+      "store": "CR3",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": ""
+    },
+    {
+      "store": "CR3",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": ""
+    },
+    {
+      "store": "CR2",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": ""
+    },
+    {
+      "store": "CR2",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": ""
+    },
+    {
+      "store": "CR2",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": ""
+    },
+    {
+      "store": "CR3",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": ""
+    },
+    {
+      "store": "CR2",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": ""
+    },
+    {
+      "store": "CR3",
+      "kind": "hours",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "cursor": ""
+    },
+    {
+      "store": "CR3",
+      "kind": "sales",
+      "start": "2026-10-20",
+      "end": "2026-10-20",
+      "cursor": ""
+    }
+  ],
+  "post_attempts": 1,
+  "cells": {
+    "F2": 9,
+    "F3": 8,
+    "F4": 17,
+    "G4": 15.5,
+    "H4": 1.5,
+    "F9": 7
+  },
+  "repeat_sha256": "af965249333b18229cc70588b949809820f2795e76011c921164b718becce0ac",
+  "page_errors": [],
+  "external_attempts": [],
+  "limitations": [
+    "Synthetic local APIs",
+    "No physical device/staff/backend/live verification"
+  ]
+}

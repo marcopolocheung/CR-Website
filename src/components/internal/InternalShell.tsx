@@ -40,9 +40,9 @@ export default function InternalShell({ children, themeClassName }: { children: 
     return () => { window.removeEventListener('hashchange', update); window.removeEventListener('popstate', update) }
   }, [pathname])
   const section = pathname.endsWith('/bookkeeping') ? (reportTabs.includes(hash) ? 'reports' : 'cash')
-    : pathname.endsWith('/cash-history') ? 'cash' : pathname.endsWith('/reports') ? 'reports' : pathname.endsWith('/inventory') ? 'inventory' : pathname.endsWith('/forms') ? 'forms'
+    : pathname.endsWith('/cash-history') ? 'cash' : (pathname.endsWith('/reports') || pathname.endsWith('/import-history')) ? 'reports' : pathname.endsWith('/inventory') ? 'inventory' : pathname.endsWith('/forms') ? 'forms'
     : pathname.endsWith('/qr-generator') ? 'qr' : pathname.endsWith('/ui-gallery') ? 'gallery' : 'dashboard'
-  const taskId = pathname.endsWith('/cash-history') ? 'cash-history' : section === 'reports' && pathname.endsWith('/bookkeeping') ? hash : section
+  const taskId = pathname.endsWith('/import-history') ? 'import-history' : pathname.endsWith('/cash-history') ? 'cash-history' : section === 'reports' && pathname.endsWith('/bookkeeping') ? hash : section
   const session = useManagerSession()
   // Start loading Toast sales for the sales code's stores as soon as it's entered, so Reports opens ready.
   const sales = useSyncExternalStore(salesSession.subscribe, salesSession.getSnapshot, salesSession.getSnapshot)

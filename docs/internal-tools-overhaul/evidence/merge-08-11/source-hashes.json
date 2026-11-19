@@ -1,0 +1,25 @@
+{
+  "baseMainBeforeInventory": "e9e1eab0b261ba9d12e7228910d36dc0418aefd3",
+  "frontend": "http://127.0.0.1:3051",
+  "api": "http://127.0.0.1:8787 (intercepted)",
+  "sourceSha256": {
+    "src/components/internal/SalesConverter.tsx": "5f54f070056b60d764b023f19de4a956a77553c9355dbaf654e512c00fc009a1",
+    "src/components/internal/HoursConverter.tsx": "699dd3494587cb2fe621125b7fbe662294f0702401acc7c352945578fdc3a7d8",
+    "src/components/internal/EmployeeMapping.tsx": "cca9cb7f70fbcf525b6a874c216898fb1f255321d9cf6b569913ba8c59fea621",
+    "src/components/internal/ImportHistoryWorkspace.tsx": "5fc55cf4c92e387c83ff5b19e5c7e707e74cf9e8aa2cca70e6a4fcdf3de0151e",
+    "src/components/internal/ImportResumeTransition.tsx": "ab0353e825c353bc3dd7606aaef993b027c684ef47f8a78869cb8a0b52efeb7d",
+    "src/components/internal/import-history-workspace.module.css": "a57ee0f23fdc94dd547266441debcee68d53cb8243563fc6fd3bd6e71de859a0",
+    "src/components/internal/Inventory.tsx": "b7497a7984e38f5818b38d12c9c47b9a39080b4b2e89746c96be9136d688b757",
+    "src/components/internal/InventoryCountRows.tsx": "572981a9c4a0f8048fd6b10b217915f0346f276a2098f1a2d1b6ca9b6a6ff5d4",
+    "src/lib/internal-tools/inventory-progress.ts": "b62214c1625356b35215b4714dec1275da0dd80f45f53d1b28803368a6e80169",
+    "src/components/scheduler/SchedulerDemo.tsx": "23c9077442ab20bfa596389e607cc317c94e07eb6ac30076d4af1666040e3a87",
+    "src/lib/scheduler/repair.ts": "4c1da67113434005326ffb1a54b9ecaac9f7848f5722142df0a220806e828888",
+    "scripts/test-import-history-hub.py": "582bdc669dac29c01a6db22fd11b19879458764fb8984883107f06954dddffdd",
+    "scripts/import_browser_helpers.py": "212de538c42820f38ce1fedbbb9c6c8dafaab61ca80d5d3bc9aa150cfc15ea17",
+    "package.json": "268ca23b736be8927545a8eac4cc1298dfe1a75d96ecf4b1ed1cb3406093b7d6",
+    "out/_next/static/chunks/656f3081f24b40b0.js": "f8823812cc97e3de1e8d608f411ef46bba7a007b08aac40c743b93efcd23a9a5",
+    "out/_next/static/chunks/b807637abd5f967d.js": "a7492ea86244664eaa8414e3a81bef38d53b53b01ad016156a3e92a357a2b321",
+    "out/_next/static/chunks/4226749012315f4c.js": "3ad374c9cd9cb656edca30b398c4e4f60dbfc0f83d224bc8e3b572b1badc27b9",
+    "out/_next/static/chunks/cf8b9e3296b954c4.js": "f798771301c96adf3ac0ae2b5607f0f6020a61d3bd33d42def2dc11d53630ff9"
+  }
+}

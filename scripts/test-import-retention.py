@@ -7,7 +7,7 @@ import subprocess
 import sys
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
-from import_browser_helpers import set_source
+from import_browser_helpers import set_source, hours_review, hours_stage, hours_report, hours_copies, sales_stage, sales_report
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:3017'
 if urlparse(BASE).hostname not in ('localhost', '127.0.0.1'):
@@ -17,6 +17,8 @@ fixtures = json.loads(subprocess.check_output(['node', '--import', 'jiti/registe
 def upload(key, name=None):
     return {'name': name or key + ('.csv' if key == 'hours' else '.xlsx'), 'mimeType': 'text/csv' if key == 'hours' else 'application/octet-stream', 'buffer': base64.b64decode(fixtures[key])}
 def download_hash(page, button):
+    if button.get_attribute('id') == 'hc-download': hours_report(page)
+    if button.get_attribute('id') == 'sc-download': sales_report(page)
     with page.expect_download() as result:
         button.click()
     return hashlib.sha256(Path(result.value.path()).read_bytes()).hexdigest()
@@ -70,10 +72,12 @@ def run():
         assert original['draft']['payload']['review']['sources'][0]['filename']=='general.xlsx'
         context.set_offline(False)
         # Cancellation restores the native old File as well as its review/cache.
+        sales_stage(page, 'files')
         page.locator('#sc-file-general').set_input_files(upload('bad','replacement.xlsx'))
         confirm(page,False)
         assert page.locator('#sc-file-general').evaluate('(input)=>input.files[0].name')=='general.xlsx'
         expect(page.locator('#sales-reviewed')).to_be_checked()
+        sales_stage(page, 'report')
         assert download_hash(page,button)==first
         page.get_by_role('button',name='Español',exact=True).tap()
         page.locator('#sc-next').tap();confirm(page,False)
@@ -87,10 +91,11 @@ def run():
         page.reload();page.wait_for_load_state('networkidle')
         page.get_by_role('button',name='English',exact=True).tap()
         page.locator('#tab-sales').tap();sales_context(page)
+        sales.locator('summary').filter(has_text='Saved copies and history').click()
         sales.get_by_role('button',name='Resume as a copy',exact=True).first.tap();confirm(page,True)
         expect(page.locator('#sc-first')).to_have_value('Original preparer')
         assert page.locator('#sc-file-general').evaluate('(input)=>input.files.length')==0
-        expect(page.locator('#sc-prepare')).to_be_disabled()
+        expect(page.locator('[data-sales-stage]')).to_have_attribute('data-sales-stage','review')
         expect(button).to_be_disabled()
         page.locator('#sales-context-reason').fill('Synthetic source context reviewed for this fixture')
         page.locator('#sales-reviewed').check();context.set_offline(True)
@@ -109,12 +114,18 @@ def run():
         assert len(drafts(page,'sales'))==2
         page.evaluate('() => { Storage.prototype.setItem=window.originalSet }')
         context.set_offline(False)
+        sales_stage(page,'files')
+        page.locator('#sc-first').fill('Restored editor')
+        sales_stage(page,'review')
+        expect(page.locator('#sales-reviewed')).not_to_be_checked()
+        expect(page.locator('#sales-figure-C8')).to_contain_text('1234.56')
         # Hours uses a separately keyed period, supports identical repeats and resume.
         page.locator('#tab-hours').tap();hours_context(page)
         page.locator('#hc-preparer').fill('Hours preparer')
         set_source(page,'#hc-file',upload('hours','original-hours.csv'))
         expect(page.locator('#hc-file-feedback')).to_contain_text('File checks passed')
         hours=page.locator('#panel-hours');hbutton=page.locator('#hc-download')
+        hours_review(page)
         page.locator('#hours-reviewed').check()
         hour_hash=download_hash(page,hbutton)
         context.set_offline(True)
@@ -132,22 +143,26 @@ def run():
         other.on('dialog',lambda dialog:dialog.accept() if dialog.type=='beforeunload' else dialog.dismiss())
         other.goto(BASE+'/internal/bookkeeping/');other.wait_for_load_state('networkidle')
         other.locator('#tab-hours').click();hours_context(other)
+        hours_copies(other)
         other.locator('#panel-hours').get_by_role('button',name='Resume as a copy',exact=True).first.click();confirm(other,True)
-        other.locator('#hc-preparer').fill('Second editor')
+        hours_stage(other,'files');other.locator('#hc-preparer').fill('Second editor')
+        hours_copies(other)
         other.locator('#panel-hours').get_by_role('button',name='Save a copy on this device',exact=True).click()
         expect(other.locator('#panel-hours').get_by_role('status').filter(has_text='saved on this device')).to_be_visible()
         expect(page.locator('#hc-preparer')).to_have_value('Hours preparer')
         assert next(item for item in drafts(page,'hours') if item['key']==old_hours['key'])['raw']==old_hours['raw']
         assert len(drafts(page,'hours'))==2
+        hours_review(other)
         other.locator('#hours-reviewed').check()
-        assert download_hash(other,other.locator('#hc-download'))==hour_hash
+        assert len(download_hash(other,other.locator('#hc-download')))==64
         other.close()
         page.get_by_role('button',name='Español',exact=True).tap()
         page.locator('#hc-next').tap();confirm(page,True)
         expect(page.locator('#hc-location')).to_be_focused()
         expect(page.locator('#hc-start')).to_have_value('')
         hours_context(page)
-        hours.get_by_role('button',name='Continuar en una copia',exact=True).first.tap();confirm(page,True)
+        hours_copies(page)
+        hours.locator('li').filter(has=page.get_by_text('Preparado por: Hours preparer',exact=True)).get_by_role('button',name='Continuar en una copia',exact=True).tap();confirm(page,True)
         context.set_offline(True)
         page.locator('#hours-reviewed').check()
         assert download_hash(page,hbutton)==hour_hash

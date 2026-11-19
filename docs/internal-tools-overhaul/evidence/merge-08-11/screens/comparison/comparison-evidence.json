@@ -1,0 +1,449 @@
+{
+  "version": 1,
+  "start": "2026-10-01",
+  "end": "2026-10-31",
+  "generatedAt": "2026-11-19T00:57:13.846Z",
+  "storeTotals": [
+    {
+      "storeId": "CR2",
+      "sourceRows": 3,
+      "includedRows": 3,
+      "excludedRows": 0,
+      "sourceHours": 24,
+      "includedHours": 24,
+      "excludedHours": 0,
+      "regularHours": 22.5,
+      "overtimeHours": 1.5,
+      "mappedActualHours": 17,
+      "unmatchedActualHours": 7,
+      "scheduledMinutes": 480,
+      "unmappedScheduledMinutes": 0,
+      "selectedImports": 1,
+      "skippedDuplicateImports": 0,
+      "skippedOverlappingImports": 0,
+      "publishedSnapshots": 1
+    },
+    {
+      "storeId": "CR3",
+      "sourceRows": 3,
+      "includedRows": 3,
+      "excludedRows": 0,
+      "sourceHours": 24,
+      "includedHours": 24,
+      "excludedHours": 0,
+      "regularHours": 22.5,
+      "overtimeHours": 1.5,
+      "mappedActualHours": 17,
+      "unmatchedActualHours": 7,
+      "scheduledMinutes": 480,
+      "unmappedScheduledMinutes": 0,
+      "selectedImports": 1,
+      "skippedDuplicateImports": 0,
+      "skippedOverlappingImports": 0,
+      "publishedSnapshots": 1
+    }
+  ],
+  "combinedTotals": {
+    "includedHours": 48,
+    "regularHours": 45,
+    "overtimeHours": 3,
+    "mappedActualHours": 34,
+    "unmatchedActualHours": 14,
+    "scheduledMinutes": 960,
+    "unmappedScheduledMinutes": 0,
+    "uniqueMappedEmployees": 1
+  },
+  "employees": [
+    {
+      "storeId": "CR2",
+      "employeeId": "10000000-0000-4000-8000-000000000001",
+      "name": "Explicit shared identity",
+      "actualHours": 17,
+      "regularHours": 15.5,
+      "overtimeHours": 1.5,
+      "scheduledMinutes": 480,
+      "sourceRefs": [
+        "imp_ede3a4d5c9d9d6714757a468639a7bc8ae12f943f67bef1f62761cf296ab2bd0:row:2",
+        "imp_ede3a4d5c9d9d6714757a468639a7bc8ae12f943f67bef1f62761cf296ab2bd0:row:4",
+        "CR2-kitchen:2026-10-18:rev:2:person:0",
+        "CR2-kitchen:2026-10-18:rev:2:wednesday-am-0-synthetic-cook"
+      ]
+    },
+    {
+      "storeId": "CR3",
+      "employeeId": "10000000-0000-4000-8000-000000000001",
+      "name": "Explicit shared identity",
+      "actualHours": 17,
+      "regularHours": 15.5,
+      "overtimeHours": 1.5,
+      "scheduledMinutes": 480,
+      "sourceRefs": [
+        "imp_1486210ccb9ef63aa33fec64109166ce6345b74ac1867058353744cab5acfb78:row:2",
+        "imp_1486210ccb9ef63aa33fec64109166ce6345b74ac1867058353744cab5acfb78:row:4",
+        "CR3-kitchen:2026-10-18:rev:2:person:0",
+        "CR3-kitchen:2026-10-18:rev:2:wednesday-am-0-synthetic-cook"
+      ]
+    }
+  ],
+  "combinedEmployees": [
+    {
+      "employeeId": "10000000-0000-4000-8000-000000000001",
+      "name": "Explicit shared identity",
+      "stores": [
+        "CR2",
+        "CR3"
+      ],
+      "actualHours": 34,
+      "regularHours": 31,
+      "overtimeHours": 3,
+      "scheduledMinutes": 960
+    }
+  ],
+  "unmatchedActual": [
+    {
+      "storeId": "CR2",
+      "jobId": "imp_ede3a4d5c9d9d6714757a468639a7bc8ae12f943f67bef1f62761cf296ab2bd0",
+      "sourceRow": 3,
+      "externalId": "EMP-A",
+      "name": "Nombre original",
+      "hours": 7,
+      "regular": 7,
+      "overtime": 0
+    },
+    {
+      "storeId": "CR3",
+      "jobId": "imp_1486210ccb9ef63aa33fec64109166ce6345b74ac1867058353744cab5acfb78",
+      "sourceRow": 3,
+      "externalId": "EMP-A",
+      "name": "Nombre original",
+      "hours": 7,
+      "regular": 7,
+      "overtime": 0
+    }
+  ],
+  "unmatchedScheduled": [],
+  "overlaps": [
+    {
+      "employeeId": "10000000-0000-4000-8000-000000000001",
+      "left": "CR2-kitchen:2026-10-18:wednesday-am-0-synthetic-cook",
+      "right": "CR3-kitchen:2026-10-18:wednesday-am-0-synthetic-cook"
+    }
+  ],
+  "limitations": [
+    {
+      "code": "unpublished",
+      "storeId": "CR2",
+      "stationId": "CR2-kitchen",
+      "weekStart": "2026-09-27"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR2",
+      "stationId": "CR2-kitchen",
+      "weekStart": "2026-10-04"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR2",
+      "stationId": "CR2-kitchen",
+      "weekStart": "2026-10-11"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR2",
+      "stationId": "CR2-kitchen",
+      "weekStart": "2026-10-25"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR2",
+      "stationId": "CR2-diningroom",
+      "weekStart": "2026-09-27"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR2",
+      "stationId": "CR2-diningroom",
+      "weekStart": "2026-10-04"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR2",
+      "stationId": "CR2-diningroom",
+      "weekStart": "2026-10-11"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR2",
+      "stationId": "CR2-diningroom",
+      "weekStart": "2026-10-18"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR2",
+      "stationId": "CR2-diningroom",
+      "weekStart": "2026-10-25"
+    },
+    {
+      "code": "legacy_timing",
+      "storeId": "CR2",
+      "stationId": "CR2-kitchen",
+      "weekStart": "2026-10-18"
+    },
+    {
+      "code": "unmapped_actual",
+      "storeId": "CR2",
+      "count": 1
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR3",
+      "stationId": "CR3-diningroom",
+      "weekStart": "2026-09-27"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR3",
+      "stationId": "CR3-diningroom",
+      "weekStart": "2026-10-04"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR3",
+      "stationId": "CR3-diningroom",
+      "weekStart": "2026-10-11"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR3",
+      "stationId": "CR3-diningroom",
+      "weekStart": "2026-10-18"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR3",
+      "stationId": "CR3-diningroom",
+      "weekStart": "2026-10-25"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR3",
+      "stationId": "CR3-kitchen",
+      "weekStart": "2026-09-27"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR3",
+      "stationId": "CR3-kitchen",
+      "weekStart": "2026-10-04"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR3",
+      "stationId": "CR3-kitchen",
+      "weekStart": "2026-10-11"
+    },
+    {
+      "code": "unpublished",
+      "storeId": "CR3",
+      "stationId": "CR3-kitchen",
+      "weekStart": "2026-10-25"
+    },
+    {
+      "code": "legacy_timing",
+      "storeId": "CR3",
+      "stationId": "CR3-kitchen",
+      "weekStart": "2026-10-18"
+    },
+    {
+      "code": "unmapped_actual",
+      "storeId": "CR3",
+      "count": 1
+    },
+    {
+      "code": "overlap",
+      "count": 1
+    }
+  ],
+  "sources": [
+    {
+      "storeId": "CR2",
+      "id": "imp_ede3a4d5c9d9d6714757a468639a7bc8ae12f943f67bef1f62761cf296ab2bd0",
+      "revision": 1,
+      "fingerprints": [
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "mappingRevision": 1
+    },
+    {
+      "storeId": "CR3",
+      "id": "imp_1486210ccb9ef63aa33fec64109166ce6345b74ac1867058353744cab5acfb78",
+      "revision": 1,
+      "fingerprints": [
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "mappingRevision": 1
+    }
+  ],
+  "excludedImports": [],
+  "sourceExceptions": [],
+  "directorySnapshots": [
+    {
+      "schemaVersion": 1,
+      "family": "employee-mapping",
+      "id": "imports-directory",
+      "storeId": "CR2",
+      "revision": 2,
+      "context": {
+        "kind": "undated"
+      },
+      "createdAt": "2026-10-24T12:00:00.000Z",
+      "updatedAt": "2026-10-24T12:00:00.000Z",
+      "data": {
+        "version": 1,
+        "hourTargets": "disabled",
+        "employees": [
+          {
+            "id": "10000000-0000-4000-8000-000000000001",
+            "name": "Explicit shared identity",
+            "active": true
+          }
+        ],
+        "mappings": [
+          {
+            "id": "10000000-0000-4000-8000-000000000002",
+            "system": "toast",
+            "scope": "CR2",
+            "externalId": "EMP-B",
+            "employeeId": "10000000-0000-4000-8000-000000000001",
+            "from": "2026-10-01",
+            "until": null,
+            "reviewedBy": "Synthetic reviewer"
+          },
+          {
+            "id": "6492fdd5-dff2-4f73-b71a-581bd85c5434",
+            "system": "scheduler",
+            "scope": "CR2-kitchen",
+            "externalId": "pub:2f695cdb95e392fd9dfacd507349175e53aeda9a161b1d0824621df691bac62f:0",
+            "employeeId": "10000000-0000-4000-8000-000000000001",
+            "from": "2026-10-18",
+            "until": null,
+            "reviewedBy": "Synthetic comparison reviewer"
+          }
+        ]
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "family": "employee-mapping",
+      "id": "imports-directory",
+      "storeId": "CR3",
+      "revision": 2,
+      "context": {
+        "kind": "undated"
+      },
+      "createdAt": "2026-10-24T12:00:00.000Z",
+      "updatedAt": "2026-10-24T12:00:00.000Z",
+      "data": {
+        "version": 1,
+        "hourTargets": "disabled",
+        "employees": [
+          {
+            "id": "10000000-0000-4000-8000-000000000001",
+            "name": "Explicit shared identity",
+            "active": true
+          }
+        ],
+        "mappings": [
+          {
+            "id": "10000000-0000-4000-8000-000000000002",
+            "system": "toast",
+            "scope": "CR3",
+            "externalId": "EMP-B",
+            "employeeId": "10000000-0000-4000-8000-000000000001",
+            "from": "2026-10-01",
+            "until": null,
+            "reviewedBy": "Synthetic reviewer"
+          },
+          {
+            "id": "df3e1f0a-5add-42e3-bb9b-c4e77ff55d5b",
+            "system": "scheduler",
+            "scope": "CR3-kitchen",
+            "externalId": "pub:2f695cdb95e392fd9dfacd507349175e53aeda9a161b1d0824621df691bac62f:0",
+            "employeeId": "10000000-0000-4000-8000-000000000001",
+            "from": "2026-10-18",
+            "until": null,
+            "reviewedBy": "Synthetic comparison reviewer"
+          }
+        ]
+      }
+    }
+  ],
+  "publications": [
+    {
+      "stationId": "CR2-kitchen",
+      "weekStart": "2026-10-18",
+      "status": "published",
+      "revision": 2,
+      "updatedAt": "2026-10-19T12:00:00.000Z",
+      "fingerprint": "sha256:2f695cdb95e392fd9dfacd507349175e53aeda9a161b1d0824621df691bac62f",
+      "people": [
+        {
+          "key": "pub:2f695cdb95e392fd9dfacd507349175e53aeda9a161b1d0824621df691bac62f:0",
+          "label": "Duplicate name",
+          "index": 0
+        }
+      ],
+      "assignments": [
+        {
+          "key": "pub:2f695cdb95e392fd9dfacd507349175e53aeda9a161b1d0824621df691bac62f:0",
+          "date": "2026-10-21",
+          "slotId": "wednesday-am-0-synthetic-cook",
+          "start": 480,
+          "end": 960
+        }
+      ],
+      "timingBasis": "legacy-estimate",
+      "templateSource": "current-week-rules",
+      "ruleFingerprint": "sha256:7c9ae18e674b3842b53c60877e3cfbe161d6bc80b119fb076c13eb5baf96798b"
+    },
+    {
+      "stationId": "CR3-kitchen",
+      "weekStart": "2026-10-18",
+      "status": "published",
+      "revision": 2,
+      "updatedAt": "2026-10-19T12:00:00.000Z",
+      "fingerprint": "sha256:2f695cdb95e392fd9dfacd507349175e53aeda9a161b1d0824621df691bac62f",
+      "people": [
+        {
+          "key": "pub:2f695cdb95e392fd9dfacd507349175e53aeda9a161b1d0824621df691bac62f:0",
+          "label": "Duplicate name",
+          "index": 0
+        }
+      ],
+      "assignments": [
+        {
+          "key": "pub:2f695cdb95e392fd9dfacd507349175e53aeda9a161b1d0824621df691bac62f:0",
+          "date": "2026-10-21",
+          "slotId": "wednesday-am-0-synthetic-cook",
+          "start": 480,
+          "end": 960
+        }
+      ],
+      "timingBasis": "legacy-estimate",
+      "templateSource": "current-week-rules",
+      "ruleFingerprint": "sha256:7c9ae18e674b3842b53c60877e3cfbe161d6bc80b119fb076c13eb5baf96798b"
+    }
+  ],
+  "directoryRevisions": [
+    {
+      "storeId": "CR2",
+      "revision": 2
+    },
+    {
+      "storeId": "CR3",
+      "revision": 2
+    }
+  ],
+  "hourTargets": "disabled"
+}

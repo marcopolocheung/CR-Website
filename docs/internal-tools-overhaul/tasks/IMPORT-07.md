@@ -112,3 +112,7 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Implementation and local verification: done. External/live: pending; activation dependencies remain required.
 - Recovery/rollback and acceptance scenarios are recorded in the linked guide. Preserve prior records and drafts when reverting scoped changes.
 - Next owner/action: Codex continues the user-authorized six-PR import stack in one worktree. Open PRs only; no merging or auto-merge.
+
+## Step 10 follow-up — November 18, 2026
+
+Shared history now has an exact-context destination, readable record summaries and checkpointed in-memory resume. Comparisons lead with observed totals, coverage and grouped exceptions; actual hours remain separate from schedule estimates. Historical mappings, duplicate quarantine, source evidence and English output remain compatible. See the [Step 10 checkpoint](../checkpoints/step-10.md). Codex coordinates shared dictionary/navigation/fixture edits. External activation and live/device/staff milestones are unchanged.

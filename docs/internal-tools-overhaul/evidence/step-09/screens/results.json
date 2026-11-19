@@ -1,0 +1,26 @@
+{
+  "cells": {
+    "F2": 8,
+    "G2": 7,
+    "H2": 1,
+    "F3": 3,
+    "G3": 2.5,
+    "H3": 0.5,
+    "F4": 11,
+    "G4": 9.5,
+    "H4": 1.5
+  },
+  "repeat_sha256": "91d31717e41a5d980fa2aaa99fbd14950c6f65ba528d2caf6894163e4db13aa6",
+  "page_errors": [],
+  "external_attempts": [],
+  "viewports": [
+    1440,
+    768,
+    390,
+    320
+  ],
+  "limitations": [
+    "Synthetic local APIs",
+    "Physical device/software keyboard, staff review and live service unverified"
+  ]
+}

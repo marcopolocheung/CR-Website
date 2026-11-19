@@ -84,3 +84,19 @@ export function reviewSales(sources: SalesSources, input: SalesForm): SalesRevie
     .map(row => ({ row: Number(row.__rowNum__) + 1, type: String(row['Payment type'] ?? ''), subtype: String(row['Payment sub type'] ?? ''), value: sourceNumber(row.Total)! }))
   return { sources: (['general', 'lunch', 'dinner'] as const).map(slot => ({ slot, filename: sources[slot].name, sheets: sources[slot].workbook.SheetNames.slice() })), figures, checks, metrics, form, unmapped, unmappedCategories }
 }
+
+/** Reconcile manual figures without rereading or replacing the uploaded sources. */
+export function updateSalesCash(review: SalesReview, input: SalesForm): SalesReview {
+  const form = { ...input }
+  for (const name of ['amDeposit','pmDeposit','amOverShort','pmOverShort'] as const) { const value = input[name].trim() ? sourceNumber(input[name]) : null; form[name] = value === null ? '' : String(value) }
+  const figures = review.figures.map(figure => {
+    if (figure.slot !== 'form') return figure
+    const raw = input[figure.column as keyof SalesForm]
+    return { ...figure, raw: raw || null, value: raw.trim() ? sourceNumber(raw) : null, absent: !raw.trim() }
+  })
+  const left = review.metrics.C9
+  const right = sum(figures.filter(figure => ['C4', 'C5'].includes(figure.cell)).map(figure => figure.value))
+  const a = cents(left), b = cents(right)
+  const difference = a !== null && b !== null && Number.isSafeInteger(a - b) ? (a - b) / 100 : null
+  return { ...review, form, figures, checks: review.checks.map(check => check.id === 'cash-deposits' ? { ...check, left, right, difference, state: difference === null ? 'missing' : 'review' } : check) }
+}

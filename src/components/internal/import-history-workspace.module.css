@@ -1,0 +1,20 @@
+.workspace { max-width: 68rem; margin: 24px 9px 24px 0; }
+.workspace h1 { font-size: 2.5rem; }
+.workspace h2 { font-size: 2rem; }
+.workspace h3 { font-size: 1.6rem; }
+.workspace summary { padding: 12px 0; min-height: 48px; cursor: pointer; font-weight: 600; }
+.workspace input:not([type=checkbox]), .workspace select { min-height: 48px; border: 1px solid var(--cr-control); border-radius: 0; width: 100%; padding: 8px; font-size: 1rem; min-width: 0; max-width: 100%; }
+.workspace label { display: block; margin-bottom: 8px; font-weight: 600; }
+.workspace button { border-radius: 0; }
+.workspace [hidden] { display: none !important; }
+.filters { min-width: 0; display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,14rem),1fr)); gap: 16px; margin: 20px 0; }
+.coverage { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,15rem),1fr)); gap: 12px; margin: 16px 0; }
+.coverage > div { background: var(--cr-accent-wash); border-left: 3px solid var(--cr-accent-ink); padding: 12px; }
+.workspace :is(button,a,summary,input,select,[tabindex]):focus-visible { outline: 3px solid var(--cr-black); outline-offset: 3px; }
+@media (max-width: 600px) { .workspace { padding: 16px; } }
+@media print { .workspace { max-width: none; border: 0; margin: 0; padding: 0; box-shadow: none; } }
+
+.printNotices { display: none; }
+@media print { .printNotices { display: block; } .screenNotices { display: none; } }
+
+.filters > div { min-width: 0; }

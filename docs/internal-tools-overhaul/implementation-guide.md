@@ -52,10 +52,10 @@ Backend activation is not established by source presence. Some historical task d
 | 05 | Task-oriented Home and separate Reports destination | Reviewed and merged ([PR #178](https://github.com/marcopolocheung/CR-Website/pull/178); [checkpoint](checkpoints/step-05.md)) |
 | 06 | Focused cash entry | [Locally verified; owner/device review pending](checkpoints/step-06.md) |
 | 07 | Saved cash lookup and clear save/history behavior | Implemented locally; [checkpoint](checkpoints/step-07.md), owner review pending. Legacy 31-day expiry/concurrent overwrites retained; 07b not started. |
-| 08 | Staged sales import | Not started |
-| 09 | Staged hours import and identity review | Not started |
-| 10 | Shared import history and readable comparison reports | Not started |
-| 11 | Inventory counting and explicit progress | Locally implemented and verified; [checkpoint](checkpoints/step-11.md), device-only progress; review/release pending |
+| 08 | Staged sales import | Merged [PR #194](https://github.com/marcopolocheung/CR-Website/pull/194); [local checkpoint](checkpoints/step-08.md). Device/staff and applicable backend/live gates remain separate. |
+| 09 | Staged hours import and identity review | Merged [PR #195](https://github.com/marcopolocheung/CR-Website/pull/195); [local checkpoint](checkpoints/step-09.md). Device/staff and applicable backend/live gates remain separate. |
+| 10 | Shared import history and readable comparison reports | Merged [PR #196](https://github.com/marcopolocheung/CR-Website/pull/196); [local checkpoint](checkpoints/step-10.md). Device/staff and applicable backend/live gates remain separate. |
+| 11 | Inventory counting and explicit progress | Locally implemented and verified; [checkpoint](checkpoints/step-11.md), device-only progress; [PR #197](https://github.com/marcopolocheung/CR-Website/pull/197) authorized for merge, physical-device/staff/live gates pending |
 | 12 | Order checklist, catalog and count-history separation | Not started |
 | 13 | Forms library and sectioned editors | Not started |
 | 14 | Unified manager scheduling workspace | Not started |

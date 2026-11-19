@@ -10,7 +10,7 @@ import sys
 import tempfile
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
-from import_browser_helpers import set_source, confirm_replacement
+from import_browser_helpers import set_source, confirm_replacement, hours_review, hours_report, sales_stage, sales_report
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:3017'
 if urlparse(BASE).hostname not in ('localhost', '127.0.0.1'):
@@ -93,29 +93,29 @@ def run():
         page.evaluate('window.releaseOldFile()')
         expect(page.locator('#sc-file-general-feedback')).to_contain_text('pasó las comprobaciones')
         # Validate manual amounts rather than exporting parseFloat("12oops") as 12.
-        page.locator('#sc-amDeposit').fill('12oops')
         prepare.tap()
-        expect(page.locator('#sc-amDeposit')).to_be_focused()
+        page.locator('#sc-amDeposit').fill('12oops')
+        expect(page.locator('#sc-accept')).to_be_disabled()
         expect(sales.get_by_role('alert')).to_contain_text('importe completo')
         page.locator('#sc-amDeposit').fill('123.45')
-        prepare.tap()
-        expect(page.locator('#sales-review-title')).to_be_focused()
+        expect(page.locator('#sales-review-title')).to_be_visible()
         expect(download).to_be_disabled()
         page.locator('#sales-context-reason').fill('Synthetic source context reviewed for this fixture')
         page.locator('#sales-reviewed').tap()
-        expect(download).to_be_enabled()
+        expect(page.locator('#sc-accept')).to_be_enabled()
         # Template failure retains every file and field and never claims a download.
         page.route('**/internal/daily-sales-template.xlsx', lambda route: route.fulfill(status=503))
-        download.tap()
-        expect(sales.get_by_role('status').last).to_contain_text('No se pudo generar')
+        page.locator('#sc-accept').tap()
+        expect(page.locator('#sc-status')).to_contain_text('No se pudo generar')
         expect(page.locator('#sc-amDeposit')).to_have_value('123.45')
         expect(page.locator('#sc-first')).to_have_value('Original preparer')
         assert len(downloads) == 0
         page.unroute('**/internal/daily-sales-template.xlsx')
+        sales_report(page)
         with page.expect_download() as saved:
             download.evaluate('(button) => { button.click(); button.click() }')
         saved.value.save_as(str(Path(temp) / 'sales.xlsx'))
-        expect(sales.get_by_role('status').last).to_contain_text('descarg')
+        expect(page.locator('#sc-status')).to_contain_text('descarg')
         assert len(downloads) == 1, 'Two immediate submits must start one export'
         expect(page.locator('#sc-first')).to_have_value('Original preparer')
         assert 'CR3' in saved.value.suggested_filename
@@ -150,16 +150,18 @@ def run():
         # Date boundaries filter whole source shifts with visible exclusions, without recalculating payroll.
         page.locator('#hc-end').fill('2026-09-30')
         expect(hdownload).to_be_disabled()
-        expect(page.locator('#hours-review-title')).to_be_visible()
-        expect(hours.get_by_role('region', name='Review employee hours').last).to_contain_text('Select a valid inclusive period')
+        hours_review(page)
+        expect(page.locator('#hc-end')).to_be_focused()
         page.locator('#hc-end').fill('2026-10-31')
         # File-only conversion needs no network and remains usable with denied storage.
+        hours_review(page)
         page.locator('#hours-reviewed').check()
+        hours_report(page)
         context.set_offline(True)
         with page.expect_download() as hours_saved:
             hdownload.tap()
         hours_saved.value.save_as(str(Path(temp) / 'hours.xlsx'))
-        expect(hours.get_by_role('status').last).to_contain_text('download')
+        expect(page.locator('#hc-status')).to_contain_text('download')
         assert hours_saved.value.suggested_filename == 'CR2_26_1001-26_1031_EMPLOYEE_HOUR_LOG_SUMMARY.xlsx'
         assert len(downloads) == 2
         expect(page.locator('#hc-start')).to_have_value('2026-10-01')

@@ -4,13 +4,21 @@ import { useEffect, useRef } from 'react'
 import { useInternalLanguage } from './InternalLanguage'
 import { needsContextReview } from '@/lib/converter/sales-context'
 import { importStore } from '@/lib/converter/import-snapshot'
+import styles from './sales-stages.module.css'
 import type { SalesReview as Review } from '@/lib/converter/sales-review'
 
-export default function SalesReview({ review, acknowledged, onAcknowledge, onReason }: { onReason: (reason: string) => void; review: Review; acknowledged: boolean; onAcknowledge: (value: boolean) => void }) {
+export default function SalesReview({ review, acknowledged, onAcknowledge, onReason, onEditContext }: { onEditContext: () => void; onReason: (reason: string) => void; review: Review; acknowledged: boolean; onAcknowledge: (value: boolean) => void }) {
   const { t, locale } = useInternalLanguage()
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => { heading.current?.focus() }, [review.sources])
   const money = (value: number | null) => value === null ? t('salesReview.missingValue') : new Intl.NumberFormat(locale === 'es' ? 'es-US' : 'en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 20 }).format(value)
+  function showFigures(cell = 'C8') { const details = document.getElementById('sales-source-details') as HTMLDetailsElement | null; if (details) details.open = true; document.getElementById(`sales-figure-${cell}`)?.focus() }
+  function showCheck(id: string) { const details = document.getElementById(`sales-check-details-${id}`) as HTMLDetailsElement | null; if (details) { details.open = true; details.querySelector('summary')?.focus() } }
+  function checkLocation(id: string) {
+    if (id.startsWith('lunch') || id.startsWith('dinner')) { const slot = id.startsWith('lunch') ? 'lunch' : 'dinner'; const figure = review.figures.find(figure => figure.cell === (slot === 'lunch' ? 'C20' : 'C23')); return `${review.sources.find(source => source.slot === slot)?.filename} · Sales category summary · Total · ${figure?.row ? t('salesReview.row', { row: figure.row }) : t('salesReview.missingValue')} · ${id.endsWith('tax') ? 'Tax amount' : 'Net sales'}` }
+    if (id === 'payments') return `${review.sources.find(source => source.slot === 'general')?.filename} · Payments summary · Total`
+    return review.figures.filter(figure => id === 'cash-deposits' ? ['C9','C4','C5'].includes(figure.cell) : ['C8','C9','C10','C11','C12','C13','C18','C19','C21','C22'].includes(figure.cell)).map(figure => `${figure.cell}: ${figure.slot === 'form' ? t('salesReview.entered') : figure.filename + ' · ' + figure.sheet + ' · ' + figure.column}`).join(' / ')
+  }
   return <section className="mt-6 border-t border-gray-200 pt-5" aria-labelledby="sales-review-title">
     <h3 ref={heading} id="sales-review-title" tabIndex={-1} className="text-lg font-semibold text-gray-900 focus-visible:outline-2 focus-visible:outline-red-700">{t('salesReview.title')}</h3>
     <p className="mt-1 text-sm text-gray-700">{t('salesReview.scope')}</p>
@@ -18,12 +26,13 @@ export default function SalesReview({ review, acknowledged, onAcknowledge, onRea
       <div><dt className="inline font-semibold">{t('imports.location')}: </dt><dd className="inline break-words">{review.form.location || t('salesReview.missingValue')}</dd></div>
       <div><dt className="inline font-semibold">{t('common.date')}: </dt><dd className="inline">{review.form.date || t('salesReview.missingValue')} {review.form.day}</dd></div>
     </dl>
-    <ul className="mt-3 space-y-2 text-sm text-gray-700">{review.sources.map(source => <li key={source.slot}>
-      <span className="font-semibold">{t(`imports.${source.slot}`)}: </span><span className="break-all">{source.filename}</span>
-      <p className="break-words">{t(source.slot === 'general' ? 'salesReview.generalDetected' : 'salesReview.categoryDetected')} · {source.sheets.join(' · ')}</p>
-    </li>)}</ul>
+    <dl className={styles.summary}>
+      <div><dt>{t('salesReview.revenue')}</dt><dd>{money(review.metrics.C8)}</dd><button type="button" onClick={() => showFigures('C8')}>{t('salesStages.details')}</button></div>
+      {review.checks.filter(check => ['payments','lunch-sales','lunch-tax','dinner-sales','dinner-tax','cash-deposits'].includes(check.id)).map(check => <div key={check.id}><dt>{t(check.label)}</dt><dd>{money(check.left)}</dd><button type="button" onClick={() => showCheck(check.id)}>{t('salesStages.details')}</button></div>)}
+    </dl>
     <div className="mt-4 rounded-lg border border-amber-300 p-3 text-sm">
       <p>{t('salesContext.rule')}</p>
+      <button type="button" className="underline min-h-11" onClick={onEditContext}>{t('salesStages.contextLink')}</button>
       {review.context?.sources.map(source => <p key={source.slot} className="break-words">{t(`imports.${source.slot as 'general' | 'lunch' | 'dinner'}`)}: {source.dates.join(', ') || t('salesContext.unknown')} · {source.stores.join(', ') || t('salesContext.unknown')}</p>)}
       {needsContextReview(review.context, review.form.date, importStore(review.form.location)) && <div>
         <label htmlFor="sales-context-reason" className="mt-3 block font-semibold">{t('salesContext.reason')}</label>
@@ -31,12 +40,32 @@ export default function SalesReview({ review, acknowledged, onAcknowledge, onRea
       </div>}
       {review.context?.cashout && <p className="mt-2 break-all">{t('salesContext.cashout')}: {review.context.cashout.storeId} · {review.context.cashout.date} · {review.context.cashout.updatedAt} · {review.context.cashout.revision}</p>}
     </div>
+    <h4 className="mt-5 font-semibold">{t('salesReview.checks')}</h4>
+    <p className="mt-1 text-sm text-gray-600">{t('salesReview.checkNote')}</p>
+    <ul className="mt-3 space-y-3">{review.checks.map(check => <li key={check.id} data-sales-check={check.id} className={`border-l-4 pl-3 text-sm ${check.state === 'match' ? 'border-green-600' : 'border-amber-500'}`}>
+      <p className="font-semibold">{t(check.label)} · {t(`salesReview.${check.state}`)}</p>
+      <p>{t('salesReview.comparison', { left: money(check.left), right: money(check.right), difference: money(check.difference) })}</p>
+      <button type="button" className="min-h-11 underline" onClick={() => { if (check.id === 'cash-deposits') document.getElementById('sc-amDeposit')?.focus(); else showCheck(check.id) }}>{t(check.id === 'cash-deposits' ? 'salesStages.cashLink' : 'salesStages.issueLink')}</button>
+      <details id={`sales-check-details-${check.id}`}><summary>{t('salesStages.details')}</summary><p>{checkLocation(check.id)}</p><p>{t('salesReview.raw')}: {check.left === null ? t('salesReview.missingValue') : String(check.left)}</p><p>{t('salesStages.aggregateNote')}</p></details>
+    </li>)}</ul>
+    {!!review.unmapped.length && <div role="alert" className="mt-4 rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
+      <p className="font-semibold">{t('salesReview.unmapped')}</p><button type="button" className="underline min-h-11" onClick={() => showFigures('C9')}>{t('salesStages.issueLink')}</button>
+      <ul>{review.unmapped.map(payment => <li key={payment.row}>{t('salesReview.row', { row: payment.row })} · {payment.type} · {payment.subtype} · {money(payment.value)}</li>)}</ul>
+    </div>}
+    {!!review.unmappedCategories.length && <div role="alert" className="mt-4 rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
+      <p className="font-semibold">{t('salesReview.unmappedCategories')}</p><button type="button" className="underline min-h-11" onClick={() => showFigures('C18')}>{t('salesStages.issueLink')}</button>
+      <ul>{review.unmappedCategories.map(category => <li key={`${category.slot}:${category.row}`}>{t(`imports.${category.slot}`)} · {t('salesReview.row', { row: category.row })} · {category.category} · {money(category.net)} · {money(category.tax)}</li>)}</ul>
+    </div>}
+    <details id="sales-source-details" className="mt-4"><summary>{t('salesStages.sourceDetails')}</summary>    <ul className="mt-3 space-y-2 text-sm text-gray-700">{review.sources.map(source => <li key={source.slot}>
+      <span className="font-semibold">{t(`imports.${source.slot}`)}: </span><span className="break-all">{source.filename}</span>
+      <p className="break-words">{t(source.slot === 'general' ? 'salesReview.generalDetected' : 'salesReview.categoryDetected')} · {source.sheets.join(' · ')}</p>
+    </li>)}</ul>
     <h4 className="mt-5 font-semibold">{t('salesReview.figures')}</h4>
     <p className="mt-1 text-sm text-gray-600">{t('salesReview.sourceNote')}</p>
     <div className="mt-2 max-w-full overflow-x-auto" tabIndex={0} role="region" aria-label={t('salesReview.figures')}>
       <table className="w-full min-w-[38rem] border-collapse text-left text-sm">
         <thead><tr>{(['salesReview.figure', 'salesReview.value', 'salesReview.source', 'salesReview.cell'] as const).map(key => <th key={key} className="border-b border-gray-300 p-2">{t(key)}</th>)}</tr></thead>
-        <tbody>{review.figures.map(figure => <tr key={figure.cell} className="align-top">
+        <tbody>{review.figures.map(figure => <tr id={`sales-figure-${figure.cell}`} tabIndex={-1} key={figure.cell} className="align-top">
           <th scope="row" className="border-b border-gray-200 p-2 font-medium">{figure.slot !== 'form' && <span>{t(`imports.${figure.slot}`)} · </span>}{t(figure.label)}</th>
           <td className="whitespace-nowrap border-b border-gray-200 p-2">{money(figure.value)}</td>
           <td className="max-w-sm border-b border-gray-200 p-2 break-words">
@@ -47,20 +76,7 @@ export default function SalesReview({ review, acknowledged, onAcknowledge, onRea
         </tr>)}</tbody>
       </table>
     </div>
-    <h4 className="mt-5 font-semibold">{t('salesReview.checks')}</h4>
-    <p className="mt-1 text-sm text-gray-600">{t('salesReview.checkNote')}</p>
-    <ul className="mt-3 space-y-3">{review.checks.map(check => <li key={check.id} data-sales-check={check.id} className={`border-l-4 pl-3 text-sm ${check.state === 'match' ? 'border-green-600' : 'border-amber-500'}`}>
-      <p className="font-semibold">{t(check.label)} · {t(`salesReview.${check.state}`)}</p>
-      <p>{t('salesReview.comparison', { left: money(check.left), right: money(check.right), difference: money(check.difference) })}</p>
-    </li>)}</ul>
-    {!!review.unmapped.length && <div role="alert" className="mt-4 rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
-      <p className="font-semibold">{t('salesReview.unmapped')}</p>
-      <ul>{review.unmapped.map(payment => <li key={payment.row}>{t('salesReview.row', { row: payment.row })} · {payment.type} · {payment.subtype} · {money(payment.value)}</li>)}</ul>
-    </div>}
-    {!!review.unmappedCategories.length && <div role="alert" className="mt-4 rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
-      <p className="font-semibold">{t('salesReview.unmappedCategories')}</p>
-      <ul>{review.unmappedCategories.map(category => <li key={`${category.slot}:${category.row}`}>{t(`imports.${category.slot}`)} · {t('salesReview.row', { row: category.row })} · {category.category} · {money(category.net)} · {money(category.tax)}</li>)}</ul>
-    </div>}
+</details>
     <label className="mt-5 flex min-h-11 cursor-pointer items-start gap-3 text-sm font-medium text-gray-900">
       <input id="sales-reviewed" type="checkbox" checked={acknowledged} onChange={event => onAcknowledge(event.target.checked)} className="mt-1 size-5 shrink-0 accent-red-700 focus-visible:outline-2 focus-visible:outline-red-700" />
       <span>{t('salesReview.acknowledge')}</span>

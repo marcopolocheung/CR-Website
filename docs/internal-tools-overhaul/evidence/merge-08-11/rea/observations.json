@@ -1,0 +1,67 @@
+[
+  {
+    "name": "hours",
+    "run": "20261119T005416.403967Z-94267c78",
+    "evidenceId": "ev_7fcf9708cabd34b4f9f2b33996c7e26f4a47e8efe2b0a9aff0e0547c41912b1d",
+    "url": "http://127.0.0.1:3051/internal/bookkeeping/#hours",
+    "targetId": "4FEB255B87B33D599703DE5259EBE980",
+    "browser": "HeadlessChrome/158.0.8127.18",
+    "captured": {
+      "started_at": "2026-11-19T00:54:19.361Z",
+      "ended_at": "2026-11-19T00:54:20.151Z",
+      "observation_ms": 500
+    }
+  },
+  {
+    "name": "sales",
+    "run": "20261119T005417.351017Z-6de57c66",
+    "evidenceId": "ev_9160ea6ee299b4dc6181fa60ef16a55b831e439aa25b679ae34ca8bda49c1179",
+    "url": "http://127.0.0.1:3051/internal/bookkeeping/#sales",
+    "targetId": "E9C2528FE7288875365225E5EF2E0432",
+    "browser": "HeadlessChrome/158.0.8127.18",
+    "captured": {
+      "started_at": "2026-11-19T00:54:20.118Z",
+      "ended_at": "2026-11-19T00:54:20.871Z",
+      "observation_ms": 500
+    }
+  },
+  {
+    "name": "inventory",
+    "run": "20261119T005445.617940Z-eac2f218",
+    "evidenceId": "ev_df991efc327663838341075a6689dbee46f9696cd3077f142054a0fa30ffe0d1",
+    "url": "http://127.0.0.1:3051/internal/inventory/",
+    "targetId": "8245E1609C7123DA2E9ADBC80723482E",
+    "browser": "HeadlessChrome/158.0.8127.18",
+    "captured": {
+      "started_at": "2026-11-19T00:54:48.764Z",
+      "ended_at": "2026-11-19T00:54:49.451Z",
+      "observation_ms": 500
+    }
+  },
+  {
+    "name": "history",
+    "run": "20261119T005645.647705Z-311c7b34",
+    "evidenceId": "ev_7ddaa692a198924ddb7b93b1c2456802144f586cfb97e035eff0a7a09fd31b4d",
+    "url": "http://127.0.0.1:3051/internal/bookkeeping#sales",
+    "targetId": "27E2A8C5F8F2D09E8453503C1DEAF5E0",
+    "browser": "HeadlessChrome/158.0.8127.18",
+    "captured": {
+      "started_at": "2026-11-19T00:56:48.577Z",
+      "ended_at": "2026-11-19T00:56:49.383Z",
+      "observation_ms": 500
+    }
+  },
+  {
+    "name": "comparison",
+    "run": "20261119T005718.063903Z-27b42fb5",
+    "evidenceId": "ev_bcd028c7655a7dcdf71a17f7ecdae20c14eec6c03d92f432f71e5c45fd6279e4",
+    "url": "http://127.0.0.1:3051/internal/bookkeeping/#comparison",
+    "targetId": "2A1133CA05B8D19579B57BFBE44EC06F",
+    "browser": "HeadlessChrome/158.0.8127.18",
+    "captured": {
+      "started_at": "2026-11-19T00:57:21.219Z",
+      "ended_at": "2026-11-19T00:57:21.918Z",
+      "observation_ms": 500
+    }
+  }
+]

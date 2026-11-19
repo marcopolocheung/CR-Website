@@ -1,0 +1,284 @@
+
+> chinarose@0.0.2 cashout:test
+> node --import jiti/register --test src/lib/cashout.test.ts src/lib/cashout-record.test.ts src/lib/dashboard.test.ts src/lib/inventory.test.ts src/lib/internal-tools/inventory-progress.test.ts src/lib/internal-tools/cashout-draft.test.ts src/lib/cashout-toast.test.ts
+
+TAP version 13
+# Subtest: links validate real dates, exact context and duplicate parameters before selecting a day
+ok 1 - links validate real dates, exact context and duplicate parameters before selecting a day
+  ---
+  duration_ms: 2.645089
+  type: 'test'
+  ...
+# Subtest: saved reader retains all paper values, stored totals, time and comparison-only identity
+ok 2 - saved reader retains all paper values, stored totals, time and comparison-only identity
+  ---
+  duration_ms: 7.341878
+  type: 'test'
+  ...
+# Subtest: malformed or mismatched saved responses are rejected without returning partial work
+ok 3 - malformed or mismatched saved responses are rejected without returning partial work
+  ---
+  duration_ms: 1.156603
+  type: 'test'
+  ...
+# Subtest: history distinguishes an empty window from invalid lists, duplicate days and out-of-window rows
+ok 4 - history distinguishes an empty window from invalid lists, duplicate days and out-of-window rows
+  ---
+  duration_ms: 0.775182
+  type: 'test'
+  ...
+# Subtest: HTTP readers preserve sheet exports and distinguish missing, invalid, failure and invalid input without a fetch
+ok 5 - HTTP readers preserve sheet exports and distinguish missing, invalid, failure and invalid input without a fetch
+  ---
+  duration_ms: 28.140676
+  type: 'test'
+  ...
+# Subtest: frozen requests detach raw metadata and comparison from later editor input
+ok 6 - frozen requests detach raw metadata and comparison from later editor input
+  ---
+  duration_ms: 0.722795
+  type: 'test'
+  ...
+# Subtest: uncertain recovery is additive, credential-free, bound to the exact draft and preserves unreadable original bytes
+ok 7 - uncertain recovery is additive, credential-free, bound to the exact draft and preserves unreadable original bytes
+  ---
+  duration_ms: 2.689133
+  type: 'test'
+  ...
+# Subtest: assessment requires exact read-back match, explicit retry or replacement; fingerprints are comparison identities
+ok 8 - assessment requires exact read-back match, explicit retry or replacement; fingerprints are comparison identities
+  ---
+  duration_ms: 2.440069
+  type: 'test'
+  ...
+# Subtest: resuming a device draft carries its source recovery into the new ID without rewriting source bytes
+ok 9 - resuming a device draft carries its source recovery into the new ID without rewriting source bytes
+  ---
+  duration_ms: 1.30483
+  type: 'test'
+  ...
+# Subtest: cents become plain dollar inputs the sheet accepts
+ok 10 - cents become plain dollar inputs the sheet accepts
+  ---
+  duration_ms: 0.968418
+  type: 'test'
+  ...
+# Subtest: an empty sheet takes Toast names, amounts and Z, reusing the starter blank drawer
+ok 11 - an empty sheet takes Toast names, amounts and Z, reusing the starter blank drawer
+  ---
+  duration_ms: 1.175979
+  type: 'test'
+  ...
+# Subtest: existing drawers keep their counts; names match ignoring case and spaces, even in the other shift
+ok 12 - existing drawers keep their counts; names match ignoring case and spaces, even in the other shift
+  ---
+  duration_ms: 0.434037
+  type: 'test'
+  ...
+# Subtest: a counted but unnamed drawer is not overwritten; Toast cashiers are added after it
+ok 13 - a counted but unnamed drawer is not overwritten; Toast cashiers are added after it
+  ---
+  duration_ms: 0.333823
+  type: 'test'
+  ...
+# Subtest: cashier drawer, turn-in and over/short
+ok 14 - cashier drawer, turn-in and over/short
+  ---
+  duration_ms: 3.490671
+  type: 'test'
+  ...
+# Subtest: day totals add both shifts and compare deposit to the Z report
+ok 15 - day totals add both shifts and compare deposit to the Z report
+  ---
+  duration_ms: 0.287781
+  type: 'test'
+  ...
+# Subtest: blank Toast or Z report leaves over/short unknown instead of $0
+ok 16 - blank Toast or Z report leaves over/short unknown instead of $0
+  ---
+  duration_ms: 0.183995
+  type: 'test'
+  ...
+# Subtest: money parsing and formatting
+ok 17 - money parsing and formatting
+  ---
+  duration_ms: 0.205106
+  type: 'test'
+  ...
+# Subtest: found cash resolves a Z shortage without rewriting cashier or shift comparisons
+ok 18 - found cash resolves a Z shortage without rewriting cashier or shift comparisons
+  ---
+  duration_ms: 0.482185
+  type: 'test'
+  ...
+# Subtest: cash amount entry accepts exact cents and rejects incomplete, signed or fractional-cent amounts
+ok 19 - cash amount entry accepts exact cents and rejects incomplete, signed or fractional-cent amounts
+  ---
+  duration_ms: 0.190237
+  type: 'test'
+  ...
+# Subtest: extra money requires a server acknowledgement so older Workers cannot silently discard it
+ok 20 - extra money requires a server acknowledgement so older Workers cannot silently discard it
+  ---
+  duration_ms: 52.089072
+  type: 'test'
+  ...
+# Subtest: datesEnding is oldest first and crosses month ends
+ok 21 - datesEnding is oldest first and crosses month ends
+  ---
+  duration_ms: 1.720096
+  type: 'test'
+  ...
+# Subtest: dailyRows sums stores and keeps blank over/short as null
+ok 22 - dailyRows sums stores and keeps blank over/short as null
+  ---
+  duration_ms: 0.690868
+  type: 'test'
+  ...
+# Subtest: summarize averages saved days and counts missing store-days before today
+ok 23 - summarize averages saved days and counts missing store-days before today
+  ---
+  duration_ms: 0.365103
+  type: 'test'
+  ...
+# Subtest: unassigned legacy sheet retains counts, AM/PM, source names and Toast/Z text without inventing context
+ok 24 - unassigned legacy sheet retains counts, AM/PM, source names and Toast/Z text without inventing context
+  ---
+  duration_ms: 2.084928
+  type: 'test'
+  ...
+# Subtest: malformed legacy sources are rejected without coercing invalid values to zero or fabricating a sheet
+ok 25 - malformed legacy sources are rejected without coercing invalid values to zero or fabricating a sheet
+  ---
+  duration_ms: 0.250932
+  type: 'test'
+  ...
+# Subtest: unknown context and credential-bearing legacy objects remain unassigned for recovery
+ok 26 - unknown context and credential-bearing legacy objects remain unassigned for recovery
+  ---
+  duration_ms: 0.385152
+  type: 'test'
+  ...
+# Subtest: blank, explicit zero and historical unknown entry states survive serialization independently
+ok 27 - blank, explicit zero and historical unknown entry states survive serialization independently
+  ---
+  duration_ms: 0.386584
+  type: 'test'
+  ...
+# Subtest: invalid count text is retained for recovery and never truncated into another number
+ok 28 - invalid count text is retained for recovery and never truncated into another number
+  ---
+  duration_ms: 0.478864
+  type: 'test'
+  ...
+# Subtest: server payload strips local status and preserves integer-cent totals and Toast/Z workbook semantics
+ok 29 - server payload strips local status and preserves integer-cent totals and Toast/Z workbook semantics
+  ---
+  duration_ms: 0.570774
+  type: 'test'
+  ...
+# Subtest: each bill and coin amount converts to an exact whole count and synchronizes in both directions
+ok 30 - each bill and coin amount converts to an exact whole count and synchronizes in both directions
+  ---
+  duration_ms: 0.859814
+  type: 'test'
+  ...
+# Subtest: nonmultiples and malformed amounts remain recoverable until corrected, without fractional bills
+ok 31 - nonmultiples and malformed amounts remain recoverable until corrected, without fractional bills
+  ---
+  duration_ms: 0.374232
+  type: 'test'
+  ...
+# Subtest: amount metadata stays local while found cash survives wire serialization and old drafts still load
+ok 32 - amount metadata stays local while found cash survives wire serialization and old drafts still load
+  ---
+  duration_ms: 0.400271
+  type: 'test'
+  ...
+# Subtest: zero/fractions/text/Enough/skips are distinct; orders do not mark a count entered
+ok 33 - zero/fractions/text/Enough/skips are distinct; orders do not mark a count entered
+  ---
+  duration_ms: 1.481658
+  type: 'test'
+  ...
+# Subtest: device envelopes preserve raw notation, captured catalog and IDs across rename/removal, with legacy wire shapes
+ok 34 - device envelopes preserve raw notation, captured catalog and IDs across rename/removal, with legacy wire shapes
+  ---
+  duration_ms: 0.978675
+  type: 'test'
+  ...
+# Subtest: unsupported/corrupt progress and legacy recovery bytes survive writes; denied storage reports failure
+ok 35 - unsupported/corrupt progress and legacy recovery bytes survive writes; denied storage reports failure
+  ---
+  duration_ms: 0.690906
+  type: 'test'
+  ...
+# Subtest: reviewed catalog adoption preserves removed IDs and never moves counts to a same-name new ID
+ok 36 - reviewed catalog adoption preserves removed IDs and never moves counts to a same-name new ID
+  ---
+  duration_ms: 0.740258
+  type: 'test'
+  ...
+# Subtest: built-in paper catalog with optional undefined notes checkpoints and resumes exact counts
+ok 37 - built-in paper catalog with optional undefined notes checkpoints and resumes exact counts
+  ---
+  duration_ms: 0.665388
+  type: 'test'
+  ...
+# Subtest: item ids are unique and fit the Worker pattern
+ok 38 - item ids are unique and fit the Worker pattern
+  ---
+  duration_ms: 1.132812
+  type: 'test'
+  ...
+# Subtest: amounts parse whole numbers and fractions only
+ok 39 - amounts parse whole numbers and fractions only
+  ---
+  duration_ms: 0.289995
+  type: 'test'
+  ...
+# Subtest: orders top up to Use, matching the paper sheets
+ok 40 - orders top up to Use, matching the paper sheets
+  ---
+  duration_ms: 0.190606
+  type: 'test'
+  ...
+# Subtest: orders group by supplier and skip blanks
+ok 41 - orders group by supplier and skip blanks
+  ---
+  duration_ms: 4.118257
+  type: 'test'
+  ...
+# Subtest: supplier filter keeps rows shared between suppliers
+ok 42 - supplier filter keeps rows shared between suppliers
+  ---
+  duration_ms: 0.817245
+  type: 'test'
+  ...
+# Subtest: orders carry the ordered check-off
+ok 43 - orders carry the ordered check-off
+  ---
+  duration_ms: 0.21252
+  type: 'test'
+  ...
+# Subtest: new item ids are readable and never collide
+ok 44 - new item ids are readable and never collide
+  ---
+  duration_ms: 0.200645
+  type: 'test'
+  ...
+# Subtest: edited lists are checked before saving
+ok 45 - edited lists are checked before saving
+  ---
+  duration_ms: 0.394898
+  type: 'test'
+  ...
+1..45
+# tests 45
+# suites 0
+# pass 45
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 866.563273
