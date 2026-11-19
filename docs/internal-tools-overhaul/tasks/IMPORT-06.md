@@ -109,3 +109,7 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Implementation and local verification: done. External/live: pending; activation dependencies remain required.
 - Recovery/rollback and acceptance scenarios are recorded in the linked guide. Preserve prior records and drafts when reverting scoped changes.
 - Next owner/action: Codex continues the user-authorized six-PR import stack in one worktree. Open PRs only; no merging or auto-merge.
+
+## Step 09 follow-up — November 18, 2026
+
+Files → Review → Report retains source-hours and identity policy. Employee totals and a focused issue queue precede raw physical rows; directory loading, unavailable, authorization and conflict states remain distinct. Stage navigation preserves choices; restoring resets only the replaced directory editor/request generation. See the [Step 09 checkpoint](../checkpoints/step-09.md). Codex coordinates shared dictionary and fixture changes. External activation, staff/device review and release remain separate; task milestone states are unchanged.

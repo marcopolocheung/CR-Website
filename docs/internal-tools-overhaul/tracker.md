@@ -228,3 +228,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 ### Experience overhaul Step 08 — November 18, 2026
 
 [Staged sales checkpoint](checkpoints/step-08.md): local implementation and focused checks completed for IMPORT-01/02/03/04; review pending. Original task milestone states remain unchanged. Shared history activation and physical-device/staff/live checks remain pending. Four independent PRs are authorized; recommended merge order is 08 → 09 → 10 → 11.
+
+### Experience overhaul Step 09 — November 18, 2026
+
+[Hours staging checkpoint](checkpoints/step-09.md): local implementation/verification for IMPORT-01/03/05/06, ready for PR review. Source payroll rules and export eligibility retained. Shared directory activation and staff/device/live gates remain pending. Independent from [Step 08 PR #194](https://github.com/marcopolocheung/CR-Website/pull/194); merge 08 → 09 → 10 → 11.

@@ -15,6 +15,26 @@ def set_source(page, selector, payload):
     if replacement:
         confirm_replacement(page)
 
+def hours_stage(page, stage):
+    page.locator(f'[data-hours-go="{stage}"]').click()
+    expect(page.locator('[data-hours-stage]')).to_have_attribute('data-hours-stage', stage)
+
+def hours_review(page, details=False):
+    if page.locator('[data-hours-stage]').count() and page.locator('[data-hours-stage]').get_attribute('data-hours-stage') != 'review':
+        page.locator('#hc-prepare').click()
+    if details and page.locator('#hours-source-details').get_attribute('open') is None:
+        page.locator('#hours-source-details > summary').click()
+
+def hours_report(page):
+    if page.locator('[data-hours-stage]').count() and page.locator('[data-hours-stage]').get_attribute('data-hours-stage') != 'report':
+        page.locator('#hc-accept').click()
+        expect(page.locator('[data-hours-stage]')).to_have_attribute('data-hours-stage', 'report')
+
+def hours_copies(page):
+    detail=page.locator('[data-hours-copies]')
+    if detail.get_attribute('open') is None:
+        detail.locator(':scope > summary').click()
+
 def sales_stage(page, stage):
     page.locator(f'[data-sales-go="{stage}"]').click()
     expect(page.locator('[data-sales-stage]')).to_have_attribute('data-sales-stage', stage)

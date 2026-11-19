@@ -2,7 +2,7 @@
 import sys,csv,io,json
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright,expect
-from import_browser_helpers import set_source
+from import_browser_helpers import set_source, hours_review, hours_stage, hours_report
 BASE=sys.argv[1];assert urlparse(BASE).hostname in ('127.0.0.1','localhost')
 HEADERS=['Employee External Id','Employee','Job Title','In Date','Out Date','Total Hours','Regular Hours','Overtime Hours']
 def run():
@@ -33,6 +33,7 @@ def run():
   s=io.StringIO();w=csv.writer(s);w.writerow(HEADERS)
   for external in ('','source-one','source-two'):w.writerow([external,'Same Name','Cook','10/24/2026 08:00 AM','10/24/2026 04:00 PM','8','7.5','0.5'])
   set_source(page,'#hc-file',{'name':'identities.csv','mimeType':'text/csv','buffer':s.getvalue().encode()})
+  hours_review(page)
   page.locator('#hours-reviewed').check();expect(page.locator('#hc-download')).to_be_disabled()
   state['mode']='absent';page.locator('#mapping-load').tap();expect(page.locator('#panel-hours')).to_contain_text('unavailable or not configured')
   expect(page.locator('#hc-preparer')).to_have_value('Synthetic manager');state['mode']='ok';page.locator('#mapping-load').tap();expect(page.locator('#mapping-new-name')).to_be_visible()
@@ -40,15 +41,16 @@ def run():
   choices=page.locator('#mapping-row-2 option').evaluate_all('(options)=>options.map(o=>o.value).filter(Boolean)');assert len(choices)==2 and choices[0]!=choices[1]
   page.locator('#mapping-row-2').select_option(choices[0]);page.locator('#mapping-row-3').select_option(choices[0]);page.locator('#mapping-row-4').select_option(choices[1])
   expect(page.locator('#hc-download')).to_be_disabled()
-  page.locator('#hc-end').fill('2026-10-25');page.get_by_role('dialog').locator('button').first.tap();expect(page.locator('#hc-end')).to_have_value('2026-10-24');expect(page.locator('#mapping-row-4')).to_have_value(choices[1])
+  hours_stage(page,'files');page.locator('#hc-end').fill('2026-10-25');page.get_by_role('dialog').locator('button').first.tap();expect(page.locator('#hc-end')).to_have_value('2026-10-24');expect(page.locator('#mapping-row-4')).to_have_value(choices[1]);hours_stage(page,'review')
   state['mode']='conflict';page.locator('#mapping-save').tap();expect(page.locator('#panel-hours')).to_contain_text('Another editor saved a newer revision')
   expect(page.locator('#mapping-row-4')).to_have_value(choices[1]);assert state['record'] is None
   first_operation=state['writes'][-1]['mutation']['operationId'];state['mode']='ok';page.locator('#mapping-save').tap();expect(page.locator('#panel-hours')).to_contain_text('Mappings saved to server')
   assert state['writes'][-1]['mutation']['operationId']==first_operation
   assert len(state['record']['data']['mappings'])==3
   assert state['record']['data']['mappings'][0]['externalId'].startswith('row:sha256:')
-  page.locator('#hours-reviewed').check();expect(page.locator('#hc-download')).to_be_enabled()
+  page.locator('#hours-reviewed').check();expect(page.locator('#hc-accept')).to_be_enabled();hours_report(page)
   with page.expect_download():page.locator('#hc-download').tap()
+  hours_stage(page,'review')
   page.get_by_role('button',name='Español',exact=True).tap();expect(page.locator('#mapping-title')).to_have_text('Asignaciones revisadas de ID del personal')
   assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
   assert 'synthetic-import-token' not in page.evaluate('JSON.stringify(localStorage)')

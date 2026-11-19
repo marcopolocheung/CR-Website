@@ -10,7 +10,7 @@ import sys
 import tempfile
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
-from import_browser_helpers import set_source, confirm_replacement, sales_stage, sales_report
+from import_browser_helpers import set_source, confirm_replacement, hours_review, hours_report, sales_stage, sales_report
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:3017'
 if urlparse(BASE).hostname not in ('localhost', '127.0.0.1'):
@@ -150,16 +150,18 @@ def run():
         # Date boundaries filter whole source shifts with visible exclusions, without recalculating payroll.
         page.locator('#hc-end').fill('2026-09-30')
         expect(hdownload).to_be_disabled()
-        expect(page.locator('#hours-review-title')).to_be_visible()
-        expect(hours.get_by_role('region', name='Review employee hours').last).to_contain_text('Select a valid inclusive period')
+        hours_review(page)
+        expect(page.locator('#hc-end')).to_be_focused()
         page.locator('#hc-end').fill('2026-10-31')
         # File-only conversion needs no network and remains usable with denied storage.
+        hours_review(page)
         page.locator('#hours-reviewed').check()
+        hours_report(page)
         context.set_offline(True)
         with page.expect_download() as hours_saved:
             hdownload.tap()
         hours_saved.value.save_as(str(Path(temp) / 'hours.xlsx'))
-        expect(hours.get_by_role('status').last).to_contain_text('download')
+        expect(page.locator('#hc-status')).to_contain_text('download')
         assert hours_saved.value.suggested_filename == 'CR2_26_1001-26_1031_EMPLOYEE_HOUR_LOG_SUMMARY.xlsx'
         assert len(downloads) == 2
         expect(page.locator('#hc-start')).to_have_value('2026-10-01')
