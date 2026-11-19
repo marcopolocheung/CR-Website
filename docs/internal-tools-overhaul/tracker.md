@@ -224,3 +224,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | DATA-04-IMPORT | Persist reviewed import directory snapshots | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [DATA-04-IMPORT](tasks/DATA-04-IMPORT.md) |
 | DEC-03-IMPORT | Approve reviewed import history without raw uploads or disposal | P1 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-03-IMPORT](tasks/DEC-03-IMPORT.md) |
 | SCH-06-IMPORT | Read published schedule estimates for import comparison | P1 | `CODE_ONLY` | DATA-04-IMPORT, DEC-01, DEC-04-IMPORT | — | complete | Codex | D/D/NA/NA | [SCH-06-IMPORT](tasks/SCH-06-IMPORT.md) |
+
+### Experience overhaul Step 08 — November 18, 2026
+
+[Staged sales checkpoint](checkpoints/step-08.md): local implementation and focused checks completed for IMPORT-01/02/03/04; review pending. Original task milestone states remain unchanged. Shared history activation and physical-device/staff/live checks remain pending. Four independent PRs are authorized; recommended merge order is 08 → 09 → 10 → 11.

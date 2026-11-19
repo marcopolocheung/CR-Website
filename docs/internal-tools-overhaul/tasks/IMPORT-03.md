@@ -105,3 +105,7 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - Milestones: I/L done; E/V not applicable. No Worker/resource/data operation, publication or staff approval. Device copies are not shared/server import history.
 - Owner/action: Codex completed this bounded task; STOP after PR creation per the user. No next task claimed. Future import date work uses the scoped delegation documented in [service session](../imports-session.md); do not merge current PRs.
 - Rollback: scoped revert plus separately authorized compatible frontend publication if live; preserve device draft keys and original source files.
+
+## Step 08 follow-up — November 18, 2026
+
+Files → Review → Report retains source validation, financial mapping and recovery readers. Cash reconciliation recomputes in Review; restored primitive values remain editable without uploads. Local evidence and limitations are recorded in the [Step 08 checkpoint](../checkpoints/step-08.md). Codex coordinates the dictionary/browser-fixture edits. This local follow-up does not change deployment, retention or staff-review milestones.

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as XLSX from 'xlsx'
 import { salesFixtures } from '../../../scripts/fixtures/imports'
-import { salesContext, needsContextReview, validSalesContext, weekday } from './sales-context'
+import { salesContext, consistentSalesContext, needsContextReview, validSalesContext, weekday } from './sales-context'
 import { sourceTime } from './business-date'
 import { fetchCashoutSnapshot } from '../cashout-store'
 const sources=()=>Object.fromEntries(Object.entries(salesFixtures()).map(([slot,workbook])=>[slot,{name:slot+'.xlsx',workbook}])) as Parameters<typeof salesContext>[0]
@@ -36,4 +36,19 @@ test('saved cash-out digest binds exact retrieved context and distinguishes miss
  await assert.rejects(fetchCashoutSnapshot('CR2','2026-10-20','synthetic'))
  globalThis.fetch=async()=>new Response('{}',{status:404});assert.equal(await fetchCashoutSnapshot('CR3','2026-10-20','synthetic'),null)
  }finally{globalThis.fetch=original}
+})
+
+test('context suggestion requires agreement from all three content sources; filenames confer no authority', () => {
+ const input = sources()
+ for (const source of Object.values(input)) {
+  source.name = 'CR2-2020-01-01.xlsx'
+  XLSX.utils.book_append_sheet(source.workbook, XLSX.utils.aoa_to_sheet([['Business date','Store'],['2026-10-20','CR3']]), 'Report context')
+ }
+ assert.deepEqual(consistentSalesContext(salesContext(input)), {date:'2026-10-20',store:'CR3'})
+ input.dinner.workbook.Sheets['Report context'].B2.v = 'Unknown'
+ assert.equal(consistentSalesContext(salesContext(input)), null)
+ input.dinner.workbook.Sheets['Report context'].B2.v = 'CR2'
+ assert.equal(consistentSalesContext(salesContext(input)), null)
+ delete input.dinner.workbook.Sheets['Report context']; input.dinner.workbook.SheetNames.pop()
+ assert.equal(consistentSalesContext(salesContext(input)), null)
 })

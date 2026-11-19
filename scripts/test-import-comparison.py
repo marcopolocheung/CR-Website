@@ -69,7 +69,7 @@ def run():
   state['fail']=True;page.locator('#comparison-load').tap();page.get_by_role('dialog').locator('button').last.tap();expect(page.locator('#panel-comparison')).to_contain_text('unavailable or not configured')
   expect(page.locator('#comparison-result-title')).to_be_visible();expect(page.locator('#panel-comparison')).to_contain_text('2026-10-01 to 2026-10-31')
   expect(page.locator('#comparison-end')).to_have_value('2026-10-30')
-  page.locator('#tab-cash-out').tap();page.locator('#draft-preparer').fill('Synthetic handoff');page.get_by_role('button',name='Start new draft',exact=True).tap();page.get_by_role('button',name='Save draft and lock',exact=True).tap();page.locator('#tab-comparison').tap()
+  page.locator('#tab-cash-out').tap();page.locator('#draft-preparer').fill('Synthetic handoff');page.get_by_role('button',name='Start new draft',exact=True).tap();page.locator('[data-shell-lock]').tap();page.locator('#tab-comparison').tap()
   expect(page.locator('#comparison-result-title')).not_to_be_visible();expect(page.locator('#comparison-end')).to_have_value('2026-10-30')
   assert not errors,errors;assert not remote,remote
   context.close();browser.close();print('PASS IMPORT-08: missing identity limitations, explicit publication mappings, reviewed source selection, reconciled per-store/combined hours, one shared identity, source regular/overtime separation, overlap evidence JSON, Spanish phone/print and failed reload preserving prior snapshot')

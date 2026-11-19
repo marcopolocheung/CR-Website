@@ -103,3 +103,7 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - Implementation and local verification: done. External/live: not applicable; frontend publication remains separate.
 - Recovery/rollback and acceptance scenarios are recorded in the linked guide. Preserve prior records and drafts when reverting scoped changes.
 - Next owner/action: Codex continues the user-authorized six-PR import stack in one worktree. Open PRs only; no merging or auto-merge.
+
+## Step 08 follow-up — November 18, 2026
+
+Files → Review → Report retains source validation, financial mapping and recovery readers. Cash reconciliation recomputes in Review; restored primitive values remain editable without uploads. Local evidence and limitations are recorded in the [Step 08 checkpoint](../checkpoints/step-08.md). Codex coordinates the dictionary/browser-fixture edits. This local follow-up does not change deployment, retention or staff-review milestones.

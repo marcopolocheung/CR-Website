@@ -110,3 +110,7 @@ No resource creation, binding change, migration execution, or Worker deployment 
 ## Claim and dependency coordination — 2026-10-24
 
 Codex completed the bounded source-validation claim. Shared package script/dictionary edits were coordinated in this single task; no Worker routes, migrations or payroll/date policies changed. Prerequisite metadata now reflects actual reuse of already completed UX-01/03/06. Owner is Codex for completed evidence; the next task remains unassigned.
+
+## Step 08 follow-up — November 18, 2026
+
+Files → Review → Report retains source validation, financial mapping and recovery readers. Cash reconciliation recomputes in Review; restored primitive values remain editable without uploads. Local evidence and limitations are recorded in the [Step 08 checkpoint](../checkpoints/step-08.md). Codex coordinates the dictionary/browser-fixture edits. This local follow-up does not change deployment, retention or staff-review milestones.

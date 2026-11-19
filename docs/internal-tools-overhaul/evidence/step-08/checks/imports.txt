@@ -1,0 +1,338 @@
+
+> chinarose@0.0.2 imports:test
+> node --import jiti/register --test src/lib/converter/validation.test.ts src/lib/converter/sales-review.test.ts src/lib/converter/import-snapshot.test.ts src/lib/converter/sales-context.test.ts src/lib/converter/hours-review.test.ts src/lib/converter/employee-mapping.test.ts src/lib/converter/import-history.test.ts src/lib/converter/scheduled-actual.test.ts
+
+TAP version 13
+# Subtest: same names are distinct and never matched without reviewed scoped IDs
+ok 1 - same names are distinct and never matched without reviewed scoped IDs
+  ---
+  duration_ms: 32.402307
+  type: 'test'
+  ...
+# Subtest: missing external IDs use exact fingerprint and physical row, never a guessed name
+ok 2 - missing external IDs use exact fingerprint and physical row, never a guessed name
+  ---
+  duration_ms: 1.926288
+  type: 'test'
+  ...
+# Subtest: unknown fields, guessed IDs, missing provenance and overlapping effective mappings fail validation
+ok 3 - unknown fields, guessed IDs, missing provenance and overlapping effective mappings fail validation
+  ---
+  duration_ms: 0.553631
+  type: 'test'
+  ...
+# Subtest: inclusive range owns whole overnight source shift with no payroll recalculation
+ok 4 - inclusive range owns whole overnight source shift with no payroll recalculation
+  ---
+  duration_ms: 15.26415
+  type: 'test'
+  ...
+# Subtest: open punches, invalid dates, DST ambiguity, missing IDs and source row numbers stay visible
+ok 5 - open punches, invalid dates, DST ambiguity, missing IDs and source row numbers stay visible
+  ---
+  duration_ms: 3.449201
+  type: 'test'
+  ...
+# Subtest: reversed times, malformed numeric values and invalid periods cannot export as accepted rows
+ok 6 - reversed times, malformed numeric values and invalid periods cannot export as accepted rows
+  ---
+  duration_ms: 2.232617
+  type: 'test'
+  ...
+# Subtest: source identity uses bytes/context/parser/mapping revision, never filename or upload time
+ok 7 - source identity uses bytes/context/parser/mapping revision, never filename or upload time
+  ---
+  duration_ms: 7.424533
+  type: 'test'
+  ...
+# Subtest: history retains reviewed values and output metadata without raw uploads or workbook bytes
+ok 8 - history retains reviewed values and output metadata without raw uploads or workbook bytes
+  ---
+  duration_ms: 23.833854
+  type: 'test'
+  ...
+# Subtest: deliberate reprocess preserves explicit lineage and source exception rows
+ok 9 - deliberate reprocess preserves explicit lineage and source exception rows
+  ---
+  duration_ms: 6.400043
+  type: 'test'
+  ...
+# Subtest: sales source fingerprint comes from the exact bytes read once
+ok 10 - sales source fingerprint comes from the exact bytes read once
+  ---
+  duration_ms: 23.387742
+  type: 'test'
+  ...
+# Subtest: sales/hours recovery snapshots preserve values, source names and null/zero while excluding File objects
+ok 11 - sales/hours recovery snapshots preserve values, source names and null/zero while excluding File objects
+  ---
+  duration_ms: 6.931362
+  type: 'test'
+  ...
+# Subtest: malformed, unsupported, credential-bearing and mismatched figure/context payloads are not applied
+ok 12 - malformed, unsupported, credential-bearing and mismatched figure/context payloads are not applied
+  ---
+  duration_ms: 15.726996
+  type: 'test'
+  ...
+# Subtest: task/store/day/period recovery keys remain isolated even if the stored payload has a conflicting context
+ok 13 - task/store/day/period recovery keys remain isolated even if the stored payload has a conflicting context
+  ---
+  duration_ms: 2.6741
+  type: 'test'
+  ...
+# Subtest: independent resumed copies preserve original bytes and lineage without overwriting another editor
+ok 14 - independent resumed copies preserve original bytes and lineage without overwriting another editor
+  ---
+  duration_ms: 3.089231
+  type: 'test'
+  ...
+# Subtest: quota/read denial leaves the working snapshot and prior recoverable copy intact
+ok 15 - quota/read denial leaves the working snapshot and prior recoverable copy intact
+  ---
+  duration_ms: 1.254463
+  type: 'test'
+  ...
+# Subtest: corrupt/future sources remain downloadable byte-for-byte rather than overwritten
+ok 16 - corrupt/future sources remain downloadable byte-for-byte rather than overwritten
+  ---
+  duration_ms: 0.827079
+  type: 'test'
+  ...
+# Subtest: generated output survives serialization and repeated download decoding with identical bytes/hash
+ok 17 - generated output survives serialization and repeated download decoding with identical bytes/hash
+  ---
+  duration_ms: 21.112436
+  type: 'test'
+  ...
+# Subtest: damaged output, wrong context filenames and unsafe download filenames are rejected
+ok 18 - damaged output, wrong context filenames and unsafe download filenames are rejected
+  ---
+  duration_ms: 1.316363
+  type: 'test'
+  ...
+# Subtest: weekday derives only from a valid selected calendar date
+ok 19 - weekday derives only from a valid selected calendar date
+  ---
+  duration_ms: 4.220788
+  type: 'test'
+  ...
+# Subtest: matching metadata, missing metadata and mismatched source store/date stay distinct
+ok 20 - matching metadata, missing metadata and mismatched source store/date stay distinct
+  ---
+  duration_ms: 2.309312
+  type: 'test'
+  ...
+# Subtest: timestamp parsing rejects normalization, DST gaps and repeats; offsets disambiguate
+ok 21 - timestamp parsing rejects normalization, DST gaps and repeats; offsets disambiguate
+  ---
+  duration_ms: 11.940467
+  type: 'test'
+  ...
+# Subtest: saved cash-out digest binds exact retrieved context and distinguishes missing from zero
+ok 22 - saved cash-out digest binds exact retrieved context and distinguishes missing from zero
+  ---
+  duration_ms: 22.842278
+  type: 'test'
+  ...
+# Subtest: context suggestion requires agreement from all three content sources; filenames confer no authority
+ok 23 - context suggestion requires agreement from all three content sources; filenames confer no authority
+  ---
+  duration_ms: 1.267324
+  type: 'test'
+  ...
+# Subtest: all 14 mapped source figures and four manual amounts have traceable original evidence
+ok 24 - all 14 mapped source figures and four manual amounts have traceable original evidence
+  ---
+  duration_ms: 3.367916
+  type: 'test'
+  ...
+# Subtest: same-report arithmetic compares complete source detail and shows inconsistent sales, tax and payments
+ok 25 - same-report arithmetic compares complete source detail and shows inconsistent sales, tax and payments
+  ---
+  duration_ms: 1.202061
+  type: 'test'
+  ...
+# Subtest: missing totals/detail never become confirmed zero and cross-report comparisons never imply matching scope
+ok 26 - missing totals/detail never become confirmed zero and cross-report comparisons never imply matching scope
+  ---
+  duration_ms: 0.82073
+  type: 'test'
+  ...
+# Subtest: payment rows outside the legacy mapping remain visible and do not silently change output
+ok 27 - payment rows outside the legacy mapping remain visible and do not silently change output
+  ---
+  duration_ms: 0.850339
+  type: 'test'
+  ...
+# Subtest: arithmetic includes extra sales categories even though the established workbook maps FOOD/DRINK only
+ok 28 - arithmetic includes extra sales categories even though the established workbook maps FOOD/DRINK only
+  ---
+  duration_ms: 0.428588
+  type: 'test'
+  ...
+# Subtest: fractional cents and unsafe sums are not rounded into a successful reconciliation
+ok 29 - fractional cents and unsafe sums are not rounded into a successful reconciliation
+  ---
+  duration_ms: 0.35565
+  type: 'test'
+  ...
+# Subtest: review retains its selected context and primitive figures independently of later input changes
+ok 30 - review retains its selected context and primitive figures independently of later input changes
+  ---
+  duration_ms: 0.656433
+  type: 'test'
+  ...
+# Subtest: generated workbook matches known existing cells and preserves template sheets, formulas, styles and print setup
+ok 31 - generated workbook matches known existing cells and preserves template sheets, formulas, styles and print setup
+  ---
+  duration_ms: 51.934469
+  type: 'test'
+  ...
+# Subtest: all labels and check states have matching English/Spanish translations without changing source evidence
+ok 32 - all labels and check states have matching English/Spanish translations without changing source evidence
+  ---
+  duration_ms: 0.730295
+  type: 'test'
+  ...
+# Subtest: cash edits retain source evidence, normalize currency and reconcile blank versus zero independently
+ok 33 - cash edits retain source evidence, normalize currency and reconcile blank versus zero independently
+  ---
+  duration_ms: 7.703458
+  type: 'test'
+  ...
+# Subtest: shared employee counted once across stores while source totals and unmatched hours reconcile
+ok 34 - shared employee counted once across stores while source totals and unmatched hours reconcile
+  ---
+  duration_ms: 43.378965
+  type: 'test'
+  ...
+# Subtest: missing mappings or imports remain unavailable rather than measured zero; explicit OFF is zero
+ok 35 - missing mappings or imports remain unavailable rather than measured zero; explicit OFF is zero
+  ---
+  duration_ms: 21.820295
+  type: 'test'
+  ...
+# Subtest: duplicate selected versions are quarantined; default selection keeps linked leaf only
+ok 36 - duplicate selected versions are quarantined; default selection keeps linked leaf only
+  ---
+  duration_ms: 27.029329
+  type: 'test'
+  ...
+# Subtest: unpublished, missing, malformed and incompatible schedules are explicit limitations
+ok 37 - unpublished, missing, malformed and incompatible schedules are explicit limitations
+  ---
+  duration_ms: 12.25403
+  type: 'test'
+  ...
+# Subtest: legacy layout hashes do not pin times: rule fingerprints and estimates expose changes
+ok 38 - legacy layout hashes do not pin times: rule fingerprints and estimates expose changes
+  ---
+  duration_ms: 1.982815
+  type: 'test'
+  ...
+# Subtest: different byte fingerprints do not double-count repeated identified attendance rows
+ok 39 - different byte fingerprints do not double-count repeated identified attendance rows
+  ---
+  duration_ms: 15.988972
+  type: 'test'
+  ...
+# Subtest: overnight overlaps are visible; excluded source rows and partial periods stay in evidence
+ok 40 - overnight overlaps are visible; excluded source rows and partial periods stay in evidence
+  ---
+  duration_ms: 23.259817
+  type: 'test'
+  ...
+# Subtest: existing sales mapping is preserved, including explicit zeros for absent cards/discounts and blank unused category cells
+ok 41 - existing sales mapping is preserved, including explicit zeros for absent cards/discounts and blank unused category cells
+  ---
+  duration_ms: 3.378595
+  type: 'test'
+  ...
+# Subtest: source numbers never coerce blank, partial, ambiguous separators or nonfinite values to zero
+ok 42 - source numbers never coerce blank, partial, ambiguous separators or nonfinite values to zero
+  ---
+  duration_ms: 0.596097
+  type: 'test'
+  ...
+# Subtest: sales rejects missing/wrong/empty sheets, columns, duplicate headers and missing or duplicate metric rows with evidence
+ok 43 - sales rejects missing/wrong/empty sheets, columns, duplicate headers and missing or duplicate metric rows with evidence
+  ---
+  duration_ms: 0.329069
+  type: 'test'
+  ...
+# Subtest: sales blocks malformed numbers and spreadsheet errors at their actual sheet/cell rows, including direct extraction
+ok 44 - sales blocks malformed numbers and spreadsheet errors at their actual sheet/cell rows, including direct extraction
+  ---
+  duration_ms: 0.40929
+  type: 'test'
+  ...
+# Subtest: sales file reader rejects empty/unreadable/unsupported files and verifies actual workbook bytes
+ok 45 - sales file reader rejects empty/unreadable/unsupported files and verifies actual workbook bytes
+  ---
+  duration_ms: 17.991989
+  type: 'test'
+  ...
+# Subtest: hours rejects wrong, empty and header-only reports and identifies missing and duplicate columns
+ok 46 - hours rejects wrong, empty and header-only reports and identifies missing and duplicate columns
+  ---
+  duration_ms: 1.978821
+  type: 'test'
+  ...
+# Subtest: hours reports every missing identity, bad number and unreadable source date without a partial export
+ok 47 - hours reports every missing identity, bad number and unreadable source date without a partial export
+  ---
+  duration_ms: 0.631578
+  type: 'test'
+  ...
+# Subtest: hours handles quoted commas/multiline fields, reordered/extra columns, BOM and CRLF without dropping rows
+ok 48 - hours handles quoted commas/multiline fields, reordered/extra columns, BOM and CRLF without dropping rows
+  ---
+  duration_ms: 0.552421
+  type: 'test'
+  ...
+# Subtest: hours flags malformed quotes and column-width problems, including blank-record offsets
+ok 49 - hours flags malformed quotes and column-width problems, including blank-record offsets
+  ---
+  duration_ms: 0.558293
+  type: 'test'
+  ...
+# Subtest: hours workbook preserves grouping, source regular/overtime, English headers, totals, column positions and names
+ok 50 - hours workbook preserves grouping, source regular/overtime, English headers, totals, column positions and names
+  ---
+  duration_ms: 33.922474
+  type: 'test'
+  ...
+# Subtest: arbitrary external IDs stay data, including prototype names, and no ID is dropped
+ok 51 - arbitrary external IDs stay data, including prototype names, and no ID is dropped
+  ---
+  duration_ms: 0.664184
+  type: 'test'
+  ...
+# Subtest: file read failure/invalid CSV invokes failure instead of completion; export failure is awaited
+ok 52 - file read failure/invalid CSV invokes failure instead of completion; export failure is awaited
+  ---
+  duration_ms: 13.087555
+  type: 'test'
+  ...
+# Subtest: source issue keys render in English and Spanish with raw headers and row evidence retained
+ok 53 - source issue keys render in English and Spanish with raw headers and row evidence retained
+  ---
+  duration_ms: 0.332184
+  type: 'test'
+  ...
+# Subtest: sales preserves cash-only reports but rejects missing or non-text labels before extraction
+ok 54 - sales preserves cash-only reports but rejects missing or non-text labels before extraction
+  ---
+  duration_ms: 0.342424
+  type: 'test'
+  ...
+1..54
+# tests 54
+# suites 0
+# pass 54
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1925.253425
