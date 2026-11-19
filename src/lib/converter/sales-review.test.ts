@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import * as XLSX from 'xlsx'
 import ExcelJS from 'exceljs'
 import { salesFixtures } from '../../../scripts/fixtures/imports'
-import { reviewSales, type SalesSources, type SalesForm } from './sales-review'
+import { reviewSales, updateSalesCash, type SalesSources, type SalesForm } from './sales-review'
 import { createFilledWorkbook } from './fillTemplate'
 import { SourceValidationError } from './validation'
 import { translate } from '../internal-tools/i18n'
@@ -149,4 +149,20 @@ test('all labels and check states have matching English/Spanish translations wit
   for (const locale of ['en', 'es'] as const) {
     for (const key of [...review.figures.map(figure => figure.label), ...review.checks.flatMap(check => [check.label, 'salesReview.' + check.state])]) assert.ok(!translate(locale, key).startsWith('['), key)
   }
+})
+
+test('cash edits retain source evidence, normalize currency and reconcile blank versus zero independently', async () => {
+ const before = reviewSales(sources(), form)
+ const after = updateSalesCash(before, {...form, amDeposit:'$100.00', pmDeposit:'134.56', amOverShort:'0'})
+ assert.equal(after.checks.find(check => check.id === 'cash-deposits')?.difference, 0)
+ assert.equal(after.form.amDeposit, '100')
+ assert.equal(after.figures.find(figure => figure.cell === 'C4')?.raw, '$100.00')
+ assert.deepEqual(after.sources, before.sources); assert.deepEqual(after.metrics, before.metrics)
+ const output = await createFilledWorkbook(after.metrics, after.form, await readFile('public/internal/daily-sales-template.xlsx'))
+ assert.equal(output.getWorksheet('DATAINPUT')!.getCell('C4').value, 100)
+ assert.equal(output.getWorksheet('DATAINPUT')!.getCell('C6').value, 0)
+ const blank = updateSalesCash(after, {...form, amDeposit:''})
+ assert.equal(blank.figures.find(figure => figure.cell === 'C4')?.value, null)
+ assert.equal(blank.checks.find(check => check.id === 'cash-deposits')?.state, 'missing')
+ assert.equal(before.form.amDeposit, '0')
 })

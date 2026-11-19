@@ -1,0 +1,20 @@
+{
+  "scripts/create-import-fixtures.ts": "72d121f7f560d055b06a749a1c2525232f785c8974ba26adff6af1e37178f267",
+  "scripts/import_browser_helpers.py": "eeb411ddb77c51a9c520432e2aedfdaf1f84e98d7ff57419c10656203b621e76",
+  "scripts/test-import-comparison.py": "86a943c6e9c36a3d6a6d1615bd915b52dbe45dc8ff22f16346e1adef091e091e",
+  "scripts/test-import-retention.py": "1492e93ecf29654ec5642e8ba1c09f14d5c48565f63702d686e48ec67c8ad015",
+  "scripts/test-import-review.py": "6c6873c61c22a05052a54dde9a4e40a772103e4c3c61fa4372aa3133764bcd4d",
+  "scripts/test-import-validation.py": "55b7f958337aa4129d50847745099d21f3047764d8b0602faa9f5e2b82611726",
+  "scripts/test-internal-feedback.py": "8c2886482fd1da834e98905be395d23c91f5899439b060655ee7386c5698da06",
+  "scripts/test-internal-shell.py": "3ca24047e22270e5834f2318ad8171cb55a128a2c216e522c2658ae109348497",
+  "src/components/internal/SalesConverter.tsx": "015fbabb3b3f56e275c2692b838c90fbd1ce365444e81feddbfbc41bb4e6691e",
+  "src/components/internal/SalesReview.tsx": "0f0736e47075f519b5b7fd3363f84dceff9e04f3fa094091fab9a5962c98dcb0",
+  "src/lib/converter/sales-context.test.ts": "af81d3c9bcc6c9ddbe60b1f8d865470f42f7a71afe10cdd2e84628ebe73de478",
+  "src/lib/converter/sales-context.ts": "19f6e78345a88d40fa0a1781e6336f27dcaf017667811d59717842fad11c9a1f",
+  "src/lib/converter/sales-review.test.ts": "57aed7b1a963cd0469d06ba601de42e5a16b87b4597dfed66c681e5fcbe62327",
+  "src/lib/converter/sales-review.ts": "8f123c680e82b6957ff167a08cd27d88710ccdde3e1a9ff1a9aafacff1db3275",
+  "src/lib/internal-tools/i18n/en.ts": "8a4eee36b5f665c040467d3fda847a08eb54e1b652809b3e30e16181dc1152b6",
+  "src/lib/internal-tools/i18n/es.ts": "2b8be5070489788e7de56f438df447aa7e00667fadbfced3d1970bd38b556531",
+  "src/components/internal/sales-stages.module.css": "f519c6986753a911f827faa755924241ec0838035b82dfa7e37c7c276ff13390",
+  "out/_next/static/chunks/62ec118ea6da9bd4.js": "75a19b6066a9da91c6f4e5107e48e5e19e3812ade5e6f0e4c4abd554b8bb59d6"
+}

@@ -1,0 +1,2 @@
+PASS IMPORT-06: missing source ID retained, same-name UUID choices, exact row fingerprint mapping, absent backend, conflict preservation/same-operation retry, server revision, acknowledged export, Spanish phone and no persisted token
+External network guard: 0 blocked attempts

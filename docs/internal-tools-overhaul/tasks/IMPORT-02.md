@@ -105,3 +105,7 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - Milestones: I/L done; E/V not applicable (CODE_ONLY). Frontend publication remains separate.
 - Next owner/action: IMPORT-03 is ready and remains unassigned until claimed on the successor branch. User requested imports-first, then cash-out; open PRs only, leave unmerged. [Current service session/delegated date choices](../imports-session.md).
 - Rollback: revert this scoped commit; preserve source files/device drafts; separately publish a compatible frontend only when authorized.
+
+## Step 08 follow-up — November 18, 2026
+
+Files → Review → Report retains source validation, financial mapping and recovery readers. Cash reconciliation recomputes in Review; restored primitive values remain editable without uploads. Local evidence and limitations are recorded in the [Step 08 checkpoint](../checkpoints/step-08.md). Codex coordinates the dictionary/browser-fixture edits. This local follow-up does not change deployment, retention or staff-review milestones.

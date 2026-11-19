@@ -9,7 +9,7 @@ import { mapHours, ambiguousNames, type ImportDirectory } from '@/lib/converter/
 import type { DirectoryRecord } from '@/lib/converter/import-api'
 import { reviewHours } from '@/lib/converter/hours-review'
 import HoursReview from './HoursReview'
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigationProtection } from './NavigationProtection'
 import { useInternalLanguage } from './InternalLanguage'
 import type { Message } from '@/lib/internal-tools/i18n'
@@ -23,6 +23,9 @@ import { importStore, type ImportSnapshot } from '@/lib/converter/import-snapsho
 import type { DraftContext } from '@/lib/internal-tools/drafts'
 import ImportHistory from './ImportHistory'
 import ImportRecovery from './ImportRecovery'
+import { InternalTheme } from './ui/Theme'
+import { Paper, Button } from './ui/controls'
+import styles from './hours-stages.module.css'
 import { LOCATIONS } from './SalesConverter'
 
 const inputClass =
@@ -32,6 +35,9 @@ const labelClass = 'block text-sm font-medium text-gray-700 mb-1'
 /** Validate Toast source rows before generating the familiar grouped hour log. */
 export default function HoursConverter({token = ''}: {token?: string}) {
   const { t: tr } = useInternalLanguage()
+  const [stage, setStage] = useState<'files' | 'review' | 'report'>('files')
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => { heading.current?.focus() }, [stage])
   const [mappingDirty,setMappingDirty] = useState(false)
   const contextChoice = useRef(0)
   const [fingerprint,setFingerprint] = useState('')
@@ -58,6 +64,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
   const confirmation = useConfirmation()
   useShellTask('hours', { context: [importStore(plant), startDate, endDate].filter(Boolean).join(' · ') })
   function invalidateOutput() { exportVersion.current++; setAcknowledged(false); setOutput(null); setDeviceSaved(false); setStatus(null) }
+  const mappingChanged = useCallback((dirty: boolean) => { setMappingDirty(dirty); if (dirty) { exportVersion.current++; setAcknowledged(false); setOutput(null); setDeviceSaved(false); setStatus(null) } }, [])
   useNavigationProtection({ scope: 'hours-import', busy, checkpoint: () => {
     const dirty = !!(plant || startDate || endDate || preparer || csvFile || rows)
     if (!dirty) return true
@@ -68,7 +75,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
     const choice = ++contextChoice.current
     if (mappingDirty && !await confirmation.ask({key:'mapping.contextWarning'},true)) return
     if (choice !== contextChoice.current) return
-    invalidateOutput(); setMappingDirty(false)
+    invalidateOutput(); setMappingDirty(false); setStage('files')
     if (field === 'plant') { setMapping(null); setPlant(value) }
     else if (field === 'start') setStartDate(value)
     else setEndDate(value)
@@ -76,7 +83,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
 
   async function selectFile(file: File) {
     contextChoice.current++
-    invalidateOutput(); setRows(null); setFingerprint(''); setMapping(null); setResumed(false); setSourceName(file.name)
+    invalidateOutput(); setStage('files'); setRows(null); setFingerprint(''); setMapping(null); setResumed(false); setSourceName(file.name)
     const version = ++generation.current
     setCsvFile(file)
     setStatus(null)
@@ -93,7 +100,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
     setValidation({ checking: false, valid: !!result.value && !result.issues.length, issues: result.issues })
   }
 
-  async function handleConvertAndDownload() {
+  async function handleConvertAndDownload(download = false) {
     if (converting.current || (!csvFile && !rows)) return
     const missing: FieldIssue[] = []
     if (!plant) missing.push({ fieldId: 'hc-location', message: { key: 'imports.chooseLocation' } })
@@ -101,7 +108,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
     if (!endDate) missing.push({ fieldId: 'hc-end', message: { key: 'imports.pickDates' } })
     if (startDate && endDate && startDate > endDate) missing.push({ fieldId: 'hc-end', message: { key: 'importValidation.period' } })
     setIssues(missing)
-    if (missing.length) { setStatus(null); focusField(missing[0].fieldId); return }
+    if (missing.length) { setStage('files'); setStatus(null); setTimeout(() => focusField(missing[0].fieldId), 0); return }
     converting.current = true
     setBusy(true)
     setStatus({ key: 'imports.parsing' })
@@ -112,8 +119,9 @@ export default function HoursConverter({token = ''}: {token?: string}) {
       const generated = output ?? await generateHoursOutput(included, { location: plant, startDate, endDate })
       if (exportAt !== exportVersion.current) return
       if (!output) { setOutput(generated); setDeviceSaved(false) }
-      await downloadWorkbookOutput(generated)
-      setStatus({ key: 'imports.downloaded' })
+      setStage('report')
+      if (download) { await downloadWorkbookOutput(generated); setStatus({ key: 'hoursStages.downloadStarted' }) }
+      else setStatus({ key: 'hoursStages.generated' })
     } catch (err) {
       setStatus({ key: err instanceof SourceValidationError ? 'importValidation.blocked' : 'importValidation.exportFailed' })
     } finally { converting.current = false; setBusy(false) }
@@ -122,7 +130,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
   const preview = useMemo(() => rows ? reviewHours(rows, startDate, endDate) : null, [rows, startDate, endDate])
   const identities = useMemo(() => mapHours(rows ?? [], mapping?.directory ?? null, importStore(plant) ?? 'CR3', fingerprint), [rows, mapping, plant, fingerprint])
   const mappingBlocked = !!preview?.included.some(row => !row.values.Employee.trim() || (!row.values['Employee External Id'].trim() && !identities.find(item => item.sourceRow === row.sourceRow)?.employee)) || ambiguousNames(preview?.included.map(row=>row.values) ?? [], identities.filter(item=>preview?.included.some(row=>row.sourceRow===item.sourceRow)))
-  function acceptDirectory(record:DirectoryRecord|null) { invalidateOutput(); setMapping(record ? { revision: record.revision, directory: record.data } : null) }
+  function acceptDirectory(record:DirectoryRecord|null) { invalidateOutput(); setStage(current => current === 'report' ? 'review' : current); setMapping(record ? { revision: record.revision, directory: record.data } : null) }
   const context = useMemo<DraftContext | null>(() => {
     const storeId = importStore(plant), start = businessDate(startDate), end = businessDate(endDate)
     return storeId && start && end && start <= end ? { task: 'hours-import', storeId, period: { start, end } } : null
@@ -131,7 +139,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
   function restoreSnapshot(snapshot: ImportSnapshot) {
     contextChoice.current++
     if (snapshot.kind !== 'hours') return
-    generation.current++; exportVersion.current++; setMappingDirty(false); setDeviceSaved(false); setAcknowledged(false)
+    generation.current++; exportVersion.current++; setStage('review'); setMappingDirty(false); setDeviceSaved(false); setAcknowledged(false)
     setPlant(snapshot.metadata.location); setStartDate(snapshot.metadata.startDate); setEndDate(snapshot.metadata.endDate); setPreparer(snapshot.metadata.preparer)
     setFingerprint(snapshot.metadata.fingerprint ?? ''); setMapping(snapshot.metadata.mapping ?? null); setRows(snapshot.rows); setSourceName(snapshot.sourceName); setOutput(reviewHours(snapshot.rows, snapshot.metadata.startDate, snapshot.metadata.endDate).excluded.length ? null : snapshot.output); setCsvFile(null); setResumed(true)
     setValidation(UNCHECKED); setIssues([]); setFileReset(value => value + 1); setStatus({ key: 'importRetention.resumed' })
@@ -140,16 +148,20 @@ export default function HoursConverter({token = ''}: {token?: string}) {
 
   async function startNext() {
     if (busy || (plant || startDate || endDate || preparer || csvFile || rows) && !await confirmation.ask({ key: 'importRetention.startWarning' }, true)) return
-    contextChoice.current++; generation.current++; invalidateOutput(); setRows(null); setFingerprint(''); setMapping(null); setSourceName(''); setPreparer(''); setPlant(''); setStartDate(''); setEndDate(''); setCsvFile(null)
+    contextChoice.current++; generation.current++; invalidateOutput(); setStage('files'); setRows(null); setFingerprint(''); setMapping(null); setSourceName(''); setPreparer(''); setPlant(''); setStartDate(''); setEndDate(''); setCsvFile(null)
     setValidation(UNCHECKED); setIssues([]); setResumed(false); setFileReset(value => value + 1); setTimeout(() => focusField('hc-location'), 0)
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 max-w-xl">
+<InternalTheme><Paper emphasis="active" className={styles.workspace}>
       <h2 className="text-xl font-semibold text-gray-900 mb-5">{tr('imports.hoursTitle')}</h2>
+      <ol className={styles.stages} aria-label={tr('hoursStages.label')}>
+        {(['files','review','report'] as const).map((item,index) => <li key={item}><button data-hours-go={item} type="button" aria-current={stage === item ? 'step' : undefined} disabled={busy || item === 'review' && (!rows || !context) || item === 'report' && (!output || !acknowledged || mappingBlocked)} onClick={() => setStage(item)}>{index+1}. {tr(`hoursStages.${item}`)}</button></li>)}
+      </ol>
+      <h3 ref={heading} tabIndex={-1} data-hours-stage={stage} className="text-lg font-semibold mb-4">{tr(`hoursStages.${stage}`)}</h3>
       {confirmation.dialog}
       <ErrorSummary issues={issues} />
-      <fieldset disabled={busy} className="min-w-0 space-y-4">
+      <fieldset hidden={stage !== 'files'} disabled={busy} className="min-w-0 space-y-4">
         <div>
           <label htmlFor="hc-location" className={labelClass}>{tr('imports.location')}</label>
           <select id="hc-location" aria-invalid={issues.some(issue => issue.fieldId === 'hc-location') || undefined} aria-describedby={issues.some(issue => issue.fieldId === 'hc-location') ? 'hc-location-summary-error' : undefined} value={plant} onChange={e => { void changeContext('plant',e.target.value) }} className={inputClass}>
@@ -168,25 +180,38 @@ export default function HoursConverter({token = ''}: {token?: string}) {
           </div>
         </div>
         <div><label htmlFor="hc-preparer" className={labelClass}>{tr('importRetention.preparer')}</label>
-          <input id="hc-preparer" value={preparer} maxLength={120} onChange={e => { setDeviceSaved(false); setPreparer(e.target.value) }} className={inputClass} /></div>
+          <input id="hc-preparer" value={preparer} maxLength={120} onChange={e => { invalidateOutput(); setPreparer(e.target.value) }} className={inputClass} /></div>
         <SourceFileInput key={fileReset} id="hc-file" label="imports.hoursCsv" accept=".csv" file={csvFile} validation={validation}
           beforeReplace={() => csvFile || rows ? confirmation.ask({ key: mappingDirty ? 'mapping.contextWarning' : 'importRetention.replaceWarning' }, true) : Promise.resolve(true)}
           onFile={file => { void selectFile(file) }} />
+        <Button id="hc-prepare" variant="primary" disabled={!rows || validation.checking || busy} onClick={() => {
+          const missing: FieldIssue[] = []
+          if (!plant) missing.push({ fieldId: 'hc-location', message: { key: 'imports.chooseLocation' } })
+          if (!businessDate(startDate)) missing.push({ fieldId: 'hc-start', message: { key: 'imports.pickDates' } })
+          if (!businessDate(endDate) || startDate > endDate) missing.push({ fieldId: 'hc-end', message: { key: 'importValidation.period' } })
+          setIssues(missing); if (missing.length) { focusField(missing[0].fieldId); return }; setStage('review')
+        }}>{tr('hoursStages.continue')}</Button>
       </fieldset>
       {resumed && <p className="mt-3 break-words text-sm text-gray-700">{tr('importRetention.resumed')} {sourceName}</p>}
-      {preview && <fieldset disabled={busy} className="min-w-0"><HoursReview review={preview} identities={identities} mappingBlocked={mappingBlocked} acknowledged={acknowledged} onAcknowledge={setAcknowledged} /></fieldset>}
-      {rows && context && <fieldset disabled={busy} className="min-w-0"><EmployeeMapping key={`${fileReset}:${plant}:${startDate}:${endDate}:${fingerprint}`} store={context.storeId} rows={rows} fingerprint={fingerprint} token={token} preparer={preparer} onRecord={acceptDirectory} onDirty={setMappingDirty} /></fieldset>}
-      <button id="hc-download" type="button"
-        onClick={handleConvertAndDownload}
-        disabled={!preview || !acknowledged || !preview.validPeriod || mappingBlocked || !preview.included.length || validation.checking || busy}
-        className="mt-5 min-h-11 px-6 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-      >
-        {tr('imports.download')}
-      </button>
-      <button id="hc-next" type="button" disabled={busy} onClick={() => { void startNext() }} className="ml-2 mt-4 min-h-11 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">{tr('importRetention.startNext')}</button>
+      {preview && <fieldset hidden={stage !== 'review'} disabled={busy} className="min-w-0"><HoursReview review={preview} identities={identities} mappingBlocked={mappingBlocked} acknowledged={acknowledged} onAcknowledge={setAcknowledged} /></fieldset>}
+      {rows && context && <fieldset hidden={stage !== 'review'} disabled={busy} className="min-w-0"><EmployeeMapping key={`${fileReset}:${plant}:${startDate}:${endDate}:${fingerprint}`} store={context.storeId} rows={rows} fingerprint={fingerprint} token={token} preparer={preparer} onRecord={acceptDirectory} onDirty={mappingChanged} /></fieldset>}
+      <div hidden={stage !== 'review'} className={styles.actions}>
+        <Button onClick={() => setStage('files')} disabled={busy}>{tr('hoursStages.backFiles')}</Button>
+        <Button id="hc-accept" onClick={() => void handleConvertAndDownload()} variant="primary" disabled={!preview || !context || !acknowledged || !preview.validPeriod || mappingBlocked || !preview.included.length || validation.checking || busy}>{tr('hoursStages.accept')}</Button>
+      </div>
+      <div hidden={stage !== 'report'}>
+        {output && <p className="mt-3 break-all">{output.filename}</p>}
+        <div className={styles.actions}>
+          <Button onClick={() => setStage('review')} disabled={busy}>{tr('hoursStages.backReview')}</Button>
+          <Button id="hc-download" onClick={() => void handleConvertAndDownload(true)} variant="primary" disabled={!output || !acknowledged || mappingBlocked || busy}>{tr('hoursStages.download')}</Button>
+          <Button id="hc-next" disabled={busy} onClick={() => void startNext()}>{tr('importRetention.startNext')}</Button>
+        </div>
+      </div>
+      <details open={stage === 'report'} data-hours-copies><summary>{tr('hoursStages.copies')}</summary>
       <ImportHistory token={token} context={context} snapshot={snapshot} preparer={preparer} accepted={acknowledged && !mappingBlocked} busy={busy} hasWork={!!rows} onRestore={restoreSnapshot} />
       <ImportRecovery context={context} preparer={preparer} snapshot={snapshot} hasWork={!!(plant || startDate || endDate || preparer || csvFile || rows)} busy={busy} onRestore={restoreSnapshot} onSaved={setDeviceSaved} />
+      </details>
       <p id="hc-status" role="status" className="mt-2 text-sm text-gray-600">{status ? tr(status.key, status.params) : null}</p>
-    </div>
+    </Paper></InternalTheme>
   )
 }

@@ -1,7 +1,13 @@
 import { DEFAULT_PRIORITY, type Employee, type ScheduleAssignment, type StaffingSlot } from './types'
 import { isEmployeeAvailableForSlot, isEmployeeQualified, validateSchedule } from './validator'
 
-export type RepairInput = { employees: Employee[]; slots: StaffingSlot[]; assignments: ScheduleAssignment[] }
+/** Draft-only "not this shift" marks: the employee is skipped for this date, period and role. */
+export type RepairInput = { employees: Employee[]; slots: StaffingSlot[]; assignments: ScheduleAssignment[]; exclusions?: readonly string[] }
+export const exclusionKey = (slot: Pick<StaffingSlot, 'date' | 'day' | 'period' | 'role'>, employeeId: string) =>
+  `${slot.date ?? slot.day}|${slot.period}|${slot.role}|${employeeId}`
+function isExcluded(input: RepairInput, slot: StaffingSlot | undefined, employeeId: string) {
+  return !!slot && !!input.exclusions?.length && input.exclusions.includes(exclusionKey(slot, employeeId))
+}
 export type Placement = { slotId: string; employeeId: string; fromSlotId?: string }
 export type AssignmentChange = { slotId: string; before?: string; after?: string; releasedKeep: boolean }
 export type RepairResult = { assignments: ScheduleAssignment[]; changes: AssignmentChange[]; openRequiredSlotIds: string[]; limited: boolean; nodes: number }
@@ -31,7 +37,9 @@ export function retainValidAssignments(input: RepairInput): ScheduleAssignment[]
   const kept = input.assignments.filter(a => a.locked)
   if (!valid(input, kept)) throw new RepairProblem('keptConflict')
   const retained = [...kept]
+  const slotsById = new Map(input.slots.map(s => [s.id, s]))
   for (const a of input.assignments.filter(a => !a.locked && a.employeeId)) {
+    if (isExcluded(input, slotsById.get(a.slotId), a.employeeId)) continue
     if (valid(input, [...retained, a])) retained.push({ ...a })
   }
   return retained
@@ -50,6 +58,16 @@ export function preparePlacement(input: RepairInput, placement: Placement): Sche
     { slotId, employeeId, locked: true },
     ...input.assignments.filter(a => a.slotId !== slotId && a.slotId !== fromSlotId),
   ] })
+}
+
+/** Clear one spot (including its Keep) and mark its employee as not considered for that date/shift/role. */
+export function prepareRemoval(input: RepairInput, slotId: string): { assignments: ScheduleAssignment[]; exclusions: string[] } {
+  const slot = input.slots.find(s => s.id === slotId)
+  const current = input.assignments.find(a => a.slotId === slotId)
+  if (!slot || !current?.employeeId) throw new RepairProblem('unknown')
+  const key = exclusionKey(slot, current.employeeId)
+  return { assignments: input.assignments.filter(a => a.slotId !== slotId),
+    exclusions: [...(input.exclusions ?? []).filter(k => k !== key), key] }
 }
 
 /** Only the approved employee/date range may invalidate a Keep. Other conflicts remain actionable. */
@@ -78,7 +96,7 @@ export async function repairSchedule(input: RepairInput, options: { signal?: Abo
   const reference = new Map(input.assignments.map(a => [a.slotId, a.employeeId]))
   const fixed = base.filter(a => a.locked)
   const fixedIds = new Set(fixed.map(a => a.slotId))
-  const candidates = new Map(input.slots.map(s => [s.id, input.employees.filter(e => e.active && isEmployeeQualified(e, s) && isEmployeeAvailableForSlot(e, s))]))
+  const candidates = new Map(input.slots.map(s => [s.id, input.employees.filter(e => e.active && !isExcluded(input, s, e.id) && isEmployeeQualified(e, s) && isEmployeeAvailableForSlot(e, s))]))
   const remaining = input.slots.filter(s => s.required && !fixedIds.has(s.id)).sort((a, b) => candidates.get(a.id)!.length - candidates.get(b.id)!.length || a.id.localeCompare(b.id))
   const optional = base.filter(a => !a.locked && !slotsById.get(a.slotId)?.required)
   function withOptional(list: ScheduleAssignment[]) {

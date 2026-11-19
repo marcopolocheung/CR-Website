@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { sample, slots as fixtureSlots, dates } from '../../components/scheduler-prototype/model'
-import { preparePlacement, reconcileAvailability, repairSchedule, retainValidAssignments, RepairProblem } from './repair'
+import { exclusionKey, preparePlacement, prepareRemoval, reconcileAvailability, repairSchedule, retainValidAssignments, RepairProblem } from './repair'
 import { DraftJob } from './draft-job'
 import { validateSchedule } from './validator'
 import type { Employee, StaffingSlot } from './types'
@@ -116,4 +116,18 @@ test('a full-sized kitchen week repairs a gap without changing other placements'
   assert.equal(result.changes[0].slotId, missing.slotId)
   assert.equal(validateSchedule({ ...input, assignments: result.assignments }).length, 0)
   assert(result.assignments.some(a => a.slotId === assignments[20].slotId && a.locked))
+})
+test('removing an employee excludes them from that date/shift/role and repair refills without them', async () => {
+  const input = fixture()
+  const target = fixtureSlots[0]
+  const removed = input.assignments.find(a => a.slotId === target.id)!.employeeId
+  input.assignments = input.assignments.map(a => a.slotId === target.id ? { ...a, locked: true } : a)
+  const { assignments, exclusions } = prepareRemoval(input, target.id)
+  assert(!assignments.some(a => a.slotId === target.id))
+  const result = await repairSchedule({ ...input, assignments, exclusions })
+  const sameShiftRole = fixtureSlots.filter(s => s.date === target.date && s.period === target.period && s.role === target.role).map(s => s.id)
+  assert(!result.assignments.some(a => sameShiftRole.includes(a.slotId) && a.employeeId === removed))
+  assert.equal(validateSchedule({ ...input, assignments: result.assignments, requireCoverage: false }).length, 0)
+  // Without the exclusion, the same draft would be free to put them back.
+  assert(exclusions.includes(exclusionKey(target, removed)))
 })

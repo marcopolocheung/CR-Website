@@ -1,5 +1,8 @@
 export const planningEnglish = {
   'planning.lockPlacement': 'Lock assignment', 'planning.unlockPlacement': 'Unlock assignment',
+  'planning.remove': 'Remove from this shift', 'planning.removeHelp': 'They won’t be picked for this position on this shift. Auto-adjust fills the spot.',
+  'planning.removed': 'Removed. They won’t be picked for this position on this shift.',
+  'planning.excluded': 'Not picked for this shift', 'planning.allow': 'Allow again',
   'planning.previousPosition': 'Previous position',
   'planning.assistant': 'Scheduling assistant', 'planning.generating': 'Making schedule…',
   'planning.layoutMismatch': 'The saved week uses different shift rules. Review the rules before rebuilding this draft.',
@@ -65,6 +68,9 @@ export const planningEnglish = {
 
 export const planningSpanish: Record<keyof typeof planningEnglish, string> = {
   'planning.lockPlacement': 'Fijar asignación', 'planning.unlockPlacement': 'Liberar asignación',
+  'planning.remove': 'Quitar de este turno', 'planning.removeHelp': 'No se elegirá para este puesto en este turno. El ajuste automático llena el lugar.',
+  'planning.removed': 'Quitado. No se elegirá para este puesto en este turno.',
+  'planning.excluded': 'No elegidos para este turno', 'planning.allow': 'Permitir de nuevo',
   'planning.previousPosition': 'Puesto anterior',
   'planning.assistant': 'Asistente de horarios', 'planning.generating': 'Creando horario…',
   'planning.layoutMismatch': 'La semana guardada usa otras reglas de turnos. Revísalas antes de reconstruir el borrador.',

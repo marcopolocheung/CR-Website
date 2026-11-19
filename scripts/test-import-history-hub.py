@@ -3,6 +3,7 @@ import copy,hashlib,json,subprocess,sys
 from pathlib import Path
 from urllib.parse import urlparse,parse_qs
 from playwright.sync_api import sync_playwright,expect
+from import_browser_helpers import hours_stage,hours_review,hours_report,hours_copies
 BASE=sys.argv[1];assert urlparse(BASE).hostname in ('127.0.0.1','localhost')
 ROOT=Path(__file__).resolve().parent.parent;ART=ROOT/'docs/internal-tools-overhaul/evidence/step-10/screens';ART.mkdir(parents=True,exist_ok=True)
 fixtures=json.loads(subprocess.check_output(['node','--import','jiti/register','scripts/create-history-hub-fixtures.ts'],cwd=ROOT))
@@ -41,7 +42,10 @@ with sync_playwright() as p:
  def unlock():
   page.locator('#cashout-code:visible, #import-history-code:visible').fill('synthetic-history-hub');page.get_by_role('button',name='Unlock',exact=True).click()
  def hub_link():
+  hours_copies(page)
   page.locator('#panel-hours').get_by_role('link',name='Open shared import history',exact=True).click();page.wait_for_url('**/internal/import-history*')
+ def set_preparer(value):
+  hours_stage(page,'files');page.locator('#hc-preparer').fill(value);hours_review(page)
  def confirm(yes=True):page.get_by_role('dialog').locator('button').last.click() if yes else page.keyboard.press('Escape')
  def expire_comparison():
   for route in held_directory[:]:route.fulfill(status=401,json={},headers=cors)
@@ -67,11 +71,13 @@ with sync_playwright() as p:
  page.locator('[data-history=resume]').first.click();confirm(False);expect(page.locator('#import-history-load')).to_be_visible()
  page.locator('[data-history=resume]').first.click();confirm();expect(page.locator('#tab-hours')).to_have_attribute('aria-selected','true');expect(page.locator('#hours-reviewed')).not_to_be_checked()
  assert page.locator('#hc-file').evaluate('(e)=>e.files.length')==0
- page.locator('#hc-preparer').fill('Existing device editor');page.locator('#hours-reviewed').check()
+ set_preparer('Existing device editor');page.locator('#hours-reviewed').check()
+ hours_report(page)
  with page.expect_download() as event:page.locator('#hc-download').click()
  cells=json.loads(subprocess.check_output(['node','-e',"const x=require('xlsx'),s=x.readFile(process.argv[1]).Sheets['All Employees'];console.log(JSON.stringify(Object.fromEntries(['F2','F3','F4','G4','H4','F9'].map(k=>[k,s[k].v]))))",event.value.path()],cwd=ROOT))
  assert cells=={'F2':9,'F3':8,'F4':17,'G4':15.5,'H4':1.5,'F9':7},cells
  digest=hashlib.sha256(Path(event.value.path()).read_bytes()).hexdigest()
+ hours_report(page)
  with page.expect_download() as repeat:page.locator('#hc-download').click()
  assert hashlib.sha256(Path(repeat.value.path()).read_bytes()).hexdigest()==digest
  hub_link();page.locator('#import-history-load').click();page.locator('[data-history=resume]').first.click();confirm(False);expect(page.locator('#hc-preparer')).to_have_value('Existing device editor')
@@ -79,7 +85,7 @@ with sync_playwright() as p:
  checkpoints=page.evaluate("Object.entries(localStorage).filter(([key])=>key.startsWith('cr-internal-draft:')).map(([key,raw])=>({key,raw,value:JSON.parse(raw)}))")
  assert any(item['value']['payload'].get('metadata',{}).get('preparer')=='Existing device editor' and item['value']['payload']['output'] for item in checkpoints)
  # Quota denial refuses replacement and retains current values and all recovery bytes.
- page.locator('#hc-preparer').fill('Quota retained editor');hub_link();page.locator('#import-history-load').click()
+ set_preparer('Quota retained editor');hub_link();page.locator('#import-history-load').click()
  page.evaluate('() => {window.savedSet=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new DOMException("quota","QuotaExceededError")}}')
  page.locator('[data-history=resume]').first.click();confirm();expect(page.locator('#hc-preparer')).to_have_value('Quota retained editor');expect(page.get_by_role('alert').filter(has_text='Access remains unlocked')).to_be_visible()
  page.evaluate('() => {Storage.prototype.setItem=window.savedSet}');page.get_by_role('button',name='Close',exact=True).click()
@@ -91,7 +97,8 @@ with sync_playwright() as p:
  held_history.pop().fulfill(status=200,json={'records':[original],'nextCursor':None},headers=cors);expect(page.locator('[data-history-scope]')).to_contain_text('CR2')
  mode['history']='fail';page.locator('#import-history-load').click();expect(page.get_by_role('status')).to_contain_text('unavailable or not configured');expect(page.locator('[data-import-record]')).to_have_count(1);mode['history']='ok'
  # Return to matching original hours; deliberate reprocess confirmation cannot write after expiry.
- page.get_by_role('link',name='Reports',exact=True).click();page.get_by_role('link',name='Employee hours',exact=True).click();page.locator('#hc-preparer').fill('Synthetic reviewer');page.locator('#hours-reviewed').check()
+ page.get_by_role('link',name='Reports',exact=True).click();page.get_by_role('link',name='Employee hours',exact=True).click();set_preparer('Synthetic reviewer');page.locator('#hours-reviewed').check()
+ hours_report(page)
  with page.expect_download():page.locator('#hc-download').click()
  history=page.locator('#panel-hours').get_by_role('region',name='Shared import history',exact=True)
  history.locator('[data-history=save]').click();expect(history).to_contain_text('already recorded');count=len(posts)
