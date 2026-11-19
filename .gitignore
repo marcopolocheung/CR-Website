@@ -160,3 +160,9 @@ scripts/__pycache__/
 # Agent checkpoints contain private scheduling drafts.
 .agent-data/
 .env.agent
+
+# Claude Code
+.claude/worktrees/
+.claude/settings.local.json
+.claude/gate-off
+CLAUDE.local.md
