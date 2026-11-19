@@ -204,7 +204,7 @@ with sync_playwright() as p:
     ctx.close()
     ctx,page=workspace(320,True);visit(page,'/internal/inventory');unlock(page)
     expect(context_line(page)).to_contain_text('CR3');shot(page,'inventory-cr3-phone')
-    count=page.locator('input[aria-label$=" inventory"]').first;count.fill('3B/2T')
+    count=page.locator('[data-count-id] input[id^="inventory-on-hand-"]').first;count.fill('3B/2T')
     page.locator('[data-shell-lock]').tap();expect(page.locator('#cashout-code')).to_be_visible();unlock(page)
     expect(count).to_have_value('3B/2T');expect(context_line(page)).to_contain_text('CR3')
     page.locator('[data-shell-lock]').tap();expect(page.locator('#cashout-code')).to_be_visible()

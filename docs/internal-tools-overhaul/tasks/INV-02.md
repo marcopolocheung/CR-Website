@@ -101,3 +101,9 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - Blockers: Listed prerequisites are pending.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+
+## Step 11 device-only follow-up — November 18, 2026
+
+The approved global entered/Enough/skipped/remaining/total summary, search, catalog-section selection, Remaining and Needs ordering are implemented and locally verified. Filters preserve raw values and the full captured-catalog denominator; order alone remains untouched. Broader per-section summary reporting from this brief remains open, so full-task milestones are not advanced.
+
+Codex coordinates dictionary/package edits with an unchanged count/catalog API; no migration number is needed. [Checkpoint](../checkpoints/step-11.md) and [evidence](../evidence/step-11/README.md) record local checks, observed fixtures, output, recovery and rollback. Physical-device/staff, release and live acceptance remain unverified. Original wider task milestones above remain pending.

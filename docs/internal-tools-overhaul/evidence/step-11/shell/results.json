@@ -1,0 +1,351 @@
+{
+  "baseCommit": "5dfb017d25606cef5ce29cf907ddaf14c7a59cca",
+  "sourceFilesSha256": {
+    "src/components/internal/SalesReview.tsx": "ddb0be4f9ae4a617874fe2d1f70cde7cfe4b7cda7daacab4727b953d86ec7bfd",
+    "src/components/internal/ManagerSession.tsx": "54399feca93579d30f1275eaa9e81800881853d05925363b4cd3de11a3dd205d",
+    "src/components/internal/ReportsWorkspace.tsx": "e22e9b10f60b6302517d0492ab0f286553816537d6c341d4756aae6d42379f01",
+    "src/components/internal/ImportRecovery.tsx": "5f83e0da47ddc9a9dd48a168a291ff3ae095521ca43a41529f21229e94360bd6",
+    "src/components/internal/SalesConverter.tsx": "4a94ae41282a4af482762a73016262a6e386df9decdd8ef1622469b3710a3261",
+    "src/components/internal/NavigationProtection.tsx": "b02488212b9b96fd30fc5d12af2470afcc8b5f54cc3f958bc47aecf29c3f72cb",
+    "src/components/internal/ImportHistory.tsx": "924a822285b3bc404cf084d015586d3d72d04a48af45424343ff6d14d7e3029b",
+    "src/components/internal/DashboardWorkspace.tsx": "8805d523b15b9aebae0bad07a2186da7d993abb0012fc7ebbb155b4e368e630d",
+    "src/components/internal/InventoryWorkspace.tsx": "e33ea0a02a2c3aaf166ad48a109fd063b173cbdd8805a4c73582b4f0977ff1b5",
+    "src/components/internal/HoursReview.tsx": "6560bd6d1cb54edb813e940b72bcbae4bbf11cf897bca173fa17d806dee90c82",
+    "src/components/internal/FormDraftWorkspace.tsx": "e51112b2b8f845e7f8aaf66ac362ca8b106fbaac66d803c83236336e859d5f20",
+    "src/components/internal/Dashboard.tsx": "ed54a28b2a2c9edaf8bbd2cc738fe91270c17ecd2b7622dca53e1ba17af77612",
+    "src/components/internal/DraftChooser.tsx": "5c3daa5404949d16a8a5b35c77aa4db4377e4ef342c2a1ffb90c4efe45f6a51a",
+    "src/components/internal/ScheduleIdentityMapping.tsx": "d17db2c69f9d078c421403573b0e5bb231b7112f41be90bc71d3f96bf03aee32",
+    "src/components/internal/CashHistory.tsx": "f8a0a22b66a567636617f2c9cbbfdcc8d456dd95d8a8c58dcd813cf1f38109eb",
+    "src/components/internal/WriteUps.tsx": "54a5303f58ca2ef7fb765de60f0de00694ab2575b9b7fffd12d37f6a7a037bdf",
+    "src/components/internal/Bookkeeping.tsx": "01a14282038243aaa5733e5c82ca981f17735dadfd16785d84eba626cfba3884",
+    "src/components/internal/InventoryCountRows.tsx": "572981a9c4a0f8048fd6b10b217915f0346f276a2098f1a2d1b6ca9b6a6ff5d4",
+    "src/components/internal/TaskLinks.tsx": "fbd75856b20c6707c0e4a1283e8cff303c4389cb7cc1668c4d5b14321f2df0b0",
+    "src/components/internal/FormsWorkspace.tsx": "15206aa4cea39f40244e22125906bd79bbb99c9f0806f972a49b277ae0966f4c",
+    "src/components/internal/Inventory.tsx": "b7497a7984e38f5818b38d12c9c47b9a39080b4b2e89746c96be9136d688b757",
+    "src/components/internal/ReportCharts.tsx": "e30c4cec41af071aba88d008c581a6b4715f0de596594b23c88407ee0322a792",
+    "src/components/internal/CashCopyTransition.tsx": "52696a1be8494f5d7dfe4ce95c001a86a1c98f265c48efc6b43c09ca8dc29c05",
+    "src/components/internal/InternalLanguage.tsx": "59e7b4f357cbef7c20e221dcfed350ffe60de73980d484ce63300d5cfcb2161f",
+    "src/components/internal/RecoveryPanel.tsx": "8e60721b9ad0282be5ba0cbf17381187c0d88aefd98e2f0543ff8b6a46a72951",
+    "src/components/internal/QRGenerator.tsx": "5475470153bc5a16893621e3c5c0601683af95e411b15ba48ffd72e73519f2f4",
+    "src/components/internal/BookkeepingWorkspace.tsx": "6ebea97e912397f7b33f28cbb9baa35684e9a6b8d27de44ea1b2e63d404223b9",
+    "src/components/internal/WorkspaceHost.tsx": "3dca4dbd4d7214771250fa23b28aadca5344e98c5f42b05e13bdffdd806a5790",
+    "src/components/internal/StaffEntry.tsx": "4b5cb23cd9418fff702fb6c07055957e34f0433bbe2219a522a1ab5706c493aa",
+    "src/components/internal/ShellTask.tsx": "6bc0fd53552a2f1675aaae0bd33f535bf76547e6921c348add72a83c307c4d23",
+    "src/components/internal/InternalShell.tsx": "d3b814b426451f649fda3903d0047d79853db5c4933927428ac003f2e807336a",
+    "src/components/internal/SalesReports.tsx": "1844a1547a7a63940616828564f82e7fc7d6bcdeece6eba43acceb7d7288e3ff",
+    "src/components/internal/CashOut.tsx": "3cd55ba5743161212fa7be381de1138ca02642fe7974f915b2c6dfffc0f016b3",
+    "src/components/internal/ScheduledActualReport.tsx": "656d628999edd398033d232d0e26222702c803e4f4fee5edcf76932d57b02f8b",
+    "src/components/internal/SourceFileInput.tsx": "3ed7b76ecef7e587d2e956949d4775c98043a75433181d20509d89bc5aacc057",
+    "src/components/internal/Feedback.tsx": "a37c6ab1ebdf32d0d3ae0fa456759ae60de0164faabbe40c074cb52de1fba8c1",
+    "src/components/internal/CountKeypad.tsx": "484fbedfc960516545229513cc3a86e7c9b3426120139cc0b43868082efd7d16",
+    "src/components/internal/HoursConverter.tsx": "13528af60455f74e77f1caf88472003737cd157b68508740aae45159935efde3",
+    "src/components/internal/DigitalForm.tsx": "16baae7b7b2ad14a2ba41c95c049f0039de32c437c022d98281e31b34ac2c6f7",
+    "src/components/internal/EmployeeMapping.tsx": "bb1372b96e69071663610ff71d27717b83fe9842cfe5bb079e02cbbcb9a3b6dd",
+    "src/components/internal/CashReports.tsx": "2adb3f487985dcac04709872897535ef02048e3cab0080f0bf71d1dbdb1d7f16",
+    "src/components/internal/EntryWorkspace.tsx": "ce770fd66395c964665cd23c395f659a599a3e90e896f79de41ea73379c63b2d",
+    "src/components/internal/ui/PrimitiveGallery.tsx": "f293e119061ca38994a4c2093b715f4821baf11e7bcdccbc67f19f5453c0e35b",
+    "src/components/internal/ui/MovingNavigation.tsx": "af8116a004afb3f1c991f75171e283f113d731dd2c70aefa7bb5c7bf9d164db6",
+    "src/components/internal/ui/Theme.tsx": "2a905bda54c69390199f82a1082750bfca0e3b697829768d5cd63f1e4f2dc25c",
+    "src/components/internal/ui/gallery.module.css": "7717cca8b57d49f9464b57495e2a43c6b5ae2626b956fd5f35d09b58ad932db2",
+    "src/components/internal/ui/controls.tsx": "f751c2f98c43b432aa47605dfaf3a7917f625fa09d6f574926280b8ffda8b730",
+    "src/components/internal/ui/ui.module.css": "045a222b6bea18b1500190d5196de7bb6b8f6374fad85c0dd9d112121ec47828",
+    "src/components/internal/ui/Icon.tsx": "e1ea1bc21b63d96cf42d573c3c4e74118d359aee5c5e63f3db98c5bba0fad07f",
+    "src/components/internal/shell.module.css": "770f9570d792218ba9946c41caf3947e9e856ba49dcc4c2c122c1f4d8e8c6a6c",
+    "src/app/(order-shell)/internal/layout.tsx": "7ca7f283fbcec495d9bce3931383af34937c097302a3dd34551d032f0c83f4ad",
+    "src/app/(order-shell)/scheduler-demo/layout.tsx": "e0b1dec9b9b2c8d4703960d596acf34466e093c6341c5bc4330c94897af22438",
+    "src/lib/internal-tools/i18n/en.ts": "0b4a227c0991cc2cb5d45c5be66a8d190f45bdaf6b3e8f6e85dbd8e5c79da730",
+    "src/lib/internal-tools/i18n/es.ts": "2c0b99a48b1033f6118b8e0ae56d8008d2bf0c6546b57685759aadecdc944a8f",
+    "scripts/test-internal-shell.py": "88c43e2f02023e0244a2a4695c082765a7c2ca18dced55cb04daf3ed3aafd35f"
+  },
+  "browser": "158.0.8127.18",
+  "frontend": "http://127.0.0.1:3046",
+  "api": "http://127.0.0.1:8787 (intercepted)",
+  "scenarios": [
+    {
+      "scenario": "direct routes",
+      "observed": "Nine route/hash/HTML/slash variants open with six real labelled destinations; current-page state correct; QR/gallery do not falsely select another task; no invented global store"
+    },
+    {
+      "scenario": "destinations",
+      "observed": "Cash/Reports/Inventory/Forms/Dashboard navigated by keyboard and mouse with nonblank workspaces; each includes a way home"
+    },
+    {
+      "scenario": "header controls",
+      "observed": "Quiet identity replaces warning prominence; language/help/lock positions stable, help modal Escape restores focus"
+    },
+    {
+      "scenario": "/internal/bookkeeping",
+      "observed": "Native same-document Cash/Reports links preserve mounted cash/sales/hours fields and File object; legacy tabs synchronize selected nav/context; canceling departure to Schedule preserves edits"
+    },
+    {
+      "scenario": "/internal/bookkeeping/",
+      "observed": "Native same-document Cash/Reports links preserve mounted cash/sales/hours fields and File object; legacy tabs synchronize selected nav/context; canceling departure to Schedule preserves edits"
+    },
+    {
+      "scenario": "/internal/bookkeeping.html",
+      "observed": "Native same-document Cash/Reports links preserve mounted cash/sales/hours fields and File object; legacy tabs synchronize selected nav/context; canceling departure to Schedule preserves edits"
+    },
+    {
+      "scenario": "local cash lock",
+      "observed": "Header delegates existing Save draft and lock; quota failure retains active editor/access, successful handoff preserves original draft, explicit resume restores count; shared session cleared after all device checkpoints succeed"
+    },
+    {
+      "scenario": "responsive language/print",
+      "observed": "EN/ES preserves values/context; 768/375/320px reflow and aligned surface, reduced motion 0s; printed cash retains name/$300 while shell header/rail/skip controls disappear"
+    },
+    {
+      "scenario": "form context/local lock",
+      "observed": "Header shows actual form store/date, never guessed from prior tool; manual lock checkpoints and leaves the editor; explicit resume restores its narrative"
+    },
+    {
+      "scenario": "inventory/enlarged shell",
+      "observed": "Actual CR3-only inventory context; raw 3B/2T count retained across local lock/unlock; 320px/200% Spanish shell controls and nav reflow without overflow"
+    },
+    {
+      "scenario": "schedule adapter/shared links",
+      "observed": "Schedule entry remains gated in its original route group; four station manager/public URLs remain reachable, return adapter leads home; no shared permission or public-reader rewrite"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "dashboard-keyboard.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "d01fdd2439dbe73bbd90c041c62d092d0bff17ef6e05251b2f2639ca571229b3"
+    },
+    {
+      "file": "dashboard-pointer.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "78c3bab5a63b31b035e5bbcffc871e011d64887c8040ad1034a09273068d591d"
+    },
+    {
+      "file": "cash-cr2-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "de2203e1525976d108bc6686e4e769cda3e82ab2f2b7b83453e208b95fc52b15"
+    },
+    {
+      "file": "cash-cr2-spanish-phone.png",
+      "viewport": {
+        "width": 375,
+        "height": 1000
+      },
+      "sha256": "02835e567281697bdf99dd8646029f3dcb96a6de6778656f8405698da4f35a74"
+    },
+    {
+      "file": "forms-context-phone.png",
+      "viewport": {
+        "width": 375,
+        "height": 1000
+      },
+      "sha256": "d2e5ffd0a06d7a3da776402051b85b17cbb7f9b1eb4e3e80776f9c470e9a203e"
+    },
+    {
+      "file": "inventory-cr3-phone.png",
+      "viewport": {
+        "width": 320,
+        "height": 1000
+      },
+      "sha256": "939414b256265b4e65b139882fb75bf61fdf357c46785b7e07eaaa567af06229"
+    },
+    {
+      "file": "shell-large-text-320.png",
+      "viewport": {
+        "width": 320,
+        "height": 1000
+      },
+      "sha256": "09b53e853622ef3c48e25a93f87eaa8ef9199a37b0989d3540d690d295c99f6f"
+    }
+  ],
+  "pageErrors": [],
+  "externalAttempts": [],
+  "apiRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cashout/CR2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/writeups"
+    },
+    {
+      "method": "GET",
+      "path": "/api/forms"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/writeups"
+    },
+    {
+      "method": "GET",
+      "path": "/api/forms"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inventory/CR3/list"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inventory/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inventory/CR3/list"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inventory/CR3"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule"
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule"
+    }
+  ]
+}

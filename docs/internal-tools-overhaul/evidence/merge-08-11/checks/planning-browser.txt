@@ -1,0 +1,2 @@
+{"planning": "passed", "production_api_access": false}
+External network guard: 0 blocked attempts

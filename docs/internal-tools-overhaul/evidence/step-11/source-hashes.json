@@ -1,0 +1,22 @@
+{
+  "baseCommit": "5dfb017",
+  "api": "http://127.0.0.1:8787 (intercepted)",
+  "frontend": "http://127.0.0.1:3046",
+  "sha256": {
+    "src/components/internal/Inventory.tsx": "b7497a7984e38f5818b38d12c9c47b9a39080b4b2e89746c96be9136d688b757",
+    "src/components/internal/InventoryCountRows.tsx": "572981a9c4a0f8048fd6b10b217915f0346f276a2098f1a2d1b6ca9b6a6ff5d4",
+    "src/components/internal/inventory-count.module.css": "2d6bd94deb1b327542e21bb290b27860c510ba54f4b5a4cb8c6fe1dc06a50d9b",
+    "src/lib/internal-tools/inventory-progress.ts": "b62214c1625356b35215b4714dec1275da0dd80f45f53d1b28803368a6e80169",
+    "src/lib/internal-tools/inventory-progress.test.ts": "6d7b5f9f1b1e2b5409f97fa4b20d323999f2708ad53c5edfd762e2b39c6a8195",
+    "src/lib/internal-tools/inventory-recovery.ts": "1bf91ee15d3056872e22d1bd4e0cb318baa34c5a5d520c1f9a5cf6361d78889a",
+    "src/lib/inventory.ts": "f3e3bafc9228a5cb0a35592b56ad4044f13a4e7b3a9201eef996a1d949fbdf04",
+    "src/lib/inventory-store.ts": "a3f21f19f903c6da17206ecb3ad18d10799bdbb9955123f159264f15607aebb0",
+    "src/lib/internal-tools/i18n/en.ts": "0b4a227c0991cc2cb5d45c5be66a8d190f45bdaf6b3e8f6e85dbd8e5c79da730",
+    "src/lib/internal-tools/i18n/es.ts": "2c0b99a48b1033f6118b8e0ae56d8008d2bf0c6546b57685759aadecdc944a8f",
+    "scripts/test-inventory-counting.py": "0b89c89ecce4885b841bfae6845c3584284d1a8c820b6ffa3dbbe46e3de318be",
+    "scripts/test-internal-shell.py": "88c43e2f02023e0244a2a4695c082765a7c2ca18dced55cb04daf3ed3aafd35f",
+    "package.json": "e2a8b091e0f031176656c031b8629dd451b2163898d1d44c9034cada730fb194",
+    "worker/src/index.ts": "a511fac133d7ecb24410c92ad1e2b52d8c3aec8168626815bb739f6a6513bdd1",
+    "out/_next/static/chunks/4226749012315f4c.js": "3ad374c9cd9cb656edca30b398c4e4f60dbfc0f83d224bc8e3b572b1badc27b9"
+  }
+}

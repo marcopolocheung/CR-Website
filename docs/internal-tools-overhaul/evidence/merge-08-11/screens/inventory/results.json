@@ -1,0 +1,119 @@
+{
+  "scenarios": [
+    "unknown first history freezes rows/save/clear and does not manufacture a ready empty envelope",
+    "all six count states, raw fractions/text, order-only remaining, skip undo/edit and filter-independent denominator with keyboard-pinned input",
+    "section interruption/reload uses captured catalog; explicit adoption archives previous bytes, retains removed IDs and never remaps same-name new IDs",
+    "server receives only existing fields; skips remain local; late PUT/GET preserves newer input and post-ack history failure remains distinct",
+    "date cancellation/return restores CR3/date progress; storage denial keeps fields and refuses unprotected handoff",
+    "copy/checklist suggestions unchanged; all captured rows and previous date pairs print in English despite filters; EN/ES/320px/enlarged/reduced-motion layouts inspected",
+    "unsupported progress bytes are preserved verbatim and downloadable; new raw values stay in memory/compatible legacy copies",
+    "server reload without local metadata restores only count/order fields, without inventing skips or completion",
+    "failed unknown baseline remains unavailable through catalog edits/adoption until retry loads saved fields",
+    "catalog remove/re-add of the same name allocates a fresh ID and cannot inherit retired counts/history/skips"
+  ],
+  "page_errors": [],
+  "external_attempts": [],
+  "count_puts": [
+    {
+      "counts": {
+        "zero": {
+          "inv": "0",
+          "order": "2"
+        },
+        "beverage": {
+          "inv": "3",
+          "order": "3"
+        },
+        "legacy-extra": {
+          "inv": "3B/2T",
+          "order": ""
+        },
+        "fraction": {
+          "inv": "1 1/2",
+          "order": "1"
+        },
+        "text": {
+          "inv": "3B/2T",
+          "order": ""
+        },
+        "enough": {
+          "inv": "\u2713",
+          "order": ""
+        },
+        "order-only": {
+          "inv": "",
+          "order": "4",
+          "done": true
+        },
+        "removed": {
+          "inv": "1/2",
+          "order": "1"
+        },
+        "skip": {
+          "inv": "",
+          "order": ""
+        },
+        "blank": {
+          "inv": "",
+          "order": ""
+        }
+      }
+    },
+    {
+      "counts": {
+        "zero": {
+          "inv": "2",
+          "order": ""
+        },
+        "beverage": {
+          "inv": "3",
+          "order": "3"
+        },
+        "legacy-extra": {
+          "inv": "3B/2T",
+          "order": ""
+        },
+        "fraction": {
+          "inv": "1 1/2",
+          "order": "1"
+        },
+        "text": {
+          "inv": "3B/2T",
+          "order": ""
+        },
+        "enough": {
+          "inv": "\u2713",
+          "order": ""
+        },
+        "order-only": {
+          "inv": "",
+          "order": "4",
+          "done": true
+        },
+        "removed": {
+          "inv": "1/2",
+          "order": "1"
+        },
+        "skip": {
+          "inv": "",
+          "order": ""
+        },
+        "blank": {
+          "inv": "",
+          "order": ""
+        }
+      }
+    }
+  ],
+  "clipboard": "CR3 order 2026-11-18\n\nD\n  Fraction: 1\n  Order-Only: 4\n\nPepsi\n  Beverage source: 3\n  Removed source item: 1",
+  "viewports": [
+    1440,
+    768,
+    390,
+    320
+  ],
+  "limitations": [
+    "Synthetic local APIs only",
+    "Physical device/software keyboard, staff review and live persistence unverified"
+  ]
+}

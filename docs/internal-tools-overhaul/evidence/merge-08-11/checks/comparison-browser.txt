@@ -1,0 +1,3 @@
+/tmp/cr-merge-venv/lib/python3.12/site-packages/fitz/__init__.py:17: FutureWarning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+  warnings.warn(
+PASS IMPORT-08: missing identity limitations, explicit publication mappings, reviewed source selection, reconciled per-store/combined hours, one shared identity, source regular/overtime separation, overlap evidence JSON, Spanish phone/print and failed reload preserving prior snapshot
