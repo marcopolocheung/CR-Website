@@ -1,5 +1,7 @@
 'use client'
 
+import { useImportResume } from './ImportResumeTransition'
+import { checkpointImport } from '@/lib/converter/import-checkpoint'
 import { useShellTask } from './ShellTask'
 
 import EmployeeMapping from './EmployeeMapping'
@@ -63,7 +65,11 @@ export default function HoursConverter({token = ''}: {token?: string}) {
   useShellTask('hours', { context: [importStore(plant), startDate, endDate].filter(Boolean).join(' · ') })
   function invalidateOutput() { exportVersion.current++; setAcknowledged(false); setOutput(null); setDeviceSaved(false); setStatus(null) }
   const mappingChanged = useCallback((dirty: boolean) => { setMappingDirty(dirty); if (dirty) { exportVersion.current++; setAcknowledged(false); setOutput(null); setDeviceSaved(false); setStatus(null) } }, [])
-  useNavigationProtection({ dirty: !!(plant || startDate || endDate || preparer || csvFile), deviceSaved })
+  useNavigationProtection({ scope: 'hours-import', busy, checkpoint: () => {
+    const dirty = !!(plant || startDate || endDate || preparer || csvFile || rows)
+    if (!dirty) return true
+    try { return checkpointImport(localStorage, snapshot, preparer) } catch { return false }
+  }, dirty: !!(plant || startDate || endDate || preparer || csvFile), deviceSaved })
 
   async function changeContext(field:'plant'|'start'|'end',value:string) {
     const choice = ++contextChoice.current
@@ -138,6 +144,8 @@ export default function HoursConverter({token = ''}: {token?: string}) {
     setFingerprint(snapshot.metadata.fingerprint ?? ''); setMapping(snapshot.metadata.mapping ?? null); setRows(snapshot.rows); setSourceName(snapshot.sourceName); setOutput(reviewHours(snapshot.rows, snapshot.metadata.startDate, snapshot.metadata.endDate).excluded.length ? null : snapshot.output); setCsvFile(null); setResumed(true)
     setValidation(UNCHECKED); setIssues([]); setFileReset(value => value + 1); setStatus({ key: 'importRetention.resumed' })
   }
+  useImportResume('hours', restoreSnapshot)
+
   async function startNext() {
     if (busy || (plant || startDate || endDate || preparer || csvFile || rows) && !await confirmation.ask({ key: 'importRetention.startWarning' }, true)) return
     contextChoice.current++; generation.current++; invalidateOutput(); setStage('files'); setRows(null); setFingerprint(''); setMapping(null); setSourceName(''); setPreparer(''); setPlant(''); setStartDate(''); setEndDate(''); setCsvFile(null)

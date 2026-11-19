@@ -15,7 +15,7 @@ export default function EmployeeMapping({store,rows,fingerprint,token,preparer,o
  const failureKey = useImportAccess(), session = useManagerSession()
  const {t}=useInternalLanguage(),[record,setRecord]=useState<DirectoryRecord|null>(null),[draft,setDraft]=useState<ImportDirectory>(emptyDirectory),[loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[name,setName]=useState(''),[sharedId,setSharedId]=useState('')
  const confirmation=useConfirmation()
- useNavigationProtection({dirty:loaded&&canonicalJson(draft)!==canonicalJson(record?.data??emptyDirectory()),deviceSaved:false,busy})
+ useNavigationProtection({scope:'hours-import',dirty:loaded&&canonicalJson(draft)!==canonicalJson(record?.data??emptyDirectory()),deviceSaved:false,busy})
  useEffect(()=>{onDirty?.(loaded&&canonicalJson(draft)!==canonicalJson(record?.data??emptyDirectory()))},[draft,record,loaded,onDirty])
  useEffect(()=>()=>onDirty?.(false),[onDirty])
  const generation=useRef(0),working=useRef(false),operation=useRef<{content:string;id:string}|null>(null)

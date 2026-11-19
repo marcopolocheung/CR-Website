@@ -1,0 +1,44 @@
+
+> chinarose@0.0.2 imports:worker:test
+> node --test worker/src/import-directory.test.mjs worker/src/import-history.test.mjs worker/src/published-hours.test.mjs
+
+TAP version 13
+# Subtest: directory writes atomically preserve inactive identities and history, CAS conflicts and exact retry
+ok 1 - directory writes atomically preserve inactive identities and history, CAS conflicts and exact retry
+  ---
+  duration_ms: 11915.67455
+  type: 'test'
+  ...
+# Subtest: manager-only additive route distinguishes absent backend, unauthorized and saved result
+ok 2 - manager-only additive route distinguishes absent backend, unauthorized and saved result
+  ---
+  duration_ms: 6665.679631
+  type: 'test'
+  ...
+# Subtest: same source identity has one immutable root; retry and deliberate reprocessing preserve history
+ok 3 - same source identity has one immutable root; retry and deliberate reprocessing preserve history
+  ---
+  duration_ms: 11888.62489
+  type: 'test'
+  ...
+# Subtest: forged identity, raw bodies, overwritten history and wrong-context lineage fail without mutation
+ok 4 - forged identity, raw bodies, overwritten history and wrong-context lineage fail without mutation
+  ---
+  duration_ms: 5918.41418
+  type: 'test'
+  ...
+# Subtest: manager-only published snapshot reader preserves KV and marks missing/hidden weeks explicitly
+ok 5 - manager-only published snapshot reader preserves KV and marks missing/hidden weeks explicitly
+  ---
+  duration_ms: 7829.555225
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 21328.994789

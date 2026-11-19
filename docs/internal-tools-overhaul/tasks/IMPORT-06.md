@@ -113,3 +113,7 @@ Evidence specific to this task: the three task scenarios above must pass against
 ## Step 09 follow-up — November 18, 2026
 
 Files → Review → Report retains source-hours and identity policy. Employee totals and a focused issue queue precede raw physical rows; directory loading, unavailable, authorization and conflict states remain distinct. Stage navigation preserves choices; restoring resets only the replaced directory editor/request generation. See the [Step 09 checkpoint](../checkpoints/step-09.md). Codex coordinates shared dictionary and fixture changes. External activation, staff/device review and release remain separate; task milestone states are unchanged.
+
+## Step 10 follow-up — November 18, 2026
+
+Shared history now has an exact-context destination, readable record summaries and checkpointed in-memory resume. Comparisons lead with observed totals, coverage and grouped exceptions; actual hours remain separate from schedule estimates. Historical mappings, duplicate quarantine, source evidence and English output remain compatible. See the [Step 10 checkpoint](../checkpoints/step-10.md). Codex coordinates shared dictionary/navigation/fixture edits. External activation and live/device/staff milestones are unchanged.

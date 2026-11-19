@@ -1,15 +1,16 @@
 """IMPORT-08 browser checks: selected sources, mapping, combined estimates and recovery."""
-import sys,json,subprocess,tempfile
+import sys,json,subprocess,tempfile,copy,shutil
 import fitz
 from pathlib import Path
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright,expect
 BASE=sys.argv[1];assert urlparse(BASE).hostname in ('127.0.0.1','localhost')
 ROOT=Path(__file__).resolve().parent.parent
+ART=ROOT/'docs/internal-tools-overhaul/evidence/step-10/screens';ART.mkdir(parents=True,exist_ok=True)
 fixtures=json.loads(subprocess.check_output(['node','--import','jiti/register','scripts/create-comparison-fixtures.ts'],cwd=ROOT))
 def run():
  with sync_playwright() as p:
-  browser=p.chromium.launch(headless=True);context=browser.new_context(viewport={'width':390,'height':844},has_touch=True,accept_downloads=True)
+  browser=p.chromium.launch(headless=True,args=['--remote-debugging-port=9341']);context=browser.new_context(viewport={'width':390,'height':844},has_touch=True,accept_downloads=True)
   state={'fail':False,'writes':[]};errors=[];remote=[]
   for value in fixtures.values():value['directory']['data']['mappings']=[m for m in value['directory']['data']['mappings'] if m['system']=='toast']
   cors={'access-control-allow-origin':'*','access-control-allow-headers':'Authorization,Content-Type','access-control-allow-methods':'GET,PUT,OPTIONS'}
@@ -36,6 +37,7 @@ def run():
   page.locator('#comparison-load').tap();expect(page.locator('#comparison-run')).to_be_enabled();page.locator('#comparison-run').tap()
   expect(page.locator('#comparison-result-title')).to_have_text('Observed scheduled versus actual hours')
   expect(page.locator('#panel-comparison')).to_contain_text('Published assignments have no reviewed shared identity')
+  page.locator('[data-comparison-controls] > summary').click()
   for store in ('CR2','CR3'):
    identity=fixtures[store]['directory']['data']['employees'][0]['id'];page.locator(f'#schedule-map-{store}-0').select_option(identity)
    page.get_by_role('region',name='Published snapshot identity review '+store,exact=True).locator('[data-schedule-mapping=save]').tap()
@@ -52,7 +54,10 @@ def run():
    assert len(report['unmatchedActual'])==2 and len(report['overlaps'])==1
    assert report['directoryRevisions']==[{'storeId':'CR2','revision':2},{'storeId':'CR3','revision':2}]
    assert 'synthetic-comparison-token' not in path.read_text()
-  page.get_by_role('button',name='Español',exact=True).tap();expect(page.locator('#comparison-result-title')).to_have_text('Comparación observada de horario y horas reales')
+   shutil.copyfile(path,ART/'comparison-evidence.json')
+  for width,name in [(1440,'comparison-desktop'),(768,'comparison-tablet'),(390,'comparison-phone')]:
+   page.set_viewport_size({'width':width,'height':1000});assert page.evaluate('document.documentElement.scrollWidth <= innerWidth');page.screenshot(path=str(ART/(name+'.png')),full_page=True)
+  page.get_by_role('button',name='Español',exact=True).tap();page.set_viewport_size({'width':320,'height':1000});page.evaluate('document.documentElement.style.fontSize="32px"');assert page.evaluate('document.documentElement.scrollWidth <= innerWidth');page.screenshot(path=str(ART/'comparison-spanish-enlarged.png'),full_page=True);page.evaluate('document.documentElement.style.fontSize="16px"');expect(page.locator('#comparison-result-title')).to_have_text('Comparación observada de horario y horas reales')
   assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
   page.evaluate("window.dispatchEvent(new Event('beforeprint'))");expect(page.locator('#comparison-result-title')).to_have_text('Observed scheduled versus actual hours')
   with tempfile.TemporaryDirectory() as temp:
@@ -64,13 +69,40 @@ def run():
    for printed_page in document:
     assert all(word[0]>=-1 and word[2]<=printed_page.rect.width+1 for word in printed_page.get_text('words'))
    assert 1<=len(document)<=8
+   shutil.copyfile(pdf,ART/'comparison-english.pdf')
   page.evaluate("window.dispatchEvent(new Event('afterprint'))");expect(page.locator('#comparison-result-title')).to_have_text('Comparación observada de horario y horas reales')
-  page.get_by_role('button',name='English',exact=True).tap();page.locator('#comparison-end').fill('2026-10-30');expect(page.locator('#comparison-run')).to_be_disabled()
+  page.get_by_role('button',name='English',exact=True).tap()
+  saved_fixtures=copy.deepcopy(fixtures)
+  def reload_compare():
+   page.locator('#comparison-load').click();page.get_by_role('dialog').locator('button').last.click();expect(page.locator('#comparison-run')).to_be_enabled();page.locator('#comparison-run').click()
+  # Explicit reviewed OFF mappings yield real zero; a missing publication stays unavailable.
+  for store in ('CR2','CR3'):
+   pub=fixtures[store]['page']['publications'][0];pub['fingerprint']='sha256:'+'c'*64;pub['people'][0]['key']='pub:'+'c'*64+':0';pub['assignments']=[]
+   for mapping in fixtures[store]['directory']['data']['mappings']:
+    if mapping['system']=='scheduler':mapping['externalId']=pub['people'][0]['key'];mapping['reviewedBy']='Synthetic explicit OFF mapping'
+  reload_compare()
+  for store in ('CR2','CR3'):expect(page.locator(f'[data-comparison-store={store}] td').nth(3)).to_have_text('0')
+  for store in ('CR2','CR3'):fixtures[store]['page']['publications']=[]
+  reload_compare()
+  for store in ('CR2','CR3'):expect(page.locator(f'[data-comparison-store={store}] td').nth(3)).to_have_text('Not available')
+  for store in ('CR2','CR3'):
+   hidden=copy.deepcopy(saved_fixtures[store]['page']['publications'][0]);hidden['status']='hidden';fixtures[store]['page']['publications']=[hidden]
+  reload_compare()
+  for store in ('CR2','CR3'):expect(page.locator(f'[data-comparison-store={store}] td').nth(3)).to_have_text('Not available')
+  fixtures['CR2']['imports']=[];reload_compare();expect(page.locator('[data-comparison-store=CR2] td').first).to_have_text('Not available');expect(page.locator('[data-comparison-store=CR3] td').first).to_have_text('24');expect(page.locator('[data-comparison-store=CR2] td').nth(4)).to_have_text('Not available')
+  fixtures.clear();fixtures.update(copy.deepcopy(saved_fixtures));duplicate=copy.deepcopy(fixtures['CR3']['imports'][0]);duplicate['id']='synthetic-duplicate-source';fixtures['CR3']['imports'].append(duplicate)
+  reload_compare();expect(page.locator('[data-comparison-store=CR3] td').first).to_have_text('Not available');expect(page.locator('#panel-comparison')).to_contain_text('2 duplicate')
+  fixtures.clear();fixtures.update(copy.deepcopy(saved_fixtures));reload_compare()
+  page.locator('#comparison-end').fill('2026-10-30');expect(page.locator('#comparison-run')).to_be_disabled()
   state['fail']=True;page.locator('#comparison-load').tap();page.get_by_role('dialog').locator('button').last.tap();expect(page.locator('#panel-comparison')).to_contain_text('unavailable or not configured')
   expect(page.locator('#comparison-result-title')).to_be_visible();expect(page.locator('#panel-comparison')).to_contain_text('2026-10-01 to 2026-10-31')
   expect(page.locator('#comparison-end')).to_have_value('2026-10-30')
   page.locator('#tab-cash-out').tap();page.locator('#draft-preparer').fill('Synthetic handoff');page.get_by_role('button',name='Start new draft',exact=True).tap();page.locator('[data-shell-lock]').tap();page.locator('#tab-comparison').tap()
   expect(page.locator('#comparison-result-title')).not_to_be_visible();expect(page.locator('#comparison-end')).to_have_value('2026-10-30')
+  from urllib.request import urlopen
+  targets=json.load(urlopen('http://127.0.0.1:9341/json/list'));target=next(item['id'] for item in targets if item.get('url')==page.url)
+  subprocess.run(['rea-project','run','--project',str(ROOT),'--','inspect-web-page','http://127.0.0.1:9341',target,'--include-accessibility-text','--include-storage-keys','--json'],check=True,stdout=subprocess.DEVNULL)
+  (ART/'comparison-results.json').write_text(json.dumps({'page_errors':errors,'external_attempts':remote,'checks':['independent 48/34/14 hours','explicit OFF zero','missing and hidden publications unavailable','incomplete two-store coverage','duplicate quarantine','failed reload retains report','stale requested context','locked private report','EN/ES print and viewports']},indent=2))
   assert not errors,errors;assert not remote,remote
   context.close();browser.close();print('PASS IMPORT-08: missing identity limitations, explicit publication mappings, reviewed source selection, reconciled per-store/combined hours, one shared identity, source regular/overtime separation, overlap evidence JSON, Spanish phone/print and failed reload preserving prior snapshot')
 if __name__=='__main__':run()
