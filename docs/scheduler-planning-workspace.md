@@ -1,5 +1,7 @@
 # Planning workspace
 
+**Dated restaurant hours:** all three manager layouts now provide **Hours** beside each date for restaurant-wide closures and early closing. Dining and kitchen review staffing/cleanup times and publish separately. See the [workflow and compatibility guide](internal-tools-overhaul/special-hours.md#implemented-workflow) and [local completion checkpoint](internal-tools-overhaul/checkpoints/special-hours.md). Backend activation remains a release gate.
+
 The scheduler has an opt-in **Planning workspace** at the existing
 `/scheduler-demo/:restaurantId` URLs. Choose it in **Layout** after unlocking the
 scheduler. Current remains the default; stored Current/Classic preferences remain

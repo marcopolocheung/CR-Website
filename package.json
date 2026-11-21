@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build && node scripts/mirror-trailing-slash.mjs",
     "start": "next start",
-    "scheduler:test": "node --import jiti/register --test src/lib/scheduler/scheduler.test.ts src/lib/scheduler/week-visibility.test.ts src/lib/scheduler/editor-state.test.ts src/components/scheduler/helpers.test.ts src/lib/schedule-share.test.ts src/lib/schedule-store.test.ts worker/src/index.test.ts src/components/scheduler-prototype/model.test.ts worker/src/toast.test.ts src/lib/cashout-toast.test.ts worker/src/toast-sales.test.ts src/lib/sales.test.ts src/lib/sales-cache.test.ts src/lib/scheduler/repair.test.ts src/components/scheduler/employee-colors.test.ts",
+    "scheduler:test": "node --import jiti/register --test src/lib/scheduler/scheduler.test.ts src/lib/scheduler/week-visibility.test.ts src/lib/scheduler/editor-state.test.ts src/components/scheduler/helpers.test.ts src/lib/schedule-share.test.ts src/lib/schedule-store.test.ts worker/src/index.test.ts src/components/scheduler-prototype/model.test.ts worker/src/toast.test.ts src/lib/cashout-toast.test.ts worker/src/toast-sales.test.ts src/lib/sales.test.ts src/lib/sales-cache.test.ts src/lib/scheduler/repair.test.ts src/components/scheduler/employee-colors.test.ts src/lib/scheduler/special-hours.test.ts",
     "scheduler:verify": "node scripts/verify-schedule-store.mjs",
     "scheduler:seed-kitchens": "node scripts/seed-kitchen-stations.mjs",
     "seo:check": "node scripts/seo-check.mjs",
@@ -27,7 +27,8 @@
     "agent:start": "node --import jiti/register agent/server.ts",
     "agent:test": "node --import jiti/register --test agent/agent.test.ts agent/service.test.ts",
     "check": "tsc --noEmit && python3 scripts/check-overhaul-tracker.py && npm run -s scheduler:test && npm run -s cashout:test && npm run -s internal:session:test && npm run -s recovery:test && npm run -s imports:test && npm run -s forms:test && npm run -s scheduler:requests:test && npm run -s agent:test",
-    "check:full": "npm run -s check && npm run -s data:test && npm run -s imports:worker:test && npm run -s scheduler:requests:worker:test"
+    "check:full": "npm run -s check && npm run -s data:test && npm run -s imports:worker:test && npm run -s scheduler:requests:worker:test && npm run -s scheduler:hours:worker:test",
+    "scheduler:hours:worker:test": "node --test worker/src/special-hours.test.mjs"
   },
   "dependencies": {
     "@langchain/anthropic": "^1.6.0",

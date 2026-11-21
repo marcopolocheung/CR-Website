@@ -12,6 +12,22 @@ import { buildSchedulingGraph, proposalProblems, type AgentState } from './graph
 import { fixtureContext, approvedTimeOff } from './fixtures'
 
 const config = { configurable: { thread_id: 'test-run' }, recursionLimit: 24 }
+test('assistant generates the reviewed closure/cleanup layout and invalidates changed hours revisions',async()=>{
+  const context=fixtureContext(),all=expandTemplate(context.template,context.weekStart)
+  const effective=all.filter(slot=>slot.day!=='Thursday').map(slot=>({...slot,date:slot.date!,...(slot.day==='Wednesday'&&slot.period==='PM'?{end:1170}:{})}))
+  const first=agentContextSchema.parse({...context,effectiveSlots:effective,hoursFingerprint:'event-revision-1'})
+  const next=agentContextSchema.parse({...first,hoursFingerprint:'event-revision-2'})
+  assert.notEqual(contextFingerprint(first),contextFingerprint(next))
+  assert.equal(proposalProblems(first,context.assignments).some(message=>message.includes('unknown slot')),false)
+  assert.equal(agentContextSchema.safeParse({...first,effectiveSlots:[{...effective[0],date:'2026-12-31'}]}).success,false)
+  const graph=buildSchedulingGraph(new MemorySaver())
+  await graph.invoke({context:first,goal:'balanced',instructions:''},config)
+  const state=(await graph.getState(config)).values as AgentState
+  assert.equal(state.status,'review')
+  assert.equal(state.best!.assignments.length,12)
+  assert.ok(state.best!.assignments.every(a=>!a.slotId.startsWith('thursday')))
+  assert.equal(state.best!.metrics.totalHours,74.5)
+})
 test('context rejects impossible dates, duplicate assignments, and unrecognized authority fields', () => {
   const context = fixtureContext()
   assert.equal(agentContextSchema.safeParse({ ...context, weekStart: '2026-02-30' }).success, false)

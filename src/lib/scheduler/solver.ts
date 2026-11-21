@@ -62,7 +62,7 @@ type GenerateOptions = {
 }
 
 export function generateSchedule(input: SchedulerInput, options: GenerateOptions = {}): GenerateScheduleResult {
-  const allSlots = expandTemplate(input.template, input.weekStart)
+  const allSlots = input.slots ?? expandTemplate(input.template, input.weekStart)
   const slots = allSlots.filter((slot) => slot.required)
   const optionalSlots = allSlots.filter((slot) => !slot.required)
   const diagnostics = preflightDiagnostics(input.employees, slots)

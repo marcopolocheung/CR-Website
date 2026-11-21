@@ -1,8 +1,14 @@
 import { requestRecord, saveRequests, readRequestMutation } from './schedule-requests'
 import { parseCashAmount } from '../../src/lib/cashout'
-import { isStationId } from '../../src/lib/internal-tools/contracts'
+import { businessDate, isStationId, isStoreId, STATION_STORES, type StationId, type StoreId } from '../../src/lib/internal-tools/contracts'
+import { canonicalJson } from '../../src/lib/internal-tools/json'
+import { defaultTemplateForRestaurant, expandTemplate } from '../../src/lib/scheduler/data'
+import { hoursBaseFingerprint, resolveSpecialHours, type SpecialHoursPage } from '../../src/lib/scheduler/special-hours'
+import { hoursRecords, saveHoursEvent, saveHoursReview } from './special-hours'
 import { publishedHours, weeksInPeriod } from '../../src/lib/converter/published-hours'
 import type { WeeklyStaffingTemplate } from '../../src/lib/scheduler/types'
+import { buildScheduleSnapshot, validScheduleSnapshot, type ScheduleSnapshot } from '../../src/lib/schedule-snapshot'
+import { layoutForPublication, templateHashForSlots } from '../../src/lib/schedule-share'
 import { historyPage, historyRecord, saveHistory } from './import-history'
 import { directoryRecord, saveDirectory } from './import-directory'
 import { fetchToastCash, toastConfigured, ToastError, type ToastStore } from './toast'
@@ -215,6 +221,7 @@ export type GoldenWeekDoc = {
   visible: boolean
   templateHash: string
   updatedAt: string
+  snapshot?: ScheduleSnapshot
 }
 
 const GOLDEN_VERSION = 1
@@ -283,9 +290,9 @@ async function readGoldenDoc(env: Env, restaurant: string, weekStart: string): P
 
 export function validateGoldenWeekBody(
   body: unknown,
-): { week: GoldenWeekPayload; visible: boolean; baseRev: number } | null {
+): { week: GoldenWeekPayload; visible: boolean; baseRev: number; snapshot?: ScheduleSnapshot } | null {
   if (!body || typeof body !== 'object') return null
-  const { week, visible, baseRev } = body as Record<string, unknown>
+  const { week, visible, baseRev, snapshot, templateHash } = body as Record<string, unknown>
   if (typeof baseRev !== 'number' || !Number.isInteger(baseRev) || baseRev < 0) return null
   if (!week || typeof week !== 'object') return null
   const candidate = week as Record<string, unknown>
@@ -313,6 +320,8 @@ export function validateGoldenWeekBody(
     return null
   }
   if (visible !== undefined && typeof visible !== 'boolean') return null
+  if (snapshot !== undefined && (!validScheduleSnapshot(snapshot, slotPeople.length, candidate.weekStart)
+    || templateHashForSlots(snapshot.slots) !== templateHash)) return null
   const nextVisible = visible === undefined ? true : (visible as boolean)
   return {
     week: {
@@ -324,6 +333,7 @@ export function validateGoldenWeekBody(
     },
     visible: nextVisible,
     baseRev,
+    ...(snapshot !== undefined ? { snapshot: snapshot as ScheduleSnapshot } : {}),
   }
 }
 
@@ -335,7 +345,7 @@ export function normalizeGoldenDoc(raw: unknown): GoldenWeekDoc | null {
   if (typeof doc.rev !== 'number' || !Number.isInteger(doc.rev) || doc.rev < 1) return null
   if (typeof doc.templateHash !== 'string' || !HASH_RE.test(doc.templateHash)) return null
   if (typeof doc.updatedAt !== 'string') return null
-  const week = validateGoldenWeekBody({ week: doc.week, baseRev: doc.rev })
+  const week = validateGoldenWeekBody({ week: doc.week, baseRev: doc.rev, snapshot: doc.snapshot, templateHash: doc.templateHash })
   if (!week) return null
   if (week.week.weekStart !== doc.weekStart) return null
   return {
@@ -346,7 +356,121 @@ export function normalizeGoldenDoc(raw: unknown): GoldenWeekDoc | null {
     visible: doc.visible !== false,
     templateHash: doc.templateHash,
     updatedAt: doc.updatedAt,
+    ...(week.snapshot ? { snapshot: week.snapshot } : {}),
   }
+}
+
+/** Resolve legacy times before a rules write, never from the replacement rules. */
+async function preservedSnapshotKey(restaurant: string, weekStart: string, raw: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw))
+  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+  return `r:${restaurant}:publication-layout:${weekStart}:${hash}`
+}
+
+async function preservedSnapshot(env: Env, restaurant: string, doc: GoldenWeekDoc, raw: string): Promise<ScheduleSnapshot | null> {
+  const saved = await env.SCHEDULES.get(await preservedSnapshotKey(restaurant, doc.weekStart, raw))
+  if (saved === null) return null
+  const snapshot = safeParse(saved)
+  if (!validScheduleSnapshot(snapshot, doc.week.slotPeople.length)
+    || templateHashForSlots(snapshot.slots) !== doc.templateHash) throw new Error('invalid_preserved_layout')
+  return snapshot
+}
+
+async function publicationWithSnapshot(env: Env, restaurant: string, doc: GoldenWeekDoc, raw: string): Promise<GoldenWeekDoc> {
+  if (doc.snapshot) return doc
+  const saved = await preservedSnapshot(env, restaurant, doc, raw)
+  if (saved) return { ...doc, snapshot: saved }
+  const weekRaw = await env.SCHEDULES.get(templateKeyForWeek(restaurant, doc.weekStart))
+  const globalRaw = await readTemplateRaw(env, restaurant)
+  const week = weekRaw ? normalizeTemplateDoc(safeParse(weekRaw)) : null
+  const global = globalRaw ? normalizeTemplateDoc(safeParse(globalRaw)) : null
+  const layout = layoutForPublication(doc, [week?.template as WeeklyStaffingTemplate | undefined,
+    global?.template as WeeklyStaffingTemplate | undefined], restaurant)
+  if (!layout.matches) return doc
+  const snapshot = buildScheduleSnapshot(layout.slots, 'legacy-captured')
+  return validScheduleSnapshot(snapshot, doc.week.slotPeople.length) ? { ...doc, snapshot } : doc
+}
+
+/** Preserve legacy layouts separately, without ever overwriting a concurrent publish. */
+async function preservePublication(env: Env, restaurant: string, weekStart: string): Promise<GoldenWeekDoc | null> {
+  const raw = await readGoldenDoc(env, restaurant, weekStart)
+  if (!raw) return null
+  const doc = normalizeGoldenDoc(safeParse(raw))
+  if (!doc) throw new Error('publication_layout_unavailable')
+  if (doc.snapshot) return doc
+  const pinned = await publicationWithSnapshot(env, restaurant, doc, raw)
+  if (!pinned.snapshot) throw new Error('publication_layout_unavailable')
+  await env.SCHEDULES.put(await preservedSnapshotKey(restaurant, weekStart, raw), JSON.stringify(pinned.snapshot), { expirationTtl: DOC_TTL_SECONDS })
+  // This is a conservative race check, not atomic CAS across KV documents.
+  if (await readGoldenDoc(env, restaurant, weekStart) !== raw) throw new Error('publication_changed')
+  return pinned
+}
+
+async function reportPublication(env: Env, restaurant: string, raw: string | null): Promise<unknown> {
+  if (!raw) return null
+  const parsed = safeParse(raw)
+  const doc = normalizeGoldenDoc(parsed)
+  if (!doc || doc.snapshot) return parsed
+  const snapshot = await preservedSnapshot(env, restaurant, doc, raw)
+  return snapshot ? { ...parsed as Record<string, unknown>, snapshot } : parsed
+}
+
+async function preservePublicationsBeforeRules(env: Env, restaurant: string, weekStart?: string): Promise<GoldenWeekDoc | null> {
+  if (weekStart) return preservePublication(env, restaurant, weekStart)
+  // A global seed can also be the reader's fallback for older published weeks.
+  const dates = new Set<string>()
+  for (const prefix of [`r:${restaurant}:golden:`, ...(restaurant === DEFAULT_RESTAURANT ? ['golden:'] : [])]) {
+    let cursor: string | undefined
+    do {
+      const page = await env.SCHEDULES.list({ prefix, cursor })
+      for (const key of page.keys) {
+        const suffix = key.name.slice(prefix.length)
+        if (WEEK_RE.test(suffix)) dates.add(suffix)
+      }
+      cursor = page.list_complete ? undefined : page.cursor
+      if (!page.list_complete && !cursor) throw new Error('publication_list_incomplete')
+    } while (cursor)
+  }
+  for (const date of dates) await preservePublication(env, restaurant, date)
+  return null
+}
+
+function weekForHoursDate(date: string): string {
+  const ms = Date.parse(date+'T00:00:00Z')
+  return new Date(ms-new Date(ms).getUTCDay()*86400000).toISOString().slice(0,10)
+}
+async function normalHoursTemplate(env: Env, station: StationId, week: string): Promise<WeeklyStaffingTemplate> {
+  const raw = await env.SCHEDULES.get(templateKeyForWeek(station,week)) ?? await readTemplateRaw(env,station)
+  if (raw === null) return defaultTemplateForRestaurant(station)
+  const doc = normalizeTemplateDoc(safeParse(raw))
+  if (!doc) throw new Error('Invalid staffing rules')
+  return doc.template as WeeklyStaffingTemplate
+}
+async function specialHoursPage(env: Env, store: StoreId, start: string, end: string): Promise<SpecialHoursPage> {
+  const data = await hoursRecords(env.INTERNAL_DB!,store,start,end)
+  const stations: SpecialHoursPage['stations'] = []
+  for (const event of data.events) for (const station of RESTAURANTS.filter(s=>STATION_STORES[s]===store)) {
+    const week = weekForHoursDate(event.data.date)
+    const raw = await readGoldenDoc(env,station,week)
+    const published = raw ? normalizeGoldenDoc(safeParse(raw)) : null
+    let baseFingerprint: string | null = null
+    try { baseFingerprint = hoursBaseFingerprint(expandTemplate(await normalHoursTemplate(env,station,week),week).filter(slot=>slot.date===event.data.date)) } catch { /* Unknown rules require review. */ }
+    stations.push({stationId:station,date:event.data.date,baseFingerprint,visible:published?.visible??false,
+      published:published?.snapshot?.specialHours?.find(day=>day.date===event.data.date)??null})
+  }
+  return {version:1,storeId:store,start,end,...data,stations}
+}
+async function checkSpecialHoursPublication(env: Env, station: StationId, week: string, snapshot?: ScheduleSnapshot): Promise<'unconfigured'|'changed'|null> {
+  if (!env.INTERNAL_DB) return snapshot?.specialHours?.length || await env.SCHEDULES.get(`r:${STATION_STORES[station]}:special-hours:active`) ? 'unconfigured' : null
+  const end = shiftGoldenDate(week,6)
+  const data = await hoursRecords(env.INTERNAL_DB,STATION_STORES[station],week,end)
+  if (!data.events.length) return snapshot?.specialHours?.length ? 'changed' : null
+  if (!snapshot || snapshot.basis!=='published') return 'changed'
+  const base = expandTemplate(await normalHoursTemplate(env,station,week),week)
+  const resolved = resolveSpecialHours(base,data.events,data.reviews,station)
+  if (resolved.pending.length || canonicalJson(snapshot.specialHours??[])!==canonicalJson(resolved.days)
+    || hoursBaseFingerprint(snapshot.slots)!==hoursBaseFingerprint(resolved.slots)) return 'changed'
+  return null
 }
 
 const GOLDEN_DAY_MS = 24 * 60 * 60 * 1000
@@ -1136,7 +1260,7 @@ export default {
     const path = url.pathname.replace(/\/+$/, '') || '/'
 
     if (request.method === 'GET' && (path === '/' || path === '/api/health')) {
-      return json({ ok: true }, 200, request, env)
+      return json({ ok: true, scheduleSnapshotVersion: 1, specialHoursVersion: env.INTERNAL_DB ? 1 : 0 }, 200, request, env)
     }
 
     // Gate check for the scheduler demo entry screen. Same manager token as
@@ -1148,6 +1272,39 @@ export default {
       }
       if (!isGoldenWriteAuthorized(request, env)) return json({ error: 'unauthorized' }, 401, request, env)
       return json({ ok: true }, 200, request, env)
+    }
+
+    const hoursMatch = path.match(/^\/api\/internal\/special-hours\/([^/]+)(?:\/(\d{4}-\d{2}-\d{2})(?:\/review\/([^/]+))?)?$/)
+    if (hoursMatch && (request.method==='GET'||request.method==='PUT')) {
+      const denied = await managerAuthError(request,env)
+      if (denied) return denied
+      const [,store,date,station] = hoursMatch
+      if (!isStoreId(store) || date && !businessDate(date) || station && (!isStationId(station)||STATION_STORES[station]!==store)) {
+        return json({schemaVersion:1,error:{code:'validation_failed'}},400,request,env)
+      }
+      const noStore = {'Cache-Control':'no-store'}
+      if (!env.INTERNAL_DB) {
+        const active=await env.SCHEDULES.get(`r:${store}:special-hours:active`)
+        return json({schemaVersion:1,error:{code:active?'unavailable':'backend_unconfigured'}},503,request,env,noStore)
+      }
+      try {
+        if (request.method==='GET' && !date) {
+          const start=url.searchParams.get('start')??'',end=url.searchParams.get('end')??''
+          if (!businessDate(start)||!businessDate(end)||end<start||Date.parse(end)-Date.parse(start)>30*86400000) {
+            return json({schemaVersion:1,error:{code:'validation_failed'}},400,request,env,noStore)
+          }
+          return json(await specialHoursPage(env,store,start,end),200,request,env,noStore)
+        }
+        if (request.method!=='PUT'||!date) return json({error:'method_not_allowed'},405,request,env,noStore)
+        if (!(await checkWriteThrottle(env,clientIp(request)))) return json({error:'rate_limited'},429,request,env,noStore)
+        const body=await readBody(request,100000)
+        // Keep an activation signal outside D1 before accepting an hours write.
+        // A lost binding must never turn existing closures into a legacy "no hours service" state.
+        const activationKey=`r:${store}:special-hours:active`
+        if(!await env.SCHEDULES.get(activationKey))await env.SCHEDULES.put(activationKey,'1')
+        const result=station ? await saveHoursReview(env.INTERNAL_DB,store,station as StationId,date,body) : await saveHoursEvent(env.INTERNAL_DB,store,date,body)
+        return result.ok ? json({record:result.record},200,request,env,noStore) : json(result.body,result.status,request,env,noStore)
+      } catch { return json({schemaVersion:1,error:{code:'unavailable'}},503,request,env,noStore) }
     }
 
     const requestsMatch = path.match(/^\/api\/internal\/schedule-requests\/([^/]+)$/)
@@ -1179,7 +1336,7 @@ export default {
           const [raw,weekRaw,globalRaw] = await Promise.all([readGoldenDoc(env,station,week),env.SCHEDULES.get(templateKeyForWeek(station,week)),readTemplateRaw(env,station)])
           const weekDoc = weekRaw ? normalizeTemplateDoc(safeParse(weekRaw)) : null
           const globalDoc = globalRaw ? normalizeTemplateDoc(safeParse(globalRaw)) : null
-          return publishedHours(station,week,raw?(safeParse(raw)??{}):null,(weekDoc?.template ?? null) as WeeklyStaffingTemplate|null,(globalDoc?.template ?? null) as WeeklyStaffingTemplate|null)
+          return publishedHours(station,week,await reportPublication(env,station,raw),(weekDoc?.template ?? null) as WeeklyStaffingTemplate|null,(globalDoc?.template ?? null) as WeeklyStaffingTemplate|null)
         })))
         return json({version:1,storeId:store,start,end,publications},200,request,env,{'Cache-Control':'no-store'})
       } catch { return json({schemaVersion:1,error:{code:'unavailable'}},503,request,env,{'Cache-Control':'no-store'}) }
@@ -1571,8 +1728,11 @@ export default {
           continue
         }
         const doc = normalizeGoldenDoc(parsed)
+        if (!doc && parsed && typeof parsed === 'object' && 'snapshot' in parsed) {
+          return json({ error: 'invalid_publication' }, 503, request, env, { 'Cache-Control': 'no-store' })
+        }
         if (!doc || !doc.visible) continue
-        weeks.push(doc)
+        weeks.push(await publicationWithSnapshot(env, restaurant, doc, raw))
       }
       weeks.sort((a, b) => a.weekStart.localeCompare(b.weekStart))
       return json({ weeks, rev, notModified: false }, 200, request, env, { 'Cache-Control': 'no-store' })
@@ -1595,10 +1755,13 @@ export default {
           return json({ error: 'not_found' }, 404, request, env)
         }
         const doc = normalizeGoldenDoc(parsed)
+        if (!doc && parsed && typeof parsed === 'object' && 'snapshot' in parsed) {
+          return json({ error: 'invalid_publication' }, 503, request, env, { 'Cache-Control': 'no-store' })
+        }
         if (!doc) return json({ error: 'not_found' }, 404, request, env)
-        return new Response(JSON.stringify(doc), {
+        return new Response(JSON.stringify(await publicationWithSnapshot(env, restaurant, doc, raw)), {
           status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...corsHeaders(request, env) },
         })
       }
 
@@ -1611,7 +1774,7 @@ export default {
         let templateHash: string | null = null
         let body: unknown
         try {
-          body = await readBody(request)
+          body = await readBody(request, 200000)
         } catch {
           return json({ error: 'body_too_large' }, 413, request, env)
         }
@@ -1623,6 +1786,10 @@ export default {
         if (!valid || !templateHash || valid.week.weekStart !== weekStart) {
           return json({ error: 'invalid_body' }, 400, request, env)
         }
+        try {
+          const hoursError=await checkSpecialHoursPublication(env,restaurant,weekStart,valid.snapshot)
+          if (hoursError) return json({error:hoursError==='changed'?'special_hours_changed':'special_hours_unconfigured'},hoursError==='changed'?409:503,request,env)
+        } catch { return json({error:'special_hours_unavailable'},503,request,env) }
         const existing = await readGoldenDoc(env, restaurant, weekStart)
         if (!existing) {
           if (valid.baseRev !== 0) return json({ error: 'conflict', rev: 0 }, 409, request, env)
@@ -1634,6 +1801,7 @@ export default {
             visible: valid.visible,
             templateHash,
             updatedAt: new Date().toISOString(),
+            ...(valid.snapshot ? { snapshot: valid.snapshot } : {}),
           }
           await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
           await bumpGoldenMonthRevs(env, weekStart, restaurant)
@@ -1647,8 +1815,12 @@ export default {
         }
         const current = normalizeGoldenDoc(parsed)
         if (!current) return json({ error: 'not_found' }, 404, request, env)
+        if (current.snapshot?.specialHours?.length&&!env.INTERNAL_DB) return json({error:'special_hours_unavailable'},503,request,env)
         if (valid.baseRev !== current.rev) {
           return json({ error: 'conflict', rev: current.rev, updatedAt: current.updatedAt }, 409, request, env)
+        }
+        if (!valid.snapshot && (current.snapshot || await preservedSnapshot(env, restaurant, current, existing))) {
+          return json({ error: 'snapshot_required' }, 400, request, env)
         }
         const next: GoldenWeekDoc = {
           ...current,
@@ -1657,6 +1829,7 @@ export default {
           templateHash,
           rev: current.rev + 1,
           updatedAt: new Date().toISOString(),
+          ...(valid.snapshot ? { snapshot: valid.snapshot } : {}),
         }
         await env.SCHEDULES.put(key, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
         await bumpGoldenMonthRevs(env, weekStart, restaurant)
@@ -1897,6 +2070,12 @@ export default {
         if (valid.baseRev !== currentRev) {
           return json({ error: 'conflict', rev: currentRev, updatedAt: currentUpdatedAt }, 409, request, env)
         }
+        let preservedPublication: GoldenWeekDoc | null
+        try {
+          preservedPublication = await preservePublicationsBeforeRules(env, restaurant, weekStart)
+        } catch {
+          return json({ error: 'publication_preservation_failed' }, 409, request, env)
+        }
         const next: TemplateDoc = {
           v: 1,
           rev: currentRev + 1,
@@ -1904,7 +2083,8 @@ export default {
           updatedAt: new Date().toISOString(),
         }
         await env.SCHEDULES.put(targetKey, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS })
-        return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env)
+        return json({ rev: next.rev, updatedAt: next.updatedAt,
+          ...(preservedPublication ? { preservedPublication } : {}) }, currentRev === 0 ? 201 : 200, request, env)
       }
     }
 

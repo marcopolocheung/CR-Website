@@ -13,6 +13,7 @@ import { scheduleVariants, type ScheduleVariant } from './helpers'
 import { planningDate } from './planning-format'
 import { employeeColorsFor } from './employee-colors'
 import RoleBadge from './RoleBadge'
+import { DayHoursControl } from './SpecialHours'
 import css from './planning.module.css'
 
 function LockIcon({ locked }: { locked: boolean }) {
@@ -114,7 +115,7 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
         <button disabled={blocked || p.ruleProblemCount > 0 || !p.activeEmployeeCount} onClick={p.onMake} className={!p.assignments.length ? css.primary : undefined}>{t(generating ? 'planning.generating' : 'planning.make')}</button>
         <button disabled={blocked || p.ruleProblemCount > 0} onClick={onAdjust}>{t('planning.adjust')}</button>
         <button disabled={busy || !p.historyLength} onClick={p.onUndo}>{t('planning.undo')}</button>
-        <button disabled={busy || p.isGenerating || p.storeLoading || p.ruleProblemCount > 0 || !p.assignments.length} onClick={p.onPublish} className={p.assignments.length ? css.primary : undefined}>{t('planning.publish')}</button>
+        <button disabled={busy || p.isGenerating || p.storeLoading || p.hoursBlocked || p.ruleProblemCount > 0 || (!p.assignments.length&&!p.canPublishEmpty)} onClick={p.onPublish} className={p.assignments.length||p.canPublishEmpty ? css.primary : undefined}>{t('planning.publish')}</button>
       </div>
     </div>
     <div id="planning-review" ref={reportRef} tabIndex={-1} className={css.feedback} aria-live="polite" aria-busy={busy || generating}>
@@ -137,12 +138,15 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
         <div className={css.paperHead}><h2>{t('planning.week')}</h2><span>{t('planning.hoursTotal', { hours: Math.round(totalHours * 10) / 10 })}</span></div>
         <div ref={boardRef} className={css.boardScroll} tabIndex={0} aria-label={t('planning.scroll')}><div className={css.board}>
           {DAYS.map(day => <section key={day} className={css.day}><h3>{dateText(dateForDay(p.weekStart, day))}</h3>
+            <DayHoursControl date={dateForDay(p.weekStart,day)} locale={locale} event={p.hoursDays.find(e=>e.date===dateForDay(p.weekStart,day))}
+              pending={p.hoursPending.includes(dateForDay(p.weekStart,day))} disabled={p.hoursDisabled} onEdit={()=>p.onEditHours(dateForDay(p.weekStart,day))}/>
             {PERIODS.map(period => <div key={period} className={css.period}>
               {p.slots.filter(s => s.day === day && s.period === period).map(s => {
                 const a = p.assignmentMap.get(s.id)
                 return <div key={s.id} data-planning-slot={s.id} data-employee-id={a?.employeeId ?? ''} data-kept={!!a?.locked} className={`${css.slot} ${selected === s.id ? css.selected : ''} ${adjusted.has(s.id) ? css.changed : ''} ${!a?.employeeId ? css.open : ''} ${!s.required ? css.optional : ''}`}
                   onDragOver={e => { if (!blocked) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' } }} onDrop={e => { e.preventDefault(); place(s.id, drag.current); drag.current = null }}>
                   <div className={css.slotLabel}><span className={css.shiftTag}><PeriodIcon period={period} />{period}</span><RoleBadge role={s.role} label={s.label} /></div>
+                  <p className={css.hint}>{formatTimeRange(s)}</p>
                   <div className={css.personControl} ref={menu === s.id ? menuRef : undefined}>
                     <button id={`planning-person-${s.id}`} className={css.person} style={a?.employeeId ? personStyle(a.employeeId) : undefined} disabled={blocked} draggable={!!a?.employeeId && !blocked}
                       onDragStart={e => { if (a?.employeeId) startDrag(e, { employeeId: a.employeeId, fromSlotId: s.id }) }} onDragEnd={() => { drag.current = null }}

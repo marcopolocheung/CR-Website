@@ -1,0 +1,2 @@
+PASS: real agent, restart/review recovery, stale draft protection, apply/undo, draft-only writes, credentials, desktop and 375px phone
+Screenshots: /tmp/cr-agent-browser-artifacts

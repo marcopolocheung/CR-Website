@@ -79,6 +79,7 @@ __name(canonicalJson, "canonicalJson");
 
 // ../src/lib/scheduler/types.ts
 var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var PERIODS = ["AM", "PM"];
 var DINING_ROLES = ["server", "cashier", "lead", "manager"];
 var KITCHEN_ROLES = [
   "cook",
@@ -92,6 +93,11 @@ var KITCHEN_ROLES = [
   "manager"
 ];
 var ROLES = Array.from(/* @__PURE__ */ new Set([...DINING_ROLES, ...KITCHEN_ROLES]));
+var ROLE_SLUG_RE = /^[a-z0-9-]{1,40}$/;
+function isValidRoleSlug(value) {
+  return typeof value === "string" && ROLE_SLUG_RE.test(value);
+}
+__name(isValidRoleSlug, "isValidRoleSlug");
 
 // ../src/lib/scheduler/week.ts
 var DAY_MS = 24 * 60 * 60 * 1e3;
@@ -488,6 +494,195 @@ function cloneTemplate(source) {
 }
 __name(cloneTemplate, "cloneTemplate");
 
+// ../src/lib/scheduler/special-hours.ts
+function validHoursData(value) {
+  if (!value || typeof value !== "object") return false;
+  const data = value;
+  return data.version === 1 && !!businessDate(data.date) && ["normal", "closed", "early"].includes(data.mode) && typeof data.label === "string" && data.label.length <= 80 && (data.mode === "early" ? Number.isInteger(data.closeMinute) && data.closeMinute > 0 && data.closeMinute < 1440 : data.closeMinute === null) && Object.keys(data).every((key2) => ["version", "date", "mode", "closeMinute", "label"].includes(key2));
+}
+__name(validHoursData, "validHoursData");
+function validHoursReview(value) {
+  if (!value || typeof value !== "object") return false;
+  const data = value;
+  return data.version === 1 && !!businessDate(data.date) && isStationId(data.stationId) && revision(data.eventRevision) !== null && data.eventRevision > 0 && validHoursData(data.event) && data.event.date === data.date && typeof data.baseFingerprint === "string" && data.baseFingerprint.length <= 2e4 && Array.isArray(data.decisions) && data.decisions.length <= 20 && new Set(data.decisions.map((d) => d?.slotId)).size === data.decisions.length && data.decisions.every((d) => d && typeof d.slotId === "string" && d.slotId.length > 0 && d.slotId.length <= 200 && (d.end === null || Number.isInteger(d.end) && d.end > 0 && d.end <= 2880) && Object.keys(d).every((key2) => ["slotId", "end"].includes(key2))) && Object.keys(data).every((key2) => ["version", "date", "stationId", "eventRevision", "event", "baseFingerprint", "decisions"].includes(key2));
+}
+__name(validHoursReview, "validHoursReview");
+var hoursRecordId = /* @__PURE__ */ __name((date) => `hours-${date}`, "hoursRecordId");
+var hoursReviewId = /* @__PURE__ */ __name((station, date) => `hours-review-${station}-${date}`, "hoursReviewId");
+function validHoursRecord(record, store) {
+  const r = record;
+  return !!r && r.schemaVersion === 1 && r.family === "schedule" && r.storeId === store && r.stationId === void 0 && validHoursData(r.data) && r.id === hoursRecordId(r.data.date) && r.context?.kind === "day" && r.context.businessDate === r.data.date && revision(r.revision) !== null && r.revision > 0;
+}
+__name(validHoursRecord, "validHoursRecord");
+function validReviewRecord(record, store) {
+  const r = record;
+  return !!r && r.schemaVersion === 1 && r.family === "schedule" && r.storeId === store && validHoursReview(r.data) && r.stationId === r.data.stationId && STATION_STORES[r.data.stationId] === store && r.id === hoursReviewId(r.data.stationId, r.data.date) && r.context?.kind === "day" && r.context.businessDate === r.data.date && revision(r.revision) !== null && r.revision > 0;
+}
+__name(validReviewRecord, "validReviewRecord");
+function hoursBaseFingerprint(slots) {
+  return canonicalJson(slots.map(({ id, day, period, role, label: label2, start, end, required }) => ({ id, day, period, role, label: label2, start, end, required })));
+}
+__name(hoursBaseFingerprint, "hoursBaseFingerprint");
+function reviewedDaySlots(base, review) {
+  if (!validHoursReview(review) || hoursBaseFingerprint(base) !== review.baseFingerprint) return null;
+  if (review.event.mode !== "early") return review.decisions.length ? null : review.event.mode === "closed" ? [] : [...base];
+  const affected = base.filter((slot) => slot.end > review.event.closeMinute);
+  if (affected.length !== review.decisions.length || review.decisions.some((d) => !affected.some((slot) => slot.id === d.slotId))) return null;
+  const result = [];
+  for (const slot of base) {
+    const choice = review.decisions.find((d) => d.slotId === slot.id);
+    if (!choice) {
+      result.push(slot);
+      continue;
+    }
+    if (choice.end === null) {
+      if (slot.start < review.event.closeMinute) return null;
+      continue;
+    }
+    if (choice.end <= slot.start || choice.end > slot.end) return null;
+    result.push({ ...slot, end: choice.end });
+  }
+  return result;
+}
+__name(reviewedDaySlots, "reviewedDaySlots");
+function resolveSpecialHours(base, events, reviews, station) {
+  let slots = [...base];
+  const pending = [];
+  const days = [];
+  for (const event of events) {
+    const day = base.filter((slot) => slot.date === event.data.date);
+    const review = reviews.find((r) => r.data.stationId === station && r.data.date === event.data.date);
+    const effective = review ? reviewedDaySlots(day, review.data) : null;
+    const current = review && review.data.eventRevision === event.revision && canonicalJson(review.data.event) === canonicalJson(event.data);
+    if (!current || effective === null) pending.push(event.data.date);
+    if (effective !== null && review) {
+      slots = slots.filter((slot) => slot.date !== event.data.date).concat(effective);
+      days.push({ ...review.data.event, eventRevision: review.data.eventRevision, reviewRevision: review.revision });
+    }
+  }
+  const position = new Map(base.map((slot, index) => [slot.id, index]));
+  slots.sort((a, b) => position.get(a.id) - position.get(b.id));
+  return { slots, pending, days: days.sort((a, b) => a.date.localeCompare(b.date)) };
+}
+__name(resolveSpecialHours, "resolveSpecialHours");
+
+// ../src/lib/schedule-snapshot.ts
+function buildScheduleSnapshot(slots, basis = "published", specialHours = []) {
+  return {
+    version: 1,
+    basis,
+    slots: slots.map(({ id, day, period, role, label: label2, start, end, required }) => ({ id, day, period, role, label: label2, start, end, required })),
+    ...specialHours.length ? { specialHours: specialHours.map((day) => ({ ...day })) } : {}
+  };
+}
+__name(buildScheduleSnapshot, "buildScheduleSnapshot");
+function validScheduleSnapshot(value, slotCount, weekStart) {
+  if (!value || typeof value !== "object") return false;
+  const snapshot = value;
+  if (snapshot.version !== 1 || !["published", "legacy-captured"].includes(snapshot.basis) || !Array.isArray(snapshot.slots) || snapshot.slots.length !== slotCount || slotCount > 200) return false;
+  if (snapshot.specialHours !== void 0 && (!Array.isArray(snapshot.specialHours) || snapshot.specialHours.length > 7 || new Set(snapshot.specialHours.map((day) => day?.date)).size !== snapshot.specialHours.length || !snapshot.specialHours.every((day) => {
+    if (!day || typeof day !== "object") return false;
+    const { eventRevision, reviewRevision, ...event } = day;
+    return validHoursData(event) && Number.isSafeInteger(eventRevision) && eventRevision > 0 && Number.isSafeInteger(reviewRevision) && reviewRevision > 0 && (!weekStart || day.date >= weekStart && Date.parse(day.date + "T00:00:00Z") <= Date.parse(weekStart + "T00:00:00Z") + 6 * 864e5);
+  }))) return false;
+  const ids = /* @__PURE__ */ new Set();
+  return snapshot.slots.every((slot) => {
+    if (!slot || typeof slot !== "object" || typeof slot.id !== "string" || !slot.id || slot.id.length > 200 || ids.has(slot.id) || !DAYS.includes(slot.day) || !PERIODS.includes(slot.period) || !isValidRoleSlug(slot.role) || typeof slot.label !== "string" || !slot.label.trim() || slot.label.length > 60 || typeof slot.required !== "boolean" || !Number.isInteger(slot.start) || !Number.isInteger(slot.end) || slot.start < 0 || slot.start >= 1440 || slot.end <= slot.start || slot.end > 2880 || slot.end > slot.start + 1440 || Object.keys(slot).some((key2) => !["id", "day", "period", "role", "label", "start", "end", "required"].includes(key2))) return false;
+    ids.add(slot.id);
+    return true;
+  }) && Object.keys(snapshot).every((key2) => ["version", "basis", "slots", "specialHours"].includes(key2));
+}
+__name(validScheduleSnapshot, "validScheduleSnapshot");
+
+// src/special-hours.ts
+async function readRecord(db, store, id) {
+  const row = await db.prepare("SELECT data_json,revision,created_at,updated_at,station_id,business_date FROM records WHERE store_id=? AND family='schedule' AND id=?").bind(store, id).first();
+  if (!row) return null;
+  return {
+    schemaVersion: 1,
+    family: "schedule",
+    id,
+    storeId: store,
+    ...row.station_id ? { stationId: row.station_id } : {},
+    context: { kind: "day", businessDate: businessDate(row.business_date) },
+    revision: row.revision,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    data: JSON.parse(row.data_json)
+  };
+}
+__name(readRecord, "readRecord");
+async function hoursEvent(db, store, date) {
+  const record = await readRecord(db, store, hoursRecordId(date));
+  if (record && !validHoursRecord(record, store)) throw new Error("Invalid hours record");
+  return record;
+}
+__name(hoursEvent, "hoursEvent");
+async function hoursRecords(db, store, start, end) {
+  const rows = await db.prepare("SELECT id FROM records WHERE store_id=? AND family='schedule' AND business_date>=? AND business_date<=? AND id LIKE 'hours-%' ORDER BY business_date,id LIMIT 100").bind(store, start, end).all();
+  const events = [], reviews = [];
+  for (const row of rows.results) {
+    const record = await readRecord(db, store, row.id);
+    if (validHoursRecord(record, store)) events.push(record);
+    else if (validReviewRecord(record, store)) reviews.push(record);
+    else throw new Error("Invalid hours record");
+  }
+  return { events, reviews };
+}
+__name(hoursRecords, "hoursRecords");
+async function saveHoursEvent(db, store, date, raw) {
+  const body = raw;
+  if (!body?.mutation || !validHoursData(body.mutation.data) || body.mutation.data.date !== date) {
+    return { ok: false, status: 400, body: apiError("validation_failed") };
+  }
+  return mutateRecord(
+    db,
+    {
+      storeId: store,
+      family: "schedule",
+      id: hoursRecordId(date),
+      context: { kind: "day", businessDate: businessDate(date) },
+      callerScope: "manager",
+      action: "edit-hours",
+      actor: { kind: "authenticated", subject: "manager" }
+    },
+    body.mutation,
+    (data) => validHoursData(data) && data.date === date ? [] : [{ path: "data", code: "invalid_hours" }]
+  );
+}
+__name(saveHoursEvent, "saveHoursEvent");
+async function saveHoursReview(db, store, station, date, raw) {
+  const body = raw;
+  if (!body?.mutation || !validHoursReview(body.mutation.data) || body.mutation.data.stationId !== station || STATION_STORES[station] !== store || body.mutation.data.date !== date || !Array.isArray(body.baseSlots) || body.baseSlots.length > 20 || !validScheduleSnapshot({ version: 1, basis: "published", slots: body.baseSlots }, body.baseSlots.length)) {
+    return { ok: false, status: 400, body: apiError("validation_failed") };
+  }
+  const base = body.baseSlots;
+  if (base.some((slot) => slot.day !== DAYS[(/* @__PURE__ */ new Date(date + "T00:00:00Z")).getUTCDay()]) || reviewedDaySlots(base, body.mutation.data) === null) {
+    return { ok: false, status: 400, body: apiError("validation_failed") };
+  }
+  const event = await hoursEvent(db, store, date);
+  const result = await mutateRecord(
+    db,
+    {
+      storeId: store,
+      family: "schedule",
+      id: hoursReviewId(station, date),
+      stationId: station,
+      context: { kind: "day", businessDate: businessDate(date) },
+      callerScope: "manager",
+      action: "review-hours",
+      actor: { kind: "authenticated", subject: "manager" }
+    },
+    body.mutation,
+    (data) => !event || event.revision !== data.eventRevision || canonicalJson(event.data) !== canonicalJson(data.event) ? [{ path: "eventRevision", code: "stale_event" }] : []
+  );
+  if (!result.ok && result.body.error.fields?.some((issue) => issue.code === "stale_event")) {
+    return { ok: false, status: 409, body: apiError("revision_conflict") };
+  }
+  return result;
+}
+__name(saveHoursReview, "saveHoursReview");
+
 // ../src/lib/schedule-share.ts
 function templateHashForSlots(slots) {
   let hash = 2166136261;
@@ -506,6 +701,15 @@ function layoutForWeek(saved, restaurantId, templateHash) {
   return { slots: match ?? layouts[0], matches: match !== void 0 };
 }
 __name(layoutForWeek, "layoutForWeek");
+function layoutForPublication(doc, saved, restaurantId) {
+  if (doc.snapshot !== void 0) {
+    const matches = validScheduleSnapshot(doc.snapshot, doc.week.slotPeople.length) && templateHashForSlots(doc.snapshot.slots) === doc.templateHash;
+    return { slots: matches ? doc.snapshot.slots : [], matches };
+  }
+  const layout = layoutForWeek(saved, restaurantId, doc.templateHash);
+  return { ...layout, matches: layout.matches && layout.slots.length === doc.week.slotPeople.length };
+}
+__name(layoutForPublication, "layoutForPublication");
 
 // ../src/lib/converter/published-hours.ts
 function weeksInPeriod(start, end) {
@@ -520,12 +724,15 @@ async function publishedHours(stationId, weekStart, raw, weekTemplate, globalTem
   if (!raw || typeof raw !== "object") return empty;
   const doc = raw;
   if (doc.v !== 3 || doc.weekStart !== weekStart || !Number.isSafeInteger(doc.rev) || doc.rev < 1 || typeof doc.updatedAt !== "string" || !Number.isFinite(Date.parse(doc.updatedAt)) || typeof doc.templateHash !== "string" || !doc.week || doc.week.weekStart !== weekStart || doc.week.version !== 1 || !Array.isArray(doc.week.people) || doc.week.people.length > 300 || !doc.week.people.every((p) => typeof p === "string" && p.length <= 120) || !Array.isArray(doc.week.slotPeople) || !doc.week.slotPeople.every((i) => Number.isInteger(i) && i >= -1 && i < doc.week.people.length)) return empty;
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalJson(doc))), fingerprint = Array.from(new Uint8Array(digest), (n) => n.toString(16).padStart(2, "0")).join("");
+  if (doc.snapshot !== void 0 && (!validScheduleSnapshot(doc.snapshot, doc.week.slotPeople.length, weekStart) || templateHashForSlots(doc.snapshot.slots) !== doc.templateHash)) return empty;
+  const { snapshot, ...legacyIdentity } = doc;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalJson(snapshot?.basis === "legacy-captured" ? legacyIdentity : doc))), fingerprint = Array.from(new Uint8Array(digest), (n) => n.toString(16).padStart(2, "0")).join("");
   const result = { ...empty, revision: doc.rev, updatedAt: doc.updatedAt, fingerprint: "sha256:" + fingerprint, status: doc.visible === false ? "hidden" : "published", people: doc.week.people.map((label2, index) => ({ key: `pub:${fingerprint}:${index}`, label: label2, index })) };
   if (doc.visible === false) return result;
-  const layout = layoutForWeek([weekTemplate, globalTemplate], stationId, doc.templateHash);
+  const layout = layoutForPublication({ snapshot: doc.snapshot, templateHash: doc.templateHash, week: { slotPeople: doc.week.slotPeople } }, [weekTemplate, globalTemplate], stationId);
   if (!layout.matches || doc.week.slotPeople.length !== layout.slots.length) return { ...result, status: "layout_unavailable" };
-  result.templateSource = weekTemplate && templateHashForSlots(expandTemplate(weekTemplate)) === doc.templateHash ? "current-week-rules" : globalTemplate && templateHashForSlots(expandTemplate(globalTemplate)) === doc.templateHash ? "current-station-rules" : "built-in-rules";
+  result.timingBasis = doc.snapshot?.basis === "published" ? "published-snapshot" : "legacy-estimate";
+  result.templateSource = doc.snapshot ? doc.snapshot.basis === "published" ? "published-snapshot" : "captured-legacy-rules" : weekTemplate && templateHashForSlots(expandTemplate(weekTemplate)) === doc.templateHash ? "current-week-rules" : globalTemplate && templateHashForSlots(expandTemplate(globalTemplate)) === doc.templateHash ? "current-station-rules" : "built-in-rules";
   const ruleDigest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalJson(layout.slots)));
   result.ruleFingerprint = "sha256:" + Array.from(new Uint8Array(ruleDigest), (n) => n.toString(16).padStart(2, "0")).join("");
   const assignments = [];
@@ -699,8 +906,328 @@ function isWorkbookOutput(value) {
 }
 __name(isWorkbookOutput, "isWorkbookOutput");
 
+// ../src/lib/internal-tools/i18n/planning.ts
+var planningEnglish = {
+  "planning.lockPlacement": "Lock assignment",
+  "planning.unlockPlacement": "Unlock assignment",
+  "planning.remove": "Remove from this shift",
+  "planning.removeHelp": "They won\u2019t be picked for this position on this shift. Auto-adjust fills the spot.",
+  "planning.removed": "Removed. They won\u2019t be picked for this position on this shift.",
+  "planning.excluded": "Not picked for this shift",
+  "planning.allow": "Allow again",
+  "planning.previousPosition": "Previous position",
+  "planning.assistant": "Scheduling assistant",
+  "planning.generating": "Making schedule\u2026",
+  "planning.layoutMismatch": "The saved week uses different shift rules. Review the rules before rebuilding this draft.",
+  "planning.reviewRules": "Review shift rules",
+  "planning.strategy": "How to build the week",
+  "planning.goal.balanced": "Balanced",
+  "planning.goal.fewestDoubles": "Fewest doubles",
+  "planning.goal.similarWeek": "Like last week",
+  "planning.goal.fairHours": "Similar hours for all",
+  "planning.restore": "Restore the generated week",
+  "planning.reset": "Start over",
+  "planning.resetConfirm": "Restore the starting setup and clear all draft weeks? You can undo.",
+  "planning.made": "Schedule created. Review the board, then publish when ready.",
+  "planning.unchanged": "The schedule is unchanged.",
+  "planning.generationFailed": "The schedule could not be made with these rules. Review staff availability and Messages in More actions.",
+  "planning.requestDraftKept": "Your unfinished request is still open. Finish or cancel it before starting another.",
+  "planning.problem.unknown_slot": "This spot no longer exists. Review the shift rules.",
+  "planning.problem.unknown_employee": "This employee is no longer on the staff list.",
+  "planning.problem.inactive_employee": "This employee is off the active staff list.",
+  "planning.problem.unqualified_employee": "This employee is not qualified for this position.",
+  "planning.problem.unavailable_employee": "This employee is unavailable for this shift.",
+  "planning.problem.overlapping_assignment": "This employee has overlapping assignments.",
+  "planning.problem.max_days_exceeded": "This employee exceeds their weekly day limit.",
+  "planning.problem.max_shifts_exceeded": "This employee exceeds their weekly shift limit.",
+  "planning.problem.max_hours_exceeded": "This employee exceeds their weekly hours limit.",
+  "planning.problem.prohibited_double": "This employee cannot work both shifts on one day.",
+  "planning.problem.max_doubles_exceeded": "This employee exceeds their weekly double-shift limit.",
+  "planning.problem.incompatible_pair": "These employees cannot work the same shift.",
+  "planning.problem.locked_assignment_changed": "A kept assignment changed. Review the placement.",
+  "planning.loading": "Loading the selected week\u2026",
+  "planning.title": "Schedule",
+  "planning.identity": "Manager workspace",
+  "planning.navigation": "Planning navigation",
+  "planning.schedule": "Schedule",
+  "planning.team": "Team",
+  "planning.review": "Review",
+  "planning.settings": "Staff & rules",
+  "planning.layout": "Layout",
+  "planning.current": "Current",
+  "planning.classic": "Classic",
+  "planning.workspace": "Planning workspace",
+  "planning.auto": "Auto-adjust",
+  "planning.autoHelp": "Keep your placements. Adjust the rest.",
+  "planning.adjust": "Adjust schedule",
+  "planning.make": "Make schedule",
+  "planning.publish": "Publish to staff",
+  "planning.undo": "Undo",
+  "planning.busy": "Adjusting the week\u2026",
+  "planning.covered": "{filled}/{required} required spots covered \xB7 {kept} kept",
+  "planning.more": "More actions",
+  "planning.print": "Print",
+  "planning.copy": "Copy last week",
+  "planning.clear": "Clear week",
+  "planning.clearConfirm": "Clear this week\u2019s assignments?",
+  "planning.cancel": "Cancel",
+  "planning.month": "Month & week visibility",
+  "planning.messages": "Messages",
+  "planning.close": "Close",
+  "planning.week": "The week",
+  "planning.scroll": "Scroll weekly schedule",
+  "planning.open": "Open",
+  "planning.optional": "Optional",
+  "planning.needs": "Needs coverage",
+  "planning.keep": "Keep",
+  "planning.adjusted": "Adjusted",
+  "planning.position": "Position",
+  "planning.hours": "Weekly hours",
+  "planning.shiftHours": "Shift hours",
+  "planning.roles": "Positions",
+  "planning.rule": "Shift rule",
+  "planning.doubles": "Doubles allowed",
+  "planning.noDoubles": "No doubles",
+  "planning.unavailable": "Unavailable",
+  "planning.place": "Place {name}",
+  "planning.moving": "Placing {name} \u2014 choose a destination.",
+  "planning.move": "Move {name}",
+  "planning.editPerson": "Edit person",
+  "planning.actions": "{name} actions",
+  "planning.assign": "Assign employee",
+  "planning.keepPlacement": "Keep this placement",
+  "planning.request": "Record callout / availability request",
+  "planning.requestHelp": "Requests affect scheduling after approval. Publishing is a separate action.",
+  "planning.editRules": "Edit employee rules",
+  "planning.choose": "Select a person or a spot.",
+  "planning.help": "Move a name into a spot. Your placement stays kept while the rest adjusts. You can also use Place and choose a destination.",
+  "planning.gaps": "{count} required spots open",
+  "planning.teamHelp": "Drag a person or choose Place.",
+  "planning.search": "Search staff",
+  "planning.reviewChanges": "Review {count} changes",
+  "planning.released": "Keep released",
+  "planning.hoursTotal": "{hours} scheduled hours",
+  "planning.hoursEach": "Hours for each person",
+  "planning.limit": "Search limit reached. Showing the best valid repair found; a better result may exist.",
+  "planning.ready": "Ready to plan. Changes remain in the draft until you publish.",
+  "planning.done": "Draft updated. Review the changes before publishing.",
+  "planning.failed": "Adjustment failed. Your previous board is preserved. Try again.",
+  "planning.approved": "Approved availability applied to the draft. Undo restores the board; the approval stays saved.",
+  "planning.external": "Availability changed. Review the affected spots and adjust the draft when ready.",
+  "planning.unknown": "That employee or spot is no longer available. Select it again.",
+  "planning.keptDestination": "Release Keep on the destination before replacing it.",
+  "planning.unqualified": "This employee is not qualified for this position.",
+  "planning.unavailablePlacement": "This employee is unavailable for this shift.",
+  "planning.keptConflict": "A kept assignment conflicts with availability or another rule. Review its Keep or employee rules first.",
+  "planning.empty": "Add employees in Staff & rules before making a schedule.",
+  "planning.rulesProblem": "Review shift rules before making or publishing a schedule.",
+  "planning.staffView": "View staff schedule",
+  "planning.internal": "Internal tools",
+  "planning.previous": "Previous week",
+  "planning.next": "Next week",
+  "planning.thisWeek": "This week",
+  "planning.status.live": "Staff see this week",
+  "planning.status.changed": "Unpublished changes",
+  "planning.status.hidden": "Hidden from staff",
+  "planning.status.draft": "Not published",
+  "planning.changesKept": "Keep changed",
+  "planning.atLimit": "{hours}h / {limit}h",
+  "planning.day": "Availability on selected date",
+  "planning.optionalOpen": "Open (optional)"
+};
+
+// ../src/lib/internal-tools/i18n/special-hours.ts
+var hoursEnglish = {
+  "hours.edit": "Hours for",
+  "hours.button": "Hours",
+  "hours.title": "Restaurant hours",
+  "hours.scope": "Applies to dining and kitchen at {store}. Each station is reviewed and published separately.",
+  "hours.normal": "Normal hours",
+  "hours.closed": "Closed all day",
+  "hours.early": "Close early",
+  "hours.closes": "Closes at {time}",
+  "hours.closedLabel": "Closed",
+  "hours.closeTime": "Customer closing time",
+  "hours.label": "Label (optional)",
+  "hours.preview": "Staffing preview",
+  "hours.noSpots": "No staffing spots on this date.",
+  "hours.finish": "Employee finish time",
+  "hours.cleanup": "Keep this shift for cleanup",
+  "hours.original": "Previously {time}",
+  "hours.remove": "Remove shift",
+  "hours.keep": "Keep",
+  "hours.unassigned": "Unassigned",
+  "hours.removed": "Assignments removed: {count}. Includes {kept} kept assignments. Other assignments are unchanged.",
+  "hours.apply": "Save hours & update this draft",
+  "hours.applying": "Saving\u2026",
+  "hours.cancel": "Cancel",
+  "hours.retry": "Retry same save",
+  "hours.reload": "Reload latest",
+  "hours.saved": "Hours saved. Review the draft and publish when ready.",
+  "hours.undo": "Undo restores this draft. Saved restaurant hours remain and may need review again.",
+  "hours.pending": "Restaurant hours need review before making, adjusting or publishing this week.",
+  "hours.review": "Review hours",
+  "hours.needsReview": "Needs review",
+  "hours.ready": "Ready to publish",
+  "hours.published": "Published",
+  "hours.dining": "Dining",
+  "hours.kitchen": "Kitchen",
+  "hours.partial": "Restaurant hours were saved. This station\u2019s staffing review is not confirmed; the draft has not changed.",
+  "hours.uncertain": "The save outcome is not confirmed. Retry the same save, or reload the latest records before changing these choices.",
+  "hours.conflict": "Restaurant hours or this station\u2019s review changed elsewhere. Reload the latest records and review your choices.",
+  "hours.unavailable": "Special hours could not be checked. Reload before making, adjusting or publishing a schedule.",
+  "hours.unconfigured": "Special hours are not available on this server yet.",
+  "hours.loading": "Checking restaurant hours\u2026",
+  "hours.locked": "Unlock this station\u2019s staff editing in Staff & rules before updating its hours review.",
+  "hours.invalid": "Choose a valid closing time and finish time for every affected shift.",
+  "hours.unauthorized": "Your access could not be confirmed. Reopen the scheduler with the current manager code.",
+  "hours.updated": "Draft updated for {date}. {removed}",
+  "hours.publishChanged": "Restaurant hours changed. Reload and review Hours before publishing.",
+  "hours.print": "Special restaurant hours",
+  "hours.allClosed": "The restaurant is closed every day this week."
+};
+
 // ../src/lib/internal-tools/i18n/en.ts
 var en = {
+  ...hoursEnglish,
+  "inventoryCount.date": "Count date",
+  "inventoryCount.save": "Save count",
+  "inventoryCount.clear": "Clear count",
+  "inventoryCount.clearConfirm": "Clear the counts and device-only skips on this screen? Saved server counts and other dates are unchanged.",
+  "inventoryCount.units": "Use the catalog notation shown on each row. Units and pack conversions are not inferred.",
+  "inventoryCount.editHelp": "Edit catalog names, suppliers and Use values. Saved counts remain attached to their item IDs. The current counting session keeps its captured catalog for review.",
+  "inventoryCount.deviceOnly": "Progress and skips are device-only. Save count shares the existing count/order fields; it does not share skips or mark the session complete.",
+  "inventoryCount.deviceFailed": "Some device copies could not be protected. Keep this page open and download current progress. Unreadable recovery bytes are preserved.",
+  "inventoryCount.deviceSaved": "Progress saved on this device.",
+  "inventoryCount.devicePending": "Progress is not yet protected on this device.",
+  "inventoryCount.progress": "Counting progress on this device",
+  "inventoryCount.entered": "Entered",
+  "inventoryCount.enough": "Enough",
+  "inventoryCount.skipped": "Skipped",
+  "inventoryCount.remaining": "Remaining",
+  "inventoryCount.total": "Total items",
+  "inventoryCount.recovery": "Original device recovery bytes",
+  "inventoryCount.currentCopy": "Current device progress",
+  "inventoryCount.downloadProgress": "Download current progress",
+  "inventoryCount.catalogChanged": "Catalog changed: review stable item IDs",
+  "inventoryCount.catalogSnapshot": "This count uses its captured catalog revision {revision}. Current catalog differences are listed below; names do not remap identities.",
+  "inventoryCount.orphans": "Unlisted saved item IDs to review",
+  "inventoryCount.showSuppliers": "Show suppliers",
+  "inventoryCount.supplierFilter": "Suppliers",
+  "inventoryCount.all": "All",
+  "inventoryCount.search": "Search items",
+  "inventoryCount.section": "Counting section",
+  "inventoryCount.allSections": "All catalog sections",
+  "inventoryCount.filter": "Show rows",
+  "inventoryCount.needsOrdering": "Needs ordering",
+  "inventoryCount.noRows": "No rows match these filters. Overall progress still includes the full captured catalog.",
+  "inventoryCount.previous": "Compare previous count dates",
+  "inventoryCount.loadingCatalog": "Loading the counting catalog\u2026",
+  "inventoryCount.orderList": "Order list",
+  "inventoryCount.noOrders": "Nothing to order yet.",
+  "inventoryCount.ordered": "Ordered",
+  "inventoryCount.copied": "Order list copied.",
+  "inventoryCount.copyFailed": "Could not copy. Select the list and copy it by hand.",
+  "inventoryCount.copy": "Copy order list",
+  "inventoryCount.account": "Account",
+  "inventoryCount.supplier": "Supplier",
+  "inventoryCount.noSupplier": "Not specified",
+  "inventoryCount.onHand": "On hand",
+  "inventoryCount.order": "Order",
+  "inventoryCount.orderOverride": "Order override",
+  "inventoryCount.suggested": "Existing suggestion",
+  "inventoryCount.skip": "Skip",
+  "inventoryCount.undoSkip": "Undo skip",
+  "inventoryCount.state.untouched": "Not counted",
+  "inventoryCount.state.zero": "Entered zero",
+  "inventoryCount.state.measured": "Measured quantity",
+  "inventoryCount.state.text": "Free-text count",
+  "inventoryCount.state.enough": "Enough",
+  "inventoryCount.state.skipped": "Skipped on this device",
+  "inventoryCount.saved": "Count fields saved for {date}. Progress and skips remain device-only.",
+  "inventoryCount.olderSaved": "Earlier count fields saved for {date}. Newer input remains on this device; progress and skips were not shared.",
+  "inventoryCount.savedHistoryFailed": "Count fields saved for {date}, but saved-day refresh failed. Current input and device-only progress are retained.",
+  "inventoryCount.catalogUnavailable": "The counting catalog is unavailable. Recovered values are retained. Retry loading the source catalog.",
+  "inventoryCount.retryLoad": "Retry source load",
+  "inventoryCount.recoveryNote": "These device bytes could not be read and were not replaced. Download the original source before repair.",
+  "inventoryCount.loadingDay": "Loading saved count fields before starting a new count\u2026",
+  "inventoryCount.dayUnavailable": "Saved count fields are unavailable. Retry before starting; recovered device work is retained.",
+  "inventoryCount.olderHistoryFailed": "Earlier count fields saved for {date}, but saved-day refresh failed. Newer input and device-only progress remain on this device.",
+  "inventoryCount.adopt": "Use reviewed catalog by item ID",
+  "inventoryCount.adoptConfirm": "Use the reviewed catalog for this device count? Existing IDs keep their counts, removed IDs stay available for review, and new items increase the total. The previous device snapshot will be archived first.",
+  "inventoryCount.retained": "Removed item IDs stay in their captured sections for review. Names never transfer a count to another item.",
+  "inventoryCount.archives": "Prior device catalog snapshots",
+  "inventoryCount.retainedId": "Retained from the captured catalog \xB7 ID: {id}",
+  "inventoryCount.saveBottom": "Save count fields",
+  "historyHub.open": "Open shared import history",
+  "historyHub.bounds": "Look up one exact sales date or one exact inclusive hours period. This service does not search across periods. Shared history contains reviewed values and output metadata; original uploads are unavailable.",
+  "historyHub.kind": "Import kind",
+  "historyHub.savedAt": "Saved {time}",
+  "historyHub.reprocessed": "Reprocessed from an earlier import. The earlier record is preserved.",
+  "historyHub.original": "Original import",
+  "historyHub.details": "Details",
+  "historyHub.loading": "Loading matching imports\u2026",
+  "historyHub.invalidLink": "Invalid history link. Choose a valid store, kind and exact date or inclusive period. No history was requested.",
+  "historyHub.choose": "Choose the exact date or inclusive period to load matching imports.",
+  "historyHub.displayed": "Displayed history: {store} \xB7 {start} \u2013 {end}",
+  "historyHub.stale": "Filters have changed. These records still belong to the displayed context. Load the new exact context to replace them.",
+  "historyHub.resumeConfirm": "Resume these reviewed values in the matching converter? Existing import work must first be protected as a device copy. Original uploads are not stored. Review is required again; shared source records remain unchanged.",
+  "historyHub.notReplaced": "The import was not replaced. If you did not cancel, prepare existing work with a preparer and save pending mappings before retrying. Existing work and records are retained.",
+  "historyHub.sourceControls": "Source selection and mappings",
+  "historyHub.coverage": "Source coverage",
+  "historyHub.exceptions": "Exceptions and coverage limits",
+  "historyHub.reportContext": "Displayed report: {start} \u2013 {end} \xB7 {stores}",
+  "historyHub.coverageStore": "{store}: {imports} included imports \xB7 {rows} included / {excluded} excluded rows \xB7 {publications} published snapshots",
+  "historyHub.quarantine": "{duplicates} duplicate and {overlaps} overlapping imports quarantined",
+  "historyHub.employeeDetails": "Employee totals by store and source evidence",
+  "historyHub.notices": "{count} source notices",
+  "hoursStages.files": "Files",
+  "hoursStages.review": "Review",
+  "hoursStages.report": "Report",
+  "hoursStages.label": "Hours import stages",
+  "hoursStages.continue": "Continue to Review",
+  "hoursStages.backFiles": "Back to Files",
+  "hoursStages.backReview": "Back to Review",
+  "hoursStages.accept": "Accept review and generate report",
+  "hoursStages.download": "Download workbook",
+  "hoursStages.downloadStarted": "Workbook download started.",
+  "hoursStages.generated": "Report generated. Download, device copies and shared saving have separate results.",
+  "hoursStages.copies": "Saved copies and history",
+  "hoursStages.employees": "Employee totals",
+  "hoursStages.queue": "Rows to review",
+  "hoursStages.all": "All issues",
+  "hoursStages.excluded": "Excluded rows",
+  "hoursStages.identity": "Missing identity",
+  "hoursStages.ambiguous": "Ambiguous names",
+  "hoursStages.unmatched": "Unmatched shared identities",
+  "hoursStages.unmatchedPolicy": "Unmatched shared identities with complete source IDs can still export. Missing or ambiguous export identities must be resolved. People are never matched by name.",
+  "hoursStages.details": "Source row details",
+  "hoursStages.mapping": "Review employee mappings",
+  "hoursStages.total": "Total hours",
+  "hoursStages.regular": "Regular hours",
+  "hoursStages.overtime": "Overtime hours",
+  "hoursStages.rows": "Source rows: {rows}",
+  "hoursStages.directoryLoading": "Loading employee directory\u2026",
+  "hoursStages.directorySaving": "Saving reviewed mappings\u2026",
+  "salesStages.aggregateNote": "Reconciliation totals are comparisons. Only the individual figures listed in Source files and workbook figures are copied to workbook cells.",
+  "salesStages.copies": "Saved copies and history",
+  "salesStages.download": "Download workbook",
+  "salesStages.downloadStarted": "Workbook download started.",
+  "salesStages.files": "Files",
+  "salesStages.review": "Review",
+  "salesStages.report": "Report",
+  "salesStages.label": "Sales import stages",
+  "salesStages.accept": "Accept review and generate report",
+  "salesStages.backFiles": "Back to Files",
+  "salesStages.backReview": "Back to Review",
+  "salesStages.details": "Details",
+  "salesStages.generated": "Report generated. Choose Download to start a download. Device copies and shared saving have separate results.",
+  "salesStages.restored": "Reviewed values restored. Original uploads are unavailable. Review these values again before generating a report.",
+  "salesStages.issueLink": "Review related figures",
+  "salesStages.contextLink": "Edit store or date in Files",
+  "salesStages.cashLink": "Review manual cash figures",
+  "salesStages.sourceDetails": "Source files and workbook figures",
+  ...planningEnglish,
   "cash.lookup.storageUncertain": "Could not save on this device. The frozen save attempt is still unresolved. Keep this page open and download your current draft before resolving storage.",
   "cash.lookup.unknownCounts": "The saved counts have no original Count/Amount entry status. Zero counts do not confirm that a denomination was entered.",
   "cash.lookup.readOnly": "Saved record \xB7 read-only. Choose Edit a copy to start a new device draft.",
@@ -757,6 +1284,9 @@ var en = {
   "cash.focus.history": "Saved days",
   "home.title": "Home",
   "home.context": "Choose a task",
+  "home.entryTitle": "Internal tools",
+  "home.entryInstructions": "Enter the manager code to open the internal tools.",
+  "home.entryOpen": "Open internal tools",
   "home.cash": "Cash count",
   "home.tasks": "Start a task",
   "reports.tools": "Imports and comparison reports",
@@ -2168,7 +2698,7 @@ async function readGoldenDoc(env, restaurant, weekStart) {
 __name(readGoldenDoc, "readGoldenDoc");
 function validateGoldenWeekBody(body) {
   if (!body || typeof body !== "object") return null;
-  const { week, visible, baseRev } = body;
+  const { week, visible, baseRev, snapshot, templateHash } = body;
   if (typeof baseRev !== "number" || !Number.isInteger(baseRev) || baseRev < 0) return null;
   if (!week || typeof week !== "object") return null;
   const candidate = week;
@@ -2191,6 +2721,7 @@ function validateGoldenWeekBody(body) {
     return null;
   }
   if (visible !== void 0 && typeof visible !== "boolean") return null;
+  if (snapshot !== void 0 && (!validScheduleSnapshot(snapshot, slotPeople.length, candidate.weekStart) || templateHashForSlots(snapshot.slots) !== templateHash)) return null;
   const nextVisible = visible === void 0 ? true : visible;
   return {
     week: {
@@ -2201,7 +2732,8 @@ function validateGoldenWeekBody(body) {
       slotPeople: [...slotPeople]
     },
     visible: nextVisible,
-    baseRev
+    baseRev,
+    ...snapshot !== void 0 ? { snapshot } : {}
   };
 }
 __name(validateGoldenWeekBody, "validateGoldenWeekBody");
@@ -2213,7 +2745,7 @@ function normalizeGoldenDoc(raw) {
   if (typeof doc.rev !== "number" || !Number.isInteger(doc.rev) || doc.rev < 1) return null;
   if (typeof doc.templateHash !== "string" || !HASH_RE.test(doc.templateHash)) return null;
   if (typeof doc.updatedAt !== "string") return null;
-  const week = validateGoldenWeekBody({ week: doc.week, baseRev: doc.rev });
+  const week = validateGoldenWeekBody({ week: doc.week, baseRev: doc.rev, snapshot: doc.snapshot, templateHash: doc.templateHash });
   if (!week) return null;
   if (week.week.weekStart !== doc.weekStart) return null;
   return {
@@ -2223,10 +2755,131 @@ function normalizeGoldenDoc(raw) {
     week: week.week,
     visible: doc.visible !== false,
     templateHash: doc.templateHash,
-    updatedAt: doc.updatedAt
+    updatedAt: doc.updatedAt,
+    ...week.snapshot ? { snapshot: week.snapshot } : {}
   };
 }
 __name(normalizeGoldenDoc, "normalizeGoldenDoc");
+async function preservedSnapshotKey(restaurant, weekStart, raw) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `r:${restaurant}:publication-layout:${weekStart}:${hash}`;
+}
+__name(preservedSnapshotKey, "preservedSnapshotKey");
+async function preservedSnapshot(env, restaurant, doc, raw) {
+  const saved = await env.SCHEDULES.get(await preservedSnapshotKey(restaurant, doc.weekStart, raw));
+  if (saved === null) return null;
+  const snapshot = safeParse(saved);
+  if (!validScheduleSnapshot(snapshot, doc.week.slotPeople.length) || templateHashForSlots(snapshot.slots) !== doc.templateHash) throw new Error("invalid_preserved_layout");
+  return snapshot;
+}
+__name(preservedSnapshot, "preservedSnapshot");
+async function publicationWithSnapshot(env, restaurant, doc, raw) {
+  if (doc.snapshot) return doc;
+  const saved = await preservedSnapshot(env, restaurant, doc, raw);
+  if (saved) return { ...doc, snapshot: saved };
+  const weekRaw = await env.SCHEDULES.get(templateKeyForWeek(restaurant, doc.weekStart));
+  const globalRaw = await readTemplateRaw(env, restaurant);
+  const week = weekRaw ? normalizeTemplateDoc(safeParse(weekRaw)) : null;
+  const global = globalRaw ? normalizeTemplateDoc(safeParse(globalRaw)) : null;
+  const layout = layoutForPublication(doc, [
+    week?.template,
+    global?.template
+  ], restaurant);
+  if (!layout.matches) return doc;
+  const snapshot = buildScheduleSnapshot(layout.slots, "legacy-captured");
+  return validScheduleSnapshot(snapshot, doc.week.slotPeople.length) ? { ...doc, snapshot } : doc;
+}
+__name(publicationWithSnapshot, "publicationWithSnapshot");
+async function preservePublication(env, restaurant, weekStart) {
+  const raw = await readGoldenDoc(env, restaurant, weekStart);
+  if (!raw) return null;
+  const doc = normalizeGoldenDoc(safeParse(raw));
+  if (!doc) throw new Error("publication_layout_unavailable");
+  if (doc.snapshot) return doc;
+  const pinned = await publicationWithSnapshot(env, restaurant, doc, raw);
+  if (!pinned.snapshot) throw new Error("publication_layout_unavailable");
+  await env.SCHEDULES.put(await preservedSnapshotKey(restaurant, weekStart, raw), JSON.stringify(pinned.snapshot), { expirationTtl: DOC_TTL_SECONDS });
+  if (await readGoldenDoc(env, restaurant, weekStart) !== raw) throw new Error("publication_changed");
+  return pinned;
+}
+__name(preservePublication, "preservePublication");
+async function reportPublication(env, restaurant, raw) {
+  if (!raw) return null;
+  const parsed = safeParse(raw);
+  const doc = normalizeGoldenDoc(parsed);
+  if (!doc || doc.snapshot) return parsed;
+  const snapshot = await preservedSnapshot(env, restaurant, doc, raw);
+  return snapshot ? { ...parsed, snapshot } : parsed;
+}
+__name(reportPublication, "reportPublication");
+async function preservePublicationsBeforeRules(env, restaurant, weekStart) {
+  if (weekStart) return preservePublication(env, restaurant, weekStart);
+  const dates = /* @__PURE__ */ new Set();
+  for (const prefix of [`r:${restaurant}:golden:`, ...restaurant === DEFAULT_RESTAURANT ? ["golden:"] : []]) {
+    let cursor;
+    do {
+      const page = await env.SCHEDULES.list({ prefix, cursor });
+      for (const key2 of page.keys) {
+        const suffix = key2.name.slice(prefix.length);
+        if (WEEK_RE.test(suffix)) dates.add(suffix);
+      }
+      cursor = page.list_complete ? void 0 : page.cursor;
+      if (!page.list_complete && !cursor) throw new Error("publication_list_incomplete");
+    } while (cursor);
+  }
+  for (const date of dates) await preservePublication(env, restaurant, date);
+  return null;
+}
+__name(preservePublicationsBeforeRules, "preservePublicationsBeforeRules");
+function weekForHoursDate(date) {
+  const ms = Date.parse(date + "T00:00:00Z");
+  return new Date(ms - new Date(ms).getUTCDay() * 864e5).toISOString().slice(0, 10);
+}
+__name(weekForHoursDate, "weekForHoursDate");
+async function normalHoursTemplate(env, station, week) {
+  const raw = await env.SCHEDULES.get(templateKeyForWeek(station, week)) ?? await readTemplateRaw(env, station);
+  if (raw === null) return defaultTemplateForRestaurant(station);
+  const doc = normalizeTemplateDoc(safeParse(raw));
+  if (!doc) throw new Error("Invalid staffing rules");
+  return doc.template;
+}
+__name(normalHoursTemplate, "normalHoursTemplate");
+async function specialHoursPage(env, store, start, end) {
+  const data = await hoursRecords(env.INTERNAL_DB, store, start, end);
+  const stations = [];
+  for (const event of data.events) for (const station of RESTAURANTS.filter((s) => STATION_STORES[s] === store)) {
+    const week = weekForHoursDate(event.data.date);
+    const raw = await readGoldenDoc(env, station, week);
+    const published = raw ? normalizeGoldenDoc(safeParse(raw)) : null;
+    let baseFingerprint = null;
+    try {
+      baseFingerprint = hoursBaseFingerprint(expandTemplate(await normalHoursTemplate(env, station, week), week).filter((slot) => slot.date === event.data.date));
+    } catch {
+    }
+    stations.push({
+      stationId: station,
+      date: event.data.date,
+      baseFingerprint,
+      visible: published?.visible ?? false,
+      published: published?.snapshot?.specialHours?.find((day) => day.date === event.data.date) ?? null
+    });
+  }
+  return { version: 1, storeId: store, start, end, ...data, stations };
+}
+__name(specialHoursPage, "specialHoursPage");
+async function checkSpecialHoursPublication(env, station, week, snapshot) {
+  if (!env.INTERNAL_DB) return snapshot?.specialHours?.length || await env.SCHEDULES.get(`r:${STATION_STORES[station]}:special-hours:active`) ? "unconfigured" : null;
+  const end = shiftGoldenDate(week, 6);
+  const data = await hoursRecords(env.INTERNAL_DB, STATION_STORES[station], week, end);
+  if (!data.events.length) return snapshot?.specialHours?.length ? "changed" : null;
+  if (!snapshot || snapshot.basis !== "published") return "changed";
+  const base = expandTemplate(await normalHoursTemplate(env, station, week), week);
+  const resolved = resolveSpecialHours(base, data.events, data.reviews, station);
+  if (resolved.pending.length || canonicalJson(snapshot.specialHours ?? []) !== canonicalJson(resolved.days) || hoursBaseFingerprint(snapshot.slots) !== hoursBaseFingerprint(resolved.slots)) return "changed";
+  return null;
+}
+__name(checkSpecialHoursPublication, "checkSpecialHoursPublication");
 var GOLDEN_DAY_MS = 24 * 60 * 60 * 1e3;
 function goldenWeeksForMonth(monthKey) {
   if (!MONTH_RE.test(monthKey)) return [];
@@ -2267,9 +2920,9 @@ async function readRosterRaw(env, restaurant) {
 }
 __name(readRosterRaw, "readRosterRaw");
 var ROSTER_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-var ROLE_SLUG_RE = /^[a-z0-9-]{1,40}$/;
+var ROLE_SLUG_RE2 = /^[a-z0-9-]{1,40}$/;
 function isValidRole(value) {
-  return typeof value === "string" && ROLE_SLUG_RE.test(value);
+  return typeof value === "string" && ROLE_SLUG_RE2.test(value);
 }
 __name(isValidRole, "isValidRole");
 var MAX_EMPLOYEES = 100;
@@ -2818,7 +3471,7 @@ var index_default = {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
     if (request.method === "GET" && (path === "/" || path === "/api/health")) {
-      return json({ ok: true }, 200, request, env);
+      return json({ ok: true, scheduleSnapshotVersion: 1, specialHoursVersion: env.INTERNAL_DB ? 1 : 0 }, 200, request, env);
     }
     if (request.method === "GET" && path === "/api/auth/verify") {
       if (goldenWriteError(env)) return json({ error: "write_not_configured" }, 503, request, env);
@@ -2827,6 +3480,38 @@ var index_default = {
       }
       if (!isGoldenWriteAuthorized(request, env)) return json({ error: "unauthorized" }, 401, request, env);
       return json({ ok: true }, 200, request, env);
+    }
+    const hoursMatch = path.match(/^\/api\/internal\/special-hours\/([^/]+)(?:\/(\d{4}-\d{2}-\d{2})(?:\/review\/([^/]+))?)?$/);
+    if (hoursMatch && (request.method === "GET" || request.method === "PUT")) {
+      const denied = await managerAuthError(request, env);
+      if (denied) return denied;
+      const [, store, date, station] = hoursMatch;
+      if (!isStoreId(store) || date && !businessDate(date) || station && (!isStationId(station) || STATION_STORES[station] !== store)) {
+        return json({ schemaVersion: 1, error: { code: "validation_failed" } }, 400, request, env);
+      }
+      const noStore = { "Cache-Control": "no-store" };
+      if (!env.INTERNAL_DB) {
+        const active = await env.SCHEDULES.get(`r:${store}:special-hours:active`);
+        return json({ schemaVersion: 1, error: { code: active ? "unavailable" : "backend_unconfigured" } }, 503, request, env, noStore);
+      }
+      try {
+        if (request.method === "GET" && !date) {
+          const start = url.searchParams.get("start") ?? "", end = url.searchParams.get("end") ?? "";
+          if (!businessDate(start) || !businessDate(end) || end < start || Date.parse(end) - Date.parse(start) > 30 * 864e5) {
+            return json({ schemaVersion: 1, error: { code: "validation_failed" } }, 400, request, env, noStore);
+          }
+          return json(await specialHoursPage(env, store, start, end), 200, request, env, noStore);
+        }
+        if (request.method !== "PUT" || !date) return json({ error: "method_not_allowed" }, 405, request, env, noStore);
+        if (!await checkWriteThrottle(env, clientIp(request))) return json({ error: "rate_limited" }, 429, request, env, noStore);
+        const body = await readBody(request, 1e5);
+        const activationKey = `r:${store}:special-hours:active`;
+        if (!await env.SCHEDULES.get(activationKey)) await env.SCHEDULES.put(activationKey, "1");
+        const result = station ? await saveHoursReview(env.INTERNAL_DB, store, station, date, body) : await saveHoursEvent(env.INTERNAL_DB, store, date, body);
+        return result.ok ? json({ record: result.record }, 200, request, env, noStore) : json(result.body, result.status, request, env, noStore);
+      } catch {
+        return json({ schemaVersion: 1, error: { code: "unavailable" } }, 503, request, env, noStore);
+      }
     }
     const requestsMatch = path.match(/^\/api\/internal\/schedule-requests\/([^/]+)$/);
     if (requestsMatch && (request.method === "GET" || request.method === "PUT")) {
@@ -2862,7 +3547,7 @@ var index_default = {
           const [raw, weekRaw, globalRaw] = await Promise.all([readGoldenDoc(env, station, week), env.SCHEDULES.get(templateKeyForWeek(station, week)), readTemplateRaw(env, station)]);
           const weekDoc = weekRaw ? normalizeTemplateDoc(safeParse(weekRaw)) : null;
           const globalDoc = globalRaw ? normalizeTemplateDoc(safeParse(globalRaw)) : null;
-          return publishedHours(station, week, raw ? safeParse(raw) ?? {} : null, weekDoc?.template ?? null, globalDoc?.template ?? null);
+          return publishedHours(station, week, await reportPublication(env, station, raw), weekDoc?.template ?? null, globalDoc?.template ?? null);
         })));
         return json({ version: 1, storeId: store, start, end, publications }, 200, request, env, { "Cache-Control": "no-store" });
       } catch {
@@ -3229,8 +3914,11 @@ var index_default = {
           continue;
         }
         const doc = normalizeGoldenDoc(parsed);
+        if (!doc && parsed && typeof parsed === "object" && "snapshot" in parsed) {
+          return json({ error: "invalid_publication" }, 503, request, env, { "Cache-Control": "no-store" });
+        }
         if (!doc || !doc.visible) continue;
-        weeks.push(doc);
+        weeks.push(await publicationWithSnapshot(env, restaurant, doc, raw));
       }
       weeks.sort((a, b) => a.weekStart.localeCompare(b.weekStart));
       return json({ weeks, rev, notModified: false }, 200, request, env, { "Cache-Control": "no-store" });
@@ -3251,10 +3939,13 @@ var index_default = {
           return json({ error: "not_found" }, 404, request, env);
         }
         const doc = normalizeGoldenDoc(parsed);
+        if (!doc && parsed && typeof parsed === "object" && "snapshot" in parsed) {
+          return json({ error: "invalid_publication" }, 503, request, env, { "Cache-Control": "no-store" });
+        }
         if (!doc) return json({ error: "not_found" }, 404, request, env);
-        return new Response(JSON.stringify(doc), {
+        return new Response(JSON.stringify(await publicationWithSnapshot(env, restaurant, doc, raw)), {
           status: 200,
-          headers: { "Content-Type": "application/json", ...corsHeaders(request, env) }
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders(request, env) }
         });
       }
       if (request.method === "PUT") {
@@ -3266,7 +3957,7 @@ var index_default = {
         let templateHash = null;
         let body;
         try {
-          body = await readBody(request);
+          body = await readBody(request, 2e5);
         } catch {
           return json({ error: "body_too_large" }, 413, request, env);
         }
@@ -3278,6 +3969,12 @@ var index_default = {
         if (!valid || !templateHash || valid.week.weekStart !== weekStart) {
           return json({ error: "invalid_body" }, 400, request, env);
         }
+        try {
+          const hoursError = await checkSpecialHoursPublication(env, restaurant, weekStart, valid.snapshot);
+          if (hoursError) return json({ error: hoursError === "changed" ? "special_hours_changed" : "special_hours_unconfigured" }, hoursError === "changed" ? 409 : 503, request, env);
+        } catch {
+          return json({ error: "special_hours_unavailable" }, 503, request, env);
+        }
         const existing = await readGoldenDoc(env, restaurant, weekStart);
         if (!existing) {
           if (valid.baseRev !== 0) return json({ error: "conflict", rev: 0 }, 409, request, env);
@@ -3288,7 +3985,8 @@ var index_default = {
             week: valid.week,
             visible: valid.visible,
             templateHash,
-            updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+            updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+            ...valid.snapshot ? { snapshot: valid.snapshot } : {}
           };
           await env.SCHEDULES.put(key2, JSON.stringify(next2), { expirationTtl: DOC_TTL_SECONDS });
           await bumpGoldenMonthRevs(env, weekStart, restaurant);
@@ -3302,8 +4000,12 @@ var index_default = {
         }
         const current = normalizeGoldenDoc(parsed);
         if (!current) return json({ error: "not_found" }, 404, request, env);
+        if (current.snapshot?.specialHours?.length && !env.INTERNAL_DB) return json({ error: "special_hours_unavailable" }, 503, request, env);
         if (valid.baseRev !== current.rev) {
           return json({ error: "conflict", rev: current.rev, updatedAt: current.updatedAt }, 409, request, env);
+        }
+        if (!valid.snapshot && (current.snapshot || await preservedSnapshot(env, restaurant, current, existing))) {
+          return json({ error: "snapshot_required" }, 400, request, env);
         }
         const next = {
           ...current,
@@ -3311,7 +4013,8 @@ var index_default = {
           visible: valid.visible,
           templateHash,
           rev: current.rev + 1,
-          updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+          updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          ...valid.snapshot ? { snapshot: valid.snapshot } : {}
         };
         await env.SCHEDULES.put(key2, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
         await bumpGoldenMonthRevs(env, weekStart, restaurant);
@@ -3541,6 +4244,12 @@ var index_default = {
         if (valid.baseRev !== currentRev) {
           return json({ error: "conflict", rev: currentRev, updatedAt: currentUpdatedAt }, 409, request, env);
         }
+        let preservedPublication;
+        try {
+          preservedPublication = await preservePublicationsBeforeRules(env, restaurant, weekStart);
+        } catch {
+          return json({ error: "publication_preservation_failed" }, 409, request, env);
+        }
         const next = {
           v: 1,
           rev: currentRev + 1,
@@ -3548,7 +4257,11 @@ var index_default = {
           updatedAt: (/* @__PURE__ */ new Date()).toISOString()
         };
         await env.SCHEDULES.put(targetKey, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
-        return json({ rev: next.rev, updatedAt: next.updatedAt }, currentRev === 0 ? 201 : 200, request, env);
+        return json({
+          rev: next.rev,
+          updatedAt: next.updatedAt,
+          ...preservedPublication ? { preservedPublication } : {}
+        }, currentRev === 0 ? 201 : 200, request, env);
       }
     }
     const weekMatch = path.match(/^\/api\/weeks\/([A-Za-z0-9_-]+)$/);

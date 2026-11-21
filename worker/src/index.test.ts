@@ -24,6 +24,11 @@ import handler, {
 } from './index'
 import { DIGITAL_FORM_TYPES, emptyDigitalForm, type DigitalFormDoc } from '../../src/lib/digital-forms'
 import { DENOMINATIONS, dayTotals } from '../../src/lib/cashout'
+import { expandTemplate } from '../../src/lib/scheduler/data'
+import { templateHashForSlots } from '../../src/lib/schedule-share'
+import { buildScheduleSnapshot } from '../../src/lib/schedule-snapshot'
+import type { WeeklyStaffingTemplate } from '../../src/lib/scheduler/types'
+import { publishedHours } from '../../src/lib/converter/published-hours'
 
 function mockEnv(token = 'manager-token', staffPassword?: string) {
   const data = new Map<string, string>()
@@ -779,6 +784,152 @@ test('templates are isolated per week and fall back to the global seed', async (
 
   const bad = await handler.fetch(new Request('https://api.test/api/template?weekStart=bad'), env)
   assert.equal(bad.status, 400)
+})
+
+function publicationFixture(snapshot = true) {
+  const template = templatePayload() as WeeklyStaffingTemplate
+  const slots = expandTemplate(template)
+  return { template, body: { week: goldenPayload({ slotPeople: [0] }), templateHash: templateHashForSlots(slots),
+    baseRev: 0, visible: true, ...(snapshot ? { snapshot: buildScheduleSnapshot(slots) } : {}) } }
+}
+
+function weekTemplatePut(template: WeeklyStaffingTemplate, baseRev: number, token = 'manager-token', station = 'CR3-diningroom') {
+  return new Request(`https://api.test/api/template?restaurant=${station}&weekStart=2026-09-13`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ template, baseRev }),
+  })
+}
+
+test('saved rules and a failed publish cannot change snapshot times; republishing can', async () => {
+  const env = mockEnv()
+  const { template, body } = publicationFixture()
+  assert.equal((await handler.fetch(weekTemplatePut(template, 0), env)).status, 201)
+  assert.equal((await handler.fetch(goldenPut('2026-09-13', body), env)).status, 201)
+  const changed = structuredClone(template)
+  changed.Sunday[0].end = 1140
+  assert.equal((await handler.fetch(weekTemplatePut(changed, 1), env)).status, 200)
+  const read = async () => (await handler.fetch(new Request('https://api.test/api/schedule/2026-09-13'), env)).json() as Promise<{ snapshot: ReturnType<typeof buildScheduleSnapshot>; rev: number }>
+  assert.equal((await read()).snapshot.slots[0].end, 960)
+  const updated = { ...body, snapshot: buildScheduleSnapshot(expandTemplate(changed)) }
+  assert.equal((await handler.fetch(goldenPut('2026-09-13', updated), env)).status, 409)
+  assert.equal((await read()).snapshot.slots[0].end, 960)
+  assert.equal((await handler.fetch(goldenPut('2026-09-13', { ...updated, baseRev: 1 }), env)).status, 200)
+  assert.equal((await read()).snapshot.slots[0].end, 1140)
+  assert.equal((await read()).rev, 2)
+})
+
+test('legacy times are pinned before editing rules without changing publication or employee mapping identity', async () => {
+  const env = mockEnv()
+  const { template, body } = publicationFixture(false)
+  await handler.fetch(weekTemplatePut(template, 0), env)
+  await handler.fetch(goldenPut('2026-09-13', body), env)
+  const key = 'r:CR3-diningroom:golden:2026-09-13'
+  const original = JSON.parse((await env.SCHEDULES.get(key))!)
+  const before = await publishedHours('CR3-diningroom', '2026-09-13', original, template, null)
+  const changed = structuredClone(template)
+  changed.Sunday[0].end = 1140
+  const response = await handler.fetch(weekTemplatePut(changed, 1), env)
+  assert.equal(response.status, 200)
+  const saved = await response.json() as { preservedPublication: typeof original }
+  assert.equal(saved.preservedPublication.snapshot.basis, 'legacy-captured')
+  assert.deepEqual(JSON.parse((await env.SCHEDULES.get(key))!), original, 'capture must not rewrite the published record')
+  const pinned = await (await handler.fetch(new Request('https://api.test/api/schedule/2026-09-13'), env)).json() as typeof original
+  assert.equal(pinned.rev, original.rev)
+  assert.equal(pinned.updatedAt, original.updatedAt)
+  const after = await publishedHours('CR3-diningroom', '2026-09-13', pinned, changed, null)
+  assert.equal(after.assignments[0].end, 960)
+  assert.deepEqual(after.people, before.people)
+  assert.equal(after.fingerprint, before.fingerprint)
+  assert.equal(after.timingBasis, 'legacy-estimate')
+  const report = await handler.fetch(new Request('https://api.test/api/internal/import-schedules/CR3?start=2026-09-13&end=2026-09-19', {
+    headers: { Authorization: 'Bearer manager-token' },
+  }), env)
+  assert.equal(report.status, 200)
+  const page = await report.json() as { publications: typeof after[] }
+  const projection = page.publications.find(item => item.stationId === 'CR3-diningroom')!
+  assert.deepEqual(projection.people, before.people)
+  assert.equal(projection.assignments[0].end, 960)
+})
+
+test('legacy global fallbacks are preserved across paginated rules saves, including old default keys', async () => {
+  const env = mockEnv()
+  const { template, body } = publicationFixture(false)
+  await handler.fetch(templatePut({ template, baseRev: 0 }), env)
+  await handler.fetch(goldenPut('2026-09-13', body), env)
+  const legacy = { v: 3, weekStart: '2026-09-20', rev: 1, week: { ...body.week, weekStart: '2026-09-20' },
+    templateHash: body.templateHash, visible: true, updatedAt: '2026-09-21T00:00:00.000Z' }
+  await env.SCHEDULES.put('golden:2026-09-20', JSON.stringify(legacy))
+  const changed = structuredClone(template)
+  changed.Sunday = []
+  assert.equal((await handler.fetch(templatePut({ template: changed, baseRev: 1 }), env)).status, 200)
+  for (const date of ['2026-09-13', '2026-09-20']) {
+    const raw = await (await handler.fetch(new Request(`https://api.test/api/schedule/${date}`), env)).json() as { snapshot: ReturnType<typeof buildScheduleSnapshot> }
+    assert.equal(raw.snapshot.slots[0].end, 960)
+  }
+})
+
+test('failed legacy preservation leaves rules untouched; kitchen save authorization is preserved', async () => {
+  const env = mockEnv('manager-token', 'crew-token')
+  const { template, body } = publicationFixture(false)
+  await handler.fetch(weekTemplatePut(template, 0), env)
+  await handler.fetch(goldenPut('2026-09-13', { ...body, templateHash: '00000000' }), env)
+  const prior = await env.SCHEDULES.get(templateKeyForWeek('CR3-diningroom', '2026-09-13'))
+  assert.equal((await handler.fetch(weekTemplatePut(template, 1), env)).status, 409)
+  assert.equal(await env.SCHEDULES.get(templateKeyForWeek('CR3-diningroom', '2026-09-13')), prior)
+  assert.equal((await handler.fetch(weekTemplatePut(template, 0, 'wrong-token', 'CR3-kitchen'), env)).status, 401)
+  assert.equal((await handler.fetch(weekTemplatePut(template, 0, 'crew-token', 'CR3-kitchen'), env)).status, 201)
+  assert.equal((await handler.fetch(weekTemplatePut(template, 1, 'manager-token', 'CR3-kitchen'), env)).status, 200)
+})
+
+test('unknown snapshots and snapshot downgrades are refused without modifying the publication', async () => {
+  const env = mockEnv()
+  const { body } = publicationFixture()
+  assert.equal((await handler.fetch(goldenPut('2026-09-13', { ...body, snapshot: { ...body.snapshot, version: 2 } }), env)).status, 400)
+  assert.equal((await handler.fetch(goldenPut('2026-09-13', body), env)).status, 201)
+  const key = 'r:CR3-diningroom:golden:2026-09-13'
+  const prior = await env.SCHEDULES.get(key)
+  const { snapshot, ...legacy } = body
+  assert.equal((await handler.fetch(goldenPut('2026-09-13', { ...legacy, baseRev: 1 }), env)).status, 400)
+  assert.equal(await env.SCHEDULES.get(key), prior)
+  await env.SCHEDULES.put(key, JSON.stringify({ ...JSON.parse(prior!), snapshot: { version: 99, slots: [] } }))
+  assert.equal((await handler.fetch(new Request('https://api.test/api/schedule/2026-09-13'), env)).status, 503)
+  assert.equal((await handler.fetch(new Request('https://api.test/api/schedule?month=2026-09'), env)).status, 503)
+})
+
+test('a failed snapshot write prevents the rules overwrite', async () => {
+  const env = mockEnv()
+  const { template, body } = publicationFixture(false)
+  await handler.fetch(weekTemplatePut(template, 0), env)
+  await handler.fetch(goldenPut('2026-09-13', body), env)
+  const put = env.SCHEDULES.put.bind(env.SCHEDULES)
+  env.SCHEDULES.put = async (key, value, options) => {
+    if (key.includes(':publication-layout:2026-09-13:')) throw new Error('Synthetic storage failure')
+    return put(key, value, options)
+  }
+  const prior = await env.SCHEDULES.get(templateKeyForWeek('CR3-diningroom', '2026-09-13'))
+  const changed = structuredClone(template)
+  changed.Sunday = []
+  const response = await handler.fetch(weekTemplatePut(changed, 1), env)
+  assert.equal(response.status, 409)
+  assert.equal(await env.SCHEDULES.get(templateKeyForWeek('CR3-diningroom', '2026-09-13')), prior)
+})
+
+test('legacy capture does not overwrite an intervening publication and stops the rules save', async () => {
+  const env = mockEnv()
+  const { template, body } = publicationFixture(false)
+  await handler.fetch(weekTemplatePut(template, 0), env)
+  await handler.fetch(goldenPut('2026-09-13', body), env)
+  const key = 'r:CR3-diningroom:golden:2026-09-13'
+  const original = JSON.parse((await env.SCHEDULES.get(key))!)
+  const put = env.SCHEDULES.put.bind(env.SCHEDULES)
+  env.SCHEDULES.put = async (target, value, options) => {
+    if (target.includes(':publication-layout:')) await put(key, JSON.stringify({ ...original, rev: 2, week: { ...original.week, name: 'Other manager' } }))
+    return put(target, value, options)
+  }
+  const changed = structuredClone(template)
+  changed.Sunday = []
+  assert.equal((await handler.fetch(weekTemplatePut(changed, 1), env)).status, 409)
+  assert.equal(JSON.parse((await env.SCHEDULES.get(key))!).week.name, 'Other manager')
+  assert.equal(JSON.parse((await env.SCHEDULES.get(templateKeyForWeek('CR3-diningroom', '2026-09-13')))!).rev, 1)
 })
 
 test('schedule-only stations refuse roster and global template writes', async () => {

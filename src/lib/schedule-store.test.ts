@@ -9,6 +9,10 @@ import {
   saveGoldenWeek,
   verifyWriteToken,
 } from './schedule-store'
+import { saveTemplate } from './template-store'
+import { seedTemplate, expandTemplate } from './scheduler/data'
+import { buildScheduleSnapshot } from './schedule-snapshot'
+import { templateHashForSlots } from './schedule-share'
 
 function mockFetchOnce(handler: (url: string, init?: RequestInit) => { status: number; payload: unknown }) {
   const original = globalThis.fetch
@@ -257,4 +261,46 @@ test('verifyWriteToken sends the bearer code and maps statuses', async () => {
   } finally {
     restore()
   }
+})
+
+test('older servers are detected before snapshot publication or dependent rule writes', async () => {
+  const calls: string[] = []
+  const restore = mockFetchOnce((url, init) => {
+    calls.push(url)
+    assert.notEqual(init?.method, 'PUT', 'unsupported server must receive no writes')
+    return { status: 200, payload: { ok: true } }
+  })
+  try {
+    const slots = expandTemplate(seedTemplate)
+    await assert.rejects(() => saveGoldenWeek(goldenWeek.weekStart, { week: goldenWeek,
+      templateHash: templateHashForSlots(slots), snapshot: buildScheduleSnapshot(slots), visible: true, baseRev: 0 }, 'manager-token'), StoreUnavailableError)
+    await assert.rejects(() => saveTemplate(seedTemplate, 0, 'manager-token', 'CR3-diningroom', goldenWeek.weekStart), StoreUnavailableError)
+    assert.equal(calls.length, 2)
+    assert.ok(calls.every(url => url.endsWith('/api/health')))
+  } finally { restore() }
+})
+
+test('snapshot publications travel intact after checking server support', async () => {
+  const slots = expandTemplate(seedTemplate)
+  const snapshot = buildScheduleSnapshot(slots)
+  const week = { ...goldenWeek, slotPeople: slots.map(() => -1) }
+  const restore = mockFetchOnce((url, init) => {
+    if (url.endsWith('/api/health')) return { status: 200, payload: { scheduleSnapshotVersion: 1 } }
+    assert.equal(init?.method, 'PUT')
+    assert.deepEqual(JSON.parse(init!.body as string).snapshot, snapshot)
+    return { status: 201, payload: { rev: 1 } }
+  })
+  try {
+    assert.equal((await saveGoldenWeek(week.weekStart, { week, snapshot, templateHash: templateHashForSlots(slots), visible: true, baseRev: 0 }, 'manager-token')).rev, 1)
+  } finally { restore() }
+})
+
+test('malformed snapshots cannot be silently omitted from single or month reads', async () => {
+  const doc = { v: 3, weekStart: goldenWeek.weekStart, week: goldenWeek, rev: 1,
+    templateHash: 'a1b2', visible: true, updatedAt: 'x', snapshot: { version: 2, slots: [] } }
+  const restore = mockFetchOnce(url => ({ status: 200, payload: url.includes('?month=') ? { weeks: [doc], rev: 1 } : doc }))
+  try {
+    await assert.rejects(() => fetchGoldenWeek(goldenWeek.weekStart), StoreUnavailableError)
+    await assert.rejects(() => fetchGoldenMonth('2026-09'), StoreUnavailableError)
+  } finally { restore() }
 })

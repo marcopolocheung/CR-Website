@@ -1,0 +1,38 @@
+
+> chinarose@0.0.2 scheduler:requests:worker:test
+> node --test worker/src/schedule-requests.test.mjs
+
+TAP version 13
+# Subtest: atomic create/review keeps originals and replays historical success after later revisions
+ok 1 - atomic create/review keeps originals and replays historical success after later revisions
+  ---
+  duration_ms: 7904.061036
+  type: 'test'
+  ...
+# Subtest: concurrent reviewers produce one decision and a recoverable conflict without losing the request
+ok 2 - concurrent reviewers produce one decision and a recoverable conflict without losing the request
+  ---
+  duration_ms: 13693.687673
+  type: 'test'
+  ...
+# Subtest: approvals serialize overlapping requests, preserve recurring/staff KV and reject rewritten originals
+ok 3 - approvals serialize overlapping requests, preserve recurring/staff KV and reject rewritten originals
+  ---
+  duration_ms: 9879.890442
+  type: 'test'
+  ...
+# Subtest: authorized routes distinguish absent capability, private empty data, invalid stations and bounded bodies
+ok 4 - authorized routes distinguish absent capability, private empty data, invalid stations and bounded bodies
+  ---
+  duration_ms: 5384.462116
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 37748.873468

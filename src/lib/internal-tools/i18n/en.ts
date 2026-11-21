@@ -1,5 +1,7 @@
 import { planningEnglish } from './planning'
+import { hoursEnglish } from './special-hours'
 const en = {
+  ...hoursEnglish,
   "inventoryCount.date": "Count date",
   "inventoryCount.save": "Save count",
   "inventoryCount.clear": "Clear count",

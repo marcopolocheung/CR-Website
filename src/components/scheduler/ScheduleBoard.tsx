@@ -15,6 +15,10 @@ import {
 import { DragState, DropFeedback, MovePreview, ShiftKey, SpotStatus, periodLabels, reviewLabel, roleChipClass, roleInitial, roleLabel, shiftStatus, shortTimeRange, slotBadge, spotStatus, statusMeta, unassignableReason } from './helpers'
 import { Icon } from './ui'
 import { RoleIcon } from './RoleBadge'
+import { DayHoursControl } from './SpecialHours'
+import { dateForDay } from '@/lib/scheduler/week'
+import type { SpecialHoursData } from '@/lib/scheduler/special-hours'
+import type { Locale } from '@/lib/internal-tools/contracts'
 export function WeeklyScheduleBoard({
   slots,
   weekStart,
@@ -42,6 +46,7 @@ export function WeeklyScheduleBoard({
   onActivateSlot,
   roles,
   showLegend = true,
+  hoursDays=[],hoursPending=[],hoursDisabled=false,hoursLocale='en',onEditHours,
 }: {
   slots: StaffingSlot[]
   weekStart: string
@@ -69,6 +74,11 @@ export function WeeklyScheduleBoard({
   onActivateSlot: (slotId: string) => void
   roles: string[]
   showLegend?: boolean
+  hoursDays?:SpecialHoursData[]
+  hoursPending?:string[]
+  hoursDisabled?:boolean
+  hoursLocale?:Locale
+  onEditHours?:(date:string)=>void
 }) {
   return (
     <div className="mt-4 min-w-0">
@@ -95,6 +105,8 @@ export function WeeklyScheduleBoard({
                   {filled}/{daySlots.length}
                 </span>
               </h3>
+              {onEditHours&&weekStart&&<DayHoursControl date={dateForDay(weekStart,day)} event={hoursDays.find(e=>e.date===dateForDay(weekStart,day))} locale={hoursLocale}
+                pending={hoursPending.includes(dateForDay(weekStart,day))} disabled={hoursDisabled} onEdit={()=>onEditHours(dateForDay(weekStart,day))}/>}
               {PERIODS.map((period) => {
                 const shiftKey = `${day}-${period}` as ShiftKey
                 const shiftSlots = slots.filter((slot) => slot.day === day && slot.period === period)

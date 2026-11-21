@@ -1,3 +1,6 @@
+import { validScheduleSnapshot, type ScheduleSnapshot } from './schedule-snapshot'
+import { templateHashForSlots } from './schedule-share'
+
 export const DEFAULT_SCHEDULE_API = 'https://chinarose-schedule-api.crbrucecheung.workers.dev'
 
 export function getScheduleApiBase(): string {
@@ -47,9 +50,10 @@ export type GoldenWeekDoc = {
   visible: boolean
   templateHash: string
   updatedAt: string
+  snapshot?: ScheduleSnapshot
 }
 
-function isGoldenWeekDoc(body: unknown): body is GoldenWeekDoc {
+export function isGoldenWeekDoc(body: unknown): body is GoldenWeekDoc {
   if (!body || typeof body !== 'object') return false
   const doc = body as Record<string, unknown>
   const week = doc.week as Record<string, unknown> | undefined
@@ -62,7 +66,9 @@ function isGoldenWeekDoc(body: unknown): body is GoldenWeekDoc {
     typeof week.weekStart === 'string' &&
     typeof week.name === 'string' &&
     Array.isArray(week.people) &&
-    Array.isArray(week.slotPeople)
+    Array.isArray(week.slotPeople) &&
+    (doc.snapshot === undefined || (validScheduleSnapshot(doc.snapshot, week.slotPeople.length, doc.weekStart as string)
+      && templateHashForSlots(doc.snapshot.slots) === doc.templateHash))
   )
 }
 
@@ -96,7 +102,10 @@ export async function fetchGoldenMonth(month: string, knownRev = 0, restaurantId
     const { weeks, rev, notModified } = body as { weeks: unknown; rev: unknown; notModified: unknown }
     if (Array.isArray(weeks)) {
       return {
-        weeks: notModified === true ? [] : weeks.filter(isGoldenWeekDoc),
+        weeks: notModified === true ? [] : weeks.map(week => {
+          if (!isGoldenWeekDoc(week)) throw new StoreUnavailableError('A published schedule could not be read safely.')
+          return week
+        }),
         rev: typeof rev === 'number' ? rev : 0,
         notModified: notModified === true,
       }
@@ -107,10 +116,11 @@ export async function fetchGoldenMonth(month: string, knownRev = 0, restaurantId
 
 export async function saveGoldenWeek(
   weekStart: string,
-  input: { week: GoldenWeekPayload; templateHash: string; visible: boolean; baseRev: number },
+  input: { week: GoldenWeekPayload; templateHash: string; visible: boolean; baseRev: number; snapshot?: ScheduleSnapshot },
   token: string,
   restaurantId?: string,
 ): Promise<{ rev: number; updatedAt: string | null }> {
+  if (input.snapshot) await requireScheduleSnapshots()
   const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
   const { status, body } = await requestJson(`/api/schedule/${weekStart}${suffix}`, {
     method: 'PUT',
@@ -126,6 +136,7 @@ export async function saveGoldenWeek(
     )
   }
   if (status === 409) {
+    if ((body as {error?:string}|null)?.error==='special_hours_changed') throw new StoreRejectedError('Restaurant hours changed. Reload and review Hours before publishing.')
     const rev = body && typeof body === 'object' && 'rev' in body ? (body as { rev: unknown }).rev : 0
     throw new StoreConflictError(typeof rev === 'number' ? rev : 0)
   }
@@ -134,6 +145,15 @@ export async function saveGoldenWeek(
     if (typeof rev === 'number') return { rev, updatedAt: typeof updatedAt === 'string' ? updatedAt : null }
   }
   throw new StoreUnavailableError()
+}
+
+/** Check before any dependent write: older Workers silently discard unknown fields. */
+export async function requireScheduleSnapshots(): Promise<void> {
+  const { status, body } = await requestJson('/api/health')
+  if (status !== 200 || !body || typeof body !== 'object' || !('scheduleSnapshotVersion' in body)
+    || body.scheduleSnapshotVersion !== 1) {
+    throw new StoreUnavailableError('The schedule server needs an update before these changes can be saved.')
+  }
 }
 
 /**

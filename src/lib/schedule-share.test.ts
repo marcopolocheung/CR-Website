@@ -3,6 +3,8 @@ import test from 'node:test'
 import {
   SHARE_VERSION,
   layoutForWeek,
+  layoutForPublication,
+  publishedWeekFingerprint,
   assignmentsFromPublishedWeek,
   templateHashForSlots,
   type PublishedWeek,
@@ -11,6 +13,7 @@ import {
 import { defaultTemplateForRestaurant, expandTemplate, seedTemplate } from './scheduler/data'
 import { seedEmployees } from './scheduler/seed-crews'
 import { generateSchedule } from './scheduler/solver'
+import { buildScheduleSnapshot, validScheduleSnapshot } from './schedule-snapshot'
 
 
 const week: PublishedWeek = {
@@ -146,4 +149,42 @@ test('a week published with its own saved rules is read with those rules', () =>
   const published = templateHashForSlots(expandTemplate(custom, '2026-10-11'))
   assert.equal(layoutForWeek([custom], 'CR3-diningroom', published).matches, true)
   assert.equal(layoutForWeek([null], 'CR3-diningroom', published).matches, false)
+})
+
+test('publication snapshots pin times and index order independently of changed rules', () => {
+  const original = expandTemplate(seedTemplate, '2026-11-22')
+  const snapshot = buildScheduleSnapshot(original)
+  const doc = { snapshot, templateHash: templateHashForSlots(original), week: { slotPeople: original.map(() => -1) } }
+  const changed = structuredClone(seedTemplate)
+  changed.Thursday = []
+  changed.Wednesday = changed.Wednesday.map(slot => ({ ...slot, end: Math.min(slot.end, 1140) }))
+  const layout = layoutForPublication(doc, [changed], 'CR3-diningroom')
+  assert.equal(layout.matches, true)
+  assert.deepEqual(layout.slots.map(slot => slot.id), original.map(slot => slot.id))
+  assert.equal(layout.slots[0].end, original[0].end)
+  assert.ok(layout.slots.every(slot => !('date' in slot)))
+  original[0].end -= 60
+  assert.notEqual(snapshot.slots[0].end, original[0].end, 'snapshot does not share mutable slot objects')
+})
+
+test('time-only edits change the publication fingerprint without changing slot identity', () => {
+  const slots = expandTemplate(seedTemplate)
+  const before = buildScheduleSnapshot(slots)
+  const after = buildScheduleSnapshot(slots.map((slot, index) => index === 0 ? { ...slot, end: slot.end - 60 } : slot))
+  assert.equal(templateHashForSlots(before.slots), templateHashForSlots(after.slots))
+  assert.notEqual(publishedWeekFingerprint(week, before), publishedWeekFingerprint(week, after))
+  assert.equal(publishedWeekFingerprint(week, before), publishedWeekFingerprint(week, { ...before, basis: 'legacy-captured' }))
+})
+
+test('invalid or unknown snapshots fail closed even when normal rules match', () => {
+  const slots = expandTemplate(seedTemplate)
+  const valid = buildScheduleSnapshot(slots)
+  const doc = { snapshot: valid, templateHash: templateHashForSlots(slots), week: { slotPeople: slots.map(() => -1) } }
+  assert.equal(validScheduleSnapshot(valid, slots.length), true)
+  for (const snapshot of [null, { ...valid, version: 2 }, { ...valid, slots: valid.slots.slice(1) },
+    { ...valid, slots: valid.slots.map((s, index) => index === 1 ? { ...s, id: valid.slots[0].id } : s) },
+    { ...valid, slots: valid.slots.map((s, index) => index === 0 ? { ...s, end: s.start } : s) }]) {
+    assert.equal(validScheduleSnapshot(snapshot, slots.length), false)
+    assert.deepEqual(layoutForPublication({ ...doc, snapshot: snapshot as typeof valid }, [seedTemplate]), { slots: [], matches: false })
+  }
 })

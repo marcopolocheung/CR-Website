@@ -34,7 +34,12 @@ import { fetchRoster, rosterFingerprint, saveRoster } from '@/lib/employee-store
 import { fetchStaff, saveStaff, staffFingerprint, undoStaff, verifyStaffPassword, type StaffWriteResult } from '@/lib/staff-store'
 import { fetchTemplate, saveTemplate, templateFingerprint } from '@/lib/template-store'
 import { fetchGoldenMonth, fetchGoldenWeek, saveErrorMessage, type GoldenWeekDoc } from '@/lib/schedule-store'
-import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForWeek, publishedWeekFingerprint, templateHashForSlots } from '@/lib/schedule-share'
+import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForPublication, publishedWeekFingerprint } from '@/lib/schedule-share'
+import { buildScheduleSnapshot } from '@/lib/schedule-snapshot'
+import { businessDate } from '@/lib/internal-tools/contracts'
+import { resolveSpecialHours, type DraftHoursReviews, type HoursReviewRecord, type SpecialHoursRecord } from '@/lib/scheduler/special-hours'
+import { useSpecialHours } from './useSpecialHours'
+import SpecialHoursDialog, { HoursBanner, HoursStationStatus, HoursSummary as SpecialHoursSummary } from './SpecialHours'
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
 import { useManagerCode } from './DemoGate'
 import { DEFAULT_STATION, isStationId, type Locale } from '@/lib/internal-tools/contracts'
@@ -231,6 +236,18 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const managerCode = useManagerCode()
   const requestStation = isStationId(restaurantId) ? restaurantId : DEFAULT_STATION
   const requestSource = useScheduleRequests(requestStation, managerCode)
+  const hoursSource = useSpecialHours(requestStation, weekStart, managerCode)
+  const [hoursDraftReviews, setHoursDraftReviews] = useState<Record<string,DraftHoursReviews>>({})
+  const [hoursDate,setHoursDate] = useState<string|null>(null)
+  const [hoursDirty,setHoursDirty] = useState(false)
+  const hoursScope=useRef('')
+  hoursScope.current=`${requestStation}:${weekStart}`
+  useEffect(()=>{
+    if(hoursSource.phase!=='ready'||!hoursSource.page)return
+    const page=hoursSource.page
+    setHoursDraftReviews(old=>old[weekStart]!==undefined?old:{...old,[weekStart]:Object.fromEntries(page.events.map(event=>[
+      event.data.date,page.reviews.find(r=>r.data.stationId===requestStation&&r.data.date===event.data.date)??null]))})
+  },[hoursSource.phase,hoursSource.page,weekStart,requestStation])
   const [requestLocale, setRequestLocale] = useState<Locale>('en')
   const [requestDirty, setRequestDirty] = useState(false)
   useEffect(() => { try { if (localStorage.getItem(LOCALE_STORAGE_KEY) === 'es') setRequestLocale('es') } catch { /* optional preference */ } }, [])
@@ -270,7 +287,16 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setGeneratedWeeks((current) => ({ ...current, [weekStart]: next }))
   }
 
-  const slots = useMemo(() => expandTemplate(template, weekStart || undefined), [template, weekStart])
+  const baseSlots = useMemo(() => expandTemplate(template, weekStart || undefined), [template, weekStart])
+  const activeHoursReviews=useMemo(()=>{
+    if(hoursDraftReviews[weekStart]!==undefined)return Object.values(hoursDraftReviews[weekStart]).filter((r):r is HoursReviewRecord=>r!==null)
+    return hoursSource.page?.reviews.filter(r=>r.data.stationId===requestStation)??[]
+  },[hoursDraftReviews,weekStart,hoursSource.page,requestStation])
+  const resolvedHours=useMemo(()=>resolveSpecialHours(baseSlots,hoursSource.page?.events??[],activeHoursReviews,requestStation),[baseSlots,hoursSource.page,activeHoursReviews,requestStation])
+  const slots=resolvedHours.slots
+  const hoursBlocked=hoursSource.phase==='loading'||hoursSource.phase==='failed'||hoursSource.phase==='uncertain'||resolvedHours.pending.length>0
+  const canPublishEmpty=slots.length===0&&resolvedHours.days.length===7&&resolvedHours.days.every(day=>day.mode==='closed')&&!hoursBlocked
+  const hoursSnapshot=useMemo(()=>buildScheduleSnapshot(slots,'published',resolvedHours.days),[slots,resolvedHours.days])
   // Scheduling checks see approved requests as dated overrides; the saved staff list never stores them.
   const scheduleEmployees = useMemo(
     () => withApprovedRequests(employees, requestSource.record?.data, weekStart),
@@ -280,14 +306,14 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const ruleProblems = useMemo(() => templateProblems(template), [template])
   const t = (key: string) => translate(requestLocale, key)
   const draftContext = JSON.stringify([restaurantId, weekStart, layout, tab, employees, template, assignments,
-    exclusions, requestSource.record?.revision])
+    exclusions, requestSource.record?.revision, hoursSource.page?.events, activeHoursReviews, slots])
   const currentDraftContext = useRef(draftContext)
   currentDraftContext.current = draftContext
   const adjustment = useDraftAdjustment({
     input: { employees: scheduleEmployees, slots, assignments, exclusions },
     contextKey: `${draftContext}:${isGenerating}`, scope: `${restaurantId}:${weekStart}`,
     disabled: layout !== 'workspace' || !weekStart || !rosterLoaded || !templateLoaded || !!rosterLoadError || !!templateLoadError ||
-      isGenerating || !!staffLoadError || ruleProblems.length > 0,
+      isGenerating || !!staffLoadError || ruleProblems.length > 0 || hoursBlocked,
     onCommit: (next, nextExclusions) => { commitSchedule('draft before adjustment', next); setExclusions([...nextExclusions]) },
   })
   useEffect(() => {
@@ -395,7 +421,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const activeEmployeeCount = employees.filter((employee) => employee.active).length
   const keptCount = assignments.filter((assignment) => assignment.locked && assignment.employeeId).length
   // Only empty required spots block printing — warnings the fix panel lets you skip never do.
-  const schedulePassing = assignments.length > 0 && !violations.some((violation) => violation.code === 'missing_assignment')
+  const schedulePassing = (assignments.length > 0 || canPublishEmpty) && !violations.some((violation) => violation.code === 'missing_assignment')
   const publishedDoc = weekStart ? publishedWeeks[weekStart] : undefined
   const currentPublishState: PublishState | null =
     publishedDoc === undefined
@@ -404,8 +430,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           published: publishedDoc,
           fingerprintOnScreen: publishedWeekFingerprint(
             buildPublishedWeek({ weekStart, name: '', slots, employees, assignments }),
+            hoursSnapshot,
           ),
-          publishedFingerprint: publishedDoc ? publishedWeekFingerprint(publishedDoc.week) : null,
+          publishedFingerprint: publishedDoc ? publishedWeekFingerprint(publishedDoc.week, publishedDoc.snapshot) : null,
           visibleOnScreen: weekVisibility === 'on',
         })
   const otherWeeksWithEdits = Object.keys(weeks).filter(
@@ -415,9 +442,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const currentWeekUnpublished =
     Boolean(weekStart) &&
     (assignmentFingerprint(assignments) !== (publishedBaselines[weekStart] ?? '') ||
+      currentPublishState === 'changed' ||
       Boolean(publishedDoc && publishedDoc.visible !== (weekVisibility === 'on')))
   const hasUnsavedWork =
-    currentWeekUnpublished || otherWeeksWithEdits.length > 0 || rosterDirty || templateDirty || staffDirty || requestDirty
+    currentWeekUnpublished || otherWeeksWithEdits.length > 0 || rosterDirty || templateDirty || staffDirty || requestDirty || hoursDirty
   const selectedRoles = availableRoles.filter((role) => draft.roles[role])
   const canAddEmployee = draft.name.trim().length > 0 && (selectedRoles.length > 0 || draft.newHire)
 
@@ -431,7 +459,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     // The date has to wait for the browser: this page is prerendered,
     // so reading it during render would not match the HTML that shipped.
     // Drafts live only in memory now; the Worker store is the source of truth.
-    const start = currentWeekStart()
+    const query=new URLSearchParams(window.location.search),requested=query.get('week')??''
+    const start = businessDate(requested)&&new Date(requested+'T00:00:00Z').getUTCDay()===0?requested:currentWeekStart()
+    const requestedHours=query.get('hoursDate')??''
+    if(businessDate(requestedHours)&&requestedHours>=start&&requestedHours<=dateForDay(start,'Saturday'))setHoursDate(requestedHours)
     setWeekStart(start)
     setMonthKey(monthKeyForWeek(start))
     setOnboardingDismissed(readOnboardingDismissed())
@@ -440,6 +471,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
   useEffect(() => {
     setRosters({})
+    setHoursDraftReviews({})
     setRosterRevs({})
     setRosterSnapshots({})
     setRosterUpdatedAts({})
@@ -656,19 +688,22 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }, [weekStart, restaurantId])
 
   useEffect(() => {
-    if (!weekStart || !rosterLoaded || !templateLoaded || hydratedWeeks[weekStart]) return
+    if (!weekStart || !rosterLoaded || !templateLoaded || hoursSource.phase==='loading' || hydratedWeeks[weekStart]) return
     const doc = publishedWeeks[weekStart]
     if (doc === undefined || doc === null) return
     if ((weeks[weekStart]?.length ?? 0) > 0) {
       setHydratedWeeks((current) => ({ ...current, [weekStart]: true }))
       return
     }
-    if (templateHashForSlots(slots) !== doc.templateHash) {
+    const layout = layoutForPublication(doc, [template], restaurantId)
+    if (!layout.matches) {
       setHydratedWeeks((current) => ({ ...current, [weekStart]: true }))
       setLayoutMismatchWeeks((current) => ({ ...current, [weekStart]: true }))
       return
     }
-    const hydrated = assignmentsFromPublishedWeek({ slots, employees, published: doc.week })
+    const currentIds = new Set(slots.map(slot => slot.id))
+    const hydrated = assignmentsFromPublishedWeek({ slots: layout.slots, employees, published: doc.week })
+      .filter(assignment => currentIds.has(assignment.slotId))
     setPublishedBaselines((current) => ({ ...current, [weekStart]: assignmentFingerprint(hydrated) }))
     setWeeks((current) => (current[weekStart] ? current : { ...current, [weekStart]: hydrated }))
     setGeneratedWeeks((current) =>
@@ -678,7 +713,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     if (hydrated.length > 0) {
       setDiagnostics((current) => [...current, 'Loaded the published week from the server.'])
     }
-  }, [weekStart, restaurantId, rosterLoaded, templateLoaded, publishedWeeks, hydratedWeeks, slots, employees, weeks])
+  }, [weekStart, restaurantId, rosterLoaded, templateLoaded, publishedWeeks, hydratedWeeks, slots, employees, weeks, hoursSource.phase])
 
   useEffect(() => {
     if (!monthKey) return
@@ -791,6 +826,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       setTemplateRevs((current) => (current[nextWeekStart] !== undefined ? current : { ...current, [nextWeekStart]: 0 }))
     }
     setWeekStart(nextWeekStart)
+    setHoursDate(null)
     setMonthKey(monthKeyForWeek(nextWeekStart))
     setDiagnostics([])
     setLastReport(null)
@@ -836,7 +872,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     const doc = await fetchGoldenWeek(prior, restaurantId)
     if (!doc) return []
     const savedRules = templates[prior] ?? (await fetchTemplate(restaurantId, prior).then((found) => found.template))
-    const { slots: priorSlots, matches } = layoutForWeek([savedRules], restaurantId, doc.templateHash)
+    const { slots: priorSlots, matches } = layoutForPublication(doc, [savedRules], restaurantId)
     if (!matches) return []
     const priorAssignments = assignmentsFromPublishedWeek({ slots: priorSlots, employees, published: doc.week })
     // Only spots that still exist this week can be copied.
@@ -893,6 +929,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         generatedWeeks: cloneWeeks(generatedWeeks),
         weekStatus: { ...weekStatus },
         diagnostics: [...diagnostics],
+        hoursReviews: {...(hoursDraftReviews[weekStart]??Object.fromEntries(activeHoursReviews.map(r=>[r.data.date,r])))},
       },
       // shortcut: 30 snapshots of every week in memory, fine for a manager's session; trim if weeks pile up.
       ...current.slice(0, UNDO_LIMIT - 1),
@@ -911,6 +948,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       setRosters((current) => ({ ...current, [target]: cloneEmployeeList(snapshot.employees) }))
     }
     if (target) setTemplates((current) => ({ ...current, [target]: cloneTemplate(snapshot.template) }))
+    if (target) setHoursDraftReviews(current=>({...current,[target]:snapshot.hoursReviews??{}}))
     setWeeks(cloneWeeks(snapshot.weeks))
     setExclusions([...snapshot.exclusions])
     setGeneratedWeeks(cloneWeeks(snapshot.generatedWeeks))
@@ -1029,7 +1067,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   async function generate(variant: ScheduleVariant = selectedVariant) {
-    if (isGenerating || adjustment.busy) return
+    if (isGenerating || adjustment.busy || hoursBlocked) return
     adjustment.clearReport()
     const job = generationJobs.current.begin(draftContext)
     setSelectedVariant(variant)
@@ -1053,7 +1091,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     }
     try {
       const result = generateSchedule(
-        { employees: scheduleEmployees, template, weekStart },
+        { employees: scheduleEmployees, template, weekStart, slots },
         {
           strategy: variant,
           referenceAssignments: previousAssignments,
@@ -1217,6 +1255,27 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setLastReport(null)
     setAssignments(cloneAssignmentList(next))
     setIgnoredIssueIds([])
+  }
+
+  function openHours(date:string) {
+    if(adjustment.busy||isGenerating||hoursSource.phase!=='ready'||storeLoading||storeOffline)return
+    setHoursDraftReviews(old=>({...old,[weekStart]:{...(old[weekStart]??Object.fromEntries(activeHoursReviews.map(r=>[r.data.date,r]))),
+      [date]:activeHoursReviews.find(r=>r.data.date===date)??null}}))
+    setHoursDate(date)
+  }
+  function applyHours(event:SpecialHoursRecord,review:HoursReviewRecord) {
+    if(hoursScope.current!==`${review.data.stationId}:${weekStart}`)return
+    adjustment.cancel();generationJobs.current.cancel();setIsGenerating(false)
+    remember('updated restaurant hours')
+    const nextReviews=activeHoursReviews.filter(r=>r.data.date!==event.data.date).concat(review)
+    const events=(hoursSource.page?.events??[]).filter(e=>e.data.date!==event.data.date).concat(event)
+    const next=resolveSpecialHours(baseSlots,events,nextReviews,requestStation)
+    const ids=new Set(next.slots.map(slot=>slot.id)),removed=assignments.filter(a=>!ids.has(a.slotId))
+    setHoursDraftReviews(old=>({...old,[weekStart]:{...(old[weekStart]??{}),[event.data.date]:review}}))
+    setAssignments(assignments.filter(a=>ids.has(a.slotId)))
+    setWeekStatus(old=>old[weekStart]?old:{...old,[weekStart]:'on'})
+    setDiagnostics([translate(requestLocale,'hours.updated',{date:event.data.date,removed:translate(requestLocale,'hours.removed',{count:removed.length,kept:removed.filter(a=>a.locked).length})}),t('hours.undo')])
+    setSetupNotice(t('hours.saved'))
   }
 
   function placeInWorkspace(placement: Placement) {
@@ -1434,6 +1493,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         // CR3 Kitchen rules are the password holder's to change; publishing a week still saves them with the manager code.
         const result = await saveTemplate(template, templateRev, scheduleOnly && staffPassword ? staffPassword : managerCode, restaurantId, target)
         setTemplateSaved(target, result.rev, result.updatedAt, templateFingerprint(template))
+        if (result.preservedPublication) {
+          const publication = result.preservedPublication
+          setPublishedWeeks(current => ({ ...current, [target]: publication }))
+        }
       }
       return true
     } catch (caught) {
@@ -1502,8 +1565,22 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       locale={requestLocale} onLocaleChange={setRequestLocale} onDirtyChange={setRequestDirty} prefill={requestPrefill} hideLanguage={layout === 'workspace'}
       onApproved={request => setPendingApproval({ request, week: weekStart, layout })} />
   )
+  // Ordinary weeks retain the legacy assistant wire shape. Dated-hours weeks
+  // require the compatible assistant that validates the reviewed effective layout.
+  const agentHoursContext=hoursSource.page?.events.length?{
+    hoursFingerprint:JSON.stringify([hoursSource.page.events.map(e=>[e.data.date,e.revision]),activeHoursReviews.map(r=>[r.data.date,r.revision,r.data.eventRevision])]),
+    effectiveSlots:slots.map(slot=>({...slot,date:slot.date??dateForDay(weekStart,slot.day)})),
+  }:{}
 
   const scheduleWorkspace: ScheduleWorkspaceProps = {
+    hoursDays:hoursSource.page?.events.map(e=>e.data)??[],
+    publishedHours:resolvedHours.days,
+    hoursPending:resolvedHours.pending,
+    hoursDisabled:hoursSource.phase!=='ready'||isGenerating||adjustment.busy||storeLoading||storeOffline,
+    hoursBlocked,
+    canPublishEmpty,
+    hoursLocale:requestLocale,
+    onEditHours:openHours,
     weekStart,
     assignments,
     slots,
@@ -1519,7 +1596,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     changedSlotIds,
     highlightedSlotIds,
     roles: availableRoles,
-    storeLoading,
+    storeLoading:storeLoading||hoursBlocked,
     ruleProblemCount: ruleProblems.length,
     publishState: currentPublishState,
     schedulePassing,
@@ -1554,7 +1631,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     requestsPanel: null,
     onMake: () => void generate(),
     onVariantChange: setSelectedVariant,
-    onPublish: () => setSharing(true),
+    onPublish: () => {if(!hoursBlocked)setSharing(true)},
     onUndo: undoLastChange,
     onChooseEmployee: fixNextIssue,
     onPickEmployee: chooseForIssue,
@@ -1736,6 +1813,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       </header>
 
       <main className="mx-auto w-full max-w-none min-w-0 space-y-4 overflow-x-clip px-4 py-5">
+        <div className="print:hidden"><HoursBanner source={hoursSource} pending={resolvedHours.pending} locale={requestLocale} onReview={openHours}/></div>
+        {hoursSource.phase==='ready'&&hoursSource.page&&hoursSource.page.events.length>0&&<div className="print:hidden"><HoursStationStatus page={hoursSource.page} week={weekStart} station={requestStation} base={baseSlots} reviews={activeHoursReviews} locale={requestLocale} onReview={openHours}/></div>}
+        <div className="hidden print:block"><SpecialHoursSummary days={resolvedHours.days} locale={requestLocale}/></div>
           {storeLoading && (
             <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">
               <h2 className="text-sm font-semibold text-zinc-900">Loading your saved schedule…</h2>
@@ -1774,7 +1854,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           )}
 
           {tab === 'schedule' && sharing && weekStart && ruleProblems.length === 0 && (
-            <fieldset disabled={adjustment.busy || isGenerating}><PublishPanel
+            <fieldset disabled={adjustment.busy || isGenerating || hoursBlocked}><PublishPanel
+              snapshot={hoursSnapshot}
+              canPublishEmpty={canPublishEmpty}
               weekStart={weekStart}
               weekLabel={formatWeekRange(weekStart)}
               slots={slots}
@@ -1793,6 +1875,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
                 setPublishedBaselines((current) => ({ ...current, [weekStart]: assignmentFingerprint(assignments) }))
                 setLiveMonthWeeks((current) => ({ ...current, [weekStart]: doc.visible }))
                 setLayoutMismatchWeeks((current) => ({ ...current, [weekStart]: false }))
+                void hoursSource.reload()
               }}
             /></fieldset>
           )}
@@ -1856,7 +1939,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               onClick={() => void generate()}
               icon="spark"
               loading={isGenerating}
-              disabled={activeEmployeeCount === 0 || isGenerating}
+              disabled={activeEmployeeCount === 0 || isGenerating || hoursBlocked}
               title={activeEmployeeCount === 0 ? 'Add someone to the staff list first.' : 'Build the week from the staff list.'}
             >
               {isGenerating ? 'Making schedule…' : 'Make schedule'}
@@ -1864,7 +1947,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             <Button
               onClick={() => setSharing((open) => !open)}
               icon="share"
-              disabled={!weekStart || storeLoading || ruleProblems.length > 0}
+              disabled={!weekStart || storeLoading || ruleProblems.length > 0 || hoursBlocked}
               title={
                 storeLoading
                   ? 'Waiting for your saved data to load.'
@@ -2090,6 +2173,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               <GenerationReportBanner report={lastReport} onDismiss={() => setLastReport(null)} />
             )}
             <WeeklyScheduleBoard
+              hoursDays={scheduleWorkspace.hoursDays} hoursPending={resolvedHours.pending} hoursDisabled={scheduleWorkspace.hoursDisabled}
+              onEditHours={openHours} hoursLocale={requestLocale}
               slots={slots}
               weekStart={weekStart}
               hasSchedule={assignments.length > 0}
@@ -2166,7 +2251,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               <div hidden={layout !== 'workspace'}>
                 {externalAvailability && <p role="status" className="my-3 border border-amber-500 bg-amber-50 p-3">{t('planning.external')}</p>}
                 <PlanningWorkspace data={scheduleWorkspace} locale={requestLocale} auto={autoAdjust} onAuto={setAutoAdjust}
-                  busy={adjustment.busy} disabled={storeLoading || storeOffline} report={adjustment.report} error={adjustment.error}
+                  busy={adjustment.busy} disabled={storeLoading || storeOffline || hoursBlocked} report={adjustment.report} error={adjustment.error}
                   onPlace={placeInWorkspace} exclusions={exclusions} onRemove={removeFromWorkspace} onAllow={allowInWorkspace} onAdjust={() => { setExternalAvailability(false); void adjustment.run(input => input.assignments, true) }}
                   onRequest={(employeeId, date) => {
                     setRequestPrefill({ id: crypto.randomUUID(), employeeId, date })
@@ -2465,9 +2550,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           <details open={layout !== 'workspace'}>
           <summary hidden={layout !== 'workspace'} className="min-h-11 cursor-pointer py-3 font-semibold">{t('planning.assistant')}</summary>
           {weekStart && <SchedulingAgent key={`${requestStation}:${weekStart}`} token={managerCode}
-            context={{ stationId: requestStation, weekStart, employees, template, assignments: assignments.filter(item => item.employeeId),
+            context={{ ...agentHoursContext, stationId: requestStation, weekStart, employees, template, assignments: assignments.filter(item => item.employeeId),
               requests: { phase: requestSource.phase, revision: requestSource.record?.revision ?? 0, data: requestSource.record?.data ?? null } }}
-            disabled={storeLoading || storeOffline || isGenerating || adjustment.busy || ruleProblems.length > 0 || requestSource.phase !== 'ready' || requestDirty}
+            disabled={storeLoading || storeOffline || isGenerating || adjustment.busy || ruleProblems.length > 0 || requestSource.phase !== 'ready' || requestDirty || hoursBlocked}
             onApply={(next) => {
               adjustment.clearReport()
               commitSchedule('schedule before assistant proposal', next)
@@ -2480,6 +2565,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           </div>}
           <div hidden={tab !== 'schedule'} className="print:hidden">{requestsPanel}</div>
       </main>
+      {hoursDate&&rosterLoaded&&templateLoaded&&!storeOffline&&hoursSource.phase!=='unconfigured'&&hoursSource.page&&<SpecialHoursDialog key={`${requestStation}:${weekStart}:${hoursDate}`} date={hoursDate} week={weekStart} station={requestStation} locale={requestLocale}
+        source={hoursSource} base={baseSlots.filter(slot=>slot.date===hoursDate)} assignments={assignments} employees={employees} locked={scheduleOnly&&!staffUnlocked}
+        selectedReview={activeHoursReviews.find(r=>r.data.date===hoursDate)??null} onClose={()=>setHoursDate(null)} onDirty={setHoursDirty}
+        onApplied={(event,review)=>{if(hoursScope.current===`${requestStation}:${weekStart}`)applyHours(event,review)}} onNavigate={()=>{}}/>}
     </div>
     </PlanningShell>
   )

@@ -53,7 +53,7 @@ export default function SchedulingAgent({ context, token, disabled, onApply }: {
   if (!AGENT_API) return null
   const waiting = run?.status === 'running'
   const proposal = run?.proposal
-  const slots = expandTemplate(context.template, context.weekStart)
+  const slots = context.effectiveSlots ?? expandTemplate(context.template, context.weekStart)
   const changes = proposal ? slots.flatMap(slot => {
     const previous = context.assignments.find(item => item.slotId === slot.id)?.employeeId
     const proposed = proposal.assignments.find(item => item.slotId === slot.id)?.employeeId
@@ -96,7 +96,7 @@ export default function SchedulingAgent({ context, token, disabled, onApply }: {
       const draft = current.current.context
       const assignments = next.proposal.assignments
       const problems = validateSchedule({ employees: withApprovedRequests(draft.employees, draft.requests.data as RequestData | null, draft.weekStart),
-        slots: expandTemplate(draft.template, draft.weekStart), assignments,
+        slots: draft.effectiveSlots ?? expandTemplate(draft.template, draft.weekStart), assignments,
         lockedAssignments: Object.fromEntries(draft.assignments.filter(item => item.locked).map(item => [item.slotId, item.employeeId])) })
       if (problems.length || new Set(assignments.map(item => item.slotId)).size !== assignments.length)
         throw new Error('The proposal no longer passes the schedule checks. Make a new proposal.')
