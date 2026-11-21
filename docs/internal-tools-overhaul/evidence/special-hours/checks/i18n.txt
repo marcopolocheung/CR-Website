@@ -1,0 +1,11 @@
+✔ English/Spanish dictionaries have identical keys, nonempty text and matching placeholders (7.568576ms)
+✔ missing keys and parameters stay visible; original input is never translated or coerced (0.320821ms)
+✔ legacy failures map to stable translation keys without exposing arbitrary server text (0.486121ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 328.227963

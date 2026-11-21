@@ -20,7 +20,7 @@ export type AgentState = typeof State.State
 
 function inputs(context: AgentContext) {
   return { employees: withApprovedRequests(context.employees, requestData(context), context.weekStart),
-    slots: expandTemplate(context.template, context.weekStart),
+    slots: context.effectiveSlots ?? expandTemplate(context.template, context.weekStart),
     lockedAssignments: Object.fromEntries(context.assignments.filter(item => item.locked).map(item => [item.slotId, item.employeeId])) }
 }
 export function proposalProblems(context: AgentContext, assignments: ScheduleAssignment[]) {
@@ -96,7 +96,7 @@ export function buildSchedulingGraph(checkpointer: BaseCheckpointSaver, options:
     .addNode('solve', state => {
       const strategy = state.strategies[state.attempt]
       const candidate = (options.solve ?? generateSchedule)({ employees: inputs(state.context).employees,
-        template: state.context.template, weekStart: state.context.weekStart }, {
+        template: state.context.template, weekStart: state.context.weekStart, slots:state.context.effectiveSlots }, {
         strategy, existingAssignments: state.context.assignments.filter(item => item.locked),
         referenceAssignments: state.context.assignments, maxNodes: options.maxNodes ?? 15000,
       })

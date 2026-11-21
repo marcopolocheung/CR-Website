@@ -1,5 +1,5 @@
 import { DAYS, type WeeklyStaffingTemplate } from './scheduler'
-import { getScheduleApiBase, StoreAuthError, StoreConflictError, StoreRejectedError, StoreUnavailableError } from './schedule-store'
+import { getScheduleApiBase, isGoldenWeekDoc, requireScheduleSnapshots, StoreAuthError, StoreConflictError, StoreRejectedError, StoreUnavailableError, type GoldenWeekDoc } from './schedule-store'
 
 function isValidTemplate(value: unknown): value is WeeklyStaffingTemplate {
   if (!value || typeof value !== 'object') return false
@@ -51,7 +51,8 @@ export async function saveTemplate(
   token: string,
   restaurantId?: string,
   weekStart?: string,
-): Promise<{ rev: number; updatedAt: string | null }> {
+): Promise<{ rev: number; updatedAt: string | null; preservedPublication?: GoldenWeekDoc }> {
+  await requireScheduleSnapshots()
   const { status, body } = await requestJson(`/api/template${templateQuery(restaurantId, weekStart)}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
@@ -65,12 +66,17 @@ export async function saveTemplate(
     )
   }
   if (status === 409) {
+    if ((body as { error?: string } | null)?.error === 'publication_preservation_failed') {
+      throw new StoreRejectedError('The published shift times could not be preserved. Your rules were not saved. Reload and review the published week before trying again.')
+    }
     const rev = body && typeof body === 'object' && 'rev' in body ? (body as { rev: unknown }).rev : 0
     throw new StoreConflictError(typeof rev === 'number' ? rev : 0)
   }
   if ((status === 200 || status === 201) && body && typeof body === 'object' && 'rev' in body) {
-    const { rev, updatedAt } = body as { rev: unknown; updatedAt: unknown }
-    if (typeof rev === 'number') return { rev, updatedAt: typeof updatedAt === 'string' ? updatedAt : null }
+    const { rev, updatedAt, preservedPublication } = body as { rev: unknown; updatedAt: unknown; preservedPublication?: unknown }
+    if (preservedPublication !== undefined && !isGoldenWeekDoc(preservedPublication)) throw new StoreUnavailableError()
+    if (typeof rev === 'number') return { rev, updatedAt: typeof updatedAt === 'string' ? updatedAt : null,
+      ...(preservedPublication ? { preservedPublication } : {}) }
   }
   throw new StoreUnavailableError()
 }

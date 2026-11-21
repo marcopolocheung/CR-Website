@@ -5,6 +5,7 @@ import { compareScheduledActual, defaultImportSelection } from './scheduled-actu
 import { publishedHours, weeksInPeriod } from './published-hours'
 import { templateHashForSlots } from '../schedule-share'
 import { expandTemplate } from '../scheduler/data'
+import { buildScheduleSnapshot } from '../schedule-snapshot'
 test('shared employee counted once across stores while source totals and unmatched hours reconcile',async()=>{
  const inputs=await Promise.all([comparisonFixture('CR2'),comparisonFixture('CR3')]),report=compareScheduledActual(inputs,'2026-10-01','2026-10-31',defaultImportSelection(inputs))
  assert.equal(report.combinedTotals.includedHours,48);assert.equal(report.combinedTotals.mappedActualHours,34);assert.equal(report.combinedTotals.unmatchedActualHours,14)
@@ -38,6 +39,21 @@ test('legacy layout hashes do not pin times: rule fingerprints and estimates exp
  const after=await publishedHours('CR3-kitchen','2026-10-18',doc,template,null)
  assert.equal(before.fingerprint,after.fingerprint);assert.notEqual(before.ruleFingerprint,after.ruleFingerprint);assert.equal(after.timingBasis,'legacy-estimate');assert.equal(after.assignments[0].end-before.assignments[0].end,60)
  const wrong=await publishedHours('CR3-kitchen','2026-10-18',{...doc,templateHash:'00000000'},template,null);assert.equal(wrong.status,'layout_unavailable');assert.equal(wrong.assignments.length,0)
+})
+test('published time snapshots ignore later rules and distinguish confirmed timing from legacy estimates',async()=>{
+ const template=comparisonTemplate();template.Wednesday[0].role='cook'
+ const slots=expandTemplate(template)
+ const doc={v:3,weekStart:'2026-10-18',rev:2,updatedAt:'2026-10-19T12:00:00.000Z',visible:true,templateHash:templateHashForSlots(slots),snapshot:buildScheduleSnapshot(slots),week:{version:1,weekStart:'2026-10-18',name:'Synthetic',people:['Same name'],slotPeople:[0]}}
+ const before=await publishedHours('CR3-kitchen','2026-10-18',doc,template,null)
+ template.Wednesday[0].end=1020
+ const after=await publishedHours('CR3-kitchen','2026-10-18',doc,template,null)
+ assert.equal(after.timingBasis,'published-snapshot');assert.equal(after.templateSource,'published-snapshot')
+ assert.deepEqual(after.assignments,before.assignments);assert.equal(after.ruleFingerprint,before.ruleFingerprint)
+ const bad=await publishedHours('CR3-kitchen','2026-10-18',{...doc,snapshot:{...doc.snapshot,version:2}},template,null)
+ assert.equal(bad.status,'invalid');assert.equal(bad.assignments.length,0)
+ const input=await comparisonFixture();input.page.publications[0].timingBasis='published-snapshot'
+ const report=compareScheduledActual([input],'2026-10-01','2026-10-31',defaultImportSelection([input]))
+ assert.equal(report.limitations.some(item=>item.code==='legacy_timing'),false)
 })
 test('different byte fingerprints do not double-count repeated identified attendance rows',async()=>{
  const input=await comparisonFixture(),other=structuredClone(input.imports[0]);other.id='other-source' as typeof other.id

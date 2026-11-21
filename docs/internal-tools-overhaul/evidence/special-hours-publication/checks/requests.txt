@@ -1,0 +1,44 @@
+
+> chinarose@0.0.2 scheduler:requests:test
+> node --import jiti/register --test src/lib/scheduler/requests.test.ts src/lib/scheduler/request-store.test.ts
+
+TAP version 13
+# Subtest: request store validates authoritative context and keeps the retry operation identity
+ok 1 - request store validates authoritative context and keeps the retry operation identity
+  ---
+  duration_ms: 3.643582
+  type: 'test'
+  ...
+# Subtest: requests validate calendar boundaries, station-scoped identity and explicit provenance
+ok 2 - requests validate calendar boundaries, station-scoped identity and explicit provenance
+  ---
+  duration_ms: 2.049936
+  type: 'test'
+  ...
+# Subtest: temporary ranges support overnight starts, reject invalid or overlapping ranges, and leave inputs unchanged
+ok 3 - temporary ranges support overnight starts, reject invalid or overlapping ranges, and leave inputs unchanged
+  ---
+  duration_ms: 0.29907
+  type: 'test'
+  ...
+# Subtest: pending overlaps are retained; approved overlaps require an explicit nonoverlapping choice
+ok 4 - pending overlaps are retained; approved overlaps require an explicit nonoverlapping choice
+  ---
+  duration_ms: 0.317293
+  type: 'test'
+  ...
+# Subtest: append and final review preserve originals, entered labels, ordering and prior decisions
+ok 5 - append and final review preserve originals, entered labels, ordering and prior decisions
+  ---
+  duration_ms: 0.429361
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 386.267428

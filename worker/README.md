@@ -10,6 +10,89 @@ Two stores in one Worker:
   the plaintext week plus `visible` for the manager's week on/off toggle and
   `rev` for optimistic concurrency.
 
+## Published time snapshots (special-hours foundation)
+
+New manager publications include an additive `snapshot` on the existing v3 golden
+document: `{ version: 1, basis: 'published', slots: [...] }`. Slots preserve their
+published index order, IDs, days, periods, roles, labels, exact start/end times and
+required flags. Dated editor fields are excluded. The share payload stays version
+1 and existing staff URLs remain valid. Readers prefer the snapshot and refuse an
+invalid/unknown snapshot rather than substituting current rules.
+
+Before a weekly or global rules overwrite, legacy layouts are captured under
+`r:{restaurant}:publication-layout:{weekStart}:{sha256-of-original-document}`.
+These separate records do not rewrite a concurrent publication or change its
+revision, timestamp or report employee keys. Their basis is `legacy-captured`:
+the captured rules remain an estimate of historical times. Capture failure blocks
+the rules save. Global saves scan all relevant station/default legacy week keys,
+including paginated listings. These records use the existing one-year schedule
+TTL. No D1 schema, binding or data migration is introduced by this foundation.
+
+`GET /api/health` advertises `scheduleSnapshotVersion: 1`. The new client checks
+support before publishing or saving rules. `PUT /api/template` can return
+`preservedPublication` so the manager retains the correct baseline. Once a
+publication has an inline or preserved snapshot, a legacy client cannot overwrite
+it without a snapshot. Invalid persisted snapshots produce a read error rather
+than a missing week. The publication request limit is 200,000 characters to
+accommodate the existing maximum of 200 indexed slots; other body limits remain
+unchanged.
+
+Coordinate deployment of compatible readers and the backend before new snapshot
+writes. Older running frontend tabs must reload; older Workers discard unknown
+fields, and older readers still reconstruct times from mutable rules. A reader-
+compatible release or maintenance window is necessary; a frontend-only deployment
+does not activate Worker support. Reverting only the Worker would discard these
+protections. Preserve all snapshots and deploy a compatible reader/writer for
+rollback. Existing KV read/check/write revisions are **not atomic CAS**; this
+slice does not introduce stronger cross-document concurrency guarantees.
+
+The staff viewer and scheduled-versus-actual reader consume inline and preserved
+snapshots. Reports distinguish `published-snapshot` timing from `legacy-estimate`
+and retain the legacy caveat for captured rules. Restaurant-wide dated events,
+closure labels and Hours controls are now implemented locally; their [completion
+checkpoint](../docs/internal-tools-overhaul/checkpoints/special-hours.md) records
+remaining activation and review gates.
+
+[Checkpoint and verification](../docs/internal-tools-overhaul/checkpoints/special-hours-publication.md).
+
+### Dated restaurant hours service
+
+Manager-authenticated `GET /api/internal/special-hours/{CR2|CR3}?start=YYYY-MM-DD&end=YYYY-MM-DD`
+reads up to 31 days of events, station reviews and publication references.
+`PUT /api/internal/special-hours/{store}/{date}` accepts the existing mutation
+envelope under `mutation`. Station review PUTs append `/review/{station}` and
+include the normal `baseSlots` for independent choice validation. Reviews carry
+their own revisions, the source event snapshot/revision, normal-rule fingerprint
+and exact affected-slot decisions. The existing store/station IDs and authorization
+rules are retained; the UI preserves the protected kitchen editor.
+
+Records use the existing D1 schedule family with reserved IDs `hours-{date}` and
+`hours-review-{station}-{date}`. They are dated configuration/review records, not
+assignment drafts or rows in the legacy `schedules` relational projection. Existing
+core/atomic-history migrations suffice. No raw uploads or new identity mapping
+rules are introduced.
+
+KV `r:{store}:special-hours:active` records that the service has been used. It is
+set before accepting mutations, so removing `INTERNAL_DB` cannot silently restore
+legacy publishing over known closures. Without prior activation, a missing binding
+returns `backend_unconfigured` and the new controls remain unavailable. After
+activation, a missing binding is an unavailable/unknown state and publication is
+blocked. Keep the marker and D1 records when reverting UI code. A target binding
+and initialized schema must be verified independently of a successful local build.
+
+Published snapshots retain reviewed `specialHours` date labels and source
+revisions. The server rechecks current event/review versions and effective slots
+before saving a publication, including legacy clients omitting the metadata.
+Normal templates remain separate from exceptions, so copy/navigation do not make
+holidays recur. A full explicitly closed week may publish an empty assignment list.
+The optional Node assistant must support the new effective-layout context for
+dated-hours weeks; ordinary weeks retain the old context shape.
+
+Run `npm run scheduler:hours:worker:test` for disposable D1/KV integration coverage.
+See the [complete workflow and rollout contract](../docs/internal-tools-overhaul/special-hours.md).
+
+## Other stores
+
 Plus two more stores, keyed separately per station:
 
 - Employee roster (`/api/employees?restaurant={id}`): one persistent staff list

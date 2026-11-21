@@ -31,6 +31,10 @@ Scope, exact acceptance scenarios, interface, limitations and recovery: [schedul
 
 ## Handoff evidence
 
+- [Dated restaurant hours completion](../checkpoints/special-hours.md): snapshots now retain reviewed closure/early-close labels and exact cleanup finish times. Comparison math uses the same effective published slots; no implicit employee identity merge or payroll-hour recalculation was added.
+
+- November 20 follow-up: [special-hours publication foundation](../checkpoints/special-hours-publication.md) adds exact snapshot timing for new publications while retaining legacy estimates and existing employee mapping keys for captured legacy layouts. The original import slice's completion does not assert activation of this new backend capability.
+
 - Scope/artifacts: [scheduled-actual.md](../scheduled-actual.md); Codex is the coordinating owner for touched shared files.
 - Checks/evidence: Read-only publication/combined-estimate slice; 52 import tests, 5 local Worker tests, 128 scheduler tests, build/types/SEO/dictionaries, packaging and comparison/PDF browser acceptance passed. Local synthetic fixtures only; no live-system claim.
 - Implementation and local verification: done. External/live: not applicable; frontend publication remains separate.

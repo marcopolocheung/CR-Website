@@ -8,6 +8,7 @@
 
 import { defaultTemplateForRestaurant, expandTemplate, seedTemplate } from './scheduler/data'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeeklyStaffingTemplate } from './scheduler'
+import { validScheduleSnapshot, type ScheduleSnapshot } from './schedule-snapshot'
 
 export const SHARE_VERSION = 1
 
@@ -36,6 +37,21 @@ export function layoutForWeek(
   const layouts = candidates.map((template) => expandTemplate(template))
   const match = layouts.find((slots) => templateHashForSlots(slots) === templateHash)
   return { slots: match ?? layouts[0], matches: match !== undefined }
+}
+
+/** An explicit but invalid snapshot must never be replaced with today's rules. */
+export function layoutForPublication(
+  doc: { snapshot?: ScheduleSnapshot; templateHash: string; week: { slotPeople: number[] } },
+  saved: (WeeklyStaffingTemplate | null | undefined)[],
+  restaurantId?: string,
+) {
+  if (doc.snapshot !== undefined) {
+    const matches = validScheduleSnapshot(doc.snapshot, doc.week.slotPeople.length)
+      && templateHashForSlots(doc.snapshot.slots) === doc.templateHash
+    return { slots: matches ? doc.snapshot.slots : [], matches }
+  }
+  const layout = layoutForWeek(saved, restaurantId, doc.templateHash)
+  return { ...layout, matches: layout.matches && layout.slots.length === doc.week.slotPeople.length }
 }
 
 export type PublishedWeek = {
@@ -79,8 +95,9 @@ export function buildPublishedWeek({
 }
 
 /** Compares two published weeks by who works where — the name staff see is ignored. */
-export function publishedWeekFingerprint(week: Pick<PublishedWeek, 'weekStart' | 'people' | 'slotPeople'>) {
-  return JSON.stringify({ w: week.weekStart, p: week.people, s: week.slotPeople })
+export function publishedWeekFingerprint(week: Pick<PublishedWeek, 'weekStart' | 'people' | 'slotPeople'>, snapshot?: ScheduleSnapshot) {
+  return JSON.stringify({ w: week.weekStart, p: week.people, s: week.slotPeople,
+    ...(snapshot ? { slots: snapshot.slots, hours: snapshot.specialHours ?? [] } : {}) })
 }
 
 /**

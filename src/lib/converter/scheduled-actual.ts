@@ -71,7 +71,7 @@ export function compareScheduledActual(inputs:ComparisonInput[],start:string,end
   for(const pub of input.page.publications){
    if(pub.status!=='published'){limitations.push({code:pub.status==='layout_unavailable'||pub.status==='invalid'?'layout':'unpublished',storeId:input.storeId,stationId:pub.stationId,weekStart:pub.weekStart});continue}
    total.publishedSnapshots++
-   limitations.push({code:'legacy_timing',storeId:input.storeId,stationId:pub.stationId,weekStart:pub.weekStart})
+   if(pub.timingBasis==='legacy-estimate')limitations.push({code:'legacy_timing',storeId:input.storeId,stationId:pub.stationId,weekStart:pub.weekStart})
    const resolve=(key:string,date:string)=>{
     const matches=input.directory?.data.mappings.filter(m=>m.system==='scheduler'&&m.scope===pub.stationId&&m.externalId===key&&m.from<=date&&(!m.until||m.until>=date))??[]
     return matches.length===1?input.directory?.data.employees.find(e=>e.id===matches[0].employeeId)??null:null

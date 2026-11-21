@@ -17,9 +17,13 @@ import {
   todayIsoDate,
   type StaffingSlot,
 } from '@/lib/scheduler'
-import { layoutForWeek, type PublishedWeek } from '@/lib/schedule-share'
+import { layoutForPublication, type PublishedWeek } from '@/lib/schedule-share'
 import { fetchGoldenMonth, type GoldenWeekDoc } from '@/lib/schedule-store'
 import { fetchTemplate } from '@/lib/template-store'
+import { HoursNote, HoursSummary } from '@/components/scheduler/SpecialHours'
+import type { PublishedDayHours } from '@/lib/scheduler/special-hours'
+import type { Locale } from '@/lib/internal-tools/contracts'
+import { LOCALE_STORAGE_KEY } from '@/lib/internal-tools/i18n'
 
 /** A published week plus the shift layout it was published against. */
 type ViewerWeek = GoldenWeekDoc & { slots: StaffingSlot[]; layoutMatches: boolean }
@@ -30,10 +34,10 @@ async function withLayouts(weeks: GoldenWeekDoc[], restaurantId?: string): Promi
   // One request per week: the Worker answers a week with no rules of its own with the station's rules.
   return Promise.all(
     weeks.map(async (doc) => {
-      const saved = await fetchTemplate(restaurantId, doc.weekStart)
+      const saved = doc.snapshot !== undefined ? null : await fetchTemplate(restaurantId, doc.weekStart)
         .then((templateDoc) => templateDoc.template)
         .catch(() => null)
-      const { slots, matches } = layoutForWeek([saved], restaurantId, doc.templateHash)
+      const { slots, matches } = layoutForPublication(doc, [saved], restaurantId)
       return { ...doc, slots, layoutMatches: matches }
     }),
   )
@@ -219,6 +223,7 @@ export default function ScheduleViewer({ restaurantId, restaurantName }: { resta
         <WeekView
           week={week}
           slots={openDoc.slots}
+          hoursDays={openDoc.snapshot?.specialHours??[]}
           onlyPerson={week.people.includes(onlyPerson) ? onlyPerson : ''}
           onOnlyPersonChange={choosePerson}
           onBack={goBack}
@@ -470,13 +475,17 @@ function WeekView({
   onlyPerson,
   onOnlyPersonChange,
   onBack,
+  hoursDays,
 }: {
   week: PublishedWeek
   slots: ReturnType<typeof expandTemplate>
   onlyPerson: string
   onOnlyPersonChange: (person: string) => void
   onBack: () => void
+  hoursDays:PublishedDayHours[]
 }) {
+  const [hoursLocale,setHoursLocale]=useState<Locale>('en')
+  useEffect(()=>{try{if(localStorage.getItem(LOCALE_STORAGE_KEY)==='es')setHoursLocale('es')}catch{/* Optional language preference. */}},[])
   const today = todayIsoDate()
   const entries = slots
     .map((slot, index) => ({ slot, personIndex: week.slotPeople[index] }))
@@ -573,8 +582,9 @@ function WeekView({
                   {shifts.length} shift{shifts.length === 1 ? '' : 's'}
                 </span>
               </h2>
+              <HoursNote day={hoursDays.find(d=>d.date===date)} locale={hoursLocale}/>
               {shifts.length === 0 ? (
-                <p className="mt-2 text-sm text-zinc-500">Nobody scheduled{onlyPerson ? ` for ${onlyPerson}` : ''}.</p>
+                hoursDays.some(d=>d.date===date&&d.mode==='closed')?null:<p className="mt-2 text-sm text-zinc-500">Nobody scheduled{onlyPerson ? ` for ${onlyPerson}` : ''}.</p>
               ) : (
                 <ul className="mt-2 divide-y divide-zinc-100">
                   {shifts.map(({ slot, personIndex }) => (
@@ -612,6 +622,7 @@ function WeekView({
                     }`}
                   >
                     <span className="block truncate">{formatDayLabel(week.weekStart, day)}</span>
+                    <HoursNote day={hoursDays.find(d=>d.date===date)} locale={hoursLocale}/>
                     {isToday && <span className="ml-1 normal-case">(today)</span>}
                   </th>
                 )
@@ -674,6 +685,7 @@ function WeekView({
       <div className="hidden print:block">
         <h2 className="text-lg font-bold text-black">Week of {formatWeekRange(week.weekStart)}{onlyPerson ? ` — ${onlyPerson}` : ''}</h2>
         <p className="text-sm text-black">{week.name}</p>
+        <HoursSummary days={hoursDays} locale={hoursLocale}/>
         <table className="mt-3 w-full border-collapse text-left text-sm">
           <thead>
             <tr>
