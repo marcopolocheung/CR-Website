@@ -34,6 +34,8 @@ class HoursStore(views.FixtureStore):
     def route(self,route):
         request=route.request;url=urlparse(request.url);query=parse_qs(url.query)
         if request.method=='OPTIONS':return self.response(route,{})
+        if url.path=='/api/staff/verify':
+            return self.response(route,{},200 if request.headers.get('authorization')=='Bearer fixture-staff-password' else 401)
         if url.path=='/api/health':return self.response(route,{'ok':True,'scheduleSnapshotVersion':1,'specialHoursVersion':1})
         if url.path.startswith('/api/internal/special-hours/'):
             assert request.headers.get('authorization')=='Bearer fixture-password'
@@ -259,11 +261,41 @@ def check_conflict_and_kitchen_lock(browser,url):
     assert not errors,errors;context.close()
     store=HoursStore();context,page,errors=open_manager(browser,url,store,'CR3-kitchen')
     dialog=hours(page,THURSDAY)
-    expect(dialog.get_by_text('Unlock this station’s staff editing',exact=False)).to_be_visible()
+    expect(dialog.get_by_text('Enter the staff password here to edit hours.',exact=True)).to_be_visible()
     expect(dialog.get_by_role('button',name='Apply',exact=True)).to_be_disabled()
     expect(dialog.get_by_role('radio',name='Closed all day',exact=True)).to_be_disabled()
     dialog.get_by_role('button',name='Cancel',exact=True).click()
-    assert not store.events and not errors,(store.events,errors);context.close()
+    assert not store.events and not errors,(store.events,errors)
+    dialog=hours(page,THURSDAY)
+    password=dialog.get_by_label('Staff password',exact=True)
+    expect(password).to_have_attribute('type','password')
+    expect(dialog.get_by_role('button',name='Unlock hours',exact=True)).to_be_disabled()
+    password.fill('incorrect-fixture-password');password.press('Enter')
+    expect(dialog.get_by_role('alert')).to_contain_text('not accepted')
+    expect(dialog.get_by_role('radio',name='Closed all day',exact=True)).to_be_disabled()
+    assert not store.events and not store.reviews
+    password.fill('fixture-staff-password');password.press('Enter')
+    expect(dialog.get_by_role('radio',name='Closed all day',exact=True)).to_be_enabled()
+    expect(password).to_have_count(0)
+    assert not store.events, 'unlocking must not apply hours'
+    dialog.get_by_role('radio',name='Closed all day',exact=True).check();apply(dialog)
+    assert ('CR3',THURSDAY) in store.events
+    dialog=hours(page,WEDNESDAY)
+    expect(dialog.get_by_label('Staff password',exact=True)).to_have_count(0)
+    assert 'fixture-staff-password' not in page.evaluate('JSON.stringify(localStorage)')
+    dialog.get_by_role('button',name='Cancel',exact=True).click()
+    assert not errors,errors;context.close()
+    # The week-level editor offers the same gate on a narrow Spanish screen.
+    store=HoursStore();context,page,errors=open_manager(browser,url,store,'CR3-kitchen',width=320,locale='es')
+    page.get_by_role('button',name='Configurar horario',exact=True).click();dialog=page.locator('[data-hours-editor]')
+    dialog.get_by_label('Contraseña del personal',exact=True).fill('fixture-staff-password')
+    dialog.get_by_role('button',name='Desbloquear horario',exact=True).click()
+    expect(dialog.get_by_role('radio',name='Cerrado todo el día',exact=True)).to_be_enabled()
+    assert dialog.evaluate('e=>e.scrollWidth<=e.clientWidth+1')
+    dialog.get_by_label('Seleccionar '+THURSDAY+' para horario',exact=True).check()
+    dialog.get_by_role('radio',name='Cerrado todo el día',exact=True).check()
+    dialog.get_by_role('button',name='Aplicar',exact=True).click();expect(dialog).not_to_be_visible()
+    assert ('CR3',THURSDAY) in store.events and not errors,(store.events,errors);context.close()
 
 
 def check_simple_hours(browser,url,artifacts):
