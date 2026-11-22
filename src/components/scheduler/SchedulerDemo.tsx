@@ -73,7 +73,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // Schedule-only stations (CR3 Kitchen) ship default rules; their crew lives on the Worker.
   // The crew (`/api/staff`) is one per station, shared by every week, with the
   // last saved change undoable; the rules are per-week like other stations.
-  // Both stay read-only until the staff password is entered in Employee settings.
+  // Both stay read-only until the staff password is accepted in Staff & rules or Hours.
   const scheduleOnly = isScheduleOnlyRestaurant(restaurantId)
   const [weekStart, setWeekStart] = useState('')
   const [weeks, setWeeks] = useState<WeekAssignments>({})
@@ -1525,16 +1525,19 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     if (saved) setSetupNotice(`Saved the ${setupParts.join(' and ')}.`)
   }
 
-  async function unlockCrewEditing() {
-    if (!passwordInput || checkingPassword) return
+  async function unlockCrewEditing(password = passwordInput): Promise<string|null> {
+    if (!password || checkingPassword) return translate(requestLocale,'hours.unlockFailed')
     setCheckingPassword(true)
     setSetupError('')
     try {
-      await verifyStaffPassword(passwordInput, restaurantId)
-      setStaffPassword(passwordInput)
+      await verifyStaffPassword(password, restaurantId)
+      setStaffPassword(password)
       setPasswordInput('')
+      return null
     } catch (caught) {
-      setSetupError(saveErrorMessage(caught, 'crew').replace('That code was not accepted', 'That staff password was not accepted'))
+      const message=saveErrorMessage(caught, 'crew').replace('That code was not accepted', 'That staff password was not accepted')
+      setSetupError(message)
+      return message
     } finally {
       setCheckingPassword(false)
     }
@@ -2588,7 +2591,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         date={hoursEditor.date} week={weekStart} anchor={hoursEditor.anchor} station={requestStation} locale={requestLocale}
         source={hoursSource} base={baseSlots} assignments={assignments} employees={employees} locked={scheduleOnly&&!staffUnlocked}
         activeReviews={activeHoursReviews} onClose={()=>setHoursEditor(null)} onDirty={setHoursDirty} onBusy={setHoursBusy}
-        onApplied={applyHours}/>}
+        onApplied={applyHours} onUnlock={unlockCrewEditing}/>}
 
     </div>
     </PlanningShell>

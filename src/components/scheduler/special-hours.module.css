@@ -22,6 +22,9 @@
 .modes input { width:18px; height:18px; flex-shrink:0; accent-color:#1b6460; }
 .field { display:grid; gap:6px; }
 .field input { border:1px solid #737373; min-height:44px; padding:8px; width:100%; }
+.unlock { display:grid; gap:8px; margin-bottom:16px; }
+.unlock button { min-height:44px; justify-self:start; padding:8px 12px; background:#9f0712; color:#fff; font-weight:600; }
+.unlock button:disabled { opacity:.6; }
 .effect { margin:0; font-size:14px; color:#525252; }
 .options { border-top:1px solid #d4d4d4; }
 .options summary { min-height:44px; padding:10px 0; color:#1b6460; font-weight:600; cursor:pointer; }

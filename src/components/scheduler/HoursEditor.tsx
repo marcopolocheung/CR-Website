@@ -17,12 +17,13 @@ import { planningDate } from './planning-format'
 import css from './special-hours.module.css'
 
 export default function HoursEditor({ date, week, anchor, station, locale, source, base, assignments, employees,
-  locked, activeReviews, onClose, onApplied, onDirty, onBusy }: {
+  locked, activeReviews, onClose, onApplied, onDirty, onBusy, onUnlock }: {
   date: string | null; week: string; anchor: HTMLElement | null; station: StationId; locale: Locale
   source: SpecialHoursSource; base: StaffingSlot[]; assignments: ScheduleAssignment[]; employees: Employee[]
   locked: boolean; activeReviews: readonly HoursReviewRecord[]; onClose: () => void
   onApplied: (results: readonly HoursResult[], page: SpecialHoursPage) => void
   onDirty: (dirty: boolean) => void; onBusy: (busy: boolean) => void
+  onUnlock: (password: string) => Promise<string|null>
 }) {
   const t = (key: string, params?: Record<string, string | number>) => translate(locale, key, params)
   const token = useManagerCode()
@@ -37,6 +38,8 @@ export default function HoursEditor({ date, week, anchor, station, locale, sourc
   const [overrides, setOverrides] = useState<Record<string, HoursDecision[]>>({})
   const [saving, setSaving] = useState(false), [uncertain, setUncertain] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [unlockPassword,setUnlockPassword] = useState(''), [unlockError,setUnlockError] = useState<string|null>(null)
+  const [unlocking,setUnlocking] = useState(false)
   const [, setProgress] = useState(0)
   const attempt = useRef<HoursBatch | null>(null), panel = useRef<HTMLElement>(null)
   const mounted = useRef(true), running = useRef(false), latestBase = useRef(base)
@@ -46,8 +49,8 @@ export default function HoursEditor({ date, week, anchor, station, locale, sourc
   latestBase.current = base
   const form = canonicalJson({ selected: [...selected].sort(), mode, closeMinute, label, changeLabel, overrides })
   const initialForm = useRef(form)
-  const dirty = form !== initialForm.current || !!attempt.current
-  const disabled = saving || uncertain
+  const dirty = form !== initialForm.current || !!attempt.current || unlockPassword !== ''
+  const disabled = saving || uncertain || unlocking
   const plans = mode ? [...selected].sort().map(d => planHoursDay(snapshot, station, base, d,
     { mode, closeMinute, label: changeLabel ? label : undefined }, activeReviews, overrides[d])) : []
   const previews = plans.map(p => previewHoursPlan(p, station))
@@ -146,12 +149,34 @@ export default function HoursEditor({ date, week, anchor, station, locale, sourc
   function chooseMode(next: SpecialHoursData['mode']) {
     setMode(next); setOverrides({}); setError(null)
   }
+  async function unlock() {
+    if(running.current||!unlockPassword)return
+    running.current=true;setUnlocking(true);setUnlockError(null)
+    try {
+      const message=await onUnlock(unlockPassword)
+      if(!mounted.current)return
+      if(message)setUnlockError(message)
+      else {
+        setUnlockPassword('')
+        requestAnimationFrame(()=>panel.current?.querySelector<HTMLInputElement>('input[type="radio"]:not(:disabled)')?.focus())
+      }
+    } catch {if(mounted.current)setUnlockError(t('hours.unlockFailed'))}
+    finally {running.current=false;if(mounted.current)setUnlocking(false)}
+  }
   const batch = attempt.current
   return createPortal(<section ref={panel} id="restaurant-hours-editor" role="region" aria-labelledby="restaurant-hours-title"
-    data-hours-editor lang={locale} className={css.editor} style={position} aria-busy={saving}>
+    data-hours-editor lang={locale} className={css.editor} style={position} aria-busy={saving||unlocking}>
     <h2 id="restaurant-hours-title" className={css.heading}>{t('hours.title')}</h2>
     <p className={css.date}>{multiple ? t('hours.selectedDates', { count: selected.length }) : planningDate(date!, locale)}</p>
     <p className={css.scope}>{t('hours.scope', { store: STATION_STORES[station] })}</p>
+    {locked&&<form className={css.unlock} onSubmit={event=>{event.preventDefault();void unlock()}}>
+      <p id="hours-unlock-help" className={css.muted}>{t('hours.locked')}</p>
+      <label className={css.field}>{t('hours.password')}<input type="password" autoComplete="current-password"
+        aria-describedby="hours-unlock-help" value={unlockPassword} disabled={unlocking}
+        onChange={event=>{setUnlockPassword(event.target.value);setUnlockError(null)}}/></label>
+      {unlockError&&<p role="alert" className={css.error}>{unlockError}</p>}
+      <button type="submit" disabled={!unlockPassword||unlocking}>{t(unlocking?'hours.checkingPassword':'hours.unlock')}</button>
+    </form>}
     <fieldset disabled={disabled || locked} className={css.form}>
       {multiple ? <div className={css.dates}>
         <div className={css.shortcuts}><button type="button" onClick={() => setSelected(DAYS.map(d => dateForDay(week, d)))}>{t('hours.allWeek')}</button>
@@ -185,7 +210,6 @@ export default function HoursEditor({ date, week, anchor, station, locale, sourc
           })}</div>}
       </details>
     </fieldset>
-    {locked && <p className={css.error}>{t('hours.locked')}</p>}
     {batch && error && <div role="status"><p>{t('hours.batchPartial', { count: batch.filter(r => r.done).length, total: batch.length })}</p>
       <ul className={css.progress}>{batch.map(row => <li key={row.date}>{planningDate(row.date, locale)}: {t(row.done ? 'hours.confirmed' : 'hours.notConfirmed')}</li>)}</ul>
       {batch.some(row => row.event && !row.review) && <p>{t('hours.partial')}</p>}</div>}
