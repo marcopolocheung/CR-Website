@@ -78,7 +78,7 @@ export function WeeklyScheduleBoard({
   hoursPending?:string[]
   hoursDisabled?:boolean
   hoursLocale?:Locale
-  onEditHours?:(date:string)=>void
+  onEditHours?:(date:string,anchor?:HTMLElement)=>void
 }) {
   return (
     <div className="mt-4 min-w-0">
@@ -106,7 +106,7 @@ export function WeeklyScheduleBoard({
                 </span>
               </h3>
               {onEditHours&&weekStart&&<DayHoursControl date={dateForDay(weekStart,day)} event={hoursDays.find(e=>e.date===dateForDay(weekStart,day))} locale={hoursLocale}
-                pending={hoursPending.includes(dateForDay(weekStart,day))} disabled={hoursDisabled} onEdit={()=>onEditHours(dateForDay(weekStart,day))}/>}
+                pending={hoursPending.includes(dateForDay(weekStart,day))} disabled={hoursDisabled} onEdit={anchor=>onEditHours(dateForDay(weekStart,day),anchor)}/>}
               {PERIODS.map((period) => {
                 const shiftKey = `${day}-${period}` as ShiftKey
                 const shiftSlots = slots.filter((slot) => slot.day === day && slot.period === period)

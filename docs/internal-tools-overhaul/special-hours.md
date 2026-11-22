@@ -20,7 +20,7 @@ Save the shared event and station review before changing the current board. If o
 
 ## Experience and publication
 
-All manager layouts receive a visible Hours control at each date. A shared accessible, bilingual dialog names the full date and restaurant-wide scope and leads with the three modes. Early closing adds a closing-time field. Labels and affected-shift cleanup finishes are optional under collapsed More options; the main form summarizes draft changes and assigned/kept shifts being removed. Dining/kitchen Needs review, Ready to publish and Published statuses and exact station/week/date links remain on the schedule page.
+All manager layouts receive a visible Hours control at each date and Set hours beside the week controls. One accessible, bilingual editor anchors beside the clicked control without a backdrop, focus trap or dialog. It offers the three modes, a conditional closing time and explicit Apply. Apply to more days reveals checkboxes for the displayed week's dates, All week and Clear selection; Set hours opens directly with empty selection. Labels and individual-date cleanup finishes remain under collapsed More options. Dining/kitchen status and exact station/week/date links remain on the schedule page.
 
 Snapshots add the reviewed dated labels and event/review revisions. Publication rechecks current event/review data and effective slots on the server; stale or omitted hours cannot be forced through a legacy client. Staff desktop, phone and paper display closure/early-close labels and actual shift finish times. Explicitly all-closed weeks may publish without assignments; ordinary empty/unconfigured weeks remain distinct.
 
@@ -36,10 +36,10 @@ Run scheduler, requests, assistant, relevant imports/report and Worker suites, t
 
 Items 1–6 are implemented locally; see the [completion checkpoint](checkpoints/special-hours.md) for observed checks, screenshots, limits and release gates.
 
-1. Open the restaurant's week and choose **Hours** beside the affected date in Planning, Current or Classic.
+1. Open the restaurant's week and choose **Hours** beside a date, or **Set hours** beside the week controls. For several dates, use **Apply to more days**, select dates, or choose **All week**. The selection covers the displayed week only.
 2. Choose **Closed all day**, or **Close early** and review the customer closing time. The suggested 7 PM value is editable and is not an automatically saved holiday policy. Add a label if useful.
 3. Review the short explanation of draft changes. Closed days remove all of that date's shifts. Early closing shortens crossing shifts and removes later-starting shifts automatically. If needed, open **More options** to add a label or retain a later employee finish for cleanup. Finish choices cannot extend a shift beyond its normal finish. Existing custom finishes remain selected when reopening and saving.
-4. **Save hours** saves the store event and this station's staffing review before changing the board. A failed or uncertain review leaves the board unchanged. Retry reuses the same operation; Reload latest preserves entered choices for a new review after a conflict.
+4. **Apply** / **Apply to N days** saves each selected date's event and this station's review sequentially, then verifies the group before updating the board once. On partial failure, the editor names saved/unconfirmed dates and leaves the draft unchanged. **Retry remaining dates** retains the original operations and skips confirmed writes; **Reload latest** preserves entered choices and requires another Apply. Shared saves are not an atomic group and are never silently rolled back. Bulk edits preserve individual labels unless Change labels is selected; normal dates without exceptions need no new records.
 5. Review dining and kitchen separately, using their status links. These links select the exact week/date and wait for actual staff/rules to load. Existing unsaved-work protection and CR3 Kitchen's UI staff unlock remain in force.
 6. Publish each station. Published staff schedules retain prior hours until that station's Publish succeeds. The staff desktop/phone views and printed sheet show the dated labels and actual employee finishes.
 
@@ -47,7 +47,7 @@ Items 1–6 are implemented locally; see the [completion checkpoint](checkpoints
 
 Review/publication badges describe the hours step, not an assertion that every staffing requirement is filled. Other validation and coverage warnings remain on the board. A full week explicitly reviewed as closed can publish with zero assignments. Historical manual holiday edits are retained as ordinary saved rules; the feature does not guess how to migrate them.
 
-The [compact Hours UI checkpoint](checkpoints/special-hours-ui.md) records the follow-up simplification and its local checks. It changes the frontend presentation, not the existing service or publication contract.
+The [inline Hours UI checkpoint](checkpoints/special-hours-ui.md) records single-date/bulk editing and its local checks. It uses existing service endpoints and preserves the publication contract. A successful group creates one local Undo boundary; shared records remain saved. Active or uncertain saves block other scheduler actions, including keyboard Undo, until reconciled.
 
 ## Service and rollout contract
 

@@ -20,7 +20,7 @@ def base_slots(template, day=None):
 
 class HoursStore(views.FixtureStore):
     def __init__(self):
-        super().__init__();self.events={};self.reviews={};self.operations={};self.attempts=[];self.fail_review=False;self.fail_read=False
+        super().__init__();self.events={};self.reviews={};self.operations={};self.attempts=[];self.fail_review=False;self.fail_read=False;self.fail_date=None;self.fail_event=False;self.hold_final=False;self.held_reads=[]
         self.template={d:[{'period':'AM','role':'server','label':'Morning','start':600,'end':960,'required':True},
                           {'period':'PM','role':'server','label':'Evening','start':960,'end':1320,'required':True},
                           {'period':'PM','role':'server','label':'Late cleanup','start':1200,'end':1320,'required':False}] for d in DAYS}
@@ -39,6 +39,8 @@ class HoursStore(views.FixtureStore):
             assert request.headers.get('authorization')=='Bearer fixture-password'
             parts=url.path.split('/');store=parts[4]
             if request.method=='GET':
+                if self.hold_final and self.attempts:
+                    self.held_reads.append(route);return
                 if self.fail_read:return self.response(route,{'error':{'code':'unavailable'}},503)
                 start=query['start'][0];end=query['end'][0]
                 events=[e for (s,d),e in self.events.items() if s==store and start<=d<=end]
@@ -64,8 +66,8 @@ class HoursStore(views.FixtureStore):
                         'createdAt':views.UPDATED,'updatedAt':views.UPDATED,'data':mutation['data']}
                 if station:record['stationId']=station
                 collection[target]=copy.deepcopy(record);self.operations[operation]=copy.deepcopy(record)
-            if station and self.fail_review:
-                self.fail_review=False
+            if (station and self.fail_review) or (station and self.fail_date==d) or (not station and self.fail_event):
+                self.fail_review=False;self.fail_date=None;self.fail_event=False
                 return self.response(route,{'error':{'code':'unavailable'}},503)
             return self.response(route,{'record':self.operations[operation]})
         station=query.get('restaurant',[''])[0];week=query.get('weekStart',[''])[0]
@@ -93,13 +95,13 @@ def open_manager(browser,url,store,station='CR2-diningroom',layout='workspace',w
 
 def hours(page,d,locale='en'):
     page.get_by_role('button',name=('Hours for ' if locale=='en' else 'Horario del ')+d,exact=True).click()
-    dialog=page.get_by_role('dialog');expect(dialog).to_be_visible();return dialog
+    dialog=page.locator('[data-hours-editor]');expect(dialog).to_be_visible();return dialog
 def options(dialog, locale='en'):
     summary=dialog.locator('summary').filter(has_text='More options' if locale=='en' else 'Más opciones')
     if not dialog.locator('details').evaluate('element=>element.open'):summary.click()
 
 def apply(dialog):
-    dialog.get_by_role('button',name='Save hours',exact=True).click();expect(dialog).not_to_be_visible()
+    dialog.get_by_role('button',name='Apply',exact=True).click();expect(dialog).not_to_be_visible()
 def publish(page):
     page.get_by_role('button',name='Publish to staff',exact=True).first.click()
     button=page.get_by_role('button',name='Publish',exact=True)
@@ -113,14 +115,14 @@ def check_workflow(browser,url,artifacts):
     expect(page.locator('[data-planning-slot^="thursday-"]')).to_have_count(3)
     page.locator('[data-planning-slot^="thursday-"] button').filter(has=page.locator('[data-lock-state="unlocked"]')).first.click()
     dialog=hours(page,THURSDAY);dialog.get_by_role('radio',name='Closed all day',exact=True).check();options(dialog);dialog.get_by_label('Label (optional)',exact=True).fill('Thanksgiving')
-    expect(dialog.get_by_text('Removes all shifts on this date from this draft.',exact=False)).to_be_visible()
+    expect(dialog.get_by_text('Removes shifts from the selected dates in this draft.',exact=False)).to_be_visible()
     expect(dialog.get_by_text('including 1 marked Keep.',exact=False)).to_be_visible()
     expect(dialog.get_by_text('Employee finish times',exact=True)).to_have_count(0)
     dialog.screenshot(path=str(artifacts/'closed-preview-desktop.png'))
-    store.fail_review=True;dialog.get_by_role('button',name='Save hours',exact=True).click()
+    store.fail_review=True;dialog.get_by_role('button',name='Apply',exact=True).click()
     expect(dialog.get_by_role('alert')).to_contain_text('not confirmed')
     expect(page.locator('[data-planning-slot^="thursday-"]')).to_have_count(3)
-    dialog.get_by_role('button',name='Retry same save',exact=True).click();expect(dialog).not_to_be_visible()
+    dialog.get_by_role('button',name='Retry remaining dates',exact=True).click();expect(dialog).not_to_be_visible()
     assert store.events[('CR2',THURSDAY)]['revision']==1 and store.reviews[('CR2','CR2-diningroom',THURSDAY)]['revision']==1
     assert len(store.attempts)>len(set(store.attempts)), 'uncertain review retries must reuse operation identity'
     expect(page.locator('[data-planning-slot^="thursday-"]')).to_have_count(0)
@@ -177,20 +179,29 @@ def check_layouts_and_language(browser,url,artifacts):
     for layout in ['new','classic']:
         store=HoursStore();context,page,errors=open_manager(browser,url,store,layout=layout,width=768 if layout=='new' else 1440)
         trigger=page.get_by_role('button',name='Hours for '+THURSDAY,exact=True);trigger.focus();trigger.press('Enter')
-        expect(page.get_by_role('dialog')).to_be_visible();page.keyboard.press('Escape')
-        expect(page.get_by_role('dialog')).not_to_be_visible();expect(trigger).to_be_focused()
+        expect(page.locator('[data-hours-editor]')).to_be_visible();page.keyboard.press('Escape')
+        expect(page.locator('[data-hours-editor]')).not_to_be_visible();expect(trigger).to_be_focused()
         dialog=hours(page,THURSDAY);dialog.get_by_role('radio',name='Closed all day',exact=True).check();apply(dialog)
         expect(page.get_by_role('button',name='Hours for '+THURSDAY,exact=True)).to_contain_text('Closed')
+        editor=bulk(page);select_dates(editor,[WEDNESDAY,'2026-11-28']);editor.get_by_role('radio',name='Close early',exact=True).check()
+        editor.get_by_role('button',name='Apply to 2 days',exact=True).click();expect(editor).not_to_be_visible()
+        assert all(store.events[('CR2',d)]['data']['mode']=='early' for d in [WEDNESDAY,'2026-11-28'])
         page.screenshot(path=str(artifacts/f'{layout}-hours.png'),full_page=True);assert not errors,errors;context.close()
     store=HoursStore();context,page,errors=open_manager(browser,url,store,width=390,locale='es')
     dialog=hours(page,THURSDAY,'es');dialog.get_by_role('radio',name='Cerrado todo el día',exact=True).check()
     options(dialog,'es');dialog.get_by_label('Descripción (opcional)',exact=True).fill('Acción de Gracias')
     dialog.evaluate("element => element.style.fontSize = '20px'")
     assert dialog.evaluate('element=>element.scrollWidth<=element.clientWidth+1'), 'enlarged Spanish dialog must not clip horizontally'
-    expect(dialog.get_by_role('button',name='Guardar horario',exact=True)).to_be_visible()
+    expect(dialog.get_by_role('button',name='Aplicar',exact=True)).to_be_visible()
     dialog.screenshot(path=str(artifacts/'spanish-phone-preview.png'))
-    dialog.get_by_role('button',name='Guardar horario',exact=True).click();expect(dialog).not_to_be_visible()
+    dialog.get_by_role('button',name='Aplicar',exact=True).click();expect(dialog).not_to_be_visible()
     expect(page.get_by_role('button',name='Horario del '+THURSDAY,exact=True)).to_contain_text('Cerrado')
+    page.get_by_role('button',name='Configurar horario',exact=True).click();editor=page.locator('[data-hours-editor]')
+    for d in [WEDNESDAY,'2026-11-28']:editor.get_by_label('Seleccionar '+d+' para horario',exact=True).check()
+    editor.get_by_role('radio',name='Cerrado todo el día',exact=True).check();editor.evaluate("e=>e.style.fontSize='20px'")
+    assert editor.evaluate('e=>e.scrollWidth<=e.clientWidth+1')
+    editor.screenshot(path=str(artifacts/'inline-spanish-bulk.png'))
+    editor.get_by_role('button',name='Aplicar a 2 días',exact=True).click();expect(editor).not_to_be_visible()
     page.set_viewport_size({'width':320,'height':844});assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'page should reflow around the bounded board'
     assert not errors,errors;context.close()
 
@@ -216,11 +227,11 @@ def check_deep_link_and_unavailable(browser,url):
     page.goto(f'{url}/scheduler-demo/CR2-diningroom.html?week={WEEK}&hoursDate={THURSDAY}',wait_until='networkidle')
     page.get_by_label('Manager code',exact=True).fill('fixture-password');page.get_by_role('button',name='Open the scheduler',exact=True).click()
     expect(page.locator('[data-hours-banner]')).to_contain_text('need review')
-    expect(page.get_by_role('dialog')).not_to_be_visible()
+    expect(page.locator('[data-hours-editor]')).not_to_be_visible()
     expect(page.get_by_role('button',name='Hours for '+THURSDAY,exact=True)).to_be_disabled()
     paused[0]=False
     for request in held:store.route(request)
-    dialog=page.get_by_role('dialog');expect(dialog).to_be_visible()
+    dialog=page.locator('[data-hours-editor]');expect(dialog).to_be_visible()
     expect(dialog.get_by_role('radio',name='Closed all day',exact=True)).to_be_checked()
     expect(dialog.get_by_text('Late cleanup',exact=True)).to_have_count(0)
     dialog.get_by_role('button',name='Cancel',exact=True).click();assert not errors,errors;context.close()
@@ -238,18 +249,18 @@ def check_conflict_and_kitchen_lock(browser,url):
     options(dialog);dialog.get_by_label('Label (optional)',exact=True).fill('Original entered label')
     store.events[('CR2',THURSDAY)]={'schemaVersion':1,'family':'schedule','id':'hours-'+THURSDAY,'storeId':'CR2','context':{'kind':'day','businessDate':THURSDAY},
         'revision':1,'createdAt':views.UPDATED,'updatedAt':views.UPDATED,'data':{'version':1,'date':THURSDAY,'mode':'closed','closeMinute':None,'label':'Other manager'}}
-    dialog.get_by_role('button',name='Save hours',exact=True).click()
+    dialog.get_by_role('button',name='Apply',exact=True).click()
     expect(dialog.get_by_role('alert')).to_contain_text('changed elsewhere')
     expect(dialog.get_by_label('Label (optional)',exact=True)).to_have_value('Original entered label')
     dialog.get_by_role('button',name='Reload latest',exact=True).click()
-    expect(dialog.get_by_role('button',name='Save hours',exact=True)).to_be_enabled();apply(dialog)
+    expect(dialog.get_by_role('button',name='Apply',exact=True)).to_be_enabled();apply(dialog)
     assert store.events[('CR2',THURSDAY)]['revision']==2
     assert store.events[('CR2',THURSDAY)]['data']['label']=='Original entered label'
     assert not errors,errors;context.close()
     store=HoursStore();context,page,errors=open_manager(browser,url,store,'CR3-kitchen')
     dialog=hours(page,THURSDAY)
     expect(dialog.get_by_text('Unlock this station’s staff editing',exact=False)).to_be_visible()
-    expect(dialog.get_by_role('button',name='Save hours',exact=True)).to_be_disabled()
+    expect(dialog.get_by_role('button',name='Apply',exact=True)).to_be_disabled()
     expect(dialog.get_by_role('radio',name='Closed all day',exact=True)).to_be_disabled()
     dialog.get_by_role('button',name='Cancel',exact=True).click()
     assert not store.events and not errors,(store.events,errors);context.close()
@@ -260,7 +271,7 @@ def check_simple_hours(browser,url,artifacts):
     dialog=hours(page,THURSDAY)
     expect(dialog.get_by_role('radio')).to_have_count(3)
     expect(dialog.get_by_role('radio',name='Normal hours',exact=True)).to_be_checked()
-    expect(dialog.get_by_role('button',name='Save hours',exact=True)).to_be_disabled()
+    expect(dialog.get_by_role('button',name='Apply',exact=True)).to_be_disabled()
     expect(dialog.get_by_label('Label (optional)',exact=True)).not_to_be_visible()
     expect(dialog.get_by_text('Staffing preview',exact=True)).to_have_count(0)
     expect(dialog.get_by_text('Needs review',exact=True)).to_have_count(0)
@@ -291,13 +302,154 @@ def check_simple_hours(browser,url,artifacts):
     dialog=hours(page,THURSDAY)
     expect(dialog.get_by_label('Employee finish time · Evening minute',exact=True)).not_to_be_visible()
     expect(dialog.get_by_text('Custom employee finish times are set in More options.',exact=True)).to_be_visible()
-    apply(dialog)
+    expect(dialog.get_by_role('button',name='Apply',exact=True)).to_be_disabled()
+    dialog.get_by_role('button',name='Cancel',exact=True).click()
     assert store.reviews[('CR2','CR2-diningroom',THURSDAY)]['data']['decisions'][0]['end']==1125
     page.set_viewport_size({'width':390,'height':844});dialog=hours(page,THURSDAY)
     dialog.screenshot(path=str(artifacts/'simple-early-phone.png'))
     page.set_viewport_size({'width':320,'height':844})
     assert dialog.evaluate('element=>element.scrollWidth<=element.clientWidth+1')
     dialog.get_by_role('button',name='Cancel',exact=True).click()
+    assert not errors,errors;context.close()
+
+
+def bulk(page):
+    page.get_by_role('button',name='Set hours',exact=True).click()
+    editor=page.locator('[data-hours-editor]');expect(editor).to_be_visible();return editor
+
+def select_dates(editor,dates):
+    for d in dates:editor.get_by_label('Select '+d+' for hours',exact=True).check()
+
+def check_bulk_hours(browser,url,artifacts):
+    store=HoursStore();context,page,errors=open_manager(browser,url,store)
+    page.get_by_role('button',name='Make schedule',exact=True).click()
+    editor=bulk(page)
+    expect(editor.get_by_role('button',name='Apply',exact=True)).to_be_disabled()
+    expect(editor.locator('input[type=radio]:checked')).to_have_count(0)
+    select_dates(editor,[WEDNESDAY,THURSDAY,'2026-11-28'])
+    editor.get_by_role('radio',name='Closed all day',exact=True).check()
+    expect(editor.get_by_role('button',name='Apply to 3 days',exact=True)).to_be_enabled()
+    expect(page.get_by_role('dialog')).to_have_count(0)
+    editor.screenshot(path=str(artifacts/'inline-bulk-desktop.png'))
+    page.screenshot(path=str(artifacts/'inline-bulk-on-board.png'),full_page=True)
+    assert not store.events, 'settings must wait for Apply'
+    store.fail_date=THURSDAY
+    editor.get_by_role('button',name='Apply to 3 days',exact=True).click()
+    expect(editor.get_by_text('1 of 3 dates saved. This draft has not been updated.',exact=True)).to_be_visible()
+    expect(page.locator('[data-planning-slot]')).to_have_count(21)
+    expect(page.locator('[data-scheduler-content]')).to_have_attribute('inert','')
+    assert ('CR2','2026-11-28') not in store.events
+    assigned=page.locator('[data-planning-slot]').evaluate_all("nodes=>nodes.map(n=>n.dataset.employeeId)")
+    page.keyboard.press('Control+z')
+    assert page.locator('[data-planning-slot]').evaluate_all("nodes=>nodes.map(n=>n.dataset.employeeId)")==assigned
+    # A successful background refresh must not release the uncertain editor lock.
+    page.evaluate("window.dispatchEvent(new Event('focus'))")
+    expect(page.locator('[data-scheduler-content]')).to_have_attribute('inert','')
+    editor.get_by_role('button',name='Retry remaining dates',exact=True).click()
+    expect(editor).not_to_be_visible()
+    expect(page.locator('[data-planning-slot]')).to_have_count(12)
+    assert len([op for op in store.attempts if op[0].endswith(WEDNESDAY)])==1
+    assert len(set(store.attempts))==6 and len(store.attempts)==7
+    page.get_by_role('button',name='Undo',exact=True).first.click()
+    expect(page.locator('[data-planning-slot]')).to_have_count(21)
+    assert len(store.events)==3, 'Undo restores the draft, not shared saves'
+    editor=bulk(page);select_dates(editor,[WEDNESDAY,THURSDAY,'2026-11-28']);editor.get_by_role('radio',name='Closed all day',exact=True).check()
+    editor.get_by_role('button',name='Apply to 3 days',exact=True).click();expect(editor).not_to_be_visible()
+    assert len(store.attempts)==7, 'reapplying confirmed records must not write again'
+    # A separate early-close group does not alter the closed dates.
+    editor=hours(page,'2026-11-23');editor.get_by_role('radio',name='Close early',exact=True).check()
+    editor.get_by_role('button',name='Apply to more days',exact=True).click();select_dates(editor,['2026-11-24'])
+    editor.get_by_role('button',name='Apply to 2 days',exact=True).click();expect(editor).not_to_be_visible()
+    assert all(store.events[('CR2',d)]['data']['mode']=='closed' for d in [WEDNESDAY,THURSDAY,'2026-11-28'])
+    assert all(store.events[('CR2',d)]['data']['closeMinute']==1140 for d in ['2026-11-23','2026-11-24'])
+    editor=bulk(page);editor.get_by_role('button',name='All week',exact=True).click()
+    expect(editor.get_by_role('checkbox').filter(visible=True)).to_have_count(7)
+    editor.get_by_role('button',name='Clear selection',exact=True).click()
+    expect(editor.get_by_role('button',name='Apply',exact=True)).to_be_disabled()
+    editor.get_by_role('button',name='All week',exact=True).click();editor.get_by_role('radio',name='Closed all day',exact=True).check()
+    editor.get_by_role('button',name='Apply to 7 days',exact=True).click();expect(editor).not_to_be_visible()
+    expect(page.locator('[data-planning-slot]')).to_have_count(0);publish(page)
+    assert store.saved[('/api/schedule/'+WEEK,'CR2-diningroom','')]['week']['slotPeople']==[]
+    assert not errors,errors;context.close()
+
+def check_inline_dismissal_and_edges(browser,url,artifacts):
+    store=HoursStore();context,page,errors=open_manager(browser,url,store,width=390)
+    trigger=page.get_by_role('button',name='Hours for '+THURSDAY,exact=True)
+    editor=hours(page,THURSDAY)
+    expect(trigger).to_have_attribute('aria-expanded','true')
+    page.get_by_role('button',name='Next week',exact=True).click()
+    expect(editor).not_to_be_visible()
+    page.get_by_role('button',name='Previous week',exact=True).click()
+    editor=hours(page,THURSDAY);editor.get_by_role('radio',name='Close early',exact=True).check()
+    page.get_by_role('button',name='Next week',exact=True).click()
+    expect(editor).to_be_visible();expect(trigger).to_be_visible()
+    expect(editor.get_by_label('Customer closing time hour',exact=True)).to_have_value('7')
+    box=editor.bounding_box();assert box['x']>=0 and box['x']+box['width']<=390
+    editor.screenshot(path=str(artifacts/'inline-early-phone.png'))
+    page.keyboard.press('Escape');expect(editor).not_to_be_visible();expect(trigger).to_be_focused()
+    editor=bulk(page);select_dates(editor,[THURSDAY,'2026-11-27']);editor.get_by_role('radio',name='Closed all day',exact=True).check()
+    editor.screenshot(path=str(artifacts/'inline-bulk-phone.png'))
+    page.set_viewport_size({'width':320,'height':640})
+    expect(editor).to_be_visible();assert editor.evaluate('e=>e.scrollWidth<=e.clientWidth+1')
+    editor.get_by_role('button',name='Cancel',exact=True).click()
+    assert not store.events and not errors,(store.events,errors);context.close()
+
+
+def check_event_and_verification_failures(browser,url):
+    # Lost event-write response: repeat the same operation, then save its review once.
+    store=HoursStore();context,page,errors=open_manager(browser,url,store)
+    editor=hours(page,THURSDAY);editor.get_by_role('radio',name='Closed all day',exact=True).check();store.fail_event=True
+    editor.get_by_role('button',name='Apply',exact=True).click()
+    expect(editor.get_by_role('button',name='Retry remaining dates',exact=True)).to_be_enabled()
+    assert ('CR2',THURSDAY) in store.events and not store.reviews
+    editor.get_by_role('button',name='Retry remaining dates',exact=True).click();expect(editor).not_to_be_visible()
+    assert store.events[('CR2',THURSDAY)]['revision']==1 and len(set(store.attempts))==2
+    assert not errors,errors;context.close()
+    # All writes succeed, but the verification read fails. Retry must only read.
+    store=HoursStore();context,page,errors=open_manager(browser,url,store)
+    page.get_by_role('button',name='Make schedule',exact=True).click()
+    editor=bulk(page);select_dates(editor,[THURSDAY,'2026-11-27']);editor.get_by_role('radio',name='Closed all day',exact=True).check()
+    store.hold_final=True;editor.get_by_role('button',name='Apply to 2 days',exact=True).click()
+    expect(editor.get_by_role('button',name='Saving…',exact=True)).to_be_visible()
+    page.wait_for_function("()=>document.querySelector('[data-scheduler-content]').inert")
+    for _ in range(100):
+        if store.held_reads:break
+        page.wait_for_timeout(20)
+    assert store.held_reads and len(store.reviews)==2
+    expect(page.locator('[data-planning-slot]')).to_have_count(21)
+    store.hold_final=False;store.fail_read=True
+    for request in store.held_reads:store.route(request)
+    expect(editor.get_by_text('2 of 2 dates saved. This draft has not been updated.',exact=True)).to_be_visible()
+    attempts=list(store.attempts);store.fail_read=False
+    editor.get_by_role('button',name='Retry remaining dates',exact=True).click();expect(editor).not_to_be_visible()
+    assert store.attempts==attempts
+    expect(page.locator('[data-planning-slot]')).to_have_count(15)
+    assert not errors,errors;context.close()
+
+def check_bulk_labels_and_normal(browser,url):
+    store=HoursStore();context,page,errors=open_manager(browser,url,store)
+    for d,label in [(THURSDAY,'Thanksgiving'),('2026-11-27','Friday')]:
+        editor=hours(page,d);editor.get_by_role('radio',name='Close early',exact=True).check();options(editor)
+        editor.get_by_label('Label (optional)',exact=True).fill(label)
+        if d==THURSDAY:editor.get_by_label('Employee finish time · Evening minute',exact=True).select_option('30')
+        apply(editor)
+    editor=bulk(page);select_dates(editor,[THURSDAY,'2026-11-27']);editor.get_by_role('radio',name='Close early',exact=True).check()
+    # Matching policy keeps each label and the Thursday cleanup finish.
+    expect(editor.get_by_role('button',name='Apply to 2 days',exact=True)).to_be_disabled()
+    options(editor);editor.get_by_label('Change labels',exact=True).check();editor.get_by_label('Label (optional)',exact=True).fill('Holiday hours')
+    editor.get_by_role('button',name='Apply to 2 days',exact=True).click();expect(editor).not_to_be_visible()
+    assert all(store.events[('CR2',d)]['data']['label']=='Holiday hours' for d in [THURSDAY,'2026-11-27'])
+    assert store.reviews[('CR2','CR2-diningroom',THURSDAY)]['data']['decisions'][0]['end']==1170
+    editor=bulk(page);select_dates(editor,[THURSDAY,'2026-11-27']);editor.get_by_role('radio',name='Close early',exact=True).check()
+    editor.get_by_label('Customer closing time hour',exact=True).select_option('6')
+    editor.get_by_role('button',name='Apply to 2 days',exact=True).click();expect(editor).not_to_be_visible()
+    assert all(store.events[('CR2',d)]['data']['label']=='Holiday hours' for d in [THURSDAY,'2026-11-27'])
+    assert store.reviews[('CR2','CR2-diningroom',THURSDAY)]['data']['decisions'][0]['end']==1080
+    editor=bulk(page);select_dates(editor,[THURSDAY,'2026-11-27']);editor.get_by_role('radio',name='Normal hours',exact=True).check()
+    options(editor);editor.get_by_label('Change labels',exact=True).check();editor.get_by_label('Label (optional)',exact=True).fill('')
+    editor.get_by_role('button',name='Apply to 2 days',exact=True).click();expect(editor).not_to_be_visible()
+    assert all(store.events[('CR2',d)]['data']['mode']=='normal' and store.events[('CR2',d)]['data']['label']=='' for d in [THURSDAY,'2026-11-27'])
+    expect(page.locator('[data-planning-slot]')).to_have_count(21)
     assert not errors,errors;context.close()
 
 if __name__=='__main__':
@@ -307,6 +459,10 @@ if __name__=='__main__':
     artifacts=Path(args.artifacts);artifacts.mkdir(parents=True,exist_ok=True)
     with sync_playwright() as playwright:
         browser=playwright.chromium.launch(headless=True)
+        check_bulk_hours(browser,args.url.rstrip('/'),artifacts)
+        check_inline_dismissal_and_edges(browser,args.url.rstrip('/'),artifacts)
+        check_event_and_verification_failures(browser,args.url.rstrip('/'))
+        check_bulk_labels_and_normal(browser,args.url.rstrip('/'))
         check_simple_hours(browser,args.url.rstrip('/'),artifacts)
         check_workflow(browser,args.url.rstrip('/'),artifacts)
         check_layouts_and_language(browser,args.url.rstrip('/'),artifacts)
@@ -314,4 +470,4 @@ if __name__=='__main__':
         check_deep_link_and_unavailable(browser,args.url.rstrip('/'))
         check_conflict_and_kitchen_lock(browser,args.url.rstrip('/'))
         browser.close()
-    print('PASS: items 1–6, all layouts, shared dates, cleanup, uncertain retry, Undo, copying, separate publication, staff/print, Spanish/reflow and service recovery; synthetic APIs only')
+    print('PASS: inline single/bulk/week hours, partial-save recovery, labels and cleanup preservation, one Undo, keyboard/context guards; items 1–6, all layouts, shared dates, cleanup, uncertain retry, Undo, copying, separate publication, staff/print, Spanish/reflow and service recovery; synthetic APIs only')
