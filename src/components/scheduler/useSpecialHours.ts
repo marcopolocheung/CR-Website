@@ -4,6 +4,7 @@ import { STATION_STORES, type StationId } from '@/lib/internal-tools/contracts'
 import { dateForDay } from '@/lib/scheduler/week'
 import { fetchSpecialHours, SpecialHoursError } from '@/lib/scheduler/special-hours-store'
 import type { HoursReviewRecord, SpecialHoursPage, SpecialHoursRecord } from '@/lib/scheduler/special-hours'
+import type { HoursResult } from '@/lib/scheduler/hours-batch'
 
 export function useSpecialHours(station: StationId,week: string,token: string) {
   const store=STATION_STORES[station],end=week?dateForDay(week,'Saturday'):''
@@ -31,14 +32,15 @@ export function useSpecialHours(station: StationId,week: string,token: string) {
     try{channel=new BroadcastChannel('cr-special-hours');channel.onmessage=()=>void reload()}catch{/* Optional refresh signal. */}
     return()=>{epoch.current++;window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',focus);channel?.close()}
   },[reload])
-  function accept(event:SpecialHoursRecord,review:HoursReviewRecord) {
+  function acceptMany(results:readonly HoursResult[]) {
     epoch.current++
     setState(old=>old.key!==key?old:{...old,phase:'ready',page:old.page?{...old.page,
-      events:[...old.page.events.filter(e=>e.id!==event.id),event].sort((a,b)=>a.data.date.localeCompare(b.data.date)),
-      reviews:[...old.page.reviews.filter(r=>r.id!==review.id),review]}:null})
+      events:[...old.page.events.filter(e=>!results.some(r=>r.event.id===e.id)),...results.map(r=>r.event)].sort((a,b)=>a.data.date.localeCompare(b.data.date)),
+      reviews:[...old.page.reviews.filter(review=>!results.some(r=>r.review.id===review.id)),...results.map(r=>r.review)]}:null})
     try{const channel=new BroadcastChannel('cr-special-hours');channel.postMessage({store,week});channel.close()}catch{/* Reload remains available. */}
   }
+  function accept(event:SpecialHoursRecord,review:HoursReviewRecord) { acceptMany([{event,review}]) }
   function uncertain(){epoch.current++;setState(old=>({...old,phase:'uncertain'}))}
-  return {store,key,page:state.key===key?state.page:null,phase:state.key===key?state.phase:'loading' as const,reload,accept,uncertain}
+  return {store,key,page:state.key===key?state.page:null,phase:state.key===key?state.phase:'loading' as const,reload,accept,acceptMany,uncertain}
 }
 export type SpecialHoursSource=ReturnType<typeof useSpecialHours>

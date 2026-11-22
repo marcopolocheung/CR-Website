@@ -36,7 +36,7 @@ export type ScheduleWorkspaceProps = {
   hoursBlocked:boolean
   canPublishEmpty:boolean
   hoursLocale:Locale
-  onEditHours:(date:string)=>void
+  onEditHours:(date:string,anchor?:HTMLElement)=>void
   weekStart: string
   assignments: ScheduleAssignment[]
   slots: StaffingSlot[]

@@ -37,9 +37,12 @@ import { fetchGoldenMonth, fetchGoldenWeek, saveErrorMessage, type GoldenWeekDoc
 import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForPublication, publishedWeekFingerprint } from '@/lib/schedule-share'
 import { buildScheduleSnapshot } from '@/lib/schedule-snapshot'
 import { businessDate } from '@/lib/internal-tools/contracts'
-import { resolveSpecialHours, type DraftHoursReviews, type HoursReviewRecord, type SpecialHoursRecord } from '@/lib/scheduler/special-hours'
+import { resolveSpecialHours, type DraftHoursReviews, type HoursReviewRecord } from '@/lib/scheduler/special-hours'
 import { useSpecialHours } from './useSpecialHours'
-import SpecialHoursDialog, { HoursBanner, HoursStationStatus, HoursSummary as SpecialHoursSummary } from './SpecialHours'
+import HoursEditor from './HoursEditor'
+import type { HoursResult } from '@/lib/scheduler/hours-batch'
+import type { SpecialHoursPage } from '@/lib/scheduler/special-hours'
+import { HoursBanner, HoursStationStatus, HoursSummary as SpecialHoursSummary } from './SpecialHours'
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
 import { useManagerCode } from './DemoGate'
 import { DEFAULT_STATION, isStationId, type Locale } from '@/lib/internal-tools/contracts'
@@ -238,7 +241,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const requestSource = useScheduleRequests(requestStation, managerCode)
   const hoursSource = useSpecialHours(requestStation, weekStart, managerCode)
   const [hoursDraftReviews, setHoursDraftReviews] = useState<Record<string,DraftHoursReviews>>({})
-  const [hoursDate,setHoursDate] = useState<string|null>(null)
+  const [hoursEditor,setHoursEditor] = useState<{date:string|null;anchor:HTMLElement|null}|null>(null)
+  const [hoursBusy,setHoursBusy] = useState(false)
   const [hoursDirty,setHoursDirty] = useState(false)
   const hoursScope=useRef('')
   hoursScope.current=`${requestStation}:${weekStart}`
@@ -294,7 +298,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   },[hoursDraftReviews,weekStart,hoursSource.page,requestStation])
   const resolvedHours=useMemo(()=>resolveSpecialHours(baseSlots,hoursSource.page?.events??[],activeHoursReviews,requestStation),[baseSlots,hoursSource.page,activeHoursReviews,requestStation])
   const slots=resolvedHours.slots
-  const hoursBlocked=hoursSource.phase==='loading'||hoursSource.phase==='failed'||hoursSource.phase==='uncertain'||resolvedHours.pending.length>0
+  const hoursBlocked=hoursBusy||hoursSource.phase==='loading'||hoursSource.phase==='failed'||hoursSource.phase==='uncertain'||resolvedHours.pending.length>0
   const canPublishEmpty=slots.length===0&&resolvedHours.days.length===7&&resolvedHours.days.every(day=>day.mode==='closed')&&!hoursBlocked
   const hoursSnapshot=useMemo(()=>buildScheduleSnapshot(slots,'published',resolvedHours.days),[slots,resolvedHours.days])
   // Scheduling checks see approved requests as dated overrides; the saved staff list never stores them.
@@ -316,6 +320,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       isGenerating || !!staffLoadError || ruleProblems.length > 0 || hoursBlocked,
     onCommit: (next, nextExclusions) => { commitSchedule('draft before adjustment', next); setExclusions([...nextExclusions]) },
   })
+  useEffect(()=>{
+    if(hoursBusy){adjustment.cancel();generationJobs.current.cancel();setIsGenerating(false)}
+  },[hoursBusy])
   useEffect(() => {
     generationJobs.current.cancel(); setIsGenerating(false)
     return () => generationJobs.current.cancel()
@@ -462,7 +469,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     const query=new URLSearchParams(window.location.search),requested=query.get('week')??''
     const start = businessDate(requested)&&new Date(requested+'T00:00:00Z').getUTCDay()===0?requested:currentWeekStart()
     const requestedHours=query.get('hoursDate')??''
-    if(businessDate(requestedHours)&&requestedHours>=start&&requestedHours<=dateForDay(start,'Saturday'))setHoursDate(requestedHours)
+    if(businessDate(requestedHours)&&requestedHours>=start&&requestedHours<=dateForDay(start,'Saturday'))setHoursEditor({date:requestedHours,anchor:null})
     setWeekStart(start)
     setMonthKey(monthKeyForWeek(start))
     setOnboardingDismissed(readOnboardingDismissed())
@@ -750,6 +757,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       if (!link || link.getAttribute('target') === '_blank' || event.defaultPrevented) return
       const href = link.getAttribute('href') ?? ''
       if (href.startsWith('#') || href.startsWith('sms:') || href.startsWith('mailto:')) return
+      if(hoursBusy){event.preventDefault();event.stopPropagation();return}
       if (!window.confirm(message)) {
         event.preventDefault()
         event.stopPropagation()
@@ -761,7 +769,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       window.removeEventListener('beforeunload', warnOnUnload)
       document.removeEventListener('click', warnOnLink, true)
     }
-  }, [hasUnsavedWork])
+  }, [hasUnsavedWork,hoursBusy])
 
   function dismissOnboarding() {
     setOnboardingDismissed(true)
@@ -817,6 +825,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // week 2 (12 staff) stay independent.
   function goToWeek(nextWeekStart: string) {
     if (!nextWeekStart || nextWeekStart === weekStart) return
+    if(hoursDirty||hoursBusy){setSetupNotice(translate(requestLocale,'hours.finishFirst'));return}
     adjustment.cancel(); generationJobs.current.cancel(); setIsGenerating(false)
     setExternalAvailability(false)
     const fromWeek = weekStart
@@ -826,7 +835,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       setTemplateRevs((current) => (current[nextWeekStart] !== undefined ? current : { ...current, [nextWeekStart]: 0 }))
     }
     setWeekStart(nextWeekStart)
-    setHoursDate(null)
+    setHoursEditor(null)
     setMonthKey(monthKeyForWeek(nextWeekStart))
     setDiagnostics([])
     setLastReport(null)
@@ -937,6 +946,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   function undoLastChange() {
+    if(hoursBusy)return
     adjustment.cancel(); adjustment.clearReport(); generationJobs.current.cancel(); setIsGenerating(false)
     const [snapshot, ...rest] = history
     if (!snapshot) return
@@ -1257,24 +1267,26 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setIgnoredIssueIds([])
   }
 
-  function openHours(date:string) {
+  function openHours(date:string,anchor?:HTMLElement) { openHoursEditor(date,anchor) }
+  function openHoursEditor(date:string|null,anchor?:HTMLElement) {
+    if(hoursDirty||hoursBusy){setSetupNotice(translate(requestLocale,'hours.finishFirst'));return}
     if(adjustment.busy||isGenerating||hoursSource.phase!=='ready'||storeLoading||storeOffline)return
-    setHoursDraftReviews(old=>({...old,[weekStart]:{...(old[weekStart]??Object.fromEntries(activeHoursReviews.map(r=>[r.data.date,r]))),
-      [date]:activeHoursReviews.find(r=>r.data.date===date)??null}}))
-    setHoursDate(date)
+    setHoursEditor({date,anchor:anchor??document.activeElement as HTMLElement|null})
   }
-  function applyHours(event:SpecialHoursRecord,review:HoursReviewRecord) {
-    if(hoursScope.current!==`${review.data.stationId}:${weekStart}`)return
+  function applyHours(results:readonly HoursResult[],page:SpecialHoursPage) {
+    if(!results.length||results.some(result=>hoursScope.current!==`${result.review.data.stationId}:${weekStart}`))return
     adjustment.cancel();generationJobs.current.cancel();setIsGenerating(false)
     remember('updated restaurant hours')
-    const nextReviews=activeHoursReviews.filter(r=>r.data.date!==event.data.date).concat(review)
-    const events=(hoursSource.page?.events??[]).filter(e=>e.data.date!==event.data.date).concat(event)
-    const next=resolveSpecialHours(baseSlots,events,nextReviews,requestStation)
+    const dates=new Set(results.map(result=>result.event.data.date))
+    const nextReviews=activeHoursReviews.filter(r=>!dates.has(r.data.date)).concat(results.map(result=>result.review))
+    const next=resolveSpecialHours(baseSlots,page.events,nextReviews,requestStation)
     const ids=new Set(next.slots.map(slot=>slot.id)),removed=assignments.filter(a=>!ids.has(a.slotId))
-    setHoursDraftReviews(old=>({...old,[weekStart]:{...(old[weekStart]??{}),[event.data.date]:review}}))
+    setHoursDraftReviews(old=>({...old,[weekStart]:{
+      ...(old[weekStart]??Object.fromEntries(activeHoursReviews.map(r=>[r.data.date,r]))),
+      ...Object.fromEntries(results.map(result=>[result.event.data.date,result.review]))}}))
     setAssignments(assignments.filter(a=>ids.has(a.slotId)))
     setWeekStatus(old=>old[weekStart]?old:{...old,[weekStart]:'on'})
-    setDiagnostics([translate(requestLocale,'hours.updated',{date:event.data.date,removed:translate(requestLocale,'hours.removed',{count:removed.length,kept:removed.filter(a=>a.locked).length})}),t('hours.undo')])
+    setDiagnostics([translate(requestLocale,'hours.batchUpdated',{count:results.length,removed:translate(requestLocale,'hours.removed',{count:removed.length,kept:removed.filter(a=>a.locked).length})}),t('hours.undo')])
     setSetupNotice(t('hours.saved'))
   }
 
@@ -1543,12 +1555,16 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   function changeLayout(next: SchedulerLayout) {
+    if(hoursDirty||hoursBusy){setSetupNotice(translate(requestLocale,'hours.finishFirst'));return}
+    setHoursEditor(null)
     adjustment.cancel(); generationJobs.current.cancel(); setIsGenerating(false)
     setLayout(next)
     try { window.localStorage.setItem(layoutStorageKey, next) } catch { /* view preference only */ }
   }
 
   function toggleLayout() {
+    if(hoursDirty||hoursBusy){setSetupNotice(translate(requestLocale,'hours.finishFirst'));return}
+    setHoursEditor(null)
     setLayout((current) => {
       const next: SchedulerLayout = current === 'classic' ? 'new' : 'classic'
       try {
@@ -1743,7 +1759,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
   return (
     <PlanningShell enabled={layout === 'workspace'} locale={requestLocale} onSchedule={() => setTab('schedule')}>
-    <div className={layout === 'workspace' ? undefined : 'bg-zinc-100 text-zinc-950'} data-scheduler-content>
+    <div className={layout === 'workspace' ? undefined : 'bg-zinc-100 text-zinc-950'} data-scheduler-content inert={hoursBusy}>
       <header className="border-b border-zinc-200 bg-white">
         <div className="px-4 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1793,7 +1809,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           <SchedulerNavigation
             view={tab}
             settingsDirty={setupParts.length > 0}
-            onChange={setTab}
+            onChange={next=>{if(hoursDirty||hoursBusy){setSetupNotice(t('hours.finishFirst'));return}setHoursEditor(null);setTab(next)}}
             labels={layout === 'workspace' ? { schedule: t('planning.schedule'), settings: t('planning.settings') } : layout === 'new' ? { schedule: 'Schedule', settings: 'Staff & rules' } : undefined}
             neutral={layout !== 'classic'}
           />
@@ -1805,6 +1821,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
               </p>
               <IconButton icon="chevronRight" label={layout === 'workspace' ? t('planning.next') : 'Next week'} onClick={() => goToWeek(shiftWeek(weekStart, 1))} disabled={!weekStart} />
             </div>
+            <button type="button" id="set-week-hours" aria-expanded={false} disabled={!weekStart||scheduleWorkspace.hoursDisabled}
+              className="min-h-11 border border-zinc-500 bg-white px-3 py-2 text-sm font-semibold text-[#1b6460]"
+              onClick={event=>openHoursEditor(null,event.currentTarget)}>{t('hours.setHours')}</button>
             {weekStart && weekStart !== currentWeekStart() && (
               <Button onClick={() => goToWeek(currentWeekStart())} icon="reset">{layout === 'workspace' ? t('planning.thisWeek') : 'This week'}</Button>
             )}
@@ -2565,10 +2584,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           </div>}
           <div hidden={tab !== 'schedule'} className="print:hidden">{requestsPanel}</div>
       </main>
-      {hoursDate&&rosterLoaded&&templateLoaded&&!storeOffline&&hoursSource.phase!=='unconfigured'&&hoursSource.page&&<SpecialHoursDialog key={`${requestStation}:${weekStart}:${hoursDate}`} date={hoursDate} week={weekStart} station={requestStation} locale={requestLocale}
-        source={hoursSource} base={baseSlots.filter(slot=>slot.date===hoursDate)} assignments={assignments} employees={employees} locked={scheduleOnly&&!staffUnlocked}
-        selectedReview={activeHoursReviews.find(r=>r.data.date===hoursDate)??null} onClose={()=>setHoursDate(null)} onDirty={setHoursDirty}
-        onApplied={(event,review)=>{if(hoursScope.current===`${requestStation}:${weekStart}`)applyHours(event,review)}} onNavigate={()=>{}}/>}
+      {hoursEditor&&rosterLoaded&&templateLoaded&&!storeOffline&&hoursSource.page&&<HoursEditor key={`${requestStation}:${weekStart}:${hoursEditor.date??'week'}`}
+        date={hoursEditor.date} week={weekStart} anchor={hoursEditor.anchor} station={requestStation} locale={requestLocale}
+        source={hoursSource} base={baseSlots} assignments={assignments} employees={employees} locked={scheduleOnly&&!staffUnlocked}
+        activeReviews={activeHoursReviews} onClose={()=>setHoursEditor(null)} onDirty={setHoursDirty} onBusy={setHoursBusy}
+        onApplied={applyHours}/>}
+
     </div>
     </PlanningShell>
   )

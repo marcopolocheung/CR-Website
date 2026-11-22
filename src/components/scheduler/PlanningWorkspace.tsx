@@ -139,7 +139,7 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
         <div ref={boardRef} className={css.boardScroll} tabIndex={0} aria-label={t('planning.scroll')}><div className={css.board}>
           {DAYS.map(day => <section key={day} className={css.day}><h3>{dateText(dateForDay(p.weekStart, day))}</h3>
             <DayHoursControl date={dateForDay(p.weekStart,day)} locale={locale} event={p.hoursDays.find(e=>e.date===dateForDay(p.weekStart,day))}
-              pending={p.hoursPending.includes(dateForDay(p.weekStart,day))} disabled={p.hoursDisabled} onEdit={()=>p.onEditHours(dateForDay(p.weekStart,day))}/>
+              pending={p.hoursPending.includes(dateForDay(p.weekStart,day))} disabled={p.hoursDisabled} onEdit={anchor=>p.onEditHours(dateForDay(p.weekStart,day),anchor)}/>
             {PERIODS.map(period => <div key={period} className={css.period}>
               {p.slots.filter(s => s.day === day && s.period === period).map(s => {
                 const a = p.assignmentMap.get(s.id)
