@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { buildPublishedWeek, publishedWeekFingerprint, templateHashForSlots } from '@/lib/schedule-share'
+import { buildScheduleSnapshot } from '@/lib/schedule-snapshot'
+import type { ScheduleSnapshot } from '@/lib/schedule-snapshot'
 import {
   StoreConflictError,
   fetchGoldenWeek,
   saveErrorMessage,
   saveGoldenWeek,
+  requireScheduleSnapshots,
   type GoldenWeekDoc,
 } from '@/lib/schedule-store'
 import type { Employee, ScheduleAssignment, StaffingSlot, WeekStatus } from '@/lib/scheduler'
@@ -40,6 +43,8 @@ export default function PublishPanel({
   unsavedSetup,
   onSaveSetup,
   onPublished,
+  snapshot:providedSnapshot,
+  canPublishEmpty=false,
 }: {
   weekStart: string
   weekLabel: string
@@ -56,6 +61,8 @@ export default function PublishPanel({
   /** Saves the setup with the manager code; false when it failed (it shows its own error). */
   onSaveSetup: () => Promise<boolean>
   onPublished: (doc: GoldenWeekDoc) => void
+  snapshot?:ScheduleSnapshot
+  canPublishEmpty?:boolean
 }) {
   const managerCode = useManagerCode()
   const [name, setName] = useState(`Week of ${weekLabel}`)
@@ -88,10 +95,11 @@ export default function PublishPanel({
     () => buildPublishedWeek({ weekStart, name, slots, employees, assignments }),
     [weekStart, name, slots, employees, assignments],
   )
-  const fingerprint = publishedWeekFingerprint(week)
+  const snapshot = useMemo(() => providedSnapshot??buildScheduleSnapshot(slots), [slots,providedSnapshot])
+  const fingerprint = publishedWeekFingerprint(week, snapshot)
   const dirty =
     unsavedSetup.length > 0 ||
-    (serverFingerprint === null ? filled > 0 : serverFingerprint !== fingerprint || serverVisible !== visible)
+    (serverFingerprint === null ? filled > 0 || canPublishEmpty : serverFingerprint !== fingerprint || serverVisible !== visible)
 
   useEffect(() => {
     setName(`Week of ${weekLabel}`)
@@ -107,7 +115,7 @@ export default function PublishPanel({
       .then((doc) => {
         if (cancelled || !doc) return
         setBaseRev(doc.rev)
-        setServerFingerprint(publishedWeekFingerprint(doc.week))
+        setServerFingerprint(publishedWeekFingerprint(doc.week, doc.snapshot))
         setServerVisible(doc.visible)
         setServerUpdatedAt(doc.updatedAt)
         setName(doc.week.name)
@@ -126,15 +134,16 @@ export default function PublishPanel({
   }, [weekStart, weekLabel, restaurantId])
 
   async function publish() {
-    if (filled === 0 || busy || qualificationBlocked) return
+    if (filled === 0 && !canPublishEmpty || busy || qualificationBlocked) return
     setBusy(true)
     setError('')
     setNotice('')
     try {
+      await requireScheduleSnapshots()
       if (!(await onSaveSetup())) return
       const templateHash = templateHashForSlots(slots)
-      const result = await saveGoldenWeek(weekStart, { week, templateHash, visible, baseRev: baseRev ?? 0 }, managerCode, restaurantId)
-      onPublished({ v: 3, weekStart, rev: result.rev, week, visible, templateHash, updatedAt: result.updatedAt ?? new Date().toISOString() })
+      const result = await saveGoldenWeek(weekStart, { week, templateHash, snapshot, visible, baseRev: baseRev ?? 0 }, managerCode, restaurantId)
+      onPublished({ v: 3, weekStart, rev: result.rev, week, visible, templateHash, snapshot, updatedAt: result.updatedAt ?? new Date().toISOString() })
       setBaseRev(result.rev)
       setServerFingerprint(fingerprint)
       setServerVisible(visible)
@@ -228,7 +237,7 @@ export default function PublishPanel({
           type="button"
           className="inline-flex items-center justify-center gap-2 rounded bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={publish}
-          disabled={busy || loading || !dirty || filled === 0 || qualificationBlocked}
+          disabled={busy || loading || !dirty || filled === 0 && !canPublishEmpty || qualificationBlocked}
         >
           {busy ? 'Publishing…' : baseRev === null ? 'Publish' : 'Publish updates'}
         </button>
@@ -248,7 +257,7 @@ export default function PublishPanel({
           </ul>
         </div>
       )}
-      {filled === 0 && <p className="mt-2 text-sm text-zinc-600">Make a schedule for this week first.</p>}
+      {filled === 0 && !canPublishEmpty && <p className="mt-2 text-sm text-zinc-600">Make a schedule for this week first.</p>}
       {loading && <p className="mt-2 text-sm text-zinc-600">Checking what is on the server...</p>}
       {error && <p className="mt-2 text-sm font-medium text-red-800">{error}</p>}
       {notice && !error && (

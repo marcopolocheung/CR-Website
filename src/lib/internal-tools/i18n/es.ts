@@ -1,6 +1,8 @@
 import { planningSpanish } from './planning'
+import { hoursSpanish } from './special-hours'
 import type en from './en'
 const es: Record<keyof typeof en, string> = {
+  ...hoursSpanish,
   "inventoryCount.date": "Fecha del conteo",
   "inventoryCount.save": "Guardar conteo",
   "inventoryCount.clear": "Borrar conteo",

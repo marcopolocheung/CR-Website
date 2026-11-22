@@ -50,12 +50,16 @@ class FixtureStore:
         body = {}
         if request.method == 'OPTIONS':
             pass
+        elif url.path == '/api/health':
+            body = {'ok': True, 'scheduleSnapshotVersion': 1}
         elif url.path in ('/api/auth/verify', '/api/staff/verify'):
             assert request.headers.get('authorization') == 'Bearer fixture-password'
         elif url.path.startswith('/api/internal/schedule-requests/'):
             assert request.method == 'GET'
             assert request.headers.get('authorization') == 'Bearer fixture-password'
             body = {'record': None}
+        elif url.path.startswith('/api/internal/special-hours/'):
+            status, body = 503, {'schemaVersion': 1, 'error': {'code': 'backend_unconfigured'}}
         elif request.method == 'PUT':
             assert request.headers.get('authorization') == 'Bearer fixture-password'
             self.writes.append(key)
@@ -87,13 +91,13 @@ class FixtureStore:
         })
 
 
-def open_scheduler(browser, url, station, width=1440, layout='classic'):
+def open_scheduler(browser, url, station, width=1440, layout='classic', store=None):
     context = browser.new_context(viewport={'width': width, 'height': 1000})
     if layout:
         context.add_init_script(
             f"try {{ localStorage.setItem('chinarose.scheduler.layout', {json.dumps(layout)}) }} catch (e) {{}}"
         )
-    store = FixtureStore()
+    store = store or FixtureStore()
     context.route('**/*', store.route)
     page = context.new_page()
     page.set_default_timeout(10000)

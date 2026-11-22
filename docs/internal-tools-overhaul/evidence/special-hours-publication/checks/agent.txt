@@ -1,0 +1,92 @@
+
+> chinarose@0.0.2 agent:test
+> node --import jiti/register --test agent/agent.test.ts agent/service.test.ts
+
+TAP version 13
+# Subtest: context rejects impossible dates, duplicate assignments, and unrecognized authority fields
+ok 1 - context rejects impossible dates, duplicate assignments, and unrecognized authority fields
+  ---
+  duration_ms: 9.176165
+  type: 'test'
+  ...
+# Subtest: loop covers required spots, honors approved leave and locks, and pauses for review
+ok 2 - loop covers required spots, honors approved leave and locks, and pauses for review
+  ---
+  duration_ms: 90.830337
+  type: 'test'
+  ...
+# Subtest: unconfirmed requests and conflicting locks stop before generation
+ok 3 - unconfirmed requests and conflicting locks stop before generation
+  ---
+  duration_ms: 9.846655
+  type: 'test'
+  ...
+# Subtest: an unmatched approved request blocks instead of silently losing time off
+ok 4 - an unmatched approved request blocks instead of silently losing time off
+  ---
+  duration_ms: 4.544476
+  type: 'test'
+  ...
+# Subtest: impossible coverage exhausts its budget and preserves rules and crew
+ok 5 - impossible coverage exhausts its budget and preserves rules and crew
+  ---
+  duration_ms: 17.847574
+  type: 'test'
+  ...
+# Subtest: independent verification rejects a solver result that claims success with invalid assignments
+ok 6 - independent verification rejects a solver result that claims success with invalid assignments
+  ---
+  duration_ms: 37.723032
+  type: 'test'
+  ...
+# Subtest: the loop compares observed results and selects fewer doubles
+ok 7 - the loop compares observed results and selects fewer doubles
+  ---
+  duration_ms: 14.835067
+  type: 'test'
+  ...
+# Subtest: planner outages fall back to bounded tools and duplicate output cannot increase the budget
+ok 8 - planner outages fall back to bounded tools and duplicate output cannot increase the budget
+  ---
+  duration_ms: 67.448534
+  type: 'test'
+  ...
+# Subtest: SQLite checkpoints survive process reconstruction and resume review without regenerating
+ok 9 - SQLite checkpoints survive process reconstruction and resume review without regenerating
+  ---
+  duration_ms: 1942.664671
+  type: 'test'
+  ...
+# Subtest: service authenticates every request, restricts origins, and never exposes context in its view
+ok 10 - service authenticates every request, restricts origins, and never exposes context in its view
+  ---
+  duration_ms: 829.731597
+  type: 'test'
+  ...
+# Subtest: duplicate creates are idempotent and changed payloads cannot reuse an operation ID
+ok 11 - duplicate creates are idempotent and changed payloads cannot reuse an operation ID
+  ---
+  duration_ms: 41.288287
+  type: 'test'
+  ...
+# Subtest: approval rejects stale drafts and changed requests, then accepts retryable draft-only decisions
+ok 12 - approval rejects stale drafts and changed requests, then accepts retryable draft-only decisions
+  ---
+  duration_ms: 43.414563
+  type: 'test'
+  ...
+# Subtest: unavailable requests, malformed payloads, oversized bodies, and budget exhaustion fail closed
+ok 13 - unavailable requests, malformed payloads, oversized bodies, and budget exhaustion fail closed
+  ---
+  duration_ms: 339.602208
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 19137.986035

@@ -59,7 +59,7 @@ Backend activation is not established by source presence. Some historical task d
 | 12 | Order checklist, catalog and count-history separation | Not started |
 | 13 | Forms library and sectioned editors | Not started |
 | 14 | Unified manager scheduling workspace | Not started |
-| 15 | Review against the schedule staff actually see | Not started |
+| 15 | Review against the schedule staff actually see | Full comparison/history review remains open; [dated restaurant hours items 1–6](checkpoints/special-hours.md) implemented and locally verified, staff/release gates pending |
 | 16 | Focused published staff schedule | Not started |
 | 17 | Real resume/attention/recent-work signals on Home | Not started |
 | 18 | Utility cleanup and optional practice | Not started |

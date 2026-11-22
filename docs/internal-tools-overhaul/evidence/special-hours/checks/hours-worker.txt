@@ -1,0 +1,38 @@
+
+> chinarose@0.0.2 scheduler:hours:worker:test
+> node --test worker/src/special-hours.test.mjs
+
+TAP version 13
+# Subtest: dated events are atomic, retryable, isolated by store, and station reviews have independent revisions
+ok 1 - dated events are atomic, retryable, isolated by store, and station reviews have independent revisions
+  ---
+  duration_ms: 4032.350601
+  type: 'test'
+  ...
+# Subtest: stale source reviews and invalid cleanup choices are refused, while confirmed retries replay once
+ok 2 - stale source reviews and invalid cleanup choices are refused, while confirmed retries replay once
+  ---
+  duration_ms: 4018.98571
+  type: 'test'
+  ...
+# Subtest: manager API validates scope and unconfigured service; publication must match the latest reviewed event and shifts
+ok 3 - manager API validates scope and unconfigured service; publication must match the latest reviewed event and shifts
+  ---
+  duration_ms: 7046.748111
+  type: 'test'
+  ...
+# Subtest: all seven explicit closures publish zero assignments and remain distinct from empty normal weeks
+ok 4 - all seven explicit closures publish zero assignments and remain distinct from empty normal weeks
+  ---
+  duration_ms: 10513.704683
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 26869.352245

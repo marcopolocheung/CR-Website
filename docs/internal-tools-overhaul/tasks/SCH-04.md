@@ -24,6 +24,18 @@ Preserve copy, locks, undo, visibility, generation/independent validation, publi
 
 ## Current behavior and verified sources
 
+Follow-up: the user subsequently authorized items 1–6 as a combined delivery. The
+[dated hours completion checkpoint](../checkpoints/special-hours.md) records their
+local implementation and verification. Full employee-by-employee publication
+comparison/history and external/live milestones remain open.
+
+November 20 special-hours prerequisite: the [publication foundation checkpoint](../checkpoints/special-hours-publication.md)
+adds exact published layouts, safe legacy capture, time-aware dirty checks and
+compatible staff/report readers. This is a staged follow-up awaiting owner review, not
+completion of SCH-04's full comparison/history outcome. Its local results and
+remaining release limitations supersede the timing-specific inventory below;
+the wider task milestones remain pending.
+
 The scheduler already supports generation, independent validation, locks/manual assignments, prior-week copying, undo, hour summaries, draft/live status, visibility, printing, and person filtering. Published golden weeks use station-scoped KV with revisions; staff/employee lists remain station scoped. Dedicated dated-request/publication-history services are absent.
 
 Verified in the local repository on 2026-10-24; this is source inspection, not a live-environment assertion. Entry points and symbols for rechecking:

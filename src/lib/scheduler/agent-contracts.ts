@@ -3,6 +3,7 @@ import { canonicalJson } from '../internal-tools/json'
 import { businessDate, isStationId } from '../internal-tools/contracts'
 import { validRequestData, type RequestData } from './requests'
 import { DAYS, PERIODS } from './types'
+import { dateForDay } from './week'
 
 const date = z.string().refine(value => businessDate(value) !== null, 'Choose a real date.')
 const id = z.string().min(1).max(128)
@@ -36,10 +37,14 @@ export const agentContextSchema = z.object({
   weekStart: date.refine(value => new Date(`${value}T00:00:00Z`).getUTCDay() === 0, 'Choose a Sunday.'),
   employees: z.array(employee).max(100), template: z.record(z.enum(DAYS), z.array(slot).max(20)),
   assignments: z.array(assignmentSchema).max(140),
+  hoursFingerprint:z.string().max(4000).optional(),
+  effectiveSlots:z.array(z.object({id,day:z.enum(DAYS),period:z.enum(PERIODS),role,label:z.string().min(1).max(60),start:z.number().int().min(0).max(1439),end:z.number().int().max(2880),required:z.boolean(),date}).strict()
+    .refine(value=>value.end>value.start&&value.end<=value.start+1440)).max(140).optional(),
   requests: z.object({ phase: z.enum(['ready', 'loading', 'unconfigured', 'failed', 'uncertain']),
     revision: z.number().int().min(0), data: z.unknown().nullable(),
   }).strict(),
 }).strict().superRefine((value, ctx) => {
+  if(value.effectiveSlots&&(new Set(value.effectiveSlots.map(s=>s.id)).size!==value.effectiveSlots.length||value.effectiveSlots.some(s=>s.date!==dateForDay(value.weekStart,s.day))))ctx.addIssue({code:'custom',message:'Effective shifts must have unique IDs and match this week.'})
   if (new Set(value.employees.map(item => item.id)).size !== value.employees.length)
     ctx.addIssue({ code: 'custom', message: 'Employee IDs must be unique.' })
   if (new Set(value.assignments.map(item => item.slotId)).size !== value.assignments.length)

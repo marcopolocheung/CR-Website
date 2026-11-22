@@ -1,0 +1,2409 @@
+
+> chinarose@0.0.2 check
+> tsc --noEmit && python3 scripts/check-overhaul-tracker.py && npm run -s scheduler:test && npm run -s cashout:test && npm run -s internal:session:test && npm run -s recovery:test && npm run -s imports:test && npm run -s forms:test && npm run -s scheduler:requests:test && npm run -s agent:test
+
+PASS: 88 canonical briefs, 172 matching tracker rows, ready gates and acyclic dependencies
+TAP version 13
+# Subtest: sample is a valid fully covered Monday–Sunday week
+ok 1 - sample is a valid fully covered Monday–Sunday week
+  ---
+  duration_ms: 2.140778
+  type: 'test'
+  ...
+# Subtest: callout removes Keep only on the selected date, repairs and preserves other placements
+ok 2 - callout removes Keep only on the selected date, repairs and preserves other placements
+  ---
+  duration_ms: 276.495526
+  type: 'test'
+  ...
+# Subtest: occupied destination relocates former occupant and retains two manual placements
+ok 3 - occupied destination relocates former occupant and retains two manual placements
+  ---
+  duration_ms: 266.553003
+  type: 'test'
+  ...
+# Subtest: invalid placements reject and kept sources can explicitly move
+ok 4 - invalid placements reject and kept sources can explicitly move
+  ---
+  duration_ms: 1.804349
+  type: 'test'
+  ...
+# Subtest: partial availability and recurring edits affect the intended windows
+ok 5 - partial availability and recurring edits affect the intended windows
+  ---
+  duration_ms: 2.813854
+  type: 'test'
+  ...
+# Subtest: impossible coverage reports gaps; bounded search does not claim infeasibility
+ok 6 - impossible coverage reports gaps; bounded search does not claim infeasibility
+  ---
+  duration_ms: 1.396577
+  type: 'test'
+  ...
+# Subtest: a covered valid week does not reshuffle for better balance
+ok 7 - a covered valid week does not reshuffle for better balance
+  ---
+  duration_ms: 10.567015
+  type: 'test'
+  ...
+# Subtest: a 100-person roster has unique, readable colors regardless of roster order
+ok 8 - a 100-person roster has unique, readable colors regardless of roster order
+  ---
+  duration_ms: 1.521212
+  type: 'test'
+  ...
+# Subtest: adding/removing staff or switching weeks preserves previously assigned colors
+ok 9 - adding/removing staff or switching weeks preserves previously assigned colors
+  ---
+  duration_ms: 0.155364
+  type: 'test'
+  ...
+# Subtest: identities beyond the palette still get distinct colors
+ok 10 - identities beyond the palette still get distinct colors
+  ---
+  duration_ms: 0.273991
+  type: 'test'
+  ...
+# Subtest: moving onto a filled spot swaps the two people and drops their Keep
+ok 11 - moving onto a filled spot swaps the two people and drops their Keep
+  ---
+  duration_ms: 1.637762
+  type: 'test'
+  ...
+# Subtest: moving onto an empty spot leaves the old spot empty
+ok 12 - moving onto an empty spot leaves the old spot empty
+  ---
+  duration_ms: 0.185885
+  type: 'test'
+  ...
+# Subtest: a swap rejects moving a dishwasher into the cook spot and names the dishwasher
+ok 13 - a swap rejects moving a dishwasher into the cook spot and names the dishwasher
+  ---
+  duration_ms: 13.067444
+  type: 'test'
+  ...
+# Subtest: a swap checks the replacement employee availability at the source spot
+ok 14 - a swap checks the replacement employee availability at the source spot
+  ---
+  duration_ms: 0.758832
+  type: 'test'
+  ...
+# Subtest: a swap checks the replacement employee weekly limits
+ok 15 - a swap checks the replacement employee weekly limits
+  ---
+  duration_ms: 0.589326
+  type: 'test'
+  ...
+# Subtest: a swap accepts two qualified available employees
+ok 16 - a swap accepts two qualified available employees
+  ---
+  duration_ms: 0.332619
+  type: 'test'
+  ...
+# Subtest: unrelated existing issues do not block a valid swap
+ok 17 - unrelated existing issues do not block a valid swap
+  ---
+  duration_ms: 0.426332
+  type: 'test'
+  ...
+# Subtest: a person marked Keep cannot be moved
+ok 18 - a person marked Keep cannot be moved
+  ---
+  duration_ms: 0.238722
+  type: 'test'
+  ...
+# Subtest: candidates are exactly the people with no reason to refuse the spot
+ok 19 - candidates are exactly the people with no reason to refuse the spot
+  ---
+  duration_ms: 0.905458
+  type: 'test'
+  ...
+# Subtest: an empty optional spot is open, an empty required spot is missing
+ok 20 - an empty optional spot is open, an empty required spot is missing
+  ---
+  duration_ms: 0.416173
+  type: 'test'
+  ...
+# Subtest: new employee ids never collide
+ok 21 - new employee ids never collide
+  ---
+  duration_ms: 0.309402
+  type: 'test'
+  ...
+# Subtest: layout preference defaults to new, keeps a stored classic choice, and survives blocked storage
+ok 22 - layout preference defaults to new, keeps a stored classic choice, and survives blocked storage
+  ---
+  duration_ms: 0.240035
+  type: 'test'
+  ...
+# Subtest: max hours: blank is no limit, otherwise whole hours from 1 to 80
+ok 23 - max hours: blank is no limit, otherwise whole hours from 1 to 80
+  ---
+  duration_ms: 0.166336
+  type: 'test'
+  ...
+# Subtest: cents become plain dollar inputs the sheet accepts
+ok 24 - cents become plain dollar inputs the sheet accepts
+  ---
+  duration_ms: 0.511362
+  type: 'test'
+  ...
+# Subtest: an empty sheet takes Toast names, amounts and Z, reusing the starter blank drawer
+ok 25 - an empty sheet takes Toast names, amounts and Z, reusing the starter blank drawer
+  ---
+  duration_ms: 0.806426
+  type: 'test'
+  ...
+# Subtest: existing drawers keep their counts; names match ignoring case and spaces, even in the other shift
+ok 26 - existing drawers keep their counts; names match ignoring case and spaces, even in the other shift
+  ---
+  duration_ms: 0.326313
+  type: 'test'
+  ...
+# Subtest: a counted but unnamed drawer is not overwritten; Toast cashiers are added after it
+ok 27 - a counted but unnamed drawer is not overwritten; Toast cashiers are added after it
+  ---
+  duration_ms: 0.181142
+  type: 'test'
+  ...
+# Subtest: one range read per store fills cached days; only the rest are fetched day by day
+ok 28 - one range read per store fills cached days; only the rest are fetched day by day
+  ---
+  duration_ms: 12.448573
+  type: 'test'
+  ...
+# Subtest: an older Worker without the range route falls back to day requests
+ok 29 - an older Worker without the range route falls back to day requests
+  ---
+  duration_ms: 0.534713
+  type: 'test'
+  ...
+# Subtest: two callers asking for the same day share one request (preload + Reports)
+ok 30 - two callers asking for the same day share one request (preload + Reports)
+  ---
+  duration_ms: 2.339069
+  type: 'test'
+  ...
+# Subtest: yesterday and today refresh after 10 minutes; finished days stay
+ok 31 - yesterday and today refresh after 10 minutes; finished days stay
+  ---
+  duration_ms: 0.658705
+  type: 'test'
+  ...
+# Subtest: a timeout or busy day is retried after 1 s then 3 s; a third failure is reported, loaded days are kept
+ok 32 - a timeout or busy day is retried after 1 s then 3 s; a third failure is reported, loaded days are kept
+  ---
+  duration_ms: 0.920816
+  type: 'test'
+  ...
+# Subtest: other failures are not retried
+ok 33 - other failures are not retried
+  ---
+  duration_ms: 0.255329
+  type: 'test'
+  ...
+# Subtest: clearing (lock) or a different manager code drops loaded days and late answers
+ok 34 - clearing (lock) or a different manager code drops loaded days and late answers
+  ---
+  duration_ms: 0.802812
+  type: 'test'
+  ...
+# Subtest: preloadSales asks for both stores over the 30-day Reports range and swallows failures
+ok 35 - preloadSales asks for both stores over the 30-day Reports range and swallows failures
+  ---
+  duration_ms: 21.206757
+  type: 'test'
+  ...
+# Subtest: preloadSales only asks for the stores the sales code opens
+ok 36 - preloadSales only asks for the stores the sales code opens
+  ---
+  duration_ms: 22.35186
+  type: 'test'
+  ...
+# Subtest: runLimited keeps at most the limit in flight and stops after a failure
+ok 37 - runLimited keeps at most the limit in flight and stops after a failure
+  ---
+  duration_ms: 23.735717
+  type: 'test'
+  ...
+# Subtest: summing days adds every figure and merges discount and void names
+ok 38 - summing days adds every figure and merges discount and void names
+  ---
+  duration_ms: 7.879535
+  type: 'test'
+  ...
+# Subtest: rows combine the chosen stores per date and mark dates still missing a store
+ok 39 - rows combine the chosen stores per date and mark dates still missing a store
+  ---
+  duration_ms: 0.425214
+  type: 'test'
+  ...
+# Subtest: rows keep each store apart, and store totals add up to the combined total
+ok 40 - rows keep each store apart, and store totals add up to the combined total
+  ---
+  duration_ms: 0.548894
+  type: 'test'
+  ...
+# Subtest: meal-period parts include orders Toast left without one only when there are any
+ok 41 - meal-period parts include orders Toast left without one only when there are any
+  ---
+  duration_ms: 0.277427
+  type: 'test'
+  ...
+# Subtest: fetchSalesDay names why a day could not load
+ok 42 - fetchSalesDay names why a day could not load
+  ---
+  duration_ms: 0.951033
+  type: 'test'
+  ...
+# Subtest: requestJson reports a timeout separately from other network trouble
+ok 43 - requestJson reports a timeout separately from other network trouble
+  ---
+  duration_ms: 5.68306
+  type: 'test'
+  ...
+# Subtest: fetchSalesRange returns cached days, or null so an older or troubled Worker falls back to day requests
+ok 44 - fetchSalesRange returns cached days, or null so an older or troubled Worker falls back to day requests
+  ---
+  duration_ms: 0.845663
+  type: 'test'
+  ...
+# Subtest: verifySalesCode returns the stores a code opens and names wrong, throttled or not-yet-supported codes
+ok 45 - verifySalesCode returns the stores a code opens and names wrong, throttled or not-yet-supported codes
+  ---
+  duration_ms: 16.448241
+  type: 'test'
+  ...
+# Subtest: a sales code that does not open a store (403) locks sales like a wrong code
+ok 46 - a sales code that does not open a store (403) locks sales like a wrong code
+  ---
+  duration_ms: 0.452056
+  type: 'test'
+  ...
+# Subtest: the sales session keeps its code in memory and ignores a lock from an older code
+ok 47 - the sales session keeps its code in memory and ignores a lock from an older code
+  ---
+  duration_ms: 0.177777
+  type: 'test'
+  ...
+# Subtest: a built week carries the current share version
+ok 48 - a built week carries the current share version
+  ---
+  duration_ms: 0.933244
+  type: 'test'
+  ...
+# Subtest: a real generated week maps every assignment back by name
+ok 49 - a real generated week maps every assignment back by name
+  ---
+  duration_ms: 273.32807
+  type: 'test'
+  ...
+# Subtest: unfilled spots travel as nobody rather than as a stray name
+ok 50 - unfilled spots travel as nobody rather than as a stray name
+  ---
+  duration_ms: 0.301327
+  type: 'test'
+  ...
+# Subtest: a published week round-trips back into editor assignments
+ok 51 - a published week round-trips back into editor assignments
+  ---
+  duration_ms: 170.882186
+  type: 'test'
+  ...
+# Subtest: removed staff come back unassigned instead of misfiled
+ok 52 - removed staff come back unassigned instead of misfiled
+  ---
+  duration_ms: 0.170298
+  type: 'test'
+  ...
+# Subtest: the template hash is stable and changes with the shift layout
+ok 53 - the template hash is stable and changes with the shift layout
+  ---
+  duration_ms: 0.571873
+  type: 'test'
+  ...
+# Subtest: a kitchen week published with the default kitchen rules opens on /schedule
+ok 54 - a kitchen week published with the default kitchen rules opens on /schedule
+  ---
+  duration_ms: 1.033111
+  type: 'test'
+  ...
+# Subtest: a kitchen week published before kitchen posts existed still opens
+ok 55 - a kitchen week published before kitchen posts existed still opens
+  ---
+  duration_ms: 0.477585
+  type: 'test'
+  ...
+# Subtest: a week published with its own saved rules is read with those rules
+ok 56 - a week published with its own saved rules is read with those rules
+  ---
+  duration_ms: 0.518319
+  type: 'test'
+  ...
+# Subtest: publication snapshots pin times and index order independently of changed rules
+ok 57 - publication snapshots pin times and index order independently of changed rules
+  ---
+  duration_ms: 1.263546
+  type: 'test'
+  ...
+# Subtest: time-only edits change the publication fingerprint without changing slot identity
+ok 58 - time-only edits change the publication fingerprint without changing slot identity
+  ---
+  duration_ms: 0.337797
+  type: 'test'
+  ...
+# Subtest: invalid or unknown snapshots fail closed even when normal rules match
+ok 59 - invalid or unknown snapshots fail closed even when normal rules match
+  ---
+  duration_ms: 0.34902
+  type: 'test'
+  ...
+# Subtest: fetchGoldenWeek returns null on 404 and the doc on 200
+ok 60 - fetchGoldenWeek returns null on 404 and the doc on 200
+  ---
+  duration_ms: 4.917359
+  type: 'test'
+  ...
+# Subtest: golden reads map network failure to unavailable
+ok 61 - golden reads map network failure to unavailable
+  ---
+  duration_ms: 0.762132
+  type: 'test'
+  ...
+# Subtest: fetchGoldenMonth returns weeks and rev on 200 and an empty list for a bad month
+ok 62 - fetchGoldenMonth returns weeks and rev on 200 and an empty list for a bad month
+  ---
+  duration_ms: 0.507704
+  type: 'test'
+  ...
+# Subtest: fetchGoldenMonth sends knownRev and honors notModified
+ok 63 - fetchGoldenMonth sends knownRev and honors notModified
+  ---
+  duration_ms: 0.313299
+  type: 'test'
+  ...
+# Subtest: golden reads and saves scope to the restaurant query param
+ok 64 - golden reads and saves scope to the restaurant query param
+  ---
+  duration_ms: 0.832986
+  type: 'test'
+  ...
+# Subtest: saveGoldenWeek sends the write token and maps 401 to auth
+ok 65 - saveGoldenWeek sends the write token and maps 401 to auth
+  ---
+  duration_ms: 2.083355
+  type: 'test'
+  ...
+# Subtest: saveGoldenWeek maps 503 to an unavailable error saying saving is not set up
+ok 66 - saveGoldenWeek maps 503 to an unavailable error saying saving is not set up
+  ---
+  duration_ms: 0.432714
+  type: 'test'
+  ...
+# Subtest: saveGoldenWeek maps 409 to a conflict carrying the server revision
+ok 67 - saveGoldenWeek maps 409 to a conflict carrying the server revision
+  ---
+  duration_ms: 0.26425
+  type: 'test'
+  ...
+# Subtest: verifyWriteToken sends the bearer code and maps statuses
+ok 68 - verifyWriteToken sends the bearer code and maps statuses
+  ---
+  duration_ms: 0.625773
+  type: 'test'
+  ...
+# Subtest: older servers are detected before snapshot publication or dependent rule writes
+ok 69 - older servers are detected before snapshot publication or dependent rule writes
+  ---
+  duration_ms: 1.111302
+  type: 'test'
+  ...
+# Subtest: snapshot publications travel intact after checking server support
+ok 70 - snapshot publications travel intact after checking server support
+  ---
+  duration_ms: 0.791979
+  type: 'test'
+  ...
+# Subtest: malformed snapshots cannot be silently omitted from single or month reads
+ok 71 - malformed snapshots cannot be silently omitted from single or month reads
+  ---
+  duration_ms: 0.456723
+  type: 'test'
+  ...
+# Subtest: built-in rules have no problems
+ok 72 - built-in rules have no problems
+  ---
+  duration_ms: 1.704232
+  type: 'test'
+  ...
+# Subtest: a spot that ends before it starts, or has no label, is named
+ok 73 - a spot that ends before it starts, or has no label, is named
+  ---
+  duration_ms: 0.408097
+  type: 'test'
+  ...
+# Subtest: publish state tells drafts, hidden, changed and live weeks apart
+ok 74 - publish state tells drafts, hidden, changed and live weeks apart
+  ---
+  duration_ms: 0.136727
+  type: 'test'
+  ...
+# Subtest: occupied placement repairs without a forced swap, preserving multiple Keeps
+ok 75 - occupied placement repairs without a forced swap, preserving multiple Keeps
+  ---
+  duration_ms: 419.395431
+  type: 'test'
+  ...
+# Subtest: manual placement rejects role/availability conflicts and kept destinations, but can move kept sources
+ok 76 - manual placement rejects role/availability conflicts and kept destinations, but can move kept sources
+  ---
+  duration_ms: 1.271811
+  type: 'test'
+  ...
+# Subtest: approval reconciliation releases only newly unavailable Keeps in its employee/date scope
+ok 77 - approval reconciliation releases only newly unavailable Keeps in its employee/date scope
+  ---
+  duration_ms: 283.787903
+  type: 'test'
+  ...
+# Subtest: unrelated invalid Keeps remain actionable, never silently dropped
+ok 78 - unrelated invalid Keeps remain actionable, never silently dropped
+  ---
+  duration_ms: 0.401574
+  type: 'test'
+  ...
+# Subtest: dropping onto the same employee is a no-op, including another shift and a kept destination
+ok 79 - dropping onto the same employee is a no-op, including another shift and a kept destination
+  ---
+  duration_ms: 0.726894
+  type: 'test'
+  ...
+# Subtest: valid week remains unchanged and a zero-node limit retains a valid partial fallback
+ok 80 - valid week remains unchanged and a zero-node limit retains a valid partial fallback
+  ---
+  duration_ms: 1.973551
+  type: 'test'
+  ...
+# Subtest: required coverage may displace unlocked optional cover; optional Keeps are preserved
+ok 81 - required coverage may displace unlocked optional cover; optional Keeps are preserved
+  ---
+  duration_ms: 0.360676
+  type: 'test'
+  ...
+# Subtest: repair respects all independent hard constraints and reports impossible coverage as gaps
+ok 82 - repair respects all independent hard constraints and reports impossible coverage as gaps
+  ---
+  duration_ms: 80.241947
+  type: 'test'
+  ...
+# Subtest: cancellation and replaced/context-changed jobs cannot commit
+ok 83 - cancellation and replaced/context-changed jobs cannot commit
+  ---
+  duration_ms: 0.660256
+  type: 'test'
+  ...
+# Subtest: a full-sized kitchen week repairs a gap without changing other placements
+ok 84 - a full-sized kitchen week repairs a gap without changing other placements
+  ---
+  duration_ms: 375.583127
+  type: 'test'
+  ...
+# Subtest: removing an employee excludes them from that date/shift/role and repair refills without them
+ok 85 - removing an employee excludes them from that date/shift/role and repair refills without them
+  ---
+  duration_ms: 202.462949
+  type: 'test'
+  ...
+# Subtest: validator catches unavailable employees
+ok 86 - validator catches unavailable employees
+  ---
+  duration_ms: 1.536311
+  type: 'test'
+  ...
+# Subtest: validator catches unqualified employees
+ok 87 - validator catches unqualified employees
+  ---
+  duration_ms: 0.209069
+  type: 'test'
+  ...
+# Subtest: new hires bypass the role check but still need to be available
+ok 88 - new hires bypass the role check but still need to be available
+  ---
+  duration_ms: 0.387279
+  type: 'test'
+  ...
+# Subtest: validator catches max days exceeded
+ok 89 - validator catches max days exceeded
+  ---
+  duration_ms: 0.269666
+  type: 'test'
+  ...
+# Subtest: validator catches prohibited doubles
+ok 90 - validator catches prohibited doubles
+  ---
+  duration_ms: 0.292297
+  type: 'test'
+  ...
+# Subtest: validator allows doubles for employees configured to allow them
+ok 91 - validator allows doubles for employees configured to allow them
+  ---
+  duration_ms: 0.478171
+  type: 'test'
+  ...
+# Subtest: overlapping assignment violation references both conflicting slots
+ok 92 - overlapping assignment violation references both conflicting slots
+  ---
+  duration_ms: 0.272912
+  type: 'test'
+  ...
+# Subtest: validator catches employee incompatibility
+ok 93 - validator catches employee incompatibility
+  ---
+  duration_ms: 0.200353
+  type: 'test'
+  ...
+# Subtest: validator catches missing manager coverage
+ok 94 - validator catches missing manager coverage
+  ---
+  duration_ms: 0.253678
+  type: 'test'
+  ...
+# Subtest: validator catches missing staffing coverage
+ok 95 - validator catches missing staffing coverage
+  ---
+  duration_ms: 0.406827
+  type: 'test'
+  ...
+# Subtest: weekend availability exception allows Javier on Saturday PM
+ok 96 - weekend availability exception allows Javier on Saturday PM
+  ---
+  duration_ms: 0.141883
+  type: 'test'
+  ...
+# Subtest: validator catches changed locked assignments
+ok 97 - validator catches changed locked assignments
+  ---
+  duration_ms: 0.146636
+  type: 'test'
+  ...
+# Subtest: solver returns infeasible when no lead or manager is active
+ok 98 - solver returns infeasible when no lead or manager is active
+  ---
+  duration_ms: 1.384995
+  type: 'test'
+  ...
+# Subtest: generated seed schedule passes independent validation
+ok 99 - generated seed schedule passes independent validation
+  ---
+  duration_ms: 141.63867
+  type: 'test'
+  ...
+# Subtest: manual locked assignment is preserved during regeneration
+ok 100 - manual locked assignment is preserved during regeneration
+  ---
+  duration_ms: 96.759782
+  type: 'test'
+  ...
+# Subtest: availability is checked against exact slot time, not only shift name
+ok 101 - availability is checked against exact slot time, not only shift name
+  ---
+  duration_ms: 0.221052
+  type: 'test'
+  ...
+# Subtest: every schedule strategy produces a valid week
+ok 102 - every schedule strategy produces a valid week
+  ---
+  duration_ms: 373.248177
+  type: 'test'
+  ...
+# Subtest: the same strategy always returns the same week
+ok 103 - the same strategy always returns the same week
+  ---
+  duration_ms: 770.795848
+  type: 'test'
+  ...
+# Subtest: fewest doubles strategy does not increase double shifts
+ok 104 - fewest doubles strategy does not increase double shifts
+  ---
+  duration_ms: 207.622933
+  type: 'test'
+  ...
+# Subtest: keep similar strategy stays closer to the week it is given
+ok 105 - keep similar strategy stays closer to the week it is given
+  ---
+  duration_ms: 314.857811
+  type: 'test'
+  ...
+# Subtest: week keys land on Sunday regardless of the day inside the week
+ok 106 - week keys land on Sunday regardless of the day inside the week
+  ---
+  duration_ms: 0.389689
+  type: 'test'
+  ...
+# Subtest: week maths survives a daylight saving change
+ok 107 - week maths survives a daylight saving change
+  ---
+  duration_ms: 0.135815
+  type: 'test'
+  ...
+# Subtest: day dates follow the day order used by the board
+ok 108 - day dates follow the day order used by the board
+  ---
+  duration_ms: 0.172957
+  type: 'test'
+  ...
+# Subtest: week ranges spell the month out for headings
+ok 109 - week ranges spell the month out for headings
+  ---
+  duration_ms: 5.584713
+  type: 'test'
+  ...
+# Subtest: day labels abbreviate for the table header
+ok 110 - day labels abbreviate for the table header
+  ---
+  duration_ms: 0.368697
+  type: 'test'
+  ...
+# Subtest: times always read as a padded 12 hour clock with AM or PM
+ok 111 - times always read as a padded 12 hour clock with AM or PM
+  ---
+  duration_ms: 0.136966
+  type: 'test'
+  ...
+# Subtest: mid 12-7 worker fits a 12-4 extra slot but not full AM or PM halves
+ok 112 - mid 12-7 worker fits a 12-4 extra slot but not full AM or PM halves
+  ---
+  duration_ms: 0.247491
+  type: 'test'
+  ...
+# Subtest: evening 4-7 worker fits a 4-7 extra slot but not the full 4-11 PM
+ok 113 - evening 4-7 worker fits a 4-7 extra slot but not the full 4-11 PM
+  ---
+  duration_ms: 0.161735
+  type: 'test'
+  ...
+# Subtest: mid worker spanning AM and PM extra slots needs doubles allowed
+ok 114 - mid worker spanning AM and PM extra slots needs doubles allowed
+  ---
+  duration_ms: 0.249912
+  type: 'test'
+  ...
+# Subtest: kitchen pages offer kitchen posts only — no dining posts
+ok 115 - kitchen pages offer kitchen posts only — no dining posts
+  ---
+  duration_ms: 0.148602
+  type: 'test'
+  ...
+# Subtest: custom posts slugify, validate, and label for display
+ok 116 - custom posts slugify, validate, and label for display
+  ---
+  duration_ms: 0.307113
+  type: 'test'
+  ...
+# Subtest: CR03 sample crew covers every required kitchen slot
+ok 117 - CR03 sample crew covers every required kitchen slot
+  ---
+  duration_ms: 114.955407
+  type: 'test'
+  ...
+# Subtest: CR03 crew carries the sheet’s post qualifications and double limits
+ok 118 - CR03 crew carries the sheet’s post qualifications and double limits
+  ---
+  duration_ms: 0.304529
+  type: 'test'
+  ...
+# Subtest: Stef is a manager who can cover every role in validation and generation
+ok 119 - Stef is a manager who can cover every role in validation and generation
+  ---
+  duration_ms: 1.469049
+  type: 'test'
+  ...
+# Subtest: manager coverage still respects availability and shift-specific role restrictions
+ok 120 - manager coverage still respects availability and shift-specific role restrictions
+  ---
+  duration_ms: 0.256349
+  type: 'test'
+  ...
+# Subtest: M/V prep qualification implies meat prep, but not the reverse
+ok 121 - M/V prep qualification implies meat prep, but not the reverse
+  ---
+  duration_ms: 0.100182
+  type: 'test'
+  ...
+# Subtest: a shift role limits a person to one post on that shift only
+ok 122 - a shift role limits a person to one post on that shift only
+  ---
+  duration_ms: 0.460446
+  type: 'test'
+  ...
+# Subtest: optional spots are filled when a candidate exists, and left open when not
+ok 123 - optional spots are filled when a candidate exists, and left open when not
+  ---
+  duration_ms: 0.328027
+  type: 'test'
+  ...
+# Subtest: M/V prep qualification implies meat prep, but not the reverse
+ok 124 - M/V prep qualification implies meat prep, but not the reverse
+  ---
+  duration_ms: 0.082132
+  type: 'test'
+  ...
+# Subtest: optional spots are filled when a candidate exists, and left open when not
+ok 125 - optional spots are filled when a candidate exists, and left open when not
+  ---
+  duration_ms: 0.299276
+  type: 'test'
+  ...
+# Subtest: max doubles per week is a hard constraint
+ok 126 - max doubles per week is a hard constraint
+  ---
+  duration_ms: 0.252191
+  type: 'test'
+  ...
+# Subtest: max hours per week is a hard constraint
+ok 127 - max hours per week is a hard constraint
+  ---
+  duration_ms: 0.376849
+  type: 'test'
+  ...
+# Subtest: optional spots never block readiness — only required slots are checked
+ok 128 - optional spots never block readiness — only required slots are checked
+  ---
+  duration_ms: 1.056664
+  type: 'test'
+  ...
+# Subtest: CR03 kitchens never inherit the dining crew and no station ships a built-in crew
+ok 129 - CR03 kitchens never inherit the dining crew and no station ships a built-in crew
+  ---
+  duration_ms: 0.164937
+  type: 'test'
+  ...
+# Subtest: custom roles qualify and schedule like built-in ones
+ok 130 - custom roles qualify and schedule like built-in ones
+  ---
+  duration_ms: 0.31408
+  type: 'test'
+  ...
+# Subtest: extra mid and evening slots schedule on top of core AM/PM coverage
+ok 131 - extra mid and evening slots schedule on top of core AM/PM coverage
+  ---
+  duration_ms: 0.53765
+  type: 'test'
+  ...
+# Subtest: suspended employees are skipped only on dates inside the range
+ok 132 - suspended employees are skipped only on dates inside the range
+  ---
+  duration_ms: 0.808901
+  type: 'test'
+  ...
+# Subtest: higher priority staff are picked first for required and optional spots
+ok 133 - higher priority staff are picked first for required and optional spots
+  ---
+  duration_ms: 0.427852
+  type: 'test'
+  ...
+# Subtest: only approved dated requests change generation and manual validation; suspension stays separate
+ok 134 - only approved dated requests change generation and manual validation; suspension stays separate
+  ---
+  duration_ms: 2.74238
+  type: 'test'
+  ...
+# Subtest: closure removes only the dated day, including optional spots; templates and stable IDs survive
+ok 135 - closure removes only the dated day, including optional spots; templates and stable IDs survive
+  ---
+  duration_ms: 3.350282
+  type: 'test'
+  ...
+# Subtest: early close clips crossing shifts, drops late spots, and accepts explicit cleanup finish choices
+ok 136 - early close clips crossing shifts, drops late spots, and accepts explicit cleanup finish choices
+  ---
+  duration_ms: 0.699124
+  type: 'test'
+  ...
+# Subtest: invalid, incomplete or obsolete staffing choices remain pending
+ok 137 - invalid, incomplete or obsolete staffing choices remain pending
+  ---
+  duration_ms: 0.522693
+  type: 'test'
+  ...
+# Subtest: new restaurant revisions require each station to review; last reviewed draft remains visible
+ok 138 - new restaurant revisions require each station to review; last reviewed draft remains visible
+  ---
+  duration_ms: 0.408575
+  type: 'test'
+  ...
+# Subtest: normal cancellation restores base staffing only after review and does not restore assignments itself
+ok 139 - normal cancellation restores base staffing only after review and does not restore assignments itself
+  ---
+  duration_ms: 0.530161
+  type: 'test'
+  ...
+# Subtest: Undo selection can restore the original draft while leaving the shared event pending
+ok 140 - Undo selection can restore the original draft while leaving the shared event pending
+  ---
+  duration_ms: 0.175161
+  type: 'test'
+  ...
+# Subtest: station status distinguishes review, readiness, publication and hidden publication
+ok 141 - station status distinguishes review, readiness, publication and hidden publication
+  ---
+  duration_ms: 0.372399
+  type: 'test'
+  ...
+# Subtest: publication fingerprints include exact day labels and source revisions; invalid/out-of-week days fail validation
+ok 142 - publication fingerprints include exact day labels and source revisions; invalid/out-of-week days fail validation
+  ---
+  duration_ms: 1.110195
+  type: 'test'
+  ...
+# Subtest: generation uses the reviewed dated layout rather than recreating closed staffing
+ok 143 - generation uses the reviewed dated layout rather than recreating closed staffing
+  ---
+  duration_ms: 1.587324
+  type: 'test'
+  ...
+# Subtest: off weeks are hidden from the visible list
+ok 144 - off weeks are hidden from the visible list
+  ---
+  duration_ms: 1.456414
+  type: 'test'
+  ...
+# Subtest: toggling status keeps assignments intact
+ok 145 - toggling status keeps assignments intact
+  ---
+  duration_ms: 0.183486
+  type: 'test'
+  ...
+# Subtest: copying a week duplicates assignments without aliasing
+ok 146 - copying a week duplicates assignments without aliasing
+  ---
+  duration_ms: 0.154614
+  type: 'test'
+  ...
+# Subtest: month helpers cover partial edge weeks
+ok 147 - month helpers cover partial edge weeks
+  ---
+  duration_ms: 14.103402
+  type: 'test'
+  ...
+# Subtest: v1 migration turns filled weeks on and keeps generated snapshots
+ok 148 - v1 migration turns filled weeks on and keeps generated snapshots
+  ---
+  duration_ms: 0.334399
+  type: 'test'
+  ...
+# Subtest: month grid builds sunday rows with edge dimming and today marking
+ok 149 - month grid builds sunday rows with edge dimming and today marking
+  ---
+  duration_ms: 0.297854
+  type: 'test'
+  ...
+# Subtest: todayIsoDate renders the local calendar date
+ok 150 - todayIsoDate renders the local calendar date
+  ---
+  duration_ms: 1.022008
+  type: 'test'
+  ...
+# Subtest: share ids are short, url safe, and valid
+ok 151 - share ids are short, url safe, and valid
+  ---
+  duration_ms: 3.409448
+  type: 'test'
+  ...
+# Subtest: publish bodies are strictly validated
+ok 152 - publish bodies are strictly validated
+  ---
+  duration_ms: 0.393863
+  type: 'test'
+  ...
+# Subtest: a week survives publish, read, update, and conflicts reject stale writes
+ok 153 - a week survives publish, read, update, and conflicts reject stale writes
+  ---
+  duration_ms: 26.411434
+  type: 'test'
+  ...
+# Subtest: bad ids and bodies fail closed
+ok 154 - bad ids and bodies fail closed
+  ---
+  duration_ms: 1.875833
+  type: 'test'
+  ...
+# Subtest: month listing shows only visible weeks
+ok 155 - month listing shows only visible weeks
+  ---
+  duration_ms: 3.006673
+  type: 'test'
+  ...
+# Subtest: golden weeks cover every Sunday touching the month
+ok 156 - golden weeks cover every Sunday touching the month
+  ---
+  duration_ms: 0.52671
+  type: 'test'
+  ...
+# Subtest: golden week bodies are strictly validated
+ok 157 - golden week bodies are strictly validated
+  ---
+  duration_ms: 0.308426
+  type: 'test'
+  ...
+# Subtest: golden writes need the manager token and create on first save
+ok 158 - golden writes need the manager token and create on first save
+  ---
+  duration_ms: 14.702514
+  type: 'test'
+  ...
+# Subtest: golden month listing shows only visible weeks
+ok 159 - golden month listing shows only visible weeks
+  ---
+  duration_ms: 2.619568
+  type: 'test'
+  ...
+# Subtest: golden writes fail closed without a configured token
+ok 160 - golden writes fail closed without a configured token
+  ---
+  duration_ms: 0.422924
+  type: 'test'
+  ...
+# Subtest: auth verify accepts the manager token and nothing else
+ok 161 - auth verify accepts the manager token and nothing else
+  ---
+  duration_ms: 0.56306
+  type: 'test'
+  ...
+# Subtest: auth verify fails closed without a configured token
+ok 162 - auth verify fails closed without a configured token
+  ---
+  duration_ms: 0.226565
+  type: 'test'
+  ...
+# Subtest: employee roster bodies are strictly validated
+ok 163 - employee roster bodies are strictly validated
+  ---
+  duration_ms: 0.751202
+  type: 'test'
+  ...
+# Subtest: roster writes need the manager token and create on first save, and real deletes persist
+ok 164 - roster writes need the manager token and create on first save, and real deletes persist
+  ---
+  duration_ms: 2.118266
+  type: 'test'
+  ...
+# Subtest: roster and crew reads need the manager token
+ok 165 - roster and crew reads need the manager token
+  ---
+  duration_ms: 1.899994
+  type: 'test'
+  ...
+# Subtest: roster writes fail closed without a configured token
+ok 166 - roster writes fail closed without a configured token
+  ---
+  duration_ms: 0.235736
+  type: 'test'
+  ...
+# Subtest: staffing template bodies are strictly validated
+ok 167 - staffing template bodies are strictly validated
+  ---
+  duration_ms: 0.367254
+  type: 'test'
+  ...
+# Subtest: template writes need the manager token, create on first save, and round-trip
+ok 168 - template writes need the manager token, create on first save, and round-trip
+  ---
+  duration_ms: 1.882063
+  type: 'test'
+  ...
+# Subtest: template GET answers rev 0 and null template before anything is saved
+ok 169 - template GET answers rev 0 and null template before anything is saved
+  ---
+  duration_ms: 0.255426
+  type: 'test'
+  ...
+# Subtest: golden month revs answer cheap change checks
+ok 170 - golden month revs answer cheap change checks
+  ---
+  duration_ms: 9.413517
+  type: 'test'
+  ...
+# Subtest: golden saves spanning two months bump both revs
+ok 171 - golden saves spanning two months bump both revs
+  ---
+  duration_ms: 2.382962
+  type: 'test'
+  ...
+# Subtest: visibility can toggle without re-encrypting
+ok 172 - visibility can toggle without re-encrypting
+  ---
+  duration_ms: 0.700687
+  type: 'test'
+  ...
+# Subtest: restaurant ids validate and default when omitted
+ok 173 - restaurant ids validate and default when omitted
+  ---
+  duration_ms: 0.132646
+  type: 'test'
+  ...
+# Subtest: invalid restaurant ids fail closed
+ok 174 - invalid restaurant ids fail closed
+  ---
+  duration_ms: 0.250487
+  type: 'test'
+  ...
+# Subtest: rosters are isolated per restaurant
+ok 175 - rosters are isolated per restaurant
+  ---
+  duration_ms: 0.962571
+  type: 'test'
+  ...
+# Subtest: golden weeks and month revs are isolated per restaurant
+ok 176 - golden weeks and month revs are isolated per restaurant
+  ---
+  duration_ms: 2.126114
+  type: 'test'
+  ...
+# Subtest: legacy singleton docs fall back to the default restaurant only
+ok 177 - legacy singleton docs fall back to the default restaurant only
+  ---
+  duration_ms: 0.617123
+  type: 'test'
+  ...
+# Subtest: weekStart params parse and per-week keys are namespaced
+ok 178 - weekStart params parse and per-week keys are namespaced
+  ---
+  duration_ms: 0.198986
+  type: 'test'
+  ...
+# Subtest: rosters are isolated per week and fall back to the global seed
+ok 179 - rosters are isolated per week and fall back to the global seed
+  ---
+  duration_ms: 1.763658
+  type: 'test'
+  ...
+# Subtest: templates are isolated per week and fall back to the global seed
+ok 180 - templates are isolated per week and fall back to the global seed
+  ---
+  duration_ms: 1.390467
+  type: 'test'
+  ...
+# Subtest: saved rules and a failed publish cannot change snapshot times; republishing can
+ok 181 - saved rules and a failed publish cannot change snapshot times; republishing can
+  ---
+  duration_ms: 2.328682
+  type: 'test'
+  ...
+# Subtest: legacy times are pinned before editing rules without changing publication or employee mapping identity
+ok 182 - legacy times are pinned before editing rules without changing publication or employee mapping identity
+  ---
+  duration_ms: 4.168018
+  type: 'test'
+  ...
+# Subtest: legacy global fallbacks are preserved across paginated rules saves, including old default keys
+ok 183 - legacy global fallbacks are preserved across paginated rules saves, including old default keys
+  ---
+  duration_ms: 2.10738
+  type: 'test'
+  ...
+# Subtest: failed legacy preservation leaves rules untouched; kitchen save authorization is preserved
+ok 184 - failed legacy preservation leaves rules untouched; kitchen save authorization is preserved
+  ---
+  duration_ms: 1.53706
+  type: 'test'
+  ...
+# Subtest: unknown snapshots and snapshot downgrades are refused without modifying the publication
+ok 185 - unknown snapshots and snapshot downgrades are refused without modifying the publication
+  ---
+  duration_ms: 0.926797
+  type: 'test'
+  ...
+# Subtest: a failed snapshot write prevents the rules overwrite
+ok 186 - a failed snapshot write prevents the rules overwrite
+  ---
+  duration_ms: 1.394178
+  type: 'test'
+  ...
+# toast cash fill failed toast_unavailable Toast login failed.
+# Subtest: legacy capture does not overwrite an intervening publication and stops the rules save
+ok 187 - legacy capture does not overwrite an intervening publication and stops the rules save
+  ---
+  duration_ms: 1.176991
+  type: 'test'
+  ...
+# Subtest: schedule-only stations refuse roster and global template writes
+ok 188 - schedule-only stations refuse roster and global template writes
+  ---
+  duration_ms: 0.722493
+  type: 'test'
+  ...
+# Subtest: schedule-only stations still accept schedule writes
+ok 189 - schedule-only stations still accept schedule writes
+  ---
+  duration_ms: 0.265976
+  type: 'test'
+  ...
+# Subtest: staff editing is password-gated and starts empty
+ok 190 - staff editing is password-gated and starts empty
+  ---
+  duration_ms: 0.504231
+  type: 'test'
+  ...
+# Subtest: crew saves persist for every week and undo steps back through history
+ok 191 - crew saves persist for every week and undo steps back through history
+  ---
+  duration_ms: 1.41289
+  type: 'test'
+  ...
+# Subtest: staff writes reject stale revisions and unauthorized callers
+ok 192 - staff writes reject stale revisions and unauthorized callers
+  ---
+  duration_ms: 0.820982
+  type: 'test'
+  ...
+# Subtest: staff password falls back to the hardcoded demo value and locked stations are refused
+ok 193 - staff password falls back to the hardcoded demo value and locked stations are refused
+  ---
+  duration_ms: 0.832563
+  type: 'test'
+  ...
+# Subtest: cash-out days need the manager token to read or write
+ok 194 - cash-out days need the manager token to read or write
+  ---
+  duration_ms: 0.287792
+  type: 'test'
+  ...
+# Subtest: cash-out day saves, loads, and shows in the 30-day history
+ok 195 - cash-out day saves, loads, and shows in the 30-day history
+  ---
+  duration_ms: 1.341515
+  type: 'test'
+  ...
+# Subtest: cash-out bodies are strictly validated
+ok 196 - cash-out bodies are strictly validated
+  ---
+  duration_ms: 0.513239
+  type: 'test'
+  ...
+# Subtest: cash-out found money is acknowledged, retained in history and recalculated against Z on the server
+ok 197 - cash-out found money is acknowledged, retained in history and recalculated against Z on the server
+  ---
+  duration_ms: 1.066628
+  type: 'test'
+  ...
+# Subtest: cash-out totals are recalculated on the server, ignoring what the client sent
+ok 198 - cash-out totals are recalculated on the server, ignoring what the client sent
+  ---
+  duration_ms: 0.137215
+  type: 'test'
+  ...
+# Subtest: cash-out PUT stores server totals even when the client tampers
+ok 199 - cash-out PUT stores server totals even when the client tampers
+  ---
+  duration_ms: 0.406263
+  type: 'test'
+  ...
+# Subtest: server cash-out totals match the browser on the DEC-02 notebook examples
+ok 200 - server cash-out totals match the browser on the DEC-02 notebook examples
+  ---
+  duration_ms: 0.425681
+  type: 'test'
+  ...
+# Subtest: cash-out history spans 30 days, newest first, across a month edge
+ok 201 - cash-out history spans 30 days, newest first, across a month edge
+  ---
+  duration_ms: 0.091726
+  type: 'test'
+  ...
+# Subtest: inventory counts need the manager token
+ok 202 - inventory counts need the manager token
+  ---
+  duration_ms: 0.242879
+  type: 'test'
+  ...
+# Subtest: inventory days save and come back in the 14-day history, newest first
+ok 203 - inventory days save and come back in the 14-day history, newest first
+  ---
+  duration_ms: 1.23609
+  type: 'test'
+  ...
+# Subtest: inventory bodies are strictly validated
+ok 204 - inventory bodies are strictly validated
+  ---
+  duration_ms: 0.598215
+  type: 'test'
+  ...
+# Subtest: the inventory item list needs the manager token and starts empty
+ok 205 - the inventory item list needs the manager token and starts empty
+  ---
+  duration_ms: 0.361708
+  type: 'test'
+  ...
+# Subtest: inventory item list saves with a rev and rejects stale writes
+ok 206 - inventory item list saves with a rev and rejects stale writes
+  ---
+  duration_ms: 4.22562
+  type: 'test'
+  ...
+# Subtest: inventory item lists are strictly validated
+ok 207 - inventory item lists are strictly validated
+  ---
+  duration_ms: 0.462183
+  type: 'test'
+  ...
+# Subtest: write-ups need the manager token to read or write
+ok 208 - write-ups need the manager token to read or write
+  ---
+  duration_ms: 0.391165
+  type: 'test'
+  ...
+# Subtest: write-ups save, list newest first, and only the label can change
+ok 209 - write-ups save, list newest first, and only the label can change
+  ---
+  duration_ms: 2.650609
+  type: 'test'
+  ...
+# Subtest: write-up forms are strictly validated
+ok 210 - write-up forms are strictly validated
+  ---
+  duration_ms: 0.220964
+  type: 'test'
+  ...
+# Subtest: all digital forms persist, paginate, label, reject form edits, and delete both record and list metadata
+ok 211 - all digital forms persist, paginate, label, reject form edits, and delete both record and list metadata
+  ---
+  duration_ms: 4.522035
+  type: 'test'
+  ...
+# Subtest: digital form routes require manager authentication and configured storage; DELETE is allowed by CORS
+ok 212 - digital form routes require manager authentication and configured storage; DELETE is allowed by CORS
+  ---
+  duration_ms: 0.813101
+  type: 'test'
+  ...
+# Subtest: digital form API rejects invalid fields and credentials without creating records
+ok 213 - digital form API rejects invalid fields and credentials without creating records
+  ---
+  duration_ms: 1.507027
+  type: 'test'
+  ...
+# Subtest: existing write-ups can be deleted without affecting other records
+ok 214 - existing write-ups can be deleted without affecting other records
+  ---
+  duration_ms: 0.95455
+  type: 'test'
+  ...
+# Subtest: Toast cash fill needs the manager code, Toast setup and a valid store/date
+ok 215 - Toast cash fill needs the manager code, Toast setup and a valid store/date
+  ---
+  duration_ms: 0.524094
+  type: 'test'
+  ...
+# Subtest: Toast cash fill returns cashier totals and never echoes Toast credentials
+ok 216 - Toast cash fill returns cashier totals and never echoes Toast credentials
+  ---
+  duration_ms: 1.495988
+  type: 'test'
+  ...
+# Subtest: Toast sales need the manager code and Toast setup, and reject bad or future dates
+ok 217 - Toast sales need the manager code and Toast setup, and reject bad or future dates
+  ---
+  duration_ms: 0.698375
+  type: 'test'
+  ...
+# Subtest: sales codes open one store each; once set, the manager code no longer opens sales
+ok 218 - sales codes open one store each; once set, the manager code no longer opens sales
+  ---
+  duration_ms: 1.979542
+  type: 'test'
+  ...
+# Subtest: Toast sales range needs the manager code, checks the range, and returns only cached days
+ok 219 - Toast sales range needs the manager code, checks the range, and returns only cached days
+  ---
+  duration_ms: 0.677742
+  type: 'test'
+  ...
+# Subtest: the hourly cron warms Toast sales only when Toast is configured
+ok 220 - the hourly cron warms Toast sales only when Toast is configured
+  ---
+  duration_ms: 1.056089
+  type: 'test'
+  ...
+# Subtest: Toast sales return a day summary without Toast credentials, then serve it from the cache
+ok 221 - Toast sales return a day summary without Toast credentials, then serve it from the cache
+  ---
+  duration_ms: 0.87434
+  type: 'test'
+  ...
+# toast sales warm failed CR3 2026-11-12 toast_unavailable
+# Subtest: net sales are summed in cents and split by 4 PM order time and by Toast meal period
+ok 222 - net sales are summed in cents and split by 4 PM order time and by Toast meal period
+  ---
+  duration_ms: 1.729414
+  type: 'test'
+  ...
+# Subtest: discounts are totalled from check and item discounts, by name, and gross = net + discounts
+ok 223 - discounts are totalled from check and item discounts, by name, and gross = net + discounts
+  ---
+  duration_ms: 0.496644
+  type: 'test'
+  ...
+# Subtest: voids count voided items, voided checks and voided orders once each, with reasons; they never count as sales
+ok 224 - voids count voided items, voided checks and voided orders once each, with reasons; they never count as sales
+  ---
+  duration_ms: 0.436047
+  type: 'test'
+  ...
+# Subtest: finished days are cached for 40 days; yesterday and today only briefly; future days are rejected
+ok 225 - finished days are cached for 40 days; yesterday and today only briefly; future days are rejected
+  ---
+  duration_ms: 0.2434
+  type: 'test'
+  ...
+# Subtest: fetchToastSales caches a finished day so the second view makes no Toast calls
+ok 226 - fetchToastSales caches a finished day so the second view makes no Toast calls
+  ---
+  duration_ms: 21.665555
+  type: 'test'
+  ...
+# Subtest: salesDateRange lists each date and rejects backwards or over-long ranges
+ok 227 - salesDateRange lists each date and rejects backwards or over-long ranges
+  ---
+  duration_ms: 0.339327
+  type: 'test'
+  ...
+# Subtest: the cron warms the newest uncached finished days for both stores, a couple per run, skipping cached days
+ok 228 - the cron warms the newest uncached finished days for both stores, a couple per run, skipping cached days
+  ---
+  duration_ms: 6.250798
+  type: 'test'
+  ...
+# Subtest: a Toast failure stops the cron run and the next run retries that day first
+ok 229 - a Toast failure stops the cron run and the next run retries that day first
+  ---
+  duration_ms: 3.905248
+  type: 'test'
+  ...
+# Subtest: readCachedSales returns cached days and lists the rest as missing without calling Toast
+ok 230 - readCachedSales returns cached days and lists the rest as missing without calling Toast
+  ---
+  duration_ms: 1.260274
+  type: 'test'
+  ...
+# Subtest: cash payments are summed per employee in cents and split into AM/PM at 4 PM local
+ok 231 - cash payments are summed per employee in cents and split into AM/PM at 4 PM local
+  ---
+  duration_ms: 3.0885
+  type: 'test'
+  ...
+# Subtest: a cashier goes to the shift where most of their cash came in
+ok 232 - a cashier goes to the shift where most of their cash came in
+  ---
+  duration_ms: 0.477573
+  type: 'test'
+  ...
+# Subtest: voided payments, voided or deleted orders and checks are left out
+ok 233 - voided payments, voided or deleted orders and checks are left out
+  ---
+  duration_ms: 0.432117
+  type: 'test'
+  ...
+# Subtest: refunds come off the cashier and the day; same first names get a last initial; unknown staff stay visible
+ok 234 - refunds come off the cashier and the day; same first names get a last initial; unknown staff stay visible
+  ---
+  duration_ms: 0.294576
+  type: 'test'
+  ...
+# Subtest: Z expected cash adds paid-ins and subtracts paid-outs; counts, no-sales and undone entries are ignored
+ok 235 - Z expected cash adds paid-ins and subtracts paid-outs; counts, no-sales and undone entries are ignored
+  ---
+  duration_ms: 0.338361
+  type: 'test'
+  ...
+# Subtest: the Toast token is reused from KV until shortly before it expires
+ok 236 - the Toast token is reused from KV until shortly before it expires
+  ---
+  duration_ms: 19.641658
+  type: 'test'
+  ...
+# Subtest: fetchToastCash pages through orders for the store location and business date
+ok 237 - fetchToastCash pages through orders for the store location and business date
+  ---
+  duration_ms: 3.874376
+  type: 'test'
+  ...
+# Subtest: a Toast 429 waits Retry-After (capped) and retries once, then reports toast_busy
+ok 238 - a Toast 429 waits Retry-After (capped) and retries once, then reports toast_busy
+  ---
+  duration_ms: 3.151377
+  type: 'test'
+  ...
+1..238
+# tests 238
+# suites 0
+# pass 238
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3178.088659
+TAP version 13
+# Subtest: links validate real dates, exact context and duplicate parameters before selecting a day
+ok 1 - links validate real dates, exact context and duplicate parameters before selecting a day
+  ---
+  duration_ms: 1.516719
+  type: 'test'
+  ...
+# Subtest: saved reader retains all paper values, stored totals, time and comparison-only identity
+ok 2 - saved reader retains all paper values, stored totals, time and comparison-only identity
+  ---
+  duration_ms: 5.733802
+  type: 'test'
+  ...
+# Subtest: malformed or mismatched saved responses are rejected without returning partial work
+ok 3 - malformed or mismatched saved responses are rejected without returning partial work
+  ---
+  duration_ms: 0.842972
+  type: 'test'
+  ...
+# Subtest: history distinguishes an empty window from invalid lists, duplicate days and out-of-window rows
+ok 4 - history distinguishes an empty window from invalid lists, duplicate days and out-of-window rows
+  ---
+  duration_ms: 0.612044
+  type: 'test'
+  ...
+# Subtest: HTTP readers preserve sheet exports and distinguish missing, invalid, failure and invalid input without a fetch
+ok 5 - HTTP readers preserve sheet exports and distinguish missing, invalid, failure and invalid input without a fetch
+  ---
+  duration_ms: 17.112428
+  type: 'test'
+  ...
+# Subtest: frozen requests detach raw metadata and comparison from later editor input
+ok 6 - frozen requests detach raw metadata and comparison from later editor input
+  ---
+  duration_ms: 0.474133
+  type: 'test'
+  ...
+# Subtest: uncertain recovery is additive, credential-free, bound to the exact draft and preserves unreadable original bytes
+ok 7 - uncertain recovery is additive, credential-free, bound to the exact draft and preserves unreadable original bytes
+  ---
+  duration_ms: 2.126407
+  type: 'test'
+  ...
+# Subtest: assessment requires exact read-back match, explicit retry or replacement; fingerprints are comparison identities
+ok 8 - assessment requires exact read-back match, explicit retry or replacement; fingerprints are comparison identities
+  ---
+  duration_ms: 1.551174
+  type: 'test'
+  ...
+# Subtest: resuming a device draft carries its source recovery into the new ID without rewriting source bytes
+ok 9 - resuming a device draft carries its source recovery into the new ID without rewriting source bytes
+  ---
+  duration_ms: 0.865971
+  type: 'test'
+  ...
+# Subtest: cents become plain dollar inputs the sheet accepts
+ok 10 - cents become plain dollar inputs the sheet accepts
+  ---
+  duration_ms: 0.534339
+  type: 'test'
+  ...
+# Subtest: an empty sheet takes Toast names, amounts and Z, reusing the starter blank drawer
+ok 11 - an empty sheet takes Toast names, amounts and Z, reusing the starter blank drawer
+  ---
+  duration_ms: 0.712117
+  type: 'test'
+  ...
+# Subtest: existing drawers keep their counts; names match ignoring case and spaces, even in the other shift
+ok 12 - existing drawers keep their counts; names match ignoring case and spaces, even in the other shift
+  ---
+  duration_ms: 0.346165
+  type: 'test'
+  ...
+# Subtest: a counted but unnamed drawer is not overwritten; Toast cashiers are added after it
+ok 13 - a counted but unnamed drawer is not overwritten; Toast cashiers are added after it
+  ---
+  duration_ms: 0.186601
+  type: 'test'
+  ...
+# Subtest: cashier drawer, turn-in and over/short
+ok 14 - cashier drawer, turn-in and over/short
+  ---
+  duration_ms: 1.083517
+  type: 'test'
+  ...
+# Subtest: day totals add both shifts and compare deposit to the Z report
+ok 15 - day totals add both shifts and compare deposit to the Z report
+  ---
+  duration_ms: 0.273074
+  type: 'test'
+  ...
+# Subtest: blank Toast or Z report leaves over/short unknown instead of $0
+ok 16 - blank Toast or Z report leaves over/short unknown instead of $0
+  ---
+  duration_ms: 0.145704
+  type: 'test'
+  ...
+# Subtest: money parsing and formatting
+ok 17 - money parsing and formatting
+  ---
+  duration_ms: 0.18824
+  type: 'test'
+  ...
+# Subtest: found cash resolves a Z shortage without rewriting cashier or shift comparisons
+ok 18 - found cash resolves a Z shortage without rewriting cashier or shift comparisons
+  ---
+  duration_ms: 0.323708
+  type: 'test'
+  ...
+# Subtest: cash amount entry accepts exact cents and rejects incomplete, signed or fractional-cent amounts
+ok 19 - cash amount entry accepts exact cents and rejects incomplete, signed or fractional-cent amounts
+  ---
+  duration_ms: 0.207321
+  type: 'test'
+  ...
+# Subtest: extra money requires a server acknowledgement so older Workers cannot silently discard it
+ok 20 - extra money requires a server acknowledgement so older Workers cannot silently discard it
+  ---
+  duration_ms: 14.658231
+  type: 'test'
+  ...
+# Subtest: datesEnding is oldest first and crosses month ends
+ok 21 - datesEnding is oldest first and crosses month ends
+  ---
+  duration_ms: 1.741755
+  type: 'test'
+  ...
+# Subtest: dailyRows sums stores and keeps blank over/short as null
+ok 22 - dailyRows sums stores and keeps blank over/short as null
+  ---
+  duration_ms: 0.536087
+  type: 'test'
+  ...
+# Subtest: summarize averages saved days and counts missing store-days before today
+ok 23 - summarize averages saved days and counts missing store-days before today
+  ---
+  duration_ms: 0.284265
+  type: 'test'
+  ...
+# Subtest: unassigned legacy sheet retains counts, AM/PM, source names and Toast/Z text without inventing context
+ok 24 - unassigned legacy sheet retains counts, AM/PM, source names and Toast/Z text without inventing context
+  ---
+  duration_ms: 1.23253
+  type: 'test'
+  ...
+# Subtest: malformed legacy sources are rejected without coercing invalid values to zero or fabricating a sheet
+ok 25 - malformed legacy sources are rejected without coercing invalid values to zero or fabricating a sheet
+  ---
+  duration_ms: 0.251876
+  type: 'test'
+  ...
+# Subtest: unknown context and credential-bearing legacy objects remain unassigned for recovery
+ok 26 - unknown context and credential-bearing legacy objects remain unassigned for recovery
+  ---
+  duration_ms: 0.276699
+  type: 'test'
+  ...
+# Subtest: blank, explicit zero and historical unknown entry states survive serialization independently
+ok 27 - blank, explicit zero and historical unknown entry states survive serialization independently
+  ---
+  duration_ms: 0.335018
+  type: 'test'
+  ...
+# Subtest: invalid count text is retained for recovery and never truncated into another number
+ok 28 - invalid count text is retained for recovery and never truncated into another number
+  ---
+  duration_ms: 0.510971
+  type: 'test'
+  ...
+# Subtest: server payload strips local status and preserves integer-cent totals and Toast/Z workbook semantics
+ok 29 - server payload strips local status and preserves integer-cent totals and Toast/Z workbook semantics
+  ---
+  duration_ms: 0.546507
+  type: 'test'
+  ...
+# Subtest: each bill and coin amount converts to an exact whole count and synchronizes in both directions
+ok 30 - each bill and coin amount converts to an exact whole count and synchronizes in both directions
+  ---
+  duration_ms: 0.808228
+  type: 'test'
+  ...
+# Subtest: nonmultiples and malformed amounts remain recoverable until corrected, without fractional bills
+ok 31 - nonmultiples and malformed amounts remain recoverable until corrected, without fractional bills
+  ---
+  duration_ms: 0.425833
+  type: 'test'
+  ...
+# Subtest: amount metadata stays local while found cash survives wire serialization and old drafts still load
+ok 32 - amount metadata stays local while found cash survives wire serialization and old drafts still load
+  ---
+  duration_ms: 0.417106
+  type: 'test'
+  ...
+# Subtest: zero/fractions/text/Enough/skips are distinct; orders do not mark a count entered
+ok 33 - zero/fractions/text/Enough/skips are distinct; orders do not mark a count entered
+  ---
+  duration_ms: 1.587042
+  type: 'test'
+  ...
+# Subtest: device envelopes preserve raw notation, captured catalog and IDs across rename/removal, with legacy wire shapes
+ok 34 - device envelopes preserve raw notation, captured catalog and IDs across rename/removal, with legacy wire shapes
+  ---
+  duration_ms: 0.87841
+  type: 'test'
+  ...
+# Subtest: unsupported/corrupt progress and legacy recovery bytes survive writes; denied storage reports failure
+ok 35 - unsupported/corrupt progress and legacy recovery bytes survive writes; denied storage reports failure
+  ---
+  duration_ms: 0.787497
+  type: 'test'
+  ...
+# Subtest: reviewed catalog adoption preserves removed IDs and never moves counts to a same-name new ID
+ok 36 - reviewed catalog adoption preserves removed IDs and never moves counts to a same-name new ID
+  ---
+  duration_ms: 0.581153
+  type: 'test'
+  ...
+# Subtest: built-in paper catalog with optional undefined notes checkpoints and resumes exact counts
+ok 37 - built-in paper catalog with optional undefined notes checkpoints and resumes exact counts
+  ---
+  duration_ms: 0.725597
+  type: 'test'
+  ...
+# Subtest: item ids are unique and fit the Worker pattern
+ok 38 - item ids are unique and fit the Worker pattern
+  ---
+  duration_ms: 1.269
+  type: 'test'
+  ...
+# Subtest: amounts parse whole numbers and fractions only
+ok 39 - amounts parse whole numbers and fractions only
+  ---
+  duration_ms: 0.306352
+  type: 'test'
+  ...
+# Subtest: orders top up to Use, matching the paper sheets
+ok 40 - orders top up to Use, matching the paper sheets
+  ---
+  duration_ms: 0.139397
+  type: 'test'
+  ...
+# Subtest: orders group by supplier and skip blanks
+ok 41 - orders group by supplier and skip blanks
+  ---
+  duration_ms: 0.938073
+  type: 'test'
+  ...
+# Subtest: supplier filter keeps rows shared between suppliers
+ok 42 - supplier filter keeps rows shared between suppliers
+  ---
+  duration_ms: 0.711747
+  type: 'test'
+  ...
+# Subtest: orders carry the ordered check-off
+ok 43 - orders carry the ordered check-off
+  ---
+  duration_ms: 0.197162
+  type: 'test'
+  ...
+# Subtest: new item ids are readable and never collide
+ok 44 - new item ids are readable and never collide
+  ---
+  duration_ms: 0.205639
+  type: 'test'
+  ...
+# Subtest: edited lists are checked before saving
+ok 45 - edited lists are checked before saving
+  ---
+  duration_ms: 0.378445
+  type: 'test'
+  ...
+1..45
+# tests 45
+# suites 0
+# pass 45
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 561.82385
+TAP version 13
+# Subtest: session lifetime rejects old successful requests and old expiry with the same code
+ok 1 - session lifetime rejects old successful requests and old expiry with the same code
+  ---
+  duration_ms: 0.82159
+  type: 'test'
+  ...
+# Subtest: unauthorized response clears current access while unowned APIs remain independent
+ok 2 - unauthorized response clears current access while unowned APIs remain independent
+  ---
+  duration_ms: 0.12825
+  type: 'test'
+  ...
+# Subtest: internal request rejects a delayed body after reauthentication and does not expire newer access
+ok 3 - internal request rejects a delayed body after reauthentication and does not expire newer access
+  ---
+  duration_ms: 12.615193
+  type: 'test'
+  ...
+# Subtest: a verification completing after the layout exits cannot revive access
+ok 4 - a verification completing after the layout exits cannot revive access
+  ---
+  duration_ms: 0.154202
+  type: 'test'
+  ...
+# Subtest: a code checked on the staff entry page is handed to the internal tools once, and only while fresh
+ok 5 - a code checked on the staff entry page is handed to the internal tools once, and only while fresh
+  ---
+  duration_ms: 0.175834
+  type: 'test'
+  ...
+# Subtest: failed storage checkpoints other tasks without closing any editor
+ok 6 - failed storage checkpoints other tasks without closing any editor
+  ---
+  duration_ms: 0.913327
+  type: 'test'
+  ...
+# Subtest: busy work prevents partial handoff and unsupported memory-only work stays open
+ok 7 - busy work prevents partial handoff and unsupported memory-only work stays open
+  ---
+  duration_ms: 0.160422
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 272.97492
+TAP version 13
+# Subtest: one in-flight operation coalesces repeated submissions and snapshots its original data
+ok 1 - one in-flight operation coalesces repeated submissions and snapshots its original data
+  ---
+  duration_ms: 2.437758
+  type: 'test'
+  ...
+# Subtest: offline/timeout and authorization failures retain payload and identity through retry/checkpoint
+ok 2 - offline/timeout and authorization failures retain payload and identity through retry/checkpoint
+  ---
+  duration_ms: 0.532815
+  type: 'test'
+  ...
+# Subtest: uncertain operations cannot be changed/reused with new content or another target
+ok 3 - uncertain operations cannot be changed/reused with new content or another target
+  ---
+  duration_ms: 0.500465
+  type: 'test'
+  ...
+# Subtest: conflict reload/copy preserves local input and original base until explicit server selection
+ok 4 - conflict reload/copy preserves local input and original base until explicit server selection
+  ---
+  duration_ms: 0.322102
+  type: 'test'
+  ...
+# Subtest: legacy/unavailable capability and malformed server snapshots fail closed without clearing input
+ok 5 - legacy/unavailable capability and malformed server snapshots fail closed without clearing input
+  ---
+  duration_ms: 0.418453
+  type: 'test'
+  ...
+# Subtest: single-flight guard resets after failure and allows a deliberate later retry
+ok 6 - single-flight guard resets after failure and allows a deliberate later retry
+  ---
+  duration_ms: 0.182162
+  type: 'test'
+  ...
+# Subtest: inventory comparison uses stable IDs and retains raw units/names in either language
+ok 7 - inventory comparison uses stable IDs and retains raw units/names in either language
+  ---
+  duration_ms: 0.517548
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 507.162389
+TAP version 13
+# Subtest: same names are distinct and never matched without reviewed scoped IDs
+ok 1 - same names are distinct and never matched without reviewed scoped IDs
+  ---
+  duration_ms: 19.964404
+  type: 'test'
+  ...
+# Subtest: missing external IDs use exact fingerprint and physical row, never a guessed name
+ok 2 - missing external IDs use exact fingerprint and physical row, never a guessed name
+  ---
+  duration_ms: 1.314142
+  type: 'test'
+  ...
+# Subtest: unknown fields, guessed IDs, missing provenance and overlapping effective mappings fail validation
+ok 3 - unknown fields, guessed IDs, missing provenance and overlapping effective mappings fail validation
+  ---
+  duration_ms: 0.321874
+  type: 'test'
+  ...
+# Subtest: inclusive range owns whole overnight source shift with no payroll recalculation
+ok 4 - inclusive range owns whole overnight source shift with no payroll recalculation
+  ---
+  duration_ms: 15.81397
+  type: 'test'
+  ...
+# Subtest: open punches, invalid dates, DST ambiguity, missing IDs and source row numbers stay visible
+ok 5 - open punches, invalid dates, DST ambiguity, missing IDs and source row numbers stay visible
+  ---
+  duration_ms: 3.339823
+  type: 'test'
+  ...
+# Subtest: reversed times, malformed numeric values and invalid periods cannot export as accepted rows
+ok 6 - reversed times, malformed numeric values and invalid periods cannot export as accepted rows
+  ---
+  duration_ms: 2.083609
+  type: 'test'
+  ...
+# Subtest: replacement checkpoints add independent compatible device copies and retain original recovery bytes
+ok 7 - replacement checkpoints add independent compatible device copies and retain original recovery bytes
+  ---
+  duration_ms: 3.967486
+  type: 'test'
+  ...
+# Subtest: unprepared work, missing preparer, invalid snapshots and denied storage cannot authorize replacement
+ok 8 - unprepared work, missing preparer, invalid snapshots and denied storage cannot authorize replacement
+  ---
+  duration_ms: 0.532429
+  type: 'test'
+  ...
+# Subtest: source identity uses bytes/context/parser/mapping revision, never filename or upload time
+ok 9 - source identity uses bytes/context/parser/mapping revision, never filename or upload time
+  ---
+  duration_ms: 8.9672
+  type: 'test'
+  ...
+# Subtest: history retains reviewed values and output metadata without raw uploads or workbook bytes
+ok 10 - history retains reviewed values and output metadata without raw uploads or workbook bytes
+  ---
+  duration_ms: 24.93087
+  type: 'test'
+  ...
+# Subtest: deliberate reprocess preserves explicit lineage and source exception rows
+ok 11 - deliberate reprocess preserves explicit lineage and source exception rows
+  ---
+  duration_ms: 8.845942
+  type: 'test'
+  ...
+# Subtest: sales source fingerprint comes from the exact bytes read once
+ok 12 - sales source fingerprint comes from the exact bytes read once
+  ---
+  duration_ms: 25.876834
+  type: 'test'
+  ...
+# Subtest: sales/hours recovery snapshots preserve values, source names and null/zero while excluding File objects
+ok 13 - sales/hours recovery snapshots preserve values, source names and null/zero while excluding File objects
+  ---
+  duration_ms: 8.287281
+  type: 'test'
+  ...
+# Subtest: malformed, unsupported, credential-bearing and mismatched figure/context payloads are not applied
+ok 14 - malformed, unsupported, credential-bearing and mismatched figure/context payloads are not applied
+  ---
+  duration_ms: 15.839976
+  type: 'test'
+  ...
+# Subtest: task/store/day/period recovery keys remain isolated even if the stored payload has a conflicting context
+ok 15 - task/store/day/period recovery keys remain isolated even if the stored payload has a conflicting context
+  ---
+  duration_ms: 4.747505
+  type: 'test'
+  ...
+# Subtest: independent resumed copies preserve original bytes and lineage without overwriting another editor
+ok 16 - independent resumed copies preserve original bytes and lineage without overwriting another editor
+  ---
+  duration_ms: 4.853525
+  type: 'test'
+  ...
+# Subtest: quota/read denial leaves the working snapshot and prior recoverable copy intact
+ok 17 - quota/read denial leaves the working snapshot and prior recoverable copy intact
+  ---
+  duration_ms: 1.594825
+  type: 'test'
+  ...
+# Subtest: corrupt/future sources remain downloadable byte-for-byte rather than overwritten
+ok 18 - corrupt/future sources remain downloadable byte-for-byte rather than overwritten
+  ---
+  duration_ms: 0.799198
+  type: 'test'
+  ...
+# Subtest: generated output survives serialization and repeated download decoding with identical bytes/hash
+ok 19 - generated output survives serialization and repeated download decoding with identical bytes/hash
+  ---
+  duration_ms: 23.598885
+  type: 'test'
+  ...
+# Subtest: damaged output, wrong context filenames and unsafe download filenames are rejected
+ok 20 - damaged output, wrong context filenames and unsafe download filenames are rejected
+  ---
+  duration_ms: 2.005907
+  type: 'test'
+  ...
+# Subtest: weekday derives only from a valid selected calendar date
+ok 21 - weekday derives only from a valid selected calendar date
+  ---
+  duration_ms: 1.196962
+  type: 'test'
+  ...
+# Subtest: matching metadata, missing metadata and mismatched source store/date stay distinct
+ok 22 - matching metadata, missing metadata and mismatched source store/date stay distinct
+  ---
+  duration_ms: 2.617808
+  type: 'test'
+  ...
+# Subtest: timestamp parsing rejects normalization, DST gaps and repeats; offsets disambiguate
+ok 23 - timestamp parsing rejects normalization, DST gaps and repeats; offsets disambiguate
+  ---
+  duration_ms: 17.374854
+  type: 'test'
+  ...
+# Subtest: saved cash-out digest binds exact retrieved context and distinguishes missing from zero
+ok 24 - saved cash-out digest binds exact retrieved context and distinguishes missing from zero
+  ---
+  duration_ms: 29.926463
+  type: 'test'
+  ...
+# Subtest: context suggestion requires agreement from all three content sources; filenames confer no authority
+ok 25 - context suggestion requires agreement from all three content sources; filenames confer no authority
+  ---
+  duration_ms: 2.13223
+  type: 'test'
+  ...
+# Subtest: all 14 mapped source figures and four manual amounts have traceable original evidence
+ok 26 - all 14 mapped source figures and four manual amounts have traceable original evidence
+  ---
+  duration_ms: 5.10359
+  type: 'test'
+  ...
+# Subtest: same-report arithmetic compares complete source detail and shows inconsistent sales, tax and payments
+ok 27 - same-report arithmetic compares complete source detail and shows inconsistent sales, tax and payments
+  ---
+  duration_ms: 1.836009
+  type: 'test'
+  ...
+# Subtest: missing totals/detail never become confirmed zero and cross-report comparisons never imply matching scope
+ok 28 - missing totals/detail never become confirmed zero and cross-report comparisons never imply matching scope
+  ---
+  duration_ms: 1.175884
+  type: 'test'
+  ...
+# Subtest: payment rows outside the legacy mapping remain visible and do not silently change output
+ok 29 - payment rows outside the legacy mapping remain visible and do not silently change output
+  ---
+  duration_ms: 1.233084
+  type: 'test'
+  ...
+# Subtest: arithmetic includes extra sales categories even though the established workbook maps FOOD/DRINK only
+ok 30 - arithmetic includes extra sales categories even though the established workbook maps FOOD/DRINK only
+  ---
+  duration_ms: 0.711248
+  type: 'test'
+  ...
+# Subtest: fractional cents and unsafe sums are not rounded into a successful reconciliation
+ok 31 - fractional cents and unsafe sums are not rounded into a successful reconciliation
+  ---
+  duration_ms: 0.603143
+  type: 'test'
+  ...
+# Subtest: review retains its selected context and primitive figures independently of later input changes
+ok 32 - review retains its selected context and primitive figures independently of later input changes
+  ---
+  duration_ms: 1.033849
+  type: 'test'
+  ...
+# Subtest: generated workbook matches known existing cells and preserves template sheets, formulas, styles and print setup
+ok 33 - generated workbook matches known existing cells and preserves template sheets, formulas, styles and print setup
+  ---
+  duration_ms: 176.42118
+  type: 'test'
+  ...
+# Subtest: all labels and check states have matching English/Spanish translations without changing source evidence
+ok 34 - all labels and check states have matching English/Spanish translations without changing source evidence
+  ---
+  duration_ms: 1.011696
+  type: 'test'
+  ...
+# Subtest: cash edits retain source evidence, normalize currency and reconcile blank versus zero independently
+ok 35 - cash edits retain source evidence, normalize currency and reconcile blank versus zero independently
+  ---
+  duration_ms: 8.554699
+  type: 'test'
+  ...
+# Subtest: shared employee counted once across stores while source totals and unmatched hours reconcile
+ok 36 - shared employee counted once across stores while source totals and unmatched hours reconcile
+  ---
+  duration_ms: 42.218692
+  type: 'test'
+  ...
+# Subtest: missing mappings or imports remain unavailable rather than measured zero; explicit OFF is zero
+ok 37 - missing mappings or imports remain unavailable rather than measured zero; explicit OFF is zero
+  ---
+  duration_ms: 18.040601
+  type: 'test'
+  ...
+# Subtest: duplicate selected versions are quarantined; default selection keeps linked leaf only
+ok 38 - duplicate selected versions are quarantined; default selection keeps linked leaf only
+  ---
+  duration_ms: 23.827686
+  type: 'test'
+  ...
+# Subtest: unpublished, missing, malformed and incompatible schedules are explicit limitations
+ok 39 - unpublished, missing, malformed and incompatible schedules are explicit limitations
+  ---
+  duration_ms: 8.448384
+  type: 'test'
+  ...
+# Subtest: legacy layout hashes do not pin times: rule fingerprints and estimates expose changes
+ok 40 - legacy layout hashes do not pin times: rule fingerprints and estimates expose changes
+  ---
+  duration_ms: 1.692815
+  type: 'test'
+  ...
+# Subtest: published time snapshots ignore later rules and distinguish confirmed timing from legacy estimates
+ok 41 - published time snapshots ignore later rules and distinguish confirmed timing from legacy estimates
+  ---
+  duration_ms: 8.216697
+  type: 'test'
+  ...
+# Subtest: different byte fingerprints do not double-count repeated identified attendance rows
+ok 42 - different byte fingerprints do not double-count repeated identified attendance rows
+  ---
+  duration_ms: 9.701223
+  type: 'test'
+  ...
+# Subtest: overnight overlaps are visible; excluded source rows and partial periods stay in evidence
+ok 43 - overnight overlaps are visible; excluded source rows and partial periods stay in evidence
+  ---
+  duration_ms: 13.31092
+  type: 'test'
+  ...
+# Subtest: existing sales mapping is preserved, including explicit zeros for absent cards/discounts and blank unused category cells
+ok 44 - existing sales mapping is preserved, including explicit zeros for absent cards/discounts and blank unused category cells
+  ---
+  duration_ms: 3.836338
+  type: 'test'
+  ...
+# Subtest: source numbers never coerce blank, partial, ambiguous separators or nonfinite values to zero
+ok 45 - source numbers never coerce blank, partial, ambiguous separators or nonfinite values to zero
+  ---
+  duration_ms: 0.585386
+  type: 'test'
+  ...
+# Subtest: sales rejects missing/wrong/empty sheets, columns, duplicate headers and missing or duplicate metric rows with evidence
+ok 46 - sales rejects missing/wrong/empty sheets, columns, duplicate headers and missing or duplicate metric rows with evidence
+  ---
+  duration_ms: 0.46532
+  type: 'test'
+  ...
+# Subtest: sales blocks malformed numbers and spreadsheet errors at their actual sheet/cell rows, including direct extraction
+ok 47 - sales blocks malformed numbers and spreadsheet errors at their actual sheet/cell rows, including direct extraction
+  ---
+  duration_ms: 0.475196
+  type: 'test'
+  ...
+# Subtest: sales file reader rejects empty/unreadable/unsupported files and verifies actual workbook bytes
+ok 48 - sales file reader rejects empty/unreadable/unsupported files and verifies actual workbook bytes
+  ---
+  duration_ms: 21.442836
+  type: 'test'
+  ...
+# Subtest: hours rejects wrong, empty and header-only reports and identifies missing and duplicate columns
+ok 49 - hours rejects wrong, empty and header-only reports and identifies missing and duplicate columns
+  ---
+  duration_ms: 2.864302
+  type: 'test'
+  ...
+# Subtest: hours reports every missing identity, bad number and unreadable source date without a partial export
+ok 50 - hours reports every missing identity, bad number and unreadable source date without a partial export
+  ---
+  duration_ms: 0.897502
+  type: 'test'
+  ...
+# Subtest: hours handles quoted commas/multiline fields, reordered/extra columns, BOM and CRLF without dropping rows
+ok 51 - hours handles quoted commas/multiline fields, reordered/extra columns, BOM and CRLF without dropping rows
+  ---
+  duration_ms: 10.120739
+  type: 'test'
+  ...
+# Subtest: hours flags malformed quotes and column-width problems, including blank-record offsets
+ok 52 - hours flags malformed quotes and column-width problems, including blank-record offsets
+  ---
+  duration_ms: 0.545356
+  type: 'test'
+  ...
+# Subtest: hours workbook preserves grouping, source regular/overtime, English headers, totals, column positions and names
+ok 53 - hours workbook preserves grouping, source regular/overtime, English headers, totals, column positions and names
+  ---
+  duration_ms: 40.668602
+  type: 'test'
+  ...
+# Subtest: arbitrary external IDs stay data, including prototype names, and no ID is dropped
+ok 54 - arbitrary external IDs stay data, including prototype names, and no ID is dropped
+  ---
+  duration_ms: 0.931138
+  type: 'test'
+  ...
+# Subtest: file read failure/invalid CSV invokes failure instead of completion; export failure is awaited
+ok 55 - file read failure/invalid CSV invokes failure instead of completion; export failure is awaited
+  ---
+  duration_ms: 11.55263
+  type: 'test'
+  ...
+# Subtest: source issue keys render in English and Spanish with raw headers and row evidence retained
+ok 56 - source issue keys render in English and Spanish with raw headers and row evidence retained
+  ---
+  duration_ms: 0.354316
+  type: 'test'
+  ...
+# Subtest: sales preserves cash-only reports but rejects missing or non-text labels before extraction
+ok 57 - sales preserves cash-only reports but rejects missing or non-text labels before extraction
+  ---
+  duration_ms: 0.284851
+  type: 'test'
+  ...
+1..57
+# tests 57
+# suites 0
+# pass 57
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 25444.202846
+TAP version 13
+# Subtest: draft contracts reject unknown fields, credentials, and invalid checkboxes while allowing partial typing
+ok 1 - draft contracts reject unknown fields, credentials, and invalid checkboxes while allowing partial typing
+  ---
+  duration_ms: 1.529668
+  type: 'test'
+  ...
+# Subtest: calendar dates reject rollovers and accept leap days
+ok 2 - calendar dates reject rollovers and accept leap days
+  ---
+  duration_ms: 0.123366
+  type: 'test'
+  ...
+# Subtest: mixed saved-form lists search names, stores and labels and filter all five types
+ok 3 - mixed saved-form lists search names, stores and labels and filter all five types
+  ---
+  duration_ms: 1.055969
+  type: 'test'
+  ...
+# Subtest: every blank form in the catalog exists with its original format
+ok 4 - every blank form in the catalog exists with its original format
+  ---
+  duration_ms: 1.978587
+  type: 'test'
+  ...
+# Subtest: blank form links respect the deploy base path
+ok 5 - blank form links respect the deploy base path
+  ---
+  duration_ms: 0.110428
+  type: 'test'
+  ...
+# Subtest: saved form search filters by employee, label, type and date range without reordering
+ok 6 - saved form search filters by employee, label, type and date range without reordering
+  ---
+  duration_ms: 0.583236
+  type: 'test'
+  ...
+# Subtest: complete context dimensions isolate drafts; store/date/task/station/shift/record are independent
+ok 7 - complete context dimensions isolate drafts; store/date/task/station/shift/record are independent
+  ---
+  duration_ms: 3.580261
+  type: 'test'
+  ...
+# Subtest: form type separates form drafts and leaves existing keys unchanged
+ok 8 - form type separates form drafts and leaves existing keys unchanged
+  ---
+  duration_ms: 0.178841
+  type: 'test'
+  ...
+# Subtest: resuming forks into a new independent ID and preserves original source, preparer and values
+ok 9 - resuming forks into a new independent ID and preserves original source, preparer and values
+  ---
+  duration_ms: 5.166466
+  type: 'test'
+  ...
+# Subtest: corrupt/future payloads remain readable and cannot be overwritten; no cleanup/disposal is introduced
+ok 10 - corrupt/future payloads remain readable and cannot be overwritten; no cleanup/disposal is introduced
+  ---
+  duration_ms: 0.273107
+  type: 'test'
+  ...
+# Subtest: defined v0 upgrades in memory, then forks without changing the original bytes
+ok 11 - defined v0 upgrades in memory, then forks without changing the original bytes
+  ---
+  duration_ms: 0.332424
+  type: 'test'
+  ...
+# Subtest: denied storage is unavailable, never an empty success or a false save
+ok 12 - denied storage is unavailable, never an empty success or a false save
+  ---
+  duration_ms: 0.67619
+  type: 'test'
+  ...
+# Subtest: credentials, unsupported context, malformed cash payloads and renamed contexts are rejected
+ok 13 - credentials, unsupported context, malformed cash payloads and renamed contexts are rejected
+  ---
+  duration_ms: 0.324174
+  type: 'test'
+  ...
+# Subtest: write-up draft payloads accept only the form fields
+ok 14 - write-up draft payloads accept only the form fields
+  ---
+  duration_ms: 0.70047
+  type: 'test'
+  ...
+# Subtest: write-up drafts are scoped by store, date and form type and keep names and narratives as typed
+ok 15 - write-up drafts are scoped by store, date and form type and keep names and narratives as typed
+  ---
+  duration_ms: 1.774543
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 459.335904
+TAP version 13
+# Subtest: request store validates authoritative context and keeps the retry operation identity
+ok 1 - request store validates authoritative context and keeps the retry operation identity
+  ---
+  duration_ms: 3.312732
+  type: 'test'
+  ...
+# Subtest: requests validate calendar boundaries, station-scoped identity and explicit provenance
+ok 2 - requests validate calendar boundaries, station-scoped identity and explicit provenance
+  ---
+  duration_ms: 1.222708
+  type: 'test'
+  ...
+# Subtest: temporary ranges support overnight starts, reject invalid or overlapping ranges, and leave inputs unchanged
+ok 3 - temporary ranges support overnight starts, reject invalid or overlapping ranges, and leave inputs unchanged
+  ---
+  duration_ms: 0.279185
+  type: 'test'
+  ...
+# Subtest: pending overlaps are retained; approved overlaps require an explicit nonoverlapping choice
+ok 4 - pending overlaps are retained; approved overlaps require an explicit nonoverlapping choice
+  ---
+  duration_ms: 0.357714
+  type: 'test'
+  ...
+# Subtest: append and final review preserve originals, entered labels, ordering and prior decisions
+ok 5 - append and final review preserve originals, entered labels, ordering and prior decisions
+  ---
+  duration_ms: 0.360503
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 297.903208
+TAP version 13
+# Subtest: context rejects impossible dates, duplicate assignments, and unrecognized authority fields
+ok 1 - context rejects impossible dates, duplicate assignments, and unrecognized authority fields
+  ---
+  duration_ms: 9.335216
+  type: 'test'
+  ...
+# Subtest: loop covers required spots, honors approved leave and locks, and pauses for review
+ok 2 - loop covers required spots, honors approved leave and locks, and pauses for review
+  ---
+  duration_ms: 89.0854
+  type: 'test'
+  ...
+# Subtest: unconfirmed requests and conflicting locks stop before generation
+ok 3 - unconfirmed requests and conflicting locks stop before generation
+  ---
+  duration_ms: 9.967969
+  type: 'test'
+  ...
+# Subtest: an unmatched approved request blocks instead of silently losing time off
+ok 4 - an unmatched approved request blocks instead of silently losing time off
+  ---
+  duration_ms: 4.165983
+  type: 'test'
+  ...
+# Subtest: impossible coverage exhausts its budget and preserves rules and crew
+ok 5 - impossible coverage exhausts its budget and preserves rules and crew
+  ---
+  duration_ms: 15.916692
+  type: 'test'
+  ...
+# Subtest: independent verification rejects a solver result that claims success with invalid assignments
+ok 6 - independent verification rejects a solver result that claims success with invalid assignments
+  ---
+  duration_ms: 34.512135
+  type: 'test'
+  ...
+# Subtest: the loop compares observed results and selects fewer doubles
+ok 7 - the loop compares observed results and selects fewer doubles
+  ---
+  duration_ms: 14.188395
+  type: 'test'
+  ...
+# Subtest: planner outages fall back to bounded tools and duplicate output cannot increase the budget
+ok 8 - planner outages fall back to bounded tools and duplicate output cannot increase the budget
+  ---
+  duration_ms: 60.950521
+  type: 'test'
+  ...
+# Subtest: SQLite checkpoints survive process reconstruction and resume review without regenerating
+ok 9 - SQLite checkpoints survive process reconstruction and resume review without regenerating
+  ---
+  duration_ms: 4131.205407
+  type: 'test'
+  ...
+# Subtest: service authenticates every request, restricts origins, and never exposes context in its view
+ok 10 - service authenticates every request, restricts origins, and never exposes context in its view
+  ---
+  duration_ms: 1678.766872
+  type: 'test'
+  ...
+# Subtest: duplicate creates are idempotent and changed payloads cannot reuse an operation ID
+ok 11 - duplicate creates are idempotent and changed payloads cannot reuse an operation ID
+  ---
+  duration_ms: 41.207088
+  type: 'test'
+  ...
+# Subtest: approval rejects stale drafts and changed requests, then accepts retryable draft-only decisions
+ok 12 - approval rejects stale drafts and changed requests, then accepts retryable draft-only decisions
+  ---
+  duration_ms: 42.140223
+  type: 'test'
+  ...
+# Subtest: unavailable requests, malformed payloads, oversized bodies, and budget exhaustion fail closed
+ok 13 - unavailable requests, malformed payloads, oversized bodies, and budget exhaustion fail closed
+  ---
+  duration_ms: 319.918747
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 22466.325246

@@ -1,0 +1,13 @@
+
+> chinarose@0.0.2 worker:build
+> node scripts/build-worker.mjs
+
+
+ ⛅️ wrangler 4.86.0
+───────────────────
+Total Upload: 250.94 KiB / gzip: 59.34 KiB
+Your Worker has access to the following bindings:
+Binding                                             Resource
+env.SCHEDULES (REPLACE_WITH_YOUR_NAMESPACE_ID)      KV Namespace
+
+--dry-run: exiting now.

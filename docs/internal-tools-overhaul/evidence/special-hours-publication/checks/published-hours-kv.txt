@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: manager-only published snapshot reader preserves KV and marks missing/hidden weeks explicitly
+ok 1 - manager-only published snapshot reader preserves KV and marks missing/hidden weeks explicitly
+  ---
+  duration_ms: 6598.991452
+  type: 'test'
+  ...
+# Subtest: real local KV keeps published times stable through rule saves and a failed publication
+ok 2 - real local KV keeps published times stable through rule saves and a failed publication
+  ---
+  duration_ms: 8216.930634
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15880.959747

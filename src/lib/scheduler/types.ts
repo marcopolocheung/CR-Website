@@ -177,6 +177,8 @@ export type SchedulerInput = {
   template: WeeklyStaffingTemplate
   /** Dates the slots so suspensions apply. */
   weekStart?: string
+  /** Reviewed dated layout, expanded before applying closures. */
+  slots?: StaffingSlot[]
 }
 
 export type ValidationCode =

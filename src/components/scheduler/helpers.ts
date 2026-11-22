@@ -1,3 +1,4 @@
+import type { DraftHoursReviews } from '@/lib/scheduler/special-hours'
 import {
   DAYS,
   calculateScheduleStats,
@@ -52,6 +53,7 @@ export type DropFeedback = {
 } | null
 
 export type HistorySnapshot = {
+  hoursReviews?: DraftHoursReviews
   label: string
   weekStart: string
   employees: Employee[]

@@ -25,8 +25,18 @@ import {
 import { Button, Disclosure, Icon } from './ui'
 import { BoardLegend, WeeklyScheduleBoard } from './ScheduleBoard'
 import { GenerationReportBanner, GuidedFixPanel, HoursSummary, MonthStrip } from './SchedulePanels'
+import type { Locale } from '@/lib/internal-tools/contracts'
+import type { PublishedDayHours, SpecialHoursData } from '@/lib/scheduler/special-hours'
 
 export type ScheduleWorkspaceProps = {
+  hoursDays:SpecialHoursData[]
+  publishedHours:PublishedDayHours[]
+  hoursPending:string[]
+  hoursDisabled:boolean
+  hoursBlocked:boolean
+  canPublishEmpty:boolean
+  hoursLocale:Locale
+  onEditHours:(date:string)=>void
   weekStart: string
   assignments: ScheduleAssignment[]
   slots: StaffingSlot[]
@@ -204,7 +214,7 @@ export default function ScheduleWorkspace(props: ScheduleWorkspaceProps) {
   const [fixOpen, setFixOpen] = useState(false)
   const fixRef = useRef<HTMLDivElement>(null)
   const blocking = visibleIssueCount > 0 && Boolean(nextIssue && isBlocker(nextIssue))
-  const hasSchedule = assignments.length > 0
+  const hasSchedule = assignments.length > 0 || props.canPublishEmpty
   const showFixPanel = visibleIssueCount > 0 || (fixOpen && ignoredIssueCount > 0)
   const working = stats.filter((stat) => stat.shifts > 0)
   const totalHours = working.reduce((sum, stat) => sum + stat.hours, 0)
@@ -261,7 +271,7 @@ export default function ScheduleWorkspace(props: ScheduleWorkspaceProps) {
               onClick={onMake}
               icon="spark"
               loading={isGenerating}
-              disabled={activeEmployeeCount === 0 || isGenerating}
+              disabled={activeEmployeeCount === 0 || isGenerating || props.hoursBlocked}
               title={activeEmployeeCount === 0 ? 'Add someone to the staff list first.' : 'Make the week again from the staff list.'}
             >
               {isGenerating ? 'Making schedule…' : 'Remake'}
@@ -273,7 +283,7 @@ export default function ScheduleWorkspace(props: ScheduleWorkspaceProps) {
             onClick={onMake}
             icon="spark"
             loading={isGenerating}
-            disabled={activeEmployeeCount === 0 || isGenerating}
+            disabled={activeEmployeeCount === 0 || isGenerating || props.hoursBlocked}
             title={activeEmployeeCount === 0 ? 'Add someone to the staff list first.' : 'Build the week from the staff list.'}
           >
             {isGenerating ? 'Making schedule…' : 'Make schedule'}
@@ -513,6 +523,7 @@ export default function ScheduleWorkspace(props: ScheduleWorkspaceProps) {
         )}
 
         <WeeklyScheduleBoard
+          hoursDays={props.hoursDays} hoursPending={props.hoursPending} hoursDisabled={props.hoursDisabled} hoursLocale={props.hoursLocale} onEditHours={props.onEditHours}
           slots={slots}
           weekStart={weekStart}
           hasSchedule={hasSchedule}
