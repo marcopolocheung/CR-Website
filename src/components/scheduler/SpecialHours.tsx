@@ -55,10 +55,9 @@ export function HoursStationStatus({page,week,station,base,reviews,locale,onRevi
 }
 
 type SaveAttempt={eventBefore:SpecialHoursRecord|null;reviewBefore:HoursReviewRecord|null;eventOp:string;reviewOp:string;event?:SpecialHoursRecord;review?:HoursReviewRecord;data:SpecialHoursData;decisions:HoursDecision[]}
-export default function SpecialHoursDialog({date,week,station,locale,source,base,assignments,employees,locked,onClose,onApplied,onDirty,selectedReview,onNavigate}:{
-  date:string;week:string;station:StationId;locale:Locale;source:SpecialHoursSource;base:StaffingSlot[];assignments:ScheduleAssignment[];employees:Employee[];locked:boolean
+export default function SpecialHoursDialog({date,station,locale,source,base,assignments,employees,locked,onClose,onApplied,onDirty,selectedReview}:{
+  date:string;station:StationId;locale:Locale;source:SpecialHoursSource;base:StaffingSlot[];assignments:ScheduleAssignment[];employees:Employee[];locked:boolean
   onClose:()=>void;onApplied:(event:SpecialHoursRecord,review:HoursReviewRecord)=>void;onDirty:(dirty:boolean)=>void;selectedReview:HoursReviewRecord|null
-  onNavigate:(event:React.MouseEvent<HTMLAnchorElement>)=>void
 }) {
   const t=(key:string,params?:Record<string,string|number>)=>translate(locale,key,params)
   const initial=useRef(source.page?.events.find(e=>e.data.date===date)??null)
@@ -80,6 +79,8 @@ export default function SpecialHoursDialog({date,week,station,locale,source,base
   const preview=reviewedDaySlots(base,reviewData)
   const removed=new Set(base.filter(slot=>!preview?.some(s=>s.id===slot.id)).map(slot=>slot.id))
   const removedAssignments=assignments.filter(a=>removed.has(a.slotId))
+  const affectedSlots=data.mode==='early'?base.filter(slot=>slot.end>data.closeMinute!):[]
+  const customFinishes=data.mode==='early'&&canonicalJson(decisions)!==canonicalJson(suggestedHoursDecisions(base,data))
   const disabled=saving||uncertain
   async function save() {
     if(saving||locked||preview===null||source.phase==='unconfigured')return
@@ -114,40 +115,36 @@ export default function SpecialHoursDialog({date,week,station,locale,source,base
   }
   return <dialog ref={dialog} className={css.dialog} aria-labelledby="special-hours-title" lang={locale} onCancel={event=>{event.preventDefault();if(!disabled)onClose()}}>
     <div className={css.body}>
-      <h2 id="special-hours-title" className={css.heading}>{t('hours.title')} · {new Date(date+'T12:00:00Z').toLocaleDateString(locale==='es'?'es-US':'en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric',timeZone:'UTC'})}</h2>
+      <h2 id="special-hours-title" className={css.heading}>{t('hours.title')}</h2>
+      <p className={css.date}>{new Date(date+'T12:00:00Z').toLocaleDateString(locale==='es'?'es-US':'en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric',timeZone:'UTC'})}</p>
       <p className={css.scope}>{t('hours.scope',{store:STATION_STORES[station]})}</p>
       <fieldset disabled={disabled||locked} className={css.form}>
         <div className={css.modes} role="radiogroup" aria-label={t('hours.title')}>{(['normal','closed','early'] as const).map(mode=><label key={mode}><input type="radio" name="restaurant-hours-mode" value={mode} checked={data.mode===mode} onChange={()=>changeEvent({...data,mode,closeMinute:mode==='early'?1140:null})}/>{t(`hours.${mode}`)}</label>)}</div>
         {data.mode==='early'&&<label className={css.field}>{t('hours.closeTime')}<TimeField value={data.closeMinute!} ariaLabel={t('hours.closeTime')} onChange={closeMinute=>changeEvent({...data,closeMinute})}/></label>}
-        <label className={css.field}>{t('hours.label')}<input value={data.label} maxLength={80} onChange={e=>setData({...data,label:e.target.value})}/></label>
-        <div className={css.preview}><h3>{t('hours.preview')} · {t(station.endsWith('kitchen')?'hours.kitchen':'hours.dining')}</h3>
-          {!base.length&&<p>{t('hours.noSpots')}</p>}
-          {base.map(slot=>{
+        <p className={css.effect}>{t(customFinishes?'hours.customFinishes':`hours.effect.${data.mode}`)}{removedAssignments.length>0&&<> {t('hours.removeSummary',{count:removedAssignments.length,kept:removedAssignments.filter(a=>a.locked).length})}</>}</p>
+        <details className={css.options}>
+          <summary>{t('hours.options')}</summary>
+          <label className={css.field}>{t('hours.label')}<input value={data.label} maxLength={80} onChange={e=>setData({...data,label:e.target.value})}/></label>
+          {affectedSlots.length>0&&<div className={css.preview}><h3>{t('hours.finishOptions')}</h3><p className={css.muted}>{t('hours.finishHelp')}</p>
+          {affectedSlots.map(slot=>{
             const assignment=assignments.find(a=>a.slotId===slot.id),choice=decisions.find(d=>d.slotId===slot.id)
-            const affected=data.mode==='early'&&slot.end>data.closeMinute!,late=affected&&slot.start>=data.closeMinute!
+            const late=slot.start>=data.closeMinute!
             return <div className={css.row} key={slot.id}><div><strong>{slot.label}</strong><p>{employees.find(e=>e.id===assignment?.employeeId)?.name??t('hours.unassigned')}{assignment?.locked?` · ${t('hours.keep')}`:''}</p><p className={css.muted}>{t('hours.original',{time:formatTimeRange(slot)})}</p></div>
-              <div>{data.mode==='closed'?<strong>{t('hours.remove')}</strong>:affected?<>
+              <div>
                 {late&&<label><input type="checkbox" checked={choice?.end!==null} onChange={e=>setDecisions(old=>old.map(d=>d.slotId===slot.id?{...d,end:e.target.checked?slot.end:null}:d))}/>{t('hours.cleanup')}</label>}
                 {choice?.end!==null&&<label>{t('hours.finish')}<TimeField value={choice?.end??slot.end} ariaLabel={`${t('hours.finish')} · ${slot.label}`} onChange={end=>setDecisions(old=>old.map(d=>d.slotId===slot.id?{...d,end}:d))}/></label>}
                 {choice?.end===null&&<span>{t('hours.remove')}</span>}
-              </>:<span>{formatTimeRange(slot)}</span>}</div>
+              </div>
             </div>
           })}
-          <p>{t('hours.removed',{count:removedAssignments.length,kept:removedAssignments.filter(a=>a.locked).length})}</p>
-        </div>
+          </div>}
+        </details>
       </fieldset>
-      <div className={css.stations}>{(['diningroom','kitchen'] as const).map(kind=>{
-        const other=`${STATION_STORES[station]}-${kind}` as StationId,event=source.page?.events.find(e=>e.data.date===date)
-        const review=other===station?selectedReview:source.page?.reviews.find(r=>r.data.stationId===other&&r.data.date===date)
-        const state=source.page?.stations.find(s=>s.stationId===other&&s.date===date)
-        const status=event?stationHoursStatus(event,review??undefined,other===station?{stationId:station,date,baseFingerprint:hoursBaseFingerprint(base),visible:state?.visible??false,published:state?.published??null}:state):'needsReview'
-        return <div key={kind}><strong>{t(kind==='kitchen'?'hours.kitchen':'hours.dining')}</strong>: {t(`hours.${status}`)}{other!==station&&<p><Link href={`/scheduler-demo/${other}?week=${week}&hoursDate=${date}`} onClick={onNavigate}>{t('hours.review')}</Link></p>}</div>
-      })}</div>
       {locked&&<p className={css.error}>{t('hours.locked')}</p>}
       {partial&&error&&<p role="status">{t('hours.partial')}</p>}
       {error&&<p role="alert" className={css.error}>{t(error)}</p>}
       {preview===null&&<p role="alert" className={css.error}>{t('hours.invalid')}</p>}
-      <p className={css.muted}>{t('hours.undo')}</p>
+      <p className={css.muted}>{t('hours.publishHelp')}</p>
       <div className={css.actions}>
         <button type="button" className={css.primary} disabled={saving||locked||preview===null||source.phase==='unconfigured'||!initial.current&&data.mode==='normal'} onClick={()=>void save()}>{t(saving?'hours.applying':uncertain?'hours.retry':'hours.apply')}</button>
         {uncertain&&<button type="button" disabled={saving} onClick={()=>void reloadLatest()}>{t('hours.reload')}</button>}

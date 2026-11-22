@@ -2565,10 +2565,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           </div>}
           <div hidden={tab !== 'schedule'} className="print:hidden">{requestsPanel}</div>
       </main>
-      {hoursDate&&rosterLoaded&&templateLoaded&&!storeOffline&&hoursSource.phase!=='unconfigured'&&hoursSource.page&&<SpecialHoursDialog key={`${requestStation}:${weekStart}:${hoursDate}`} date={hoursDate} week={weekStart} station={requestStation} locale={requestLocale}
+      {hoursDate&&rosterLoaded&&templateLoaded&&!storeOffline&&hoursSource.phase!=='unconfigured'&&hoursSource.page&&<SpecialHoursDialog key={`${requestStation}:${weekStart}:${hoursDate}`} date={hoursDate} station={requestStation} locale={requestLocale}
         source={hoursSource} base={baseSlots.filter(slot=>slot.date===hoursDate)} assignments={assignments} employees={employees} locked={scheduleOnly&&!staffUnlocked}
         selectedReview={activeHoursReviews.find(r=>r.data.date===hoursDate)??null} onClose={()=>setHoursDate(null)} onDirty={setHoursDirty}
-        onApplied={(event,review)=>{if(hoursScope.current===`${requestStation}:${weekStart}`)applyHours(event,review)}} onNavigate={()=>{}}/>}
+        onApplied={(event,review)=>{if(hoursScope.current===`${requestStation}:${weekStart}`)applyHours(event,review)}}/>}
     </div>
     </PlanningShell>
   )

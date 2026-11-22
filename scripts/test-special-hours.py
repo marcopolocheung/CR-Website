@@ -94,8 +94,12 @@ def open_manager(browser,url,store,station='CR2-diningroom',layout='workspace',w
 def hours(page,d,locale='en'):
     page.get_by_role('button',name=('Hours for ' if locale=='en' else 'Horario del ')+d,exact=True).click()
     dialog=page.get_by_role('dialog');expect(dialog).to_be_visible();return dialog
+def options(dialog, locale='en'):
+    summary=dialog.locator('summary').filter(has_text='More options' if locale=='en' else 'Más opciones')
+    if not dialog.locator('details').evaluate('element=>element.open'):summary.click()
+
 def apply(dialog):
-    dialog.get_by_role('button',name='Save hours & update this draft',exact=True).click();expect(dialog).not_to_be_visible()
+    dialog.get_by_role('button',name='Save hours',exact=True).click();expect(dialog).not_to_be_visible()
 def publish(page):
     page.get_by_role('button',name='Publish to staff',exact=True).first.click()
     button=page.get_by_role('button',name='Publish',exact=True)
@@ -108,10 +112,12 @@ def check_workflow(browser,url,artifacts):
     page.get_by_role('button',name='Make schedule',exact=True).click()
     expect(page.locator('[data-planning-slot^="thursday-"]')).to_have_count(3)
     page.locator('[data-planning-slot^="thursday-"] button').filter(has=page.locator('[data-lock-state="unlocked"]')).first.click()
-    dialog=hours(page,THURSDAY);dialog.get_by_role('radio',name='Closed all day',exact=True).check();dialog.get_by_label('Label (optional)',exact=True).fill('Thanksgiving')
-    expect(dialog.get_by_text('Keep',exact=False).first).to_be_visible()
+    dialog=hours(page,THURSDAY);dialog.get_by_role('radio',name='Closed all day',exact=True).check();options(dialog);dialog.get_by_label('Label (optional)',exact=True).fill('Thanksgiving')
+    expect(dialog.get_by_text('Removes all shifts on this date from this draft.',exact=False)).to_be_visible()
+    expect(dialog.get_by_text('including 1 marked Keep.',exact=False)).to_be_visible()
+    expect(dialog.get_by_text('Employee finish times',exact=True)).to_have_count(0)
     dialog.screenshot(path=str(artifacts/'closed-preview-desktop.png'))
-    store.fail_review=True;dialog.get_by_role('button',name='Save hours & update this draft',exact=True).click()
+    store.fail_review=True;dialog.get_by_role('button',name='Save hours',exact=True).click()
     expect(dialog.get_by_role('alert')).to_contain_text('not confirmed')
     expect(page.locator('[data-planning-slot^="thursday-"]')).to_have_count(3)
     dialog.get_by_role('button',name='Retry same save',exact=True).click();expect(dialog).not_to_be_visible()
@@ -123,7 +129,7 @@ def check_workflow(browser,url,artifacts):
     expect(page.locator('[data-planning-slot^="thursday-"]')).to_have_count(3)
     expect(page.get_by_role('button',name='Make schedule',exact=True)).to_be_disabled()
     apply(hours(page,THURSDAY))
-    dialog=hours(page,WEDNESDAY);dialog.get_by_role('radio',name='Close early',exact=True).check();dialog.get_by_label('Label (optional)',exact=True).fill('Holiday eve')
+    dialog=hours(page,WEDNESDAY);dialog.get_by_role('radio',name='Close early',exact=True).check();options(dialog);dialog.get_by_label('Label (optional)',exact=True).fill('Holiday eve')
     dialog.get_by_label('Employee finish time · Evening minute',exact=True).select_option('30')
     expect(dialog.get_by_label('Keep this shift for cleanup',exact=True)).not_to_be_checked()
     dialog.screenshot(path=str(artifacts/'early-preview-cleanup.png'));apply(dialog)
@@ -178,12 +184,12 @@ def check_layouts_and_language(browser,url,artifacts):
         page.screenshot(path=str(artifacts/f'{layout}-hours.png'),full_page=True);assert not errors,errors;context.close()
     store=HoursStore();context,page,errors=open_manager(browser,url,store,width=390,locale='es')
     dialog=hours(page,THURSDAY,'es');dialog.get_by_role('radio',name='Cerrado todo el día',exact=True).check()
-    dialog.get_by_label('Descripción (opcional)',exact=True).fill('Acción de Gracias')
+    options(dialog,'es');dialog.get_by_label('Descripción (opcional)',exact=True).fill('Acción de Gracias')
     dialog.evaluate("element => element.style.fontSize = '20px'")
     assert dialog.evaluate('element=>element.scrollWidth<=element.clientWidth+1'), 'enlarged Spanish dialog must not clip horizontally'
-    expect(dialog.get_by_role('button',name='Guardar horario y actualizar este borrador',exact=True)).to_be_visible()
+    expect(dialog.get_by_role('button',name='Guardar horario',exact=True)).to_be_visible()
     dialog.screenshot(path=str(artifacts/'spanish-phone-preview.png'))
-    dialog.get_by_role('button',name='Guardar horario y actualizar este borrador',exact=True).click();expect(dialog).not_to_be_visible()
+    dialog.get_by_role('button',name='Guardar horario',exact=True).click();expect(dialog).not_to_be_visible()
     expect(page.get_by_role('button',name='Horario del '+THURSDAY,exact=True)).to_contain_text('Cerrado')
     page.set_viewport_size({'width':320,'height':844});assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'page should reflow around the bounded board'
     assert not errors,errors;context.close()
@@ -215,7 +221,8 @@ def check_deep_link_and_unavailable(browser,url):
     paused[0]=False
     for request in held:store.route(request)
     dialog=page.get_by_role('dialog');expect(dialog).to_be_visible()
-    expect(dialog.get_by_text('Late cleanup',exact=True)).to_be_visible()
+    expect(dialog.get_by_role('radio',name='Closed all day',exact=True)).to_be_checked()
+    expect(dialog.get_by_text('Late cleanup',exact=True)).to_have_count(0)
     dialog.get_by_role('button',name='Cancel',exact=True).click();assert not errors,errors;context.close()
     store=HoursStore();context,page,errors=open_manager(browser,url,store)
     store.fail_read=True;page.evaluate("window.dispatchEvent(new Event('focus'))")
@@ -228,24 +235,70 @@ def check_deep_link_and_unavailable(browser,url):
 def check_conflict_and_kitchen_lock(browser,url):
     store=HoursStore();context,page,errors=open_manager(browser,url,store)
     dialog=hours(page,THURSDAY);dialog.get_by_role('radio',name='Closed all day',exact=True).check()
-    dialog.get_by_label('Label (optional)',exact=True).fill('Original entered label')
+    options(dialog);dialog.get_by_label('Label (optional)',exact=True).fill('Original entered label')
     store.events[('CR2',THURSDAY)]={'schemaVersion':1,'family':'schedule','id':'hours-'+THURSDAY,'storeId':'CR2','context':{'kind':'day','businessDate':THURSDAY},
         'revision':1,'createdAt':views.UPDATED,'updatedAt':views.UPDATED,'data':{'version':1,'date':THURSDAY,'mode':'closed','closeMinute':None,'label':'Other manager'}}
-    dialog.get_by_role('button',name='Save hours & update this draft',exact=True).click()
+    dialog.get_by_role('button',name='Save hours',exact=True).click()
     expect(dialog.get_by_role('alert')).to_contain_text('changed elsewhere')
     expect(dialog.get_by_label('Label (optional)',exact=True)).to_have_value('Original entered label')
     dialog.get_by_role('button',name='Reload latest',exact=True).click()
-    expect(dialog.get_by_role('button',name='Save hours & update this draft',exact=True)).to_be_enabled();apply(dialog)
+    expect(dialog.get_by_role('button',name='Save hours',exact=True)).to_be_enabled();apply(dialog)
     assert store.events[('CR2',THURSDAY)]['revision']==2
     assert store.events[('CR2',THURSDAY)]['data']['label']=='Original entered label'
     assert not errors,errors;context.close()
     store=HoursStore();context,page,errors=open_manager(browser,url,store,'CR3-kitchen')
     dialog=hours(page,THURSDAY)
     expect(dialog.get_by_text('Unlock this station’s staff editing',exact=False)).to_be_visible()
-    expect(dialog.get_by_role('button',name='Save hours & update this draft',exact=True)).to_be_disabled()
+    expect(dialog.get_by_role('button',name='Save hours',exact=True)).to_be_disabled()
     expect(dialog.get_by_role('radio',name='Closed all day',exact=True)).to_be_disabled()
     dialog.get_by_role('button',name='Cancel',exact=True).click()
     assert not store.events and not errors,(store.events,errors);context.close()
+
+
+def check_simple_hours(browser,url,artifacts):
+    store=HoursStore();context,page,errors=open_manager(browser,url,store)
+    dialog=hours(page,THURSDAY)
+    expect(dialog.get_by_role('radio')).to_have_count(3)
+    expect(dialog.get_by_role('radio',name='Normal hours',exact=True)).to_be_checked()
+    expect(dialog.get_by_role('button',name='Save hours',exact=True)).to_be_disabled()
+    expect(dialog.get_by_label('Label (optional)',exact=True)).not_to_be_visible()
+    expect(dialog.get_by_text('Staffing preview',exact=True)).to_have_count(0)
+    expect(dialog.get_by_text('Needs review',exact=True)).to_have_count(0)
+    dialog.screenshot(path=str(artifacts/'simple-normal-desktop.png'))
+    dialog.get_by_role('radio',name='Closed all day',exact=True).check()
+    dialog.screenshot(path=str(artifacts/'simple-closed-desktop.png'))
+    dialog.get_by_role('button',name='Cancel',exact=True).click()
+    assert not store.events and not store.reviews, 'cancel must not save hours'
+    dialog=hours(page,THURSDAY);dialog.get_by_role('radio',name='Close early',exact=True).check()
+    expect(dialog.get_by_label('Customer closing time hour',exact=True)).to_have_value('7')
+    dialog.get_by_label('Customer closing time hour',exact=True).select_option('6')
+    dialog.get_by_label('Customer closing time minute',exact=True).select_option('30')
+    expect(dialog.get_by_label('Employee finish time · Evening minute',exact=True)).not_to_be_visible()
+    dialog.screenshot(path=str(artifacts/'simple-early-desktop.png'))
+    apply(dialog)
+    event=store.events[('CR2',THURSDAY)]['data'];review=store.reviews[('CR2','CR2-diningroom',THURSDAY)]['data']
+    assert event['closeMinute']==1110
+    assert [choice['end'] for choice in review['decisions']]==[1110,None]
+    assert len(store.template['Thursday'])==3, 'normal rules must remain intact'
+    dialog=hours(page,THURSDAY)
+    expect(dialog.get_by_label('Customer closing time hour',exact=True)).to_have_value('6')
+    summary=dialog.locator('summary');summary.focus();summary.press('Enter')
+    expect(dialog.get_by_label('Employee finish time · Evening minute',exact=True)).to_be_visible()
+    expect(dialog.get_by_text('Morning',exact=True)).to_have_count(0)
+    dialog.get_by_label('Employee finish time · Evening minute',exact=True).select_option('45')
+    expect(dialog.get_by_text('Custom employee finish times are set in More options.',exact=True)).to_be_visible()
+    apply(dialog)
+    dialog=hours(page,THURSDAY)
+    expect(dialog.get_by_label('Employee finish time · Evening minute',exact=True)).not_to_be_visible()
+    expect(dialog.get_by_text('Custom employee finish times are set in More options.',exact=True)).to_be_visible()
+    apply(dialog)
+    assert store.reviews[('CR2','CR2-diningroom',THURSDAY)]['data']['decisions'][0]['end']==1125
+    page.set_viewport_size({'width':390,'height':844});dialog=hours(page,THURSDAY)
+    dialog.screenshot(path=str(artifacts/'simple-early-phone.png'))
+    page.set_viewport_size({'width':320,'height':844})
+    assert dialog.evaluate('element=>element.scrollWidth<=element.clientWidth+1')
+    dialog.get_by_role('button',name='Cancel',exact=True).click()
+    assert not errors,errors;context.close()
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--url',default='http://127.0.0.1:3064');parser.add_argument('--artifacts',default='/tmp/cr-special-hours')
@@ -254,6 +307,7 @@ if __name__=='__main__':
     artifacts=Path(args.artifacts);artifacts.mkdir(parents=True,exist_ok=True)
     with sync_playwright() as playwright:
         browser=playwright.chromium.launch(headless=True)
+        check_simple_hours(browser,args.url.rstrip('/'),artifacts)
         check_workflow(browser,args.url.rstrip('/'),artifacts)
         check_layouts_and_language(browser,args.url.rstrip('/'),artifacts)
         check_closed_week(browser,args.url.rstrip('/'))
