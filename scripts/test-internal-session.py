@@ -286,7 +286,7 @@ with sync_playwright() as p:
     # Exact-day count copies and catalog recovery retain independent context/revision.
     ctx, page, mode = workspace()
     visit(page, '/internal/inventory'); unlock(page)
-    count = page.locator('input[aria-label$=" inventory"]').first
+    count = page.locator('[data-count-id] input[id^="inventory-on-hand-"]').first
     expect(count).to_be_visible()
     original_date = visible(page, '#inventory-date').input_value()
     count.fill('3B/2T')
@@ -301,10 +301,10 @@ with sync_playwright() as p:
     page.get_by_role('dialog').get_by_role('button').last.click()
     expect(visible(page, '#inventory-date')).to_have_value(next_date)
     expect(count).to_have_value('')
-    expect(page.get_by_role('button', name='Save count', exact=True)).to_be_enabled()
+    expect(page.locator('#inventory-save')).to_be_enabled()
     visible(page, '#inventory-date').fill(original_date); accept_dialog_if_any(page)
     expect(count).to_have_value('3B/2T')
-    page.locator('#inventory-edit-list').click()
+    page.locator('nav a[href="#catalog"]').click();page.locator('#inventory-edit-list').click()
     name = page.locator('input[aria-label$=" name"]').first
     name.fill('Catalog name retained across shared lock')
     go(page, 'dashboard')
@@ -316,7 +316,9 @@ with sync_playwright() as p:
     assert recovery['baseRevision'] == 7 and recovery['sheets'][0]['items'][0]['name'] == 'Catalog name retained across shared lock'
     mode['list_rev'] = 9
     unlock(page); go(page, 'inventory')
+    page.locator('nav a[href="#count"]').click()
     expect(count).to_have_value('3B/2T')
+    page.locator('nav a[href="#catalog"]').click()
     expect(page.get_by_role('button', name='Resume catalog draft', exact=True)).to_be_visible()
     expect(page.locator('input[aria-label$=" name"]:visible')).to_have_count(0)
     page.get_by_role('button', name='Resume catalog draft', exact=True).click(); accept_dialog_if_any(page)
@@ -335,6 +337,7 @@ with sync_playwright() as p:
     visible(page, '#sc-location').select_option(index=2)
     visible(page, '#sc-date').fill(DATE)
     mode['import_auth'] = True
+    page.locator('summary:visible').filter(has_text='Saved copies and history').click()
     visible(page, '[data-history="load"]').click()
     expect(page.locator('[data-shell-lock]')).to_be_disabled()
     go(page, 'cash')

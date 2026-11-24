@@ -109,3 +109,9 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Blockers: Listed prerequisites are pending.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+
+## Step 12a frontend follow-up — November 23, 2026
+
+The separate Order checklist groups the working count’s existing order fields by supplier. Marked ordered remains a manual checklist indication; Save count & checklist acknowledges only existing count/order/checklist fields. Copy includes checked displayed lines, and checklist-only print follows its own supplier selection. No issued order, vendor delivery or supplier receipt is persisted; the wider order lifecycle remains pending.
+
+The [approved Step 12a plan](../evidence/step-12a/approved-plan.md) and [checkpoint](../checkpoints/step-12a.md) define this scoped work. The frontend slice is implemented and verified locally; observed scenarios and command/output evidence are recorded there. This follow-up does not advance the wider task milestones above. Physical-device/staff, backend activation, release and live-service acceptance remain unverified. Rollback preserves existing device envelopes, archives, unreadable recovery bytes and server records.

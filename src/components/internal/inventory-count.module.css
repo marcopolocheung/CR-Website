@@ -23,3 +23,26 @@
 }
 
 .rowActions button[aria-pressed=true] { background: var(--cr-accent-wash); border-color: var(--cr-accent-ink); color: var(--cr-accent-ink); }
+
+.views { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border: 1px solid var(--cr-black); margin-block: 0 24px; background: var(--cr-white); }
+.views a { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px; text-align: center; font-weight: 600; border: 1px solid transparent; overflow-wrap: anywhere; }
+.views a[aria-current] { background: var(--cr-accent-wash); border-color: var(--cr-accent-ink); color: var(--cr-accent-ink); box-shadow: inset 0 -3px var(--cr-accent-ink); }
+.context { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-block: 16px 24px; }
+.context > div { min-width: 0; max-width: 100%; }.context label { display: block; font-weight: 600; margin-bottom: 8px; }.context select { width: 100%; }
+.viewHeading { font-size: 2.5rem; line-height: 1.2; margin-bottom: 16px; scroll-margin-top: 100px; }.viewHeading:focus { outline: 2px solid var(--cr-accent-ink); outline-offset: 4px; }
+.checklistRow { display: grid; grid-template-columns: minmax(8em,auto) minmax(0,1fr) minmax(5em,8em); align-items: center; gap: 12px; padding-block: 12px; border-bottom: 1px solid var(--cr-line); overflow-wrap: anywhere; }
+.mark { display: flex; align-items: center; gap: 12px; min-height: 48px; cursor: pointer; }.mark input { width: 22px; height: 22px; flex-shrink: 0; accent-color: var(--cr-accent-ink); }
+.tableScroll,.reportScroll { min-width: 0; max-width: 100%; overflow-x: auto; }
+.catalogSection { margin-block: 12px 28px; }.catalogSection h3,.recordHeading { font-size: 1.75rem; margin-bottom: 12px; }.catalogSection table { width: 100%; border-collapse: collapse; text-align: left; }.catalogSection :is(th,td) { padding: 12px; border-bottom: 1px solid var(--cr-line); vertical-align: top; overflow-wrap: anywhere; }.catalogSection code { overflow-wrap: anywhere; }
+.savedDays { margin-block: 16px 24px; }.savedDays li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-block: 8px; }.savedDays button[aria-pressed=true] { border-color: var(--cr-accent-ink); background: var(--cr-accent-wash); }
+.comparison { margin-block: 32px; }
+@media (max-width: 760px) { .views { grid-template-columns: repeat(2,minmax(0,1fr)); }.checklistRow { grid-template-columns: minmax(0,1fr) minmax(5em,8em); }.mark { grid-column: 1 / -1; } }
+@media (max-width: 400px) { .checklistRow { grid-template-columns: minmax(0,1fr); }.checklistRow input[type=text] { width: 100%; }.catalogSection :is(th,td) { padding: 8px; } }
+@media print { .screen { display: none !important; }.printSheets .checklistRow { grid-template-columns: 9em minmax(0,1fr) 8em; }.printSheets h2 { margin-block: 12px; }.printSheets p { font-size: 9pt; margin-bottom: 8px; } }
+
+/* Dense identity/comparison tables scroll as a whole; never squeeze labels into letters. */
+.tableScroll table { min-width: 36rem; }.tableScroll th:first-child { min-width: 12rem; }
+.reportScroll table { min-width: 68rem; }.reportScroll th:first-child { min-width: 12rem; }
+@media (max-width: 340px) { .views { grid-template-columns: minmax(0,1fr); } }
+
+.reportScroll section { overflow: visible; }

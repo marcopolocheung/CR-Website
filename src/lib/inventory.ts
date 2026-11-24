@@ -6,7 +6,7 @@
  */
 export type InventoryItem = { id: string; name: string; sup: string; use: string; gray: boolean; note?: string }
 export type InventorySheet = { id: string; title?: string; account?: string; useLabel: string; showSup: boolean; items: InventoryItem[] }
-// `done`: the order was placed (the paper crosses the ORDER number out).
+// `done`: manual Marked ordered checklist indication (paper crosses the ORDER number out).
 export type InventoryCell = { inv: string; order: string; done?: boolean }
 export type InventoryCounts = Record<string, InventoryCell>
 

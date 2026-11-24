@@ -6,10 +6,12 @@ import InventoryCountRows from './InventoryCountRows'
 import { InternalTheme } from './ui/Theme'
 import { Paper, Button } from './ui/controls'
 import styles from './inventory-count.module.css'
-import { inventoryProgressKey, readInventoryProgress, readLegacyInventory, saveInventoryProgress, validProgressCatalog, validInventoryCounts, countState, inventoryProgressTotals, visibleInventory, mergeReviewedCatalog, type InventoryProgress } from '@/lib/internal-tools/inventory-progress'
+import { inventoryProgressKey, readInventoryProgress, readLegacyInventory, saveInventoryProgress, validProgressCatalog, countState, inventoryProgressTotals, visibleInventory, mergeReviewedCatalog, type InventoryProgress } from '@/lib/internal-tools/inventory-progress'
 import { useShellTask } from './ShellTask'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { flushSync } from 'react-dom'
+import { inventoryHistoryWindow, validatedInventoryHistory, savedInventoryCatalog, inventoryReportCatalog, sameInventoryFields } from '@/lib/internal-tools/inventory-history'
 import { CodeGate } from './CashOut'
 import { useInternalLanguage } from './InternalLanguage'
 import { useConfirmation, focusField } from './Feedback'
@@ -47,11 +49,19 @@ const shortDate = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.s
 const button = 'min-h-11 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50'
 const cellBorder = 'border border-black'
 const chip = (on: boolean) => `min-h-11 min-w-11 px-3 rounded-lg text-sm font-semibold border ${on ? 'bg-zinc-900 text-white border-zinc-900' : 'border-gray-300 hover:bg-gray-50'}`
-// Earlier days are hidden on phones so today's INV / ORDER fit without scrolling.
-const pastOnly = 'max-sm:hidden print:table-cell'
+// Comparison tables scroll within their view on narrow screens.
+const pastOnly = 'print:table-cell'
 // New rows get a temporary id until the list is saved; real ids never start with "-".
 const isNewId = (id: string) => id.startsWith('-')
 let nextNewId = 0
+const VIEWS = ['count', 'orders', 'catalog', 'history'] as const
+type InventoryView = typeof VIEWS[number]
+type PrintMode = 'full' | 'checklist' | 'history'
+const hashView = (): InventoryView => {
+  const hash = window.location.hash.slice(1)
+  return VIEWS.includes(hash as InventoryView) ? hash as InventoryView : 'count'
+}
+
 
 /** CR3 supply inventory: the clipboard sheets on screen, behind the manager code. */
 export default function Inventory() {
@@ -68,10 +78,48 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   const mounted = useRef(true), restored = useRef(false), mutation = useRef(0), loadSequence = useRef(0), hasLocal = useRef(false)
   const listSaving = useRef(new SingleFlight<void>())
   const [date, setDate] = useState(today), [counts, setCounts] = useState<InventoryCounts>({}), [skipped, setSkipped] = useState<Set<string>>(new Set())
+  const [acknowledged, setAcknowledged] = useState<{date:string;counts:InventoryCounts}|null>(null)
   const [history, setHistory] = useState<InventoryDay[]>([]), [loaded, setLoaded] = useState(false), [historyReady, setHistoryReady] = useState(false)
   const [status, setStatus] = useState<string | Message>(''), [busy, setBusy] = useState(false)
+  const [view, setView] = useState<InventoryView>('count')
+  const viewHeading = useRef<HTMLHeadingElement>(null)
+  const [orderSupplier, setOrderSupplier] = useState(''), [focusedOrder, setFocusedOrder] = useState<string | null>(null)
+  const [lookupDate, setLookupDate] = useState('')
+  const lookupDateRef = useRef(lookupDate); lookupDateRef.current = lookupDate
+  const [browse, setBrowse] = useState<{to:string;days:InventoryDay[]} | null>(null)
+  const [selectedDate, setSelectedDate] = useState('')
+  const [browseBusy, setBrowseBusy] = useState(false), [browseError, setBrowseError] = useState(false)
+  const browseSequence = useRef(0)
+  const [printMode, setPrintMode] = useState<PrintMode | null>(null)
+  const requestedPrint = useRef<PrintMode | null>(null)
+  useEffect(() => {
+    const follow = () => { if(!visible)return; setView(hashView()); requestAnimationFrame(() => viewHeading.current?.focus()) }
+    follow()
+    window.addEventListener('hashchange', follow)
+    window.addEventListener('popstate', follow)
+    return () => { window.removeEventListener('hashchange', follow); window.removeEventListener('popstate', follow) }
+  }, [visible])
+  useEffect(() => {
+    const before = () => flushSync(() => setPrintMode(requestedPrint.current ?? (view === 'history' ? 'history' : 'full')))
+    const after = () => { requestedPrint.current = null; setPrintMode(null) }
+    window.addEventListener('beforeprint', before)
+    window.addEventListener('afterprint', after)
+    return () => { window.removeEventListener('beforeprint', before); window.removeEventListener('afterprint', after) }
+  }, [view])
+  function openView(event: MouseEvent<HTMLAnchorElement>, next: InventoryView) {
+    if(event.metaKey||event.ctrlKey||event.altKey||event.shiftKey)return
+    event.preventDefault()
+    // Preserve Next's history metadata so Forward never reloads the manager session.
+    if(window.location.hash!==`#${next}`)window.history.pushState(window.history.state,'',`#${next}`)
+    setView(next);requestAnimationFrame(()=>viewHeading.current?.focus())
+  }
+  function printReport(mode: PrintMode) {
+    requestedPrint.current = mode
+    flushSync(() => setPrintMode(mode))
+    window.print()
+  }
   const [catalogAvailable,setCatalogAvailable] = useState(false)
-  const [sheets, setSheets] = useState<InventorySheet[]>(DEFAULT_SHEETS), [listRev, setListRev] = useState(0)
+  const [sheets, setSheets] = useState<InventorySheet[]>(DEFAULT_SHEETS), [listRev, setListRev] = useState(0), [sharedRev, setSharedRev] = useState(0)
   const [countCatalog, setCountCatalog] = useState<InventorySheet[] | null>(null), [countCatalogRev, setCountCatalogRev] = useState(0)
   const [section, setSection] = useState(''), [search, setSearch] = useState(''), [filter, setFilter] = useState<'all'|'remaining'|'ordering'>('all'), [focusedItem, setFocusedItem] = useState<string | null>(null)
   const [draft, setDraft] = useState<InventorySheet[] | null>(null), [picked, setPicked] = useState<string[]>([])
@@ -91,7 +139,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   const [recoverySources,setRecoverySources] = useState<{key:string;raw:string}[]>([])
   const pendingRequests = useRef({ generation: session.generation, count: 0 })
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadSequence.current++ } }, [])
-  useEffect(() => { pendingRequests.current={generation:session.generation,count:0};setBusy(false);loadSequence.current++;listSaving.current=new SingleFlight<void>() }, [session.generation])
+  useEffect(() => { pendingRequests.current={generation:session.generation,count:0};setBusy(false);loadSequence.current++;browseSequence.current++;setBrowseBusy(false);listSaving.current=new SingleFlight<void>() }, [session.generation])
 
   function envelope(): InventoryProgress | null {
     return countCatalog ? {schemaVersion:1,storeId:'CR3',date,updatedAt:new Date().toISOString(),catalogRevision:countCatalogRev,catalog:countCatalog,counts,skipped:[...skipped],sectionId:section || null} : null
@@ -133,7 +181,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   },[onLocked,token])
 
   function readLocal(next:string, global?:{date:string;counts:InventoryCounts}) {
-    mutation.current++;hasLocal.current=false;setHistoryReady(false);setHistory([]);setFocusedItem(null);setSearch('');setFilter('all');setPicked([])
+    mutation.current++;hasLocal.current=false;setAcknowledged(null);setHistoryReady(false);setHistory([]);setFocusedItem(null);setSearch('');setFilter('all');setPicked([])
     let localCounts:InventoryCounts={},localCatalog:InventorySheet[]|null=null,localSkipped=new Set<string>(),localSection='',revision=0,ready=false
     const originals:{key:string;raw:string}[]=[];let readDenied=false
     try {
@@ -158,10 +206,6 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
     setCountDirty(hasLocal.current);setDeviceSaved(ready);setRecoverySources(originals);setDeviceFailed(readDenied||!!originals.length)
     try {const archives=[];for(let index=0;index<localStorage.length;index++){const key=localStorage.key(index);if(key?.startsWith(`cr-inventory-progress-archive:v1:CR3:${next}:`)){const raw=localStorage.getItem(key);if(raw!==null)archives.push({key,raw})}}setCatalogArchives(archives)}catch{setCatalogArchives([])}
   }
-  function validDays(days:InventoryDay[]) {
-    if(!Array.isArray(days)||days.some(day=>!businessDate(day?.date)||!validInventoryCounts(day?.counts)))throw new StoreUnavailableError()
-    return days
-  }
   function loadRemote(start:string) {
     const request=++loadSequence.current,at=mutation.current
     void run(async generation => {
@@ -170,9 +214,10 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
       if(!Number.isSafeInteger(list.rev)||list.rev<0||(list.sheets!==null&&!validProgressCatalog(list.sheets)))throw new StoreUnavailableError()
       if(!live())return
       const catalog=list.sheets??DEFAULT_SHEETS;setCatalogAvailable(true)
-      if(!draftRef.current){setSheets(catalog);setListRev(list.rev)}else if(list.rev!==listRevRef.current){setConflict(true);setServerList(list)}
+      setSheets(catalog);setSharedRev(list.rev)
+      if(!draftRef.current)setListRev(list.rev);else if(list.rev!==listRevRef.current){setConflict(true);setServerList(list)}
       if(!catalogRef.current){const captured=structuredClone(catalog);catalogRef.current=captured;setCountCatalog(captured);setCountCatalogRev(list.rev)}
-      const days=validDays(await fetchInventoryHistory(start,token))
+      const days=validatedInventoryHistory(await fetchInventoryHistory(start,token),start)
       if(!live())return
       setHistory(days)
       if(!hasLocal.current&&mutation.current===at){const values=days.find(day=>day.date===start)?.counts??{};countsRef.current=values;setCounts(values);hasLocal.current=true}
@@ -197,6 +242,38 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   },[run,token,visible,session.generation])
 
   useEffect(() => { if(loaded&&countCatalog&&(historyReady||countDirty))protectProgress() },[date,counts,skipped,section,countCatalog,countCatalogRev,loaded,historyReady,countDirty])
+
+  // Read-only browsing has its own context and generation. It never calls readLocal,
+  // protectProgress, or a PUT, and never replaces the working comparison baseline.
+  async function loadSavedDays(to: string) {
+    if (!token || !businessDate(to)) return
+    const request = ++browseSequence.current, generation = sessionRef.current.generation, credential = token
+    const live = () => mounted.current && request === browseSequence.current && tokenRef.current === credential && sessionRef.current.generation === generation && lookupDateRef.current === to
+    setBrowseBusy(true); setBrowseError(false)
+    try {
+      const days = validatedInventoryHistory(await fetchInventoryHistory(to,credential),to)
+      if (!live()) return
+      setBrowse({to,days}); setSelectedDate(days[0]?.date ?? '')
+    } catch (caught) {
+      if (!live()) return
+      setBrowseError(true)
+      if (caught instanceof StoreAuthError) onLocked()
+    } finally { if (live()) setBrowseBusy(false) }
+  }
+  useEffect(() => {
+    if (!token) { browseSequence.current++; setBrowse(null); setBrowseBusy(false); return }
+    if (view !== 'history' || !loaded) return
+    if (!lookupDate) {
+      lookupDateRef.current = date; setLookupDate(date); void loadSavedDays(date)
+    } else if (!browse && !browseBusy && !browseError) void loadSavedDays(lookupDate)
+  }, [token,view,loaded,session.generation])
+  // Catalog edits are recoverable after reload even before a handoff or save.
+  useEffect(() => {
+    if (!loaded || !draft) return
+    try {
+      localStorage.setItem('cr-inventory-catalog-recovery-v1',JSON.stringify({schemaVersion:1,storeId:'CR3',baseRevision:listRev,sheets:draft}))
+    } catch { setStatus({key:'feedback.storageFailed'}) }
+  }, [loaded,draft,listRev])
   const changeDate=(next:string)=>{
     if(!businessDate(next)||next===date)return
     void transitions.change(()=>{readLocal(next);loadRemote(next)})
@@ -206,11 +283,12 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
     await saveInventoryDay(savedDate,submitted,token)
     const live=()=>mounted.current&&tokenRef.current===token&&sessionRef.current.generation===generation&&dateRef.current===savedDate
     if(!live())return
+    setAcknowledged({date:savedDate,counts:structuredClone(submitted)})
     const same=mutation.current===at&&countsRef.current===submitted
     if(same&&deviceRef.current)setCountDirty(false)
     const acknowledgment=():Message=>({key:mutation.current===at&&countsRef.current===submitted?'inventoryCount.saved':'inventoryCount.olderSaved',params:{date:savedDate}})
     setStatus(acknowledgment())
-    try {const days=validDays(await fetchInventoryHistory(savedDate,token));if(live())setHistory(days)}
+    try {const days=validatedInventoryHistory(await fetchInventoryHistory(savedDate,token),savedDate);if(live())setHistory(days)}
     catch(caught){if(!live())return;if(caught instanceof StoreAuthError)onLocked();return {key:mutation.current===at&&countsRef.current===submitted?'inventoryCount.savedHistoryFailed':'inventoryCount.olderHistoryFailed',params:{date:savedDate}}}
     return acknowledgment()
   })
@@ -227,7 +305,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
       try {
         const rev = await saveInventoryList(next, listRev, token)
         if (!mounted.current || (tokenRef.current !== token || sessionRef.current.generation !== generation)) return
-        setListRev(rev)
+        setListRev(rev); setSharedRev(rev)
       } catch (caught) {
         if (!mounted.current || (tokenRef.current !== token || sessionRef.current.generation !== generation)) return
         if (caught instanceof StoreConflictError) {
@@ -247,7 +325,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   const reloadList = () => run(async generation => {
     const latest = await fetchInventoryList(token)
     if (!Number.isSafeInteger(latest.rev) || latest.rev < 0 || (latest.sheets !== null && !isInventorySheets(latest.sheets))) throw new StoreUnavailableError()
-    if (mounted.current && tokenRef.current === token && sessionRef.current.generation === generation) setServerList(latest)
+    if (mounted.current && tokenRef.current === token && sessionRef.current.generation === generation) { setServerList(latest); setSheets(latest.sheets??DEFAULT_SHEETS); setSharedRev(latest.rev) }
   })
   const useServer = async () => {
     const generation=sessionRef.current.generation,candidate=draftRef.current,source=serverList
@@ -255,7 +333,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
     if(generation!==sessionRef.current.generation||candidate!==draftRef.current||source!==serverListRef.current)return
     try { const raw = localStorage.getItem('cr-inventory-catalog-recovery-v1'); if (raw) localStorage.setItem(`cr-inventory-catalog-recovery-archive:${crypto.randomUUID()}`, raw); localStorage.removeItem('cr-inventory-catalog-recovery-v1'); setCatalogSource(null); setCatalogRecovery(null) } catch { setStatus({key:'feedback.storageFailed'}); return }
     if(generation!==sessionRef.current.generation||candidate!==draftRef.current||source!==serverListRef.current)return
-    setSheets(serverList.sheets ?? DEFAULT_SHEETS); setListRev(serverList.rev)
+    setSheets(serverList.sheets ?? DEFAULT_SHEETS); setListRev(serverList.rev); setSharedRev(serverList.rev)
     setDraft(null); setConflict(false); setServerList(null)
     requestAnimationFrame(() => focusField('inventory-edit-list'))
   }
@@ -264,7 +342,7 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
     if (!await confirmation.ask({key:'recovery.dropList'},true)) return
     if(generation!==sessionRef.current.generation||candidate!==draftRef.current)return
     try { const raw = localStorage.getItem('cr-inventory-catalog-recovery-v1'); if (raw) localStorage.setItem(`cr-inventory-catalog-recovery-archive:${crypto.randomUUID()}`, raw); localStorage.removeItem('cr-inventory-catalog-recovery-v1'); setCatalogSource(null); setCatalogRecovery(null) } catch { setStatus({key:'feedback.storageFailed'}); return }
-    setDraft(null); setConflict(false); setServerList(null)
+    setListRev(sharedRev); setDraft(null); setConflict(false); setServerList(null)
     requestAnimationFrame(() => focusField('inventory-edit-list'))
   }
 
@@ -310,152 +388,162 @@ function InventoryBook({ token, onUnlock, onLocked }: { token: string; onUnlock:
   const orphanIds=[...new Set([...Object.keys(counts),...skipped])].filter(id=>!knownIds.has(id))
   const suppliers = [...new Set(catalog.flatMap(sh => sh.items.flatMap(i => supplierCodes(i.sup))))]
   const shown = visibleInventory(catalog,counts,skipped,{suppliers:picked.filter(code=>suppliers.includes(code)),section,search,mode:filter,pinnedId:focusedItem})
-  const supplierShown=filterBySupplier(catalog,picked.filter(code=>suppliers.includes(code)))
-  const orders = ordersBySupplier(supplierShown, counts)
+  const orderCatalog = filterBySupplier(catalog, orderSupplier ? [orderSupplier] : [])
+  const orders = ordersBySupplier(orderCatalog, counts)
+  // A cleared override must stay editable until focus leaves its row.
+  const editingOrder = orderCatalog.flatMap(sheet=>sheet.items).find(item=>item.id===focusedOrder)
+  if (editingOrder && !orders.some(group=>group.lines.some(line=>line.item.id===editingOrder.id))) {
+    let group = orders.find(group=>group.sup===(editingOrder.sup||'No supplier'))
+    if (!group) { group={sup:editingOrder.sup||'No supplier',lines:[]}; orders.push(group) }
+    group.lines.push({item:editingOrder,order:counts[editingOrder.id]?.order??'',done:!!counts[editingOrder.id]?.done})
+  }
+  const fullOrders = ordersBySupplier(catalog, counts)
   const orderText = [`CR3 order ${date}`, ...orders.map(g => `\n${g.sup}\n${g.lines.map(l => `  ${l.item.name}: ${l.order}`).join('\n')}`)].join('\n')
+  const selected = browse?.days.find(day => day.date === selectedDate)
+  const savedLabels = useMemo(() => {
+    let storage: Storage | null = null
+    try { storage = localStorage } catch { /* Device catalog unavailable; use shared labels. */ }
+    return savedInventoryCatalog(storage,selected?.date ?? '',catalogAvailable?sheets:[])
+  }, [selected,sheets,catalogAvailable])
+  const selectedPast = selected ? browse!.days.filter(day => day.date < selected.date).slice(0,PAST_COLUMNS).reverse() : []
+  const reportCatalog = inventoryReportCatalog(catalog,[counts,...past.map(day=>day.counts)],tr('inventoryViews.unknownIds'))
+  const savedReportCatalog = selected ? inventoryReportCatalog(savedLabels.catalog,[selected.counts,...selectedPast.map(day=>day.counts)],tr('inventoryViews.unknownIds')) : []
+  const savedFields = acknowledged?.date===date ? acknowledged.counts : history.find(day=>day.date===date)?.counts
+  const workingSaved = !!savedFields && sameInventoryFields(savedFields,counts)
+  const workingLabel = tr(workingSaved ? 'inventoryViews.workingSaved' : 'inventoryViews.workingDraft')
+  const canCount = !!countCatalog && (historyReady || hasLocal.current)
 
   return (
     <InternalTheme><div className={styles.workspace}>
       {!token && visible && <CodeGate onUnlock={onUnlock} title={tr('nav.inventory')} />}
       <div hidden={!token}>
-      {catalogSource && !draft && <div className="mb-4 border border-gray-300 p-3 print:hidden">
-        <p>{tr(catalogRecovery ? 'session.catalogDraft' : 'drafts.unreadable')}</p>
-        {catalogRecovery && <button type="button" disabled={busy} className={button} onClick={resumeCatalog}>{tr('session.resumeCatalog')}</button>}
-        <button type="button" className={button} onClick={() => downloadDraftSource(catalogSource)}>{tr('drafts.downloadSource')}</button>
-      </div>}
-      <div className="flex flex-wrap items-end gap-3 mb-6 print:hidden">
-        <div className="min-w-0 max-w-full">
-          <label htmlFor="inventory-date" className="block text-sm font-medium text-gray-700 mb-1">{tr('inventoryCount.date')}</label>
-          <input
-            id="inventory-date"
-            type="date"
-            value={date}
-            onChange={e => changeDate(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-          />
-        </div>
-        {draft ? (
-          <>
-            <button onClick={saveList} disabled={busy || conflict} className={`${button} bg-red-600 text-white hover:bg-red-700`}>{tr('recovery.saveList')}</button>
-            <button onClick={cancelList} disabled={busy} className={`${button} border border-gray-300 hover:bg-gray-50`}>
-              {tr('feedback.cancel')}
-            </button>
-          </>
-        ) : (
-          <>
-            <Button id="inventory-save" onClick={save} variant="primary" disabled={busy||!countCatalog||(!historyReady&&!hasLocal.current)}>{tr('inventoryCount.save')}</Button>
-            <button onClick={() => window.print()} className={`${button} border border-gray-300 hover:bg-gray-50`}>{tr('common.print')}</button>
-            <button
-              disabled={busy||(!historyReady&&!hasLocal.current)} onClick={() => void clearCounts()}
-              className={`${button} border border-red-300 text-red-700 hover:bg-red-50`}
-            >
-              {tr('inventoryCount.clear')}
-            </button>
-            <button id="inventory-edit-list" hidden={!!catalogSource} onClick={() => { setConflict(false); setServerList(null); setDraft(structuredClone(sheets)) }} disabled={busy} className={`${button} border border-gray-300 hover:bg-gray-50`}>
-              {tr('recovery.editList')}
-            </button>
-          </>
-        )}
-        <p role="status" className="text-sm text-gray-700">{typeof status === 'string' ? status : tr(status.key,status.params)}</p>
-      </div>
-      <p className="text-sm text-gray-600 mb-4 print:hidden">{tr(draft?'inventoryCount.editHelp':'inventoryCount.units')}</p>
-      {!draft&&<>
-        <p className="mb-3 print:hidden">{tr('inventoryCount.deviceOnly')}</p>
-        {deviceFailed&&<p role="alert" className="mb-3 text-red-800 print:hidden">{tr('inventoryCount.deviceFailed')}</p>}
-        <p className="print:hidden" data-inventory-device>{tr(deviceSaved?'inventoryCount.deviceSaved':'inventoryCount.devicePending')}</p>
-        <dl className={styles.progress} aria-label={tr('inventoryCount.progress')} data-inventory-progress>
-          {(['entered','enough','skipped','remaining','total'] as const).map(key=><div key={key}><dt>{tr(`inventoryCount.${key}`)}</dt><dd data-inventory-total={key}>{totals[key]}</dd></div>)}
-        </dl>
-        {recoverySources.length>0&&<details className="mb-4 print:hidden"><summary>{tr('inventoryCount.recovery')}</summary><p>{tr('inventoryCount.recoveryNote')}</p>{recoverySources.map(source=><div key={source.key}><p className="break-all">{source.key}</p><Button onClick={()=>downloadDraftSource(source.raw)}>{tr('drafts.downloadSource')}</Button></div>)}</details>}
-        <details className="mb-4 print:hidden"><summary>{tr('inventoryCount.currentCopy')}</summary><Button disabled={!countCatalog} onClick={()=>{const value=envelope();if(value)downloadDraftSource(JSON.stringify(value))}}>{tr('inventoryCount.downloadProgress')}</Button></details>
-        {differences.length>0&&<details className="mb-4 print:hidden" data-inventory-catalog-difference><summary>{tr('inventoryCount.catalogChanged')}</summary><p>{tr('inventoryCount.catalogSnapshot',{revision:countCatalogRev})}</p><p>{tr('inventoryCount.retained')}</p><Button disabled={busy||!canAdopt||(!historyReady&&!hasLocal.current)} onClick={()=>void adoptCatalog()}>{tr('inventoryCount.adopt')}</Button><ul>{differences.map(row=><li key={row.id} className="break-words"><strong>{row.label}</strong> <code>{row.id}</code>: {row.yours} → {row.theirs}</li>)}</ul></details>}
-        {!!catalogArchives.length&&<details className="mb-4 print:hidden"><summary>{tr('inventoryCount.archives')}</summary>{catalogArchives.map(source=><div key={source.key}><p className="break-all">{source.key}</p><Button onClick={()=>downloadDraftSource(source.raw)}>{tr('drafts.downloadSource')}</Button></div>)}</details>}
-        {!!orphanIds.length&&<details className="mb-4 print:hidden" data-inventory-orphans><summary>{tr('inventoryCount.orphans')}</summary><ul>{orphanIds.map(id=><li key={id}>{id}: {counts[id]?.inv??'—'} · {counts[id]?.order??'—'}{skipped.has(id)&&` · ${tr('inventoryCount.state.skipped')}`}</li>)}</ul></details>}
-      </>}
-
-      {draft && <RecoveryPanel message={{key:conflict ? 'recovery.conflict' : 'recovery.localList'}}
-        copyText={() => JSON.stringify({storeId:'CR3',baseRevision:listRev,sheets:draft},null,2)}
-        busy={busy} retryLabel={{key:'recovery.retryLegacy'}} onRetry={!conflict ? saveList : undefined} onReload={conflict ? reloadList : undefined}
-        onUseServer={serverList ? useServer : undefined}
-        rows={serverList ? inventoryComparison(draft,serverList.sheets ?? DEFAULT_SHEETS,tr) : undefined} />}
-      {draft
-        ? <fieldset disabled={busy} className="min-w-0">{draft.map((sheet, si) => (
-            <EditSheetTable
-              key={sheet.id}
-              sheet={sheet}
-              onChange={items => setDraft(d => d && d.map((sh, i) => (i === si ? { ...sh, items } : sh)))}
-            />
-          ))}</fieldset>
-        : <>
-          {!countCatalog&&<div><p role="status">{tr(busy?'inventoryCount.loadingCatalog':'inventoryCount.catalogUnavailable')}</p><Button disabled={busy} onClick={()=>loadRemote(date)}>{tr('inventoryCount.retryLoad')}</Button></div>}
-          <div className={`${styles.filters} print:hidden`}>
-            <div><label htmlFor="inventory-search">{tr('inventoryCount.search')}</label><input id="inventory-search" type="search" value={search} onChange={event=>{setFocusedItem(null);setSearch(event.target.value)}}/></div>
-            <div><label htmlFor="inventory-section">{tr('inventoryCount.section')}</label><select id="inventory-section" value={section} onChange={event=>{setFocusedItem(null);setSection(event.target.value)}}><option value="">{tr('inventoryCount.allSections')}</option>{catalog.map(sheet=><option key={sheet.id} value={sheet.id}>{sheet.title||sheet.id}</option>)}</select></div>
-            <div><label htmlFor="inventory-filter">{tr('inventoryCount.filter')}</label><select id="inventory-filter" value={filter} onChange={event=>{setFocusedItem(null);setFilter(event.target.value as typeof filter)}}><option value="all">{tr('inventoryCount.all')}</option><option value="remaining">{tr('inventoryCount.remaining')}</option><option value="ordering">{tr('inventoryCount.needsOrdering')}</option></select></div>
+        <div className={styles.screen}>
+          <nav aria-label={tr('inventoryViews.navigation')} className={styles.views}>
+            {VIEWS.map(value=><a key={value} href={`#${value}`} aria-current={view===value?'page':undefined}
+              onClick={event=>openView(event,value)}>{tr(`inventoryViews.${value}`)}</a>)}
+          </nav>
+          <div className={styles.context}>
+            <div><label htmlFor="inventory-date">{tr('inventoryCount.date')}</label>
+              <input id="inventory-date" type="date" value={date} onChange={event=>changeDate(event.target.value)} /></div>
+            {(view==='count'||view==='orders')&&<>
+              <Button id="inventory-save" onClick={save} variant="primary" disabled={busy||!canCount}>{tr('inventoryCount.save')}</Button>
+              <Button data-print-full disabled={!countCatalog} onClick={()=>printReport('full')}>{tr('inventoryViews.printFull')}</Button>
+            </>}
           </div>
-          <div role="group" aria-label={tr('inventoryCount.showSuppliers')} className="flex flex-wrap items-center gap-2 mb-6 print:hidden">
-            <span className="text-sm font-medium text-gray-700">{tr('inventoryCount.supplierFilter')}:</span>
-            <button type="button" aria-pressed={!picked.length} onClick={() => setPicked([])} className={chip(!picked.length)}>{tr('inventoryCount.all')}</button>
-            {suppliers.map(code => {
-              const on = picked.includes(code)
-              return (
-                <button key={code} type="button" aria-pressed={on} onClick={() => setPicked(p => (on ? p.filter(c => c !== code) : [...p, code]))} className={chip(on)}>
-                  {on && '✓ '}{code}
-                </button>
-              )
-            })}
-          </div>
-          <Paper emphasis="active" className="print:hidden">
-            {!shown.length&&countCatalog&&<p>{tr('inventoryCount.noRows')}</p>}
-            {!historyReady&&!hasLocal.current&&<p role="status">{tr(busy?'inventoryCount.loadingDay':'inventoryCount.dayUnavailable')} {!busy&&<Button onClick={()=>loadRemote(date)}>{tr('inventoryCount.retryLoad')}</Button>}</p>}
-            <fieldset disabled={!historyReady&&!hasLocal.current} className="min-w-0"><InventoryCountRows sheets={shown} counts={counts} skipped={skipped} retained={retainedIds} onInv={setInv} onOrder={setOrder} onSkip={setSkip} onFocus={setFocusedItem}/></fieldset>
-          </Paper>
-          <div className="mt-5 print:hidden"><Button id="inventory-save-bottom" variant="primary" disabled={busy||!countCatalog||(!historyReady&&!hasLocal.current)} onClick={save}>{tr('inventoryCount.saveBottom')}</Button><p className="mt-2">{tr('inventoryCount.deviceOnly')}</p></div>
-          <details className="mt-6 min-w-0 max-w-full overflow-x-auto print:hidden" data-inventory-comparison><summary>{tr('inventoryCount.previous')}</summary>{catalog.map(sheet=><SheetTable key={sheet.id} sheet={sheet} date={date} past={past} counts={counts} onInv={setInv} onOrder={setOrder} retained={retainedIds} readOnly/>)}</details>
-          <div className={styles.printSheets}>{catalog.map(sheet=><SheetTable key={sheet.id} sheet={sheet} date={date} past={past} counts={counts} onInv={setInv} onOrder={setOrder} retained={retainedIds} readOnly/>)}</div>
+          <h2 data-inventory-heading ref={viewHeading} tabIndex={-1} className={styles.viewHeading}>{tr(`inventoryViews.${view}`)}</h2>
+          <p role="status" className="my-3">{typeof status==='string'?status:tr(status.key,status.params)}</p>
 
-        </>}
-
-      {!draft && (
-      <section data-inventory-orders className="mt-10 max-w-xl print:break-before-page">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <h2 className="text-xl font-semibold text-gray-900">{tr('inventoryCount.orderList')} · {shortDate(date)}</h2>
-          {orders.length > 0 && (
-            <button
-              onClick={() => navigator.clipboard.writeText(orderText).then(() => setStatus({key:'inventoryCount.copied'}), () => setStatus({key:'inventoryCount.copyFailed'}))}
-              className={`${button} border border-gray-300 hover:bg-gray-50 print:hidden`}
-            >
-              {tr('inventoryCount.copy')}
-            </button>
-          )}
-        </div>
-        {orders.length === 0 ? (
-          <p className="text-sm text-gray-600">{tr('inventoryCount.noOrders')}</p>
-        ) : (
-          orders.map(g => (
-            <div key={g.sup} className="mb-4 break-inside-avoid">
-              <h3 className="font-bold text-gray-900 border-b border-black mb-1">{g.sup}</h3>
-              <ul className="text-sm">
-                {g.lines.map(l => (
-                  <li key={l.item.id}>
-                    <label className="flex flex-wrap items-center gap-3 min-h-11 cursor-pointer">
-                      <input type="checkbox" checked={l.done} onChange={e => setDone(l.item, e.target.checked)} className="w-5 h-5 accent-zinc-900 print:hidden" />
-                      <span className={`flex-1 ${l.done ? 'line-through text-gray-600' : ''}`}>{l.item.name}</span>
-                      <span className={`font-semibold ${INK} ${l.done ? 'line-through' : ''}`}>{l.order}</span>
-                      {l.done && <span className="text-xs text-gray-700">{tr('inventoryCount.ordered')}</span>}
-                    </label>
-                  </li>
-                ))}
-              </ul>
+          <section hidden={view!=='count'} data-inventory-view="count">
+            <p>{tr('inventoryCount.units')}</p><p className="my-3">{tr('inventoryCount.deviceOnly')}</p>
+            {deviceFailed&&<p role="alert" className="my-3 text-red-800">{tr('inventoryCount.deviceFailed')}</p>}
+            <p data-inventory-device>{tr(deviceSaved?'inventoryCount.deviceSaved':'inventoryCount.devicePending')}</p>
+            <dl className={styles.progress} aria-label={tr('inventoryCount.progress')} data-inventory-progress>
+              {(['entered','enough','skipped','remaining','total'] as const).map(key=><div key={key}><dt>{tr(`inventoryCount.${key}`)}</dt><dd data-inventory-total={key}>{totals[key]}</dd></div>)}
+            </dl>
+            {recoverySources.length>0&&<details><summary>{tr('inventoryCount.recovery')}</summary><p>{tr('inventoryCount.recoveryNote')}</p>{recoverySources.map(source=><div key={source.key}><p className="break-all">{source.key}</p><Button onClick={()=>downloadDraftSource(source.raw)}>{tr('drafts.downloadSource')}</Button></div>)}</details>}
+            <details><summary>{tr('inventoryCount.currentCopy')}</summary><Button disabled={!countCatalog} onClick={()=>{const value=envelope();if(value)downloadDraftSource(JSON.stringify(value))}}>{tr('inventoryCount.downloadProgress')}</Button></details>
+            {canAdopt&&<p className="my-3"><a href="#catalog" onClick={event=>openView(event,'catalog')} className="underline">{tr('inventoryCount.catalogChanged')}</a></p>}
+            {!!catalogSource&&<p className="my-3"><a href="#catalog" onClick={event=>openView(event,'catalog')} className="underline">{tr('session.catalogDraft')}</a></p>}
+            {!!orphanIds.length&&<details data-inventory-orphans><summary>{tr('inventoryCount.orphans')}</summary><ul>{orphanIds.map(id=><li key={id}>{id}: {counts[id]?.inv??'—'} · {counts[id]?.order??'—'}{skipped.has(id)&&` · ${tr('inventoryCount.state.skipped')}`}</li>)}</ul></details>}
+            {!countCatalog&&<div><p role="status">{tr(busy?'inventoryCount.loadingCatalog':'inventoryCount.catalogUnavailable')}</p><Button disabled={busy} onClick={()=>loadRemote(date)}>{tr('inventoryCount.retryLoad')}</Button></div>}
+            <div className={styles.filters}>
+              <div><label htmlFor="inventory-search">{tr('inventoryCount.search')}</label><input id="inventory-search" type="search" value={search} onChange={event=>{setFocusedItem(null);setSearch(event.target.value)}}/></div>
+              <div><label htmlFor="inventory-section">{tr('inventoryCount.section')}</label><select id="inventory-section" value={section} onChange={event=>{setFocusedItem(null);setSection(event.target.value)}}><option value="">{tr('inventoryCount.allSections')}</option>{catalog.map(sheet=><option key={sheet.id} value={sheet.id}>{sheet.title||sheet.id}</option>)}</select></div>
+              <div><label htmlFor="inventory-filter">{tr('inventoryCount.filter')}</label><select id="inventory-filter" value={filter} onChange={event=>{setFocusedItem(null);setFilter(event.target.value as typeof filter)}}><option value="all">{tr('inventoryCount.all')}</option><option value="remaining">{tr('inventoryCount.remaining')}</option><option value="ordering">{tr('inventoryCount.needsOrdering')}</option></select></div>
             </div>
-          ))
-        )}
-      </section>
-      )}
-      {confirmation.dialog}
+            <div role="group" aria-label={tr('inventoryCount.showSuppliers')} className="flex flex-wrap items-center gap-2 mb-6">
+              <span>{tr('inventoryCount.supplierFilter')}:</span>
+              <button type="button" aria-pressed={!picked.length} onClick={()=>setPicked([])} className={chip(!picked.length)}>{tr('inventoryCount.all')}</button>
+              {suppliers.map(code=><button key={code} type="button" aria-pressed={picked.includes(code)} onClick={()=>setPicked(values=>values.includes(code)?values.filter(c=>c!==code):[...values,code])} className={chip(picked.includes(code))}>{code}</button>)}
+            </div>
+            <Paper emphasis="active">
+              {!shown.length&&countCatalog&&<p>{tr('inventoryCount.noRows')}</p>}
+              {!historyReady&&!hasLocal.current&&<p role="status">{tr(busy?'inventoryCount.loadingDay':'inventoryCount.dayUnavailable')} {!busy&&<Button onClick={()=>loadRemote(date)}>{tr('inventoryCount.retryLoad')}</Button>}</p>}
+              <fieldset disabled={!canCount} className="min-w-0"><InventoryCountRows sheets={shown} counts={counts} skipped={skipped} retained={retainedIds} onInv={setInv} onOrder={setOrder} onSkip={setSkip} onFocus={setFocusedItem}/></fieldset>
+            </Paper>
+            <div className="my-5 flex flex-wrap gap-3"><Button id="inventory-save-bottom" variant="primary" disabled={busy||!canCount} onClick={save}>{tr('inventoryCount.saveBottom')}</Button><Button disabled={busy||!canCount} onClick={()=>void clearCounts()}>{tr('inventoryCount.clear')}</Button></div>
+          </section>
+
+          <section hidden={view!=='orders'} data-inventory-view="orders">
+            <p>{tr('inventoryViews.manual')}</p>
+            <div className={styles.context}>
+              <div><label htmlFor="inventory-order-supplier">{tr('inventoryViews.checklistSupplier')}</label><select id="inventory-order-supplier" value={orderSupplier} onChange={event=>setOrderSupplier(event.target.value)}><option value="">{tr('inventoryCount.all')}</option>{[...new Set([...suppliers,...(orderSupplier?[orderSupplier]:[])])].map(code=><option key={code}>{code}</option>)}</select></div>
+              <Button disabled={!orders.length} onClick={()=>navigator.clipboard.writeText(orderText).then(()=>setStatus({key:'inventoryCount.copied'}),()=>setStatus({key:'inventoryCount.copyFailed'}))}>{tr('inventoryCount.copy')}</Button>
+              <Button disabled={!countCatalog} onClick={()=>printReport('checklist')}>{tr('inventoryViews.printChecklist')}</Button>
+            </div>
+            <Paper emphasis="active"><fieldset disabled={!canCount} className="min-w-0"><OrderChecklist orders={orders} counts={counts} onDone={setDone} onOrder={setOrder} onFocusOrder={setFocusedOrder}/></fieldset></Paper>
+          </section>
+
+          <section hidden={view!=='catalog'} data-inventory-view="catalog">
+            {catalogSource&&!draft&&<div className="my-4 border border-gray-300 p-3"><p>{tr(catalogRecovery?'session.catalogDraft':'drafts.unreadable')}</p>{catalogRecovery&&<Button disabled={busy} onClick={resumeCatalog}>{tr('session.resumeCatalog')}</Button>}<Button onClick={()=>downloadDraftSource(catalogSource)}>{tr('drafts.downloadSource')}</Button></div>}
+            <p>{catalogAvailable?tr('inventoryViews.sharedCatalog',{revision:sharedRev}):tr('inventoryViews.unavailableLabels')}</p>
+            {draft?<>
+              <p className="my-3">{tr('inventoryCount.editHelp')}</p>
+              <div className={styles.context}><Button variant="primary" disabled={busy||conflict} onClick={saveList}>{tr('recovery.saveList')}</Button><Button disabled={busy} onClick={cancelList}>{tr('feedback.cancel')}</Button></div>
+              <RecoveryPanel message={{key:conflict?'recovery.conflict':'recovery.localList'}} copyText={()=>JSON.stringify({storeId:'CR3',baseRevision:listRev,sheets:draft},null,2)} busy={busy} retryLabel={{key:'recovery.retryLegacy'}} onRetry={!conflict?saveList:undefined} onReload={conflict?reloadList:undefined} onUseServer={serverList?useServer:undefined} rows={serverList?inventoryComparison(draft,serverList.sheets??DEFAULT_SHEETS,tr):undefined}/>
+              <fieldset disabled={busy} className="min-w-0">{draft.map((sheet,index)=><EditSheetTable key={sheet.id} sheet={sheet} onChange={items=>setDraft(value=>value&&value.map((sh,i)=>i===index?{...sh,items}:sh))}/>)}</fieldset>
+            </>:<>
+              <div className={styles.context}><Button id="inventory-edit-list" hidden={!!catalogSource} disabled={busy||!catalogAvailable} onClick={()=>{setConflict(false);setServerList(null);setDraft(structuredClone(sheets))}}>{tr('inventoryViews.editCatalog')}</Button></div>
+              {catalogAvailable?<Paper emphasis="active"><CatalogTables sheets={sheets}/></Paper>:<div><p>{tr(busy?'inventoryCount.loadingCatalog':'inventoryCount.catalogUnavailable')}</p><Button disabled={busy} onClick={()=>loadRemote(date)}>{tr('inventoryCount.retryLoad')}</Button></div>}
+            </>}
+            {countCatalog&&<details className="my-5" data-inventory-catalog-difference><summary>{tr('inventoryCount.catalogChanged')}</summary><p>{tr('inventoryCount.catalogSnapshot',{revision:countCatalogRev})}</p><p>{tr('inventoryCount.retained')}</p><Button disabled={busy||!!draft||!canAdopt||!canCount} onClick={()=>void adoptCatalog()}>{tr('inventoryCount.adopt')}</Button><ul>{differences.map(row=><li key={row.id} className="break-words"><strong>{row.label}</strong> <code>{row.id}</code>: {row.yours} → {row.theirs}</li>)}</ul>{!differences.length&&<p>{tr('inventoryViews.noDifferences')}</p>}</details>}
+            {!!catalogArchives.length&&<details><summary>{tr('inventoryCount.archives')}</summary>{catalogArchives.map(source=><div key={source.key}><p className="break-all">{source.key}</p><Button onClick={()=>downloadDraftSource(source.raw)}>{tr('drafts.downloadSource')}</Button></div>)}</details>}
+          </section>
+
+          <section hidden={view!=='history'} data-inventory-view="history">
+            <p>{tr('inventoryViews.historyHelp')}</p>
+            <div className={styles.context}><div><label htmlFor="inventory-history-end">{tr('inventoryViews.historyEnd')}</label><input id="inventory-history-end" type="date" value={lookupDate} onChange={event=>{browseSequence.current++;lookupDateRef.current=event.target.value;setLookupDate(event.target.value);setBrowseBusy(false);setBrowseError(false)}}/></div><Button disabled={browseBusy||!businessDate(lookupDate)} onClick={()=>void loadSavedDays(lookupDate)}>{tr('inventoryViews.loadDays')}</Button></div>
+            {browseBusy&&<p role="status">{tr('inventoryViews.loadingHistory')}</p>}
+            {browseError&&<p role="alert">{tr('inventoryViews.historyFailed')}</p>}
+            {browse&&<div data-history-results>
+              <p>{tr('inventoryViews.window',inventoryHistoryWindow(browse.to))}</p>
+              {lookupDate!==browse.to&&<p data-history-stale role="status">{tr('inventoryViews.stale')}</p>}
+              {!browse.days.length?<p>{tr('inventoryViews.empty')}</p>:<>
+                <ul className={styles.savedDays}>{browse.days.map(day=><li key={day.date}><Button aria-pressed={day.date===selectedDate} onClick={()=>setSelectedDate(day.date)}>{day.date}</Button><span>{tr('inventoryViews.savedTime',{time:day.updatedAt})}</span></li>)}</ul>
+                {selected&&<Paper emphasis="active"><div data-history-record>
+                  <h3 className={styles.recordHeading}>{tr('inventoryViews.savedRecord',{date:selected.date})}</h3><p>{tr('inventoryViews.savedTime',{time:selected.updatedAt})}</p>
+                  <CatalogProvenance source={savedLabels.source} revision={savedLabels.revision} available={catalogAvailable||savedLabels.source==='device'}/>
+                  <div className="my-4"><Button onClick={()=>printReport('history')}>{tr('inventoryViews.printSaved')}</Button></div>
+                  <SavedFields sheets={inventoryReportCatalog(savedLabels.catalog,[selected.counts],tr('inventoryViews.unknownIds'))} counts={selected.counts}/>
+                </div></Paper>}
+              </>}
+            </div>}
+            <details className={styles.comparison} data-inventory-comparison><summary>{tr('inventoryViews.compare')}</summary><p>{workingLabel} · {date}</p><p>{tr('inventoryViews.comparisonHelp')}</p><div className={styles.reportScroll} tabIndex={0} role="region" aria-label={tr('inventoryViews.compare')}>{reportCatalog.map(sheet=><SheetTable key={sheet.id} sheet={sheet} date={date} past={past} counts={counts} onInv={setInv} onOrder={setOrder} retained={retainedIds} columnState={workingLabel} readOnly/>)}</div></details>
+          </section>
+          {confirmation.dialog}
+        </div>
+
+        <div className={styles.printSheets}>
+          {(printMode===null||printMode==='full')&&<><h2>CR3 inventory · {date}</h2><p>{workingLabel}</p><p>{tr('inventoryViews.workingCatalog',{revision:countCatalogRev})}</p>{reportCatalog.map(sheet=><SheetTable key={sheet.id} sheet={sheet} date={date} past={past} counts={counts} onInv={setInv} onOrder={setOrder} retained={retainedIds} columnState={workingLabel} readOnly/>)}<h2>{tr('inventoryCount.orderList')} · {shortDate(date)}</h2><p>{tr('inventoryViews.manual')}</p><OrderChecklist orders={fullOrders}/></>}
+          {printMode==='checklist'&&<><h2>CR3 {tr('inventoryViews.orders')} · {date}</h2><p>{tr('inventoryViews.checklistSupplier')}: {orderSupplier||tr('inventoryCount.all')}</p><p>{tr('inventoryViews.manual')}</p><OrderChecklist orders={orders}/></>}
+          {printMode==='history'&&(selected?<><h2>CR3 · {tr('inventoryViews.savedRecord',{date:selected.date})}</h2><p>{tr('inventoryViews.savedTime',{time:selected.updatedAt})}</p><CatalogProvenance source={savedLabels.source} revision={savedLabels.revision} available={catalogAvailable||savedLabels.source==='device'}/>{savedReportCatalog.map(sheet=><SheetTable key={sheet.id} sheet={sheet} date={selected.date} past={selectedPast} counts={selected.counts} onInv={setInv} onOrder={setOrder} columnState={tr('inventoryViews.savedColumn')} showIds readOnly/>)}<h2>{tr('inventoryCount.orderList')} · {selected.date}</h2><p>{tr('inventoryViews.manual')}</p><OrderChecklist orders={ordersBySupplier(savedReportCatalog,selected.counts)}/></>:<p>{tr('inventoryViews.empty')}</p>)}
+        </div>
       </div>
     </div></InternalTheme>
   )
+}
+
+function OrderChecklist({orders,counts,onDone,onOrder,onFocusOrder}:{orders:ReturnType<typeof ordersBySupplier>;counts?:InventoryCounts;onFocusOrder?:(id:string|null)=>void;onDone?:(item:InventoryItem,done:boolean)=>void;onOrder?:(item:InventoryItem,order:string)=>void}) {
+  const {t}=useInternalLanguage()
+  return <div data-inventory-orders>{!orders.length?<p>{t('inventoryCount.noOrders')}</p>:orders.map(group=><section key={group.sup} className="my-5 break-inside-avoid"><h3 className="font-bold border-b border-black mb-2">{group.sup}</h3><ul>{group.lines.map(line=><li key={line.item.id} className={styles.checklistRow}>
+    {onDone?<label className={styles.mark}><input type="checkbox" aria-label={`${line.item.name} ${t('inventoryCount.ordered')}`} checked={line.done} onChange={event=>onDone(line.item,event.target.checked)}/><span>{t('inventoryCount.ordered')}</span></label>:<span>{line.done?t('inventoryCount.ordered'):'□'}</span>}
+    <span className={line.done?'line-through':''}>{line.item.name}</span>
+    {onOrder?<input type="text" aria-label={`${line.item.name} ${t('inventoryViews.overrideLabel')}`} value={counts?.[line.item.id]?.order??line.order} maxLength={12} onFocus={()=>onFocusOrder?.(line.item.id)} onBlur={()=>onFocusOrder?.(null)} onChange={event=>onOrder(line.item,event.target.value)}/>:<strong>{line.order}</strong>}
+  </li>)}</ul></section>)}</div>
+}
+
+function CatalogTables({sheets}:{sheets:InventorySheet[]}) {
+  const {t}=useInternalLanguage()
+  return <>{sheets.map(sheet=><section key={sheet.id} className={styles.catalogSection}><h3>{sheet.title||sheet.id}</h3>{sheet.account&&<p>{t('inventoryCount.account')}: {sheet.account}</p>}<div className={styles.tableScroll} tabIndex={0} role="region" aria-label={sheet.title||sheet.id}><table><thead><tr><th>{t('inventoryViews.item')}</th><th>ID</th><th>{t('inventoryCount.supplier')}</th><th>{sheet.useLabel}</th></tr></thead><tbody>{sheet.items.map(item=><tr key={item.id}><th scope="row">{item.name}{item.note&&<span className="block font-normal">{item.note}</span>}</th><td><code>{item.id}</code></td><td>{item.sup}</td><td>{item.use}</td></tr>)}</tbody></table></div></section>)}</>
+}
+
+function CatalogProvenance({source,revision,available}:{source:'device'|'current';revision:number|null;available:boolean}) {
+  const {t}=useInternalLanguage()
+  return <p data-history-provenance>{t(!available?'inventoryViews.unavailableLabels':source==='device'?'inventoryViews.deviceLabels':'inventoryViews.currentLabels',{revision:revision??0})} {t('inventoryViews.noHistoricalCatalog')}</p>
+}
+function SavedFields({sheets,counts}:{sheets:InventorySheet[];counts:InventoryCounts}) {
+  const {t}=useInternalLanguage()
+  return <>{sheets.filter(sheet=>sheet.items.some(item=>Object.hasOwn(counts,item.id))).map(sheet=><section key={sheet.id} className={styles.catalogSection}><h3>{sheet.title||sheet.id}</h3><div className={styles.tableScroll} tabIndex={0} role="region" aria-label={sheet.title||sheet.id}><table><thead><tr><th>{t('inventoryViews.item')} / ID</th><th>{t('inventoryViews.savedInv')}</th><th>{t('inventoryViews.savedOrder')}</th><th>{t('inventoryCount.ordered')}</th></tr></thead><tbody>{sheet.items.filter(item=>Object.hasOwn(counts,item.id)).map(item=><tr key={item.id}><th scope="row">{item.name}<code className="block font-normal">{item.id}</code></th><td>{counts[item.id].inv}</td><td>{counts[item.id].order}</td><td>{counts[item.id].done?t('inventoryViews.yes'):t('inventoryViews.no')}</td></tr>)}</tbody></table></div></section>)}</>
 }
 
 function EditSheetTable({ sheet, onChange }: { sheet: InventorySheet; onChange: (items: InventoryItem[]) => void }) {
@@ -469,7 +557,7 @@ function EditSheetTable({ sheet, onChange }: { sheet: InventorySheet; onChange: 
   }
   const remove = (index: number) => {
     const name = items[index].name.trim()
-    if (!name || confirm(`Remove ${name}? Its saved counts stay on the server but stop showing.`)) onChange(items.filter((_, i) => i !== index))
+    if (!name || confirm(`Remove ${name}? Its saved counts stay on the server but remain available by item ID in History.`)) onChange(items.filter((_, i) => i !== index))
   }
   const add = () => onChange([...items, { id: `-new-${nextNewId++}`, name: '', sup: '', use: '', gray: false }])
   const field = 'bg-transparent px-1 py-1 text-center font-bold border border-dashed border-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500'
@@ -533,6 +621,8 @@ function SheetTable({
   onOrder,
   readOnly = false,
   retained,
+  columnState,
+  showIds,
 }: {
   sheet: InventorySheet
   date: string
@@ -542,6 +632,8 @@ function SheetTable({
   onOrder: (item: InventoryItem, order: string) => void
   readOnly?: boolean
   retained?: ReadonlySet<string>
+  columnState?: string
+  showIds?: boolean
 }) {
   const columns = [...past.map(d => d.date), date]
   return (
@@ -559,7 +651,7 @@ function SheetTable({
           <tr>
             <th className="border-0" colSpan={sheet.showSup ? 3 : 2} />
             {columns.map(d => (
-              <th key={d} colSpan={2} className={`border-0 font-normal text-base ${INK} ${d === date ? '' : pastOnly}`}>{shortDate(d)}</th>
+              <th key={d} colSpan={2} className={`border-0 font-normal text-base ${INK} ${d === date ? '' : pastOnly}`}>{shortDate(d)}{d===date&&columnState&&<span className="block text-xs">{columnState}</span>}</th>
             ))}
           </tr>
           <tr className="font-bold">
@@ -578,7 +670,7 @@ function SheetTable({
               <tr key={item.id} className={item.gray ? GRAY : ''}>
                 <th scope="row" className={`${cellBorder} px-2 py-1 font-bold text-center`}>
                   {item.name}
-                  {retained?.has(item.id)&&<span className="block font-normal text-xs">Retained ID: {item.id}</span>}
+                  {showIds?<span className="block font-normal text-xs">ID: {item.id}</span>:retained?.has(item.id)&&<span className="block font-normal text-xs">Retained ID: {item.id}</span>}
                   {item.note && <span className={`ml-1 font-normal ${INK}`}>{item.note}</span>}
                 </th>
                 {sheet.showSup && <td className={`${cellBorder} px-1 text-center font-bold`}>{item.sup}</td>}

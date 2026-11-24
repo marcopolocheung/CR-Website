@@ -1,0 +1,10 @@
+# Step 12a evidence
+
+The [approved plan](approved-plan.md) and [checkpoint](../../checkpoints/step-12a.md) define the implemented CR3 frontend slice, review scenarios, actual checks and rollback. Final local checks pass: aggregate 405 tests, dictionary/contracts 9, production build/SEO, views 11 scenario groups, counting 10, recovery, shell 11 and session 14. Owner/device/live review remains pending.
+
+- `checks/` retains aggregate/dictionary, build/SEO, inventory views/counting and recovery/session/shell command output. Initial hash-history and diagnostic failures are separate from final passing view evidence; existing session/recovery selectors were updated for separated local views and active import summaries, and final suites pass.
+- `screens/` contains sixteen four-view desktop/tablet/phone/320px enlarged Spanish screenshots, three English PDFs (full report, checklist-only and selected saved report), and request/value assertions in `results.json`. PDF tests use independent row/date values and verify saved-versus-working output separation.
+- `counting/` retains the existing count-state/progress/recovery suite's screenshots, English PDF and assertions; `shell/` and `session/` retain broader access/navigation evidence.
+- [source-hashes.json](source-hashes.json) identifies the final sources and emitted inventory chunk. `rea/` retains portable final artifact summary/run and passive Count/History observations; the [investigation](../../../investigations/internal-inventory-views-2026-11-23.md) records authoritative identities, evidence IDs, coverage and unknowns. Raw REA results/diagnostics remain under repository `.rea/runs/`, including a superseded wide analysis with its incomplete coverage identified.
+
+Synthetic local APIs only, with external request guards. Existing count/catalog/history routes and device envelopes are retained. Manual checklist marks do not establish a vendor order or receipt. Physical-device/software-keyboard/staff review, backend activation, deployment and live-service persistence remain unverified. Step 12b has not begun.

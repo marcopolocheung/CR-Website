@@ -1,0 +1,7 @@
+PASS Count rows, six states and partial raw values stay intact; checklist starts independently of Count search/section/order filters
+PASS Back/Forward and keyboard focus work; partial count and catalog draft survive navigation, language, lock/unlock and reload; cancel remains explicit
+Traceback (most recent call last):
+  File "/tmp/test-inventory-views-diagnostic.py", line 332, in <module>
+    assert set(saved['skip']) <= {'inv', 'order', 'done'}
+               ~~~~~^^^^^^^^
+KeyError: 'skip'
