@@ -56,7 +56,7 @@ Backend activation is not established by source presence. Some historical task d
 | 09 | Staged hours import and identity review | Merged [PR #195](https://github.com/marcopolocheung/CR-Website/pull/195); [local checkpoint](checkpoints/step-09.md). Device/staff and applicable backend/live gates remain separate. |
 | 10 | Shared import history and readable comparison reports | Merged [PR #196](https://github.com/marcopolocheung/CR-Website/pull/196); [local checkpoint](checkpoints/step-10.md). Device/staff and applicable backend/live gates remain separate. |
 | 11 | Inventory counting and explicit progress | Merged [PR #197](https://github.com/marcopolocheung/CR-Website/pull/197) (`00e0c63`); [checkpoint](checkpoints/step-11.md), device-only progress; physical-device/staff/live gates remain pending |
-| 12 | Order checklist, catalog and count-history separation | Step 12a implemented and verified locally; [checkpoint](checkpoints/step-12a.md), owner/device/live review pending. Step 12b/backend and unit-policy milestones remain pending. |
+| 12 | Order checklist, catalog and count-history separation | Step 12a implemented and verified locally; [PR #202](https://github.com/marcopolocheung/CR-Website/pull/202), [checkpoint](checkpoints/step-12a.md), owner/device/live review pending. Step 12b/backend and unit-policy milestones remain pending. |
 | 13 | Forms library and sectioned editors | Not started |
 | 14 | Unified manager scheduling workspace | Not started |
 | 15 | Review against the schedule staff actually see | Full comparison/history review remains open; [dated restaurant hours items 1–6](checkpoints/special-hours.md) implemented and locally verified, staff/release gates pending |

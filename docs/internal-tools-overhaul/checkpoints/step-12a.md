@@ -17,7 +17,7 @@ No persisted purchase order, receiving, supplier delivery, structured unit/conve
 | Local implementation and relevant behavior | pass | Four-view controller, independent history/report helpers and existing API/storage boundaries implemented. |
 | Automated checks, production build and SEO | pass | Aggregate 405 tests, dictionary/contracts 9, production export and SEO pass with explicit loopback APIs. |
 | Browser visual, task and output verification | pass | Views 11 scenario groups, counting 10, recovery, shell 11 and session 14 pass; PDFs and four-view responsive screenshots retained. Synthetic/local emulation only. |
-| Owner review before the next staged step | pending | Deliver one non-draft PR into main; stop without merging. |
+| Owner review before the next staged step | pending | Non-draft [PR #202](https://github.com/marcopolocheung/CR-Website/pull/202) targets main. Stop without merging or beginning Step 12b. |
 | Backend/schema/unit-policy readiness | not applicable to this slice | Existing count PUT, revisioned catalog PUT and bounded history GET retained; broader INV/DEC-05 milestones stay open. |
 | Physical-device/software-keyboard/staff acceptance | pending | Browser emulation does not establish these checks. |
 | Release and live-service verification | pending | No deployment, migration or production mutation performed. |
