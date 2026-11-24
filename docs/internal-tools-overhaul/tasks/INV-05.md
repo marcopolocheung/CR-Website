@@ -108,3 +108,9 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Blockers: Listed prerequisites are pending.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
+
+## Step 12a frontend follow-up — November 23, 2026
+
+Catalog becomes a separate CR3 view, read-only until Edit catalog. Existing revision-conflict recovery and explicit captured-catalog adoption remain available. This does not generalize the API or device envelope to CR2; multi-store catalogs/count sessions remain pending.
+
+The [approved Step 12a plan](../evidence/step-12a/approved-plan.md) and [checkpoint](../checkpoints/step-12a.md) define this scoped work. The frontend slice is implemented and verified locally; observed scenarios and command/output evidence are recorded there. This follow-up does not advance the wider task milestones above. Physical-device/staff, backend activation, release and live-service acceptance remain unverified. Rollback preserves existing device envelopes, archives, unreadable recovery bytes and server records.

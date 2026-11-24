@@ -1,0 +1,18 @@
+{
+  "src/components/internal/Inventory.tsx": "651181c791db78c7764f0d765af80afafd18ab3f580b79f1d2bf68e1640ed452",
+  "src/components/internal/InventoryWorkspace.tsx": "823e727ba442f4af084b38355892acc2ac8420fd51a2568f550ebcdc0df792de",
+  "src/components/internal/InventoryCountRows.tsx": "572981a9c4a0f8048fd6b10b217915f0346f276a2098f1a2d1b6ca9b6a6ff5d4",
+  "src/components/internal/inventory-count.module.css": "a9f929d4e593012d6856264cf308a45f5bfd2b9edf63a8fd8a822bd578a60dc7",
+  "src/lib/internal-tools/inventory-history.ts": "643d58040c44f30282f72f13b9dbeef38da33d217d6f54ab88bc99c91379bd3b",
+  "src/lib/internal-tools/inventory-history.test.ts": "bd6b51b1186b1f55c0a50211abc112bd911dab055793e2bce40783522cd27e1a",
+  "src/lib/internal-tools/inventory-progress.ts": "b62214c1625356b35215b4714dec1275da0dd80f45f53d1b28803368a6e80169",
+  "src/lib/inventory-store.ts": "a3f21f19f903c6da17206ecb3ad18d10799bdbb9955123f159264f15607aebb0",
+  "src/lib/inventory.ts": "3bf3c585f47ea715a364b76063a7880ea231fc9e3394146864c24819cbee832a",
+  "src/lib/internal-tools/i18n/en.ts": "59589599711bd9358f45e8593b00a3a646f8b9627b4827f0ad2785c252c60640",
+  "src/lib/internal-tools/i18n/es.ts": "589440ef4ce0a03b1b2e5bbb58fa3b9995396127ee1fefc1061facf8114ade67",
+  "scripts/test-inventory-views.py": "defef9e02679773e284db3f4e3392b3355e979ac10bffc6ab91983a9482c142b",
+  "scripts/test-inventory-counting.py": "585ac08a2469ad7f810ee84438b222723392240ff7e282290e6d32f0803dda25",
+  "scripts/test-internal-session.py": "f5eaf0ab3d9f0012b773bf1807eb6b03dc19213e85d2c95dcec3e504b8fe0429",
+  "scripts/test-internal-recovery.py": "7724d7cfaa56cf36c7ef9b5c52eb3b57def415cdf46bc29801e842aec47f5a25",
+  "out/_next/static/chunks/4e069c84a111834e.js": "e35b64d859d8934d11d293e34ff801ca930b932489c96162030e09dfd816931e"
+}

@@ -55,8 +55,8 @@ Backend activation is not established by source presence. Some historical task d
 | 08 | Staged sales import | Merged [PR #194](https://github.com/marcopolocheung/CR-Website/pull/194); [local checkpoint](checkpoints/step-08.md). Device/staff and applicable backend/live gates remain separate. |
 | 09 | Staged hours import and identity review | Merged [PR #195](https://github.com/marcopolocheung/CR-Website/pull/195); [local checkpoint](checkpoints/step-09.md). Device/staff and applicable backend/live gates remain separate. |
 | 10 | Shared import history and readable comparison reports | Merged [PR #196](https://github.com/marcopolocheung/CR-Website/pull/196); [local checkpoint](checkpoints/step-10.md). Device/staff and applicable backend/live gates remain separate. |
-| 11 | Inventory counting and explicit progress | Locally implemented and verified; [checkpoint](checkpoints/step-11.md), device-only progress; [PR #197](https://github.com/marcopolocheung/CR-Website/pull/197) authorized for merge, physical-device/staff/live gates pending |
-| 12 | Order checklist, catalog and count-history separation | Not started |
+| 11 | Inventory counting and explicit progress | Merged [PR #197](https://github.com/marcopolocheung/CR-Website/pull/197) (`00e0c63`); [checkpoint](checkpoints/step-11.md), device-only progress; physical-device/staff/live gates remain pending |
+| 12 | Order checklist, catalog and count-history separation | Step 12a implemented and verified locally; [checkpoint](checkpoints/step-12a.md), owner/device/live review pending. Step 12b/backend and unit-policy milestones remain pending. |
 | 13 | Forms library and sectioned editors | Not started |
 | 14 | Unified manager scheduling workspace | Not started |
 | 15 | Review against the schedule staff actually see | Full comparison/history review remains open; [dated restaurant hours items 1–6](checkpoints/special-hours.md) implemented and locally verified, staff/release gates pending |
@@ -203,6 +203,8 @@ Backend activation is not established by source presence. Some historical task d
 **Verify:** supplier grouping, an overridden suggestion, Enough versus a number, a saved checklist, a catalog revision conflict, rename/reorder/removal and an old count after the catalog changes. Renaming must not rewrite the meaning of a historical record.
 
 **Review gate:** count entry is calm; configuration is reachable; the order list says whether it is a checklist or a persisted order. No claim that a vendor received an order merely because a box was checked.
+
+**Approved Step 12a scope:** retain one CR3 workspace with linkable Count, Order checklist, Catalog and History views. Keep supplier selection independent, saved-day lookup read-only and separate from the working comparison, catalog adoption explicit and manual checkmarks labeled Marked ordered. Preserve raw notation and the existing count/catalog/history API and device envelopes. The [approved plan](evidence/step-12a/approved-plan.md) and [checkpoint](checkpoints/step-12a.md) define the verification and review boundary. Structured units, CR2 catalogs and durable sessions are excluded.
 
 **Feature extension 12b:** persisted orders, partial receiving and outstanding-order-aware suggestions are a separate connected loop, delivered in that order after supplier/unit/session contracts are dependable. They remain visible work, not a hidden definition of checklist completion.
 

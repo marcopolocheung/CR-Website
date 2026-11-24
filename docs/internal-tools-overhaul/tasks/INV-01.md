@@ -114,3 +114,9 @@ Evidence specific to this task: the three task scenarios above must pass against
 Six line states, additive CR3/date device progress, guarded resume and truthful count-field saving are implemented and locally verified. Skips/session metadata never reach the existing API. Durable sessions, explicit shared completion/skipped review, atomic revisions and deployed acceptance remain pending; this scoped slice does not complete the wider brief.
 
 Codex coordinates dictionary/package edits with an unchanged count/catalog API; no migration number is needed. [Checkpoint](../checkpoints/step-11.md) and [evidence](../evidence/step-11/README.md) record local checks, observed fixtures, output, recovery and rollback. Physical-device/staff, release and live acceptance remain unverified. Original wider task milestones above remain pending.
+
+## Step 12a frontend follow-up — November 23, 2026
+
+The retained Count, Order checklist, Catalog and History views share one working CR3/date controller. Navigation does not create a durable count session. The existing count PUT still contains only counts (`inv`, `order`, `done`); skips/progress remain device-only. Durable sessions, shared completion and atomic count revisions remain pending.
+
+The [approved Step 12a plan](../evidence/step-12a/approved-plan.md) and [checkpoint](../checkpoints/step-12a.md) define this scoped work. The frontend slice is implemented and verified locally; observed scenarios and command/output evidence are recorded there. This follow-up does not advance the wider task milestones above. Physical-device/staff, backend activation, release and live-service acceptance remain unverified. Rollback preserves existing device envelopes, archives, unreadable recovery bytes and server records.

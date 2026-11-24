@@ -12,6 +12,8 @@ a prerequisite slice of SCH-04 and a compatible SCH-06-IMPORT reader extension;
 SCH-04's broader comparison/history milestones remain pending. Dated hours controls
 are completed in the follow-up above; external/live activation remains pending.
 
+The [Step 12a checkpoint](checkpoints/step-12a.md) records the locally implemented frontend separation into Count, Order checklist, Catalog and read-only History. Local scenario evidence is recorded there; owner/device/live review remain pending; wider INV-01/03/05/06/07/08/10 and DEC-05 milestones remain unchanged. Manual checklist marks are not issued orders or receiving records.
+
 The [Step 11 checkpoint](checkpoints/step-11.md) records locally implemented and verified CR3 counting, filters and device-only progress. INV-01/03/10 remain pending for their wider durable-session, unit and historical-server scope. INV-02's requested global progress/filter/search slice is verified; its broader per-section reporting remains open. No external/live milestone is advanced.
 
 The [Step 03 checkpoint](checkpoints/step-03.md) records the locally verified shell/navigation slice of UX-02. Its broader context/shared-access lifecycle checklist remains for Step 04; no unrelated or external/live milestones are changed.

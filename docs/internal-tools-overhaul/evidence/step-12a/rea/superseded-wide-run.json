@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "started_at": "20261124T011846.036335Z",
+  "project": "/home/unusn/CR-step12a",
+  "rea_version": "6.8.0",
+  "target": {
+    "path": "/home/unusn/CR-step12a/out",
+    "kind": "directory",
+    "identity_note": "The authoritative inventory and artifact digest are in REA evidence."
+  },
+  "command": [
+    "/home/unusn/.local/share/rea/bin/rea",
+    "analyze",
+    "/home/unusn/CR-step12a/out",
+    "--json"
+  ],
+  "output": "/home/unusn/CR-step12a/.rea/runs/20261124T011827.057707Z-56e43725/evidence.json",
+  "finished_at": "20261124T012145.895158Z",
+  "exit_code": 143
+}

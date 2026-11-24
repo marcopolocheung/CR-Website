@@ -107,3 +107,9 @@ No resource creation, binding change, migration execution, or Worker deployment 
 The approved global entered/Enough/skipped/remaining/total summary, search, catalog-section selection, Remaining and Needs ordering are implemented and locally verified. Filters preserve raw values and the full captured-catalog denominator; order alone remains untouched. Broader per-section summary reporting from this brief remains open, so full-task milestones are not advanced.
 
 Codex coordinates dictionary/package edits with an unchanged count/catalog API; no migration number is needed. [Checkpoint](../checkpoints/step-11.md) and [evidence](../evidence/step-11/README.md) record local checks, observed fixtures, output, recovery and rollback. Physical-device/staff, release and live acceptance remain unverified. Original wider task milestones above remain pending.
+
+## Step 12a frontend follow-up — November 23, 2026
+
+The Step 11 count progress and search/section/Remaining/Needs ordering filters remain scoped to Count. The checklist has independent supplier selection; browsing other views must preserve Count filters and its full captured-catalog denominator. Broader per-section summary reporting remains open.
+
+The [approved Step 12a plan](../evidence/step-12a/approved-plan.md) and [checkpoint](../checkpoints/step-12a.md) define this scoped work. The frontend slice is implemented and verified locally; observed scenarios and command/output evidence are recorded there. This follow-up does not advance the wider task milestones above. Physical-device/staff, backend activation, release and live-service acceptance remain unverified. Rollback preserves existing device envelopes, archives, unreadable recovery bytes and server records.

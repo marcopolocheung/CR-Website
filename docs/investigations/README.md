@@ -1,5 +1,7 @@
 # Investigations
 
+- [Step 12a inventory views — November 23, 2026](internal-inventory-views-2026-11-23.md): emitted artifact identities, local count/history observations, report checks and coverage limits.
+
 - [Step 03 internal-shell runtime evidence — November 11, 2026](internal-shell-2026-11-11.md): shell/build identity, navigation and preservation scenarios, and verification limits.
 
 - [Step 02 primitives runtime evidence — November 11, 2026](internal-primitives-2026-11-11.md): gallery/build identity, browser scenarios and verification limits.

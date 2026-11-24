@@ -1,0 +1,12 @@
+PASS Count rows, six states and partial raw values stay intact; checklist starts independently of Count search/section/order filters
+PASS Back/Forward and keyboard focus work; partial count and catalog draft survive navigation, language, lock/unlock and reload; cancel remains explicit
+PASS Checklist supplier grouping/filter is independent, manual checked lines remain in clipboard, raw overrides and marks save/reload using only existing fields
+PASS Read-only 14-calendar-date lookup sorts gaps newest first, selects newest, shows saved time and server raw values; matching-date catalog metadata supplies labels only, invalid metadata falls back and unknown IDs stay visible
+PASS History date changes show stale original context; failed reload retains original results, empty window is distinct, browsing sends no PUT and leaves every count/device byte and working comparison unchanged
+PASS Independent lookup request generations reject older/date-invalidated/expired-session responses; lock and 401 hide private history without mutating working counts
+PASS Saved PDF uses selected server record/provenance, checklist PDF uses supplier selection including marks, full English PDF includes all catalog rows and five date pairs despite filters; language and print state restore
+PASS Desktop/tablet/phone and 320px enlarged Spanish reflow without page overflow; keyboard heading focus, reduced motion and access-token storage boundaries retained
+PASS Marked then unmarked checklist save stays correctly labeled saved before and after reload when the Worker omits done:false; raw local fields remain intact
+PASS Failed shared catalog history shows unavailable provenance and raw IDs, while validated matching-date device labels still work; Catalog retry restores the original count baseline
+PASS Direct Count/orders/catalog/history hashes, empty/unknown hashes and extensionless/trailing-slash/.html routes open the expected view without writes
+PASS Step12a 11 browser scenario groups; no page errors or external requests

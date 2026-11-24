@@ -47,7 +47,7 @@ with sync_playwright() as p:
     page.goto(base+'/internal/inventory/');page.wait_for_load_state('networkidle')
     def unlock():
         page.locator('#cashout-code').fill(TOKEN);page.get_by_role('button',name='Unlock',exact=True).click();page.wait_for_load_state('networkidle')
-    unlock();page.get_by_role('button',name='Edit list',exact=True).click()
+    unlock();page.locator('a[href="#catalog"]').click();page.get_by_role('button',name='Edit catalog',exact=True).click()
     name=page.locator('input[aria-label$=" name"]').first
     name.fill('Local retained item')
     # In-app navigation cancels without changing the page or entered fields.
@@ -107,22 +107,22 @@ with sync_playwright() as p:
     assert exported['baseRevision']==1 and TOKEN not in json.dumps(exported)
     page.get_by_role('button',name='Usar la versión del servidor',exact=True).click()
     dialog.get_by_role('button',name='Usar la versión del servidor',exact=True).click()
-    expect(page.get_by_role('button',name='Editar lista',exact=True)).to_be_focused()
+    expect(page.get_by_role('button',name='Editar catálogo',exact=True)).to_be_focused()
     page.get_by_role('button',name='English',exact=True).click()
-    page.get_by_role('button',name='Edit list',exact=True).click()
+    page.get_by_role('button',name='Edit catalog',exact=True).click()
     expect(name).to_have_value('Other editor item')
     name.fill('Reviewed new edit')
     # Two immediate clicks issue one request while the server response is held.
     mode['write']='hold';before=len(puts)
     page.get_by_role('button',name='Save list',exact=True).evaluate('(button)=>{button.click();button.click()}')
     expect(page.get_by_role('button',name='Save list',exact=True)).to_be_disabled()
-    page.wait_for_function('document.querySelector("fieldset")?.disabled === true')
+    page.wait_for_function("document.querySelector('[data-inventory-view=catalog] fieldset')?.disabled === true")
     page.wait_for_function('window.__recoveryHeld === true')
     assert len(puts)==before+1 and puts[-1]['baseRev']==2
     assert pending
     held,headers=pending.pop();mode['list_rev']=3;mode['list']=puts[-1]['sheets']
     held.fulfill(status=200,json={'rev':3},headers=headers)
-    expect(page.get_by_role('button',name='Edit list',exact=True)).to_be_visible()
+    expect(page.get_by_role('button',name='Edit catalog',exact=True)).to_be_visible()
     # Successful acknowledgment clears this editor's navigation warning.
     page.get_by_role('link',name='Recovery navigation fixture',exact=True).click()
     page.wait_for_url(lambda url: urlparse(url).path.rstrip('/') == '/scheduler-demo')

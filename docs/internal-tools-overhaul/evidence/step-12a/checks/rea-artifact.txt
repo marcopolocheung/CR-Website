@@ -1,0 +1,2 @@
+REA run: /home/unusn/CR-step12a/.rea/runs/20261124T011827.057707Z-56e43725
+Exit status: 143; original output: /home/unusn/CR-step12a/.rea/runs/20261124T011827.057707Z-56e43725/evidence.json

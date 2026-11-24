@@ -1,0 +1,380 @@
+{
+  "scenarios": [
+    "Count rows, six states and partial raw values stay intact; checklist starts independently of Count search/section/order filters",
+    "Back/Forward and keyboard focus work; partial count and catalog draft survive navigation, language, lock/unlock and reload; cancel remains explicit",
+    "Checklist supplier grouping/filter is independent, manual checked lines remain in clipboard, raw overrides and marks save/reload using only existing fields",
+    "Read-only 14-calendar-date lookup sorts gaps newest first, selects newest, shows saved time and server raw values; matching-date catalog metadata supplies labels only, invalid metadata falls back and unknown IDs stay visible",
+    "History date changes show stale original context; failed reload retains original results, empty window is distinct, browsing sends no PUT and leaves every count/device byte and working comparison unchanged",
+    "Independent lookup request generations reject older/date-invalidated/expired-session responses; lock and 401 hide private history without mutating working counts",
+    "Saved PDF uses selected server record/provenance, checklist PDF uses supplier selection including marks, full English PDF includes all catalog rows and five date pairs despite filters; language and print state restore",
+    "Desktop/tablet/phone and 320px enlarged Spanish reflow without page overflow; keyboard heading focus, reduced motion and access-token storage boundaries retained",
+    "Marked then unmarked checklist save stays correctly labeled saved before and after reload when the Worker omits done:false; raw local fields remain intact",
+    "Failed shared catalog history shows unavailable provenance and raw IDs, while validated matching-date device labels still work; Catalog retry restores the original count baseline",
+    "Direct Count/orders/catalog/history hashes, empty/unknown hashes and extensionless/trailing-slash/.html routes open the expected view without writes"
+  ],
+  "page_errors": [],
+  "external_attempts": [],
+  "requests": [
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/2026-11-18",
+      "query": "",
+      "method": "PUT"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-03",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-01",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-09-01",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-03",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-02",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-03",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-03",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-02",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-02",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-03",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-03",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/2026-11-18",
+      "query": "",
+      "method": "PUT"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/2026-11-18",
+      "query": "",
+      "method": "PUT"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-03",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3/list",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/inventory/CR3",
+      "query": "to=2026-11-18",
+      "method": "GET"
+    }
+  ],
+  "clipboard": "CR3 order 2026-11-18\n\nD\n  Zero source: 2\n  Fraction source: 9/10 box",
+  "viewports": [
+    1440,
+    768,
+    390,
+    320
+  ],
+  "limits": [
+    "Synthetic local APIs only",
+    "Physical devices/software keyboard, staff acceptance and live persistence unverified"
+  ]
+}

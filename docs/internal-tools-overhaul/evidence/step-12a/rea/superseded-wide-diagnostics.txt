@@ -1,0 +1,77 @@
+{"rea_progress":{"phase":"analyze_javascript_application","completed":0,"total":1,"message":"Inventorying and parsing application artifacts","sequence":1}}
+{"rea_progress":{"phase":"read_javascript_artifacts","completed":0,"total":1,"message":"Reading inventoried JavaScript application sources","sequence":2}}
+{"rea_progress":{"phase":"parse_javascript_sources","completed":0,"total":1,"message":"Processing 80 selected application files","sequence":3}}
+{"rea_progress":{"phase":"process_javascript_artifact_metadata","completed":0,"total":1,"message":"Processing metadata for 404.html (1/80)","sequence":4}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/0a46531879f2e4a3.js (2/80)","sequence":5}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/0a46531879f2e4a3.js","sequence":6}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/0a46531879f2e4a3.js","sequence":7}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/0a46531879f2e4a3.js","sequence":8}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/0a46531879f2e4a3.js","sequence":9}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/0a46531879f2e4a3.js","sequence":10}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/0e9d3a89fadbec5f.js (3/80)","sequence":11}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/0e9d3a89fadbec5f.js","sequence":12}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/0e9d3a89fadbec5f.js","sequence":13}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/0e9d3a89fadbec5f.js","sequence":14}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/0e9d3a89fadbec5f.js","sequence":15}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/0e9d3a89fadbec5f.js","sequence":16}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/17e5a82ea512002c.js (4/80)","sequence":17}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/17e5a82ea512002c.js","sequence":18}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/17e5a82ea512002c.js","sequence":19}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/17e5a82ea512002c.js","sequence":20}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/17e5a82ea512002c.js","sequence":21}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/17e5a82ea512002c.js","sequence":22}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/3b522ca9534dc524.js (5/80)","sequence":23}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/3b522ca9534dc524.js","sequence":24}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/3b522ca9534dc524.js","sequence":25}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/3b522ca9534dc524.js","sequence":26}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/3b522ca9534dc524.js","sequence":27}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/3b522ca9534dc524.js","sequence":28}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/3d3410c5c370b520.js (6/80)","sequence":29}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/3d3410c5c370b520.js","sequence":30}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/3d3410c5c370b520.js","sequence":31}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/3d3410c5c370b520.js","sequence":32}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/3d3410c5c370b520.js","sequence":33}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/3d3410c5c370b520.js","sequence":34}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/430a27e650f4e4bf.js (7/80)","sequence":35}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/430a27e650f4e4bf.js","sequence":36}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/430a27e650f4e4bf.js","sequence":37}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/430a27e650f4e4bf.js","sequence":38}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/430a27e650f4e4bf.js","sequence":39}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/430a27e650f4e4bf.js","sequence":40}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/43e8e2b66945831d.js (8/80)","sequence":41}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/43e8e2b66945831d.js","sequence":42}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/43e8e2b66945831d.js","sequence":43}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/43e8e2b66945831d.js","sequence":44}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/43e8e2b66945831d.js","sequence":45}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/43e8e2b66945831d.js","sequence":46}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/4798de6f7b37fff3.js (9/80)","sequence":47}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/4798de6f7b37fff3.js","sequence":48}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/4798de6f7b37fff3.js","sequence":49}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/4798de6f7b37fff3.js","sequence":50}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/4798de6f7b37fff3.js","sequence":51}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/4798de6f7b37fff3.js","sequence":52}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/5c81c399cfe66ae2.js (10/80)","sequence":53}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/5c81c399cfe66ae2.js","sequence":54}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/5c81c399cfe66ae2.js","sequence":55}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/5c81c399cfe66ae2.js","sequence":56}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/5c81c399cfe66ae2.js","sequence":57}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/5c81c399cfe66ae2.js","sequence":58}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/5cc4091a817ee01d.js (11/80)","sequence":59}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/5cc4091a817ee01d.js","sequence":60}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/5cc4091a817ee01d.js","sequence":61}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/62cef7fc41f971f1.js (12/80)","sequence":62}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/62cef7fc41f971f1.js","sequence":63}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/62cef7fc41f971f1.js","sequence":64}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/62cef7fc41f971f1.js","sequence":65}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/62cef7fc41f971f1.js","sequence":66}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/62cef7fc41f971f1.js","sequence":67}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/66a8c16702b8a250.js (13/80)","sequence":68}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/66a8c16702b8a250.js","sequence":69}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/66a8c16702b8a250.js","sequence":70}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/66a8c16702b8a250.js","sequence":71}}
+{"rea_progress":{"phase":"javascript_worker_projection","completed":0,"total":1,"message":"JavaScript worker projection: _next/static/chunks/66a8c16702b8a250.js","sequence":72}}
+{"rea_progress":{"phase":"javascript_worker_transfer","completed":0,"total":1,"message":"JavaScript worker transfer: _next/static/chunks/66a8c16702b8a250.js","sequence":73}}
+{"rea_progress":{"phase":"parse_javascript_source","completed":0,"total":1,"message":"Parsing and projecting _next/static/chunks/6955547cd6f58fcd.js (14/80)","sequence":74}}
+{"rea_progress":{"phase":"javascript_worker_parse","completed":0,"total":1,"message":"JavaScript worker parse: _next/static/chunks/6955547cd6f58fcd.js","sequence":75}}
+{"rea_progress":{"phase":"javascript_worker_static","completed":0,"total":1,"message":"JavaScript worker static: _next/static/chunks/6955547cd6f58fcd.js","sequence":76}}
+{"rea_progress":{"phase":"javascript_worker_semantic","completed":0,"total":1,"message":"JavaScript worker semantic: _next/static/chunks/6955547cd6f58fcd.js","sequence":77}}

@@ -114,3 +114,9 @@ Evidence specific to this task: the three task scenarios above must pass against
 On hand and order override labels expose original supplier/catalog context, preserve raw fractions/text and explicitly avoid inferred units or pack conversions. This is locally verified UI clarification only; confirmed unit/pack/target policy and structured backend work remain pending.
 
 Codex coordinates dictionary/package edits with an unchanged count/catalog API; no migration number is needed. [Checkpoint](../checkpoints/step-11.md) and [evidence](../evidence/step-11/README.md) record local checks, observed fixtures, output, recovery and rollback. Physical-device/staff, release and live acceptance remain unverified. Original wider task milestones above remain pending.
+
+## Step 12a frontend follow-up — November 23, 2026
+
+Count/checklist/catalog/history retain original supplier and Use notation, suggestions, blank-versus-zero behavior and raw fractions/text. No unit, pack conversion or cross-quantity total is inferred. DEC-05 and structured unit/pack/target work remain pending.
+
+The [approved Step 12a plan](../evidence/step-12a/approved-plan.md) and [checkpoint](../checkpoints/step-12a.md) define this scoped work. The frontend slice is implemented and verified locally; observed scenarios and command/output evidence are recorded there. This follow-up does not advance the wider task milestones above. Physical-device/staff, backend activation, release and live-service acceptance remain unverified. Rollback preserves existing device envelopes, archives, unreadable recovery bytes and server records.
