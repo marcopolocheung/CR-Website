@@ -90,7 +90,7 @@ export default function NavigationProtection({ children }: { children: React.Rea
       const navigateBack = anchor.dataset.historyBack === 'true'
       if (target.origin === location.origin && target.pathname === location.pathname && target.search === location.search) {
         // Re-selecting the active task must not reload the memory-only session.
-        if (target.hash === location.hash) { event.preventDefault(); event.stopImmediatePropagation() }
+        if (target.hash === location.hash && anchor.dataset.localView !== 'true') { event.preventDefault(); event.stopImmediatePropagation() }
         return
       }
       const normalized = target.pathname.replace(/\.html$/, '').replace(/\/$/, '')

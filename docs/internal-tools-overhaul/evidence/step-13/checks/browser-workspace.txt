@@ -1,0 +1,15 @@
+PASS Saved-first library and one New form action; all eleven original blank URLs/formats remain public without unlocking
+PASS Historical write-up stays read-only, original fields/signature names unchanged, label request is label-only and full English long-text paper remains compatible
+PASS All five existing types preserve requirements/raw canonical fields, separate read-only review sends no mutation, one POST saves and English PDFs include independent options/amounts/declarations/signatures/all forty narrative lines
+PASS Active draft values and byte-identical device copies survive library navigation, Back/Forward and Return to draft without POSTs
+PASS Dedicated Drafts discovers all form contexts, preserves corrupt downloadable source, reload requires unlock and Resume as a copy creates a fresh credential-free identity without replacing original bytes
+PASS Denied device storage retains raw text and refuses an unprotected lock/handoff
+PASS Confirmed write-up POST is retained before a failed follow-up read; loading/retrying the record never replays POST
+PASS Unconfirmed POST keeps the draft, directs the manager to saved forms and does not automatically retry
+PASS Late record detail response cannot hijack a newer library selection
+PASS Saved/Drafts/Blank/editor reflow at desktop/tablet/phone/320px enlarged Spanish with preserved work, keyboard focus and reduced motion
+PASS Latest saved-record selection wins and late 401 reads from a previous session cannot revoke a same-code unlock
+PASS Double-clicking Save issues one POST; a held acknowledgement from an expired generation cannot mark the reauthenticated draft saved or replay its write
+PASS Every newly saved draft identity requires a fresh explicit acknowledgement before creating another immutable record
+PASS Extensionless/slash/.html and direct Saved/Drafts/Blank/unknown hashes initialize without mutations
+PASS Step13 14 scenario groups; no page errors or external attempts

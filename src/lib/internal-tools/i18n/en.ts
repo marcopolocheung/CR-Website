@@ -1,7 +1,13 @@
+import { formsEnglish } from './forms-entry'
+import { formsDraftEnglish } from './forms-drafts'
+import { formsWorkspaceEnglish } from './forms-workspace'
 import { planningEnglish } from './planning'
 import { hoursEnglish } from './special-hours'
 const en = {
   ...hoursEnglish,
+  ...formsEnglish,
+  ...formsDraftEnglish,
+  ...formsWorkspaceEnglish,
   "inventoryViews.unknownIds": "Unknown / removed IDs",
   "inventoryViews.workingCatalog": "Labels: working count’s captured catalog, revision {revision}. Earlier server catalog versions are unavailable; columns join by item ID.",
   "inventoryViews.unavailableLabels": "The current shared catalog could not be loaded. Saved fields are shown by raw item ID unless a matching-date device catalog is available.",

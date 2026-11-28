@@ -1,0 +1,54 @@
+{
+  "customer-complaint-english.pdf": {
+    "pages": 2,
+    "bytes": 128436,
+    "fonts": [
+      "AAAAAA+DejaVuSans-Bold",
+      "BAAAAA+DejaVuSans-Bold",
+      "CAAAAA+DejaVuSans"
+    ]
+  },
+  "injury-report-english.pdf": {
+    "pages": 3,
+    "bytes": 130323,
+    "fonts": [
+      "AAAAAA+DejaVuSans-Bold",
+      "BAAAAA+DejaVuSans-Bold",
+      "CAAAAA+DejaVuSans"
+    ]
+  },
+  "legacy-write-up.pdf": {
+    "pages": 3,
+    "bytes": 130479,
+    "fonts": [
+      "AAAAAA+DejaVuSans-Bold",
+      "BAAAAA+DejaVuSans"
+    ]
+  },
+  "pay-rate-increase-english.pdf": {
+    "pages": 2,
+    "bytes": 129662,
+    "fonts": [
+      "AAAAAA+DejaVuSans-Bold",
+      "BAAAAA+DejaVuSans-Bold",
+      "CAAAAA+DejaVuSans"
+    ]
+  },
+  "payroll-change-request-english.pdf": {
+    "pages": 3,
+    "bytes": 131102,
+    "fonts": [
+      "AAAAAA+DejaVuSans-Bold",
+      "BAAAAA+DejaVuSans-Bold",
+      "CAAAAA+DejaVuSans"
+    ]
+  },
+  "write-up-english.pdf": {
+    "pages": 3,
+    "bytes": 130433,
+    "fonts": [
+      "AAAAAA+DejaVuSans-Bold",
+      "BAAAAA+DejaVuSans"
+    ]
+  }
+}

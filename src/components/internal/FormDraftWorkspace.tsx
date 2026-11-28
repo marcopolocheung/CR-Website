@@ -1,8 +1,7 @@
 'use client'
 
-import { useShellTask } from './ShellTask'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { STORE_LABELS } from './CashOut'
 import DraftChooser, { downloadDraftSource } from './DraftChooser'
 import { LabeledInput, focusField } from './Feedback'
@@ -40,8 +39,11 @@ export function formDraftValidator<F>(validForm: (value: unknown) => value is F)
  * Store/date/preparer chooser plus device autosave and leave-page protection for one paper form type.
  * Saved drafts stay on the device (no disposal until DEC-03) and remember their record, so resuming one warns first.
  */
-export default function FormDraftWorkspace<F extends Json>({ formType, title, createForm, validateForm, children }: {
+export default function FormDraftWorkspace<F extends Json>({ formType, title, createForm, validateForm, children, initialDraft, onActiveChange, busy = false }: {
   formType: string
+  initialDraft?: Draft<FormDraftPayload<F>>
+  onActiveChange?: (draft: Draft<FormDraftPayload<F>> | null) => void
+  busy?: boolean
   title: TranslationKey
   createForm: (date: string, context: { store: CashoutStore; preparer: string }) => F
   validateForm: (value: unknown) => value is F
@@ -65,7 +67,6 @@ export default function FormDraftWorkspace<F extends Json>({ formType, title, cr
     return parsed ? { task: 'form', formType, storeId: store, businessDate: parsed } : null
   }, [formType, store, date])
 
-  useShellTask('forms-context', { context: context ? `${STORE_LABELS[store]} · ${date}` : null })
 
   const write = useCallback((payload: T): boolean => {
     const current = activeRef.current
@@ -93,7 +94,7 @@ export default function FormDraftWorkspace<F extends Json>({ formType, title, cr
     setDirty(false)
   }, [write])
 
-  useNavigationProtection({ dirty: !!active && dirty && !active.payload.savedId, deviceSaved: !storageFailed,
+  useNavigationProtection({ busy, dirty: !!active && dirty && !active.payload.savedId, deviceSaved: !storageFailed,
     checkpoint: () => !activeRef.current || write(activeRef.current.payload),
     leave: () => { activeRef.current = null; setActive(null); setDirty(false) } })
 
@@ -108,6 +109,9 @@ export default function FormDraftWorkspace<F extends Json>({ formType, title, cr
     setDirty(false)
   }
 
+  useEffect(() => { onActiveChange?.(active) }, [active,onActiveChange])
+  useEffect(() => { if (initialDraft) open(initialDraft) }, [initialDraft])
+
   const close = () => {
     const current = activeRef.current
     if (current && !write(current.payload)) return
@@ -120,7 +124,7 @@ export default function FormDraftWorkspace<F extends Json>({ formType, title, cr
   if (active) {
     return (
       <>
-        <div className="max-w-[8.5in] mx-auto mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 print:hidden">
+        <div className="max-w-[8.5in] mx-auto mb-4 border border-gray-200 bg-gray-50 p-3 print:hidden">
           <p className="break-words text-sm font-medium text-gray-900">{t('drafts.active', { store: STORE_LABELS[active.context.storeId], date: active.context.businessDate!, preparer: active.preparer })}</p>
           <p role="status" aria-live="polite" className="text-sm text-gray-700">
             {active.payload.savedId ? `✓ ${t('formDrafts.saved')}` : storageFailed ? `✕ ${t('drafts.storageUnavailable')}` : lastSavedAt ? `✓ ${t('drafts.savedAt', { time: new Date(lastSavedAt).toLocaleTimeString() })}` : `! ${t('common.unsaved')}`}

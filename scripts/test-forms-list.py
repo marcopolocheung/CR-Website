@@ -48,7 +48,7 @@ with sync_playwright() as p:
         page.goto(base + '/internal/forms')
         page.locator('#cashout-code').fill(TOKEN)
         page.get_by_role('button', name='Unlock', exact=True).click()
-        expect(page.get_by_text(f'Showing {len(mode["rows"])} of {len(mode["rows"])}')).to_be_visible()
+        expect(page.get_by_text(f'Showing {len(mode["rows"])} of {len(mode["rows"])}',exact=True)).to_be_visible()
         return context, page
     def employees(page):
         return [c.strip() for c in page.locator('tbody tr td:nth-child(3)').evaluate_all('cells => cells.map(c => c.firstChild.textContent)')]
@@ -82,11 +82,11 @@ with sync_playwright() as p:
 
     # Scenario 3: open the exact record by touch, return, then by keyboard.
     page.get_by_role('button', name='Open Write-up for Ana López, 2026-01-05', exact=True).tap()
-    expect(page.get_by_label('Incident Descriptions', exact=True)).to_have_value('Record analopez01')
-    expect(page.get_by_placeholder('e.g. Second attendance warning')).to_have_value('First warning')
+    expect(page.locator('[data-form-record]')).to_contain_text('Record analopez01')
+    expect(page.locator('#forms-label')).to_have_value('First warning')
     # A failed refresh keeps the last list visible and offers a retry instead of saying there are none.
     mode['fail'] = True
-    page.get_by_role('button', name='Back to list', exact=True).click()
+    page.get_by_role('button', name='Back to saved forms', exact=True).click()
     expect(page.get_by_text('Could not load saved forms. Your filters are kept.')).to_be_visible()
     expect(page.get_by_text('No forms saved yet.')).to_have_count(0)
     assert employees(page) == ['Dana', 'Ana López', 'Carl', 'Ana López']
@@ -96,8 +96,8 @@ with sync_playwright() as p:
     target = page.get_by_role('button', name='Open Write-up for Ana López, 2026-10-09', exact=True)
     expect(target).to_be_enabled()
     target.focus(); page.keyboard.press('Enter')
-    expect(page.get_by_label('Incident Descriptions', exact=True)).to_have_value('Record analopez02')
-    box = page.get_by_role('button', name='Back to list', exact=True).bounding_box()
+    expect(page.locator('[data-form-record]')).to_contain_text('Record analopez02')
+    box = page.get_by_role('button', name='Back to saved forms', exact=True).bounding_box()
     assert box['height'] >= 44, box
     context.close()
 
@@ -105,7 +105,7 @@ with sync_playwright() as p:
     context, page = session({'width': 375, 'height': 812}, True)
     assert page.evaluate('document.documentElement.scrollWidth') <= 375, 'Horizontal scroll at 375px with records'
     page.get_by_role('button', name='Open Write-up for Carl, 2026-10-09', exact=True).tap()
-    expect(page.get_by_label('Incident Descriptions', exact=True)).to_have_value('Record carl000003')
+    expect(page.locator('[data-form-record]')).to_contain_text('Record carl000003')
     context.close()
 
     # Empty store, and a first load that fails, at phone width in Spanish.

@@ -1,289 +1,296 @@
 'use client'
-import { useNavigationProtection, useWorkTransitions } from './NavigationProtection'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useManagerSession } from './ManagerSession'
 import { useWorkspaceVisible } from './WorkspaceVisibility'
-
+import { useNavigationProtection, useWorkTransitions } from './NavigationProtection'
 import { useShellTask } from './ShellTask'
-
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
-import { CodeGate } from './CashOut'
-import { StoreAuthError } from '@/lib/schedule-store'
-import {
-  ACTIONS,
-  VIOLATIONS,
-  fetchWriteUp,
-  fetchWriteUps,
-  saveWriteUp,
-  saveWriteUpLabel,
-  type WriteUpDoc,
-  type WriteUpForm,
-} from '@/lib/writeup-store'
-import { NO_FILTER, SAVED_FORM_TYPES, filterSavedForms, isFiltered, type SavedFormFilter, type SavedFormRow, type SavedFormType } from '@/lib/forms'
-import { DIGITAL_FORMS, digitalFormPerson, type DigitalFormDoc } from '@/lib/digital-forms'
-import { deleteSavedForm, fetchDigitalForm, fetchDigitalForms, saveDigitalForm, saveDigitalFormLabel } from '@/lib/digital-form-store'
-import { DigitalPaperForm, NewDigitalForm } from './DigitalForm'
 import { useInternalLanguage } from './InternalLanguage'
-import { EmptyState, focusField } from './Feedback'
-import FormDraftWorkspace, { type FormEditorProps } from './FormDraftWorkspace'
+import { CodeGate } from './CashOut'
+import { EmptyState, ErrorSummary, focusField } from './Feedback'
+import { InternalTheme } from './ui/Theme'
+import { Button, Paper } from './ui/controls'
+import FormDraftWorkspace, { type FormDraftPayload, type FormEditorProps } from './FormDraftWorkspace'
+import FormDraftLibrary from './FormDraftLibrary'
+import FormContent from './FormContent'
+import WriteUpPaper from './WriteUpPaper'
+import { DigitalPaperForm } from './DigitalForm'
+import { formIssues, type FormValue } from '@/lib/internal-tools/form-presentation'
 import { isWriteUpDraft } from '@/lib/internal-tools/writeup-draft'
+import { newDraft, type Draft } from '@/lib/internal-tools/drafts'
+import type { ReadyFormDraftSource } from '@/lib/internal-tools/form-drafts'
+import { BLANK_FORMS, blankFormHref, NO_FILTER, SAVED_FORM_TYPES, filterSavedForms, isFiltered, type SavedFormFilter, type SavedFormRow, type SavedFormType } from '@/lib/forms'
+import { DIGITAL_FORMS, emptyDigitalForm, isDigitalForm, digitalFormPerson, type DigitalForm, type DigitalFormDoc } from '@/lib/digital-forms'
+import { fetchWriteUp, fetchWriteUps, saveWriteUp, saveWriteUpLabel, type WriteUpDoc, type WriteUpForm } from '@/lib/writeup-store'
+import { deleteSavedForm, fetchDigitalForm, fetchDigitalForms, saveDigitalForm, saveDigitalFormLabel } from '@/lib/digital-form-store'
+import { StoreAuthError } from '@/lib/schedule-store'
+import { errorKey, type Message } from '@/lib/internal-tools/i18n'
+import styles from './forms-workspace.module.css'
 
-const emptyForm = (date: string): WriteUpForm => ({
-  date,
-  employee: '',
-  manager: '',
-  violations: [],
-  otherSpecify: '',
-  actions: [],
-  incident: '',
-  incidentCont: '',
-  expected: '',
-  employeeComments: '',
-  employeeSignature: '',
-  employeeSignedDate: '',
-  managerSignature: '',
-  managerSignedDate: '',
-})
-
-type View = { kind: 'list' } | { kind: 'new'; type: SavedFormType } | { kind: 'saved'; doc: WriteUpDoc } | { kind: 'digital'; doc: DigitalFormDoc }
-
-const button = 'min-h-11 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50'
-const primary = `${button} bg-red-600 text-white hover:bg-red-700`
-const secondary = `${button} border border-gray-300 text-gray-700 hover:bg-gray-50`
-
-/** Shared digital form book, retaining the original write-up editor and stored records. */
-export default function WriteUps() {
-  const visible = useWorkspaceVisible()
-  // Manager token lives in memory only, like cash out.
-  const { token, unlock: setToken, expire: lock } = useManagerSession()
-  const [unlocked, setUnlocked] = useState(false)
-  if (token && !unlocked) setUnlocked(true)
-  useShellTask('forms', { onLock: token ? lock : undefined })
-  return (
-    <>
-      {!token && visible && (
-        <div className="max-w-6xl mx-auto px-4">
-          <CodeGate onUnlock={setToken} title="Saved forms" />
-        </div>
-      )}
-      {/* After the first unlock the book stays mounted, so an expired code never discards an unsaved write-up. */}
-      {unlocked && <div hidden={!token}><WriteUpBook token={token} onLocked={lock} /></div>}
-    </>
-  )
+type Library = 'saved'|'drafts'|'blank'
+type FormData = WriteUpForm|DigitalForm
+type Slot = {type:SavedFormType;id:string;initial?:Draft<FormDraftPayload<FormData>>}
+type RecordSelection = {type:SavedFormType;id:string;doc:WriteUpDoc|DigitalFormDoc|null}
+const LIBRARIES: Library[] = ['saved','drafts','blank']
+const libraryHash = (): Library => LIBRARIES.includes(location.hash.slice(1) as Library) ? location.hash.slice(1) as Library : 'saved'
+const button = 'min-h-11 px-4 py-2 text-sm font-medium disabled:opacity-50'
+const primary = `${button} bg-red-800 text-white`
+const secondary = `${button} border border-gray-400 bg-white`
+const field = 'mt-1 block w-full min-h-11 border border-gray-400 bg-white px-3 py-2 text-base'
+const emptyWriteUp = (date:string):WriteUpForm => ({date,employee:'',manager:'',violations:[],otherSpecify:'',actions:[],incident:'',incidentCont:'',expected:'',employeeComments:'',employeeSignature:'',employeeSignedDate:'',managerSignature:'',managerSignedDate:''})
+const asValue = (type:SavedFormType,form:FormData):FormValue => type==='write-up'?{type,form:form as WriteUpForm}:{type,form:form as DigitalForm}
+const person = (type:SavedFormType,form:FormData) => type==='write-up'?(form as WriteUpForm).employee.trim():digitalFormPerson(type,form as DigitalForm)
+const summary = (type:SavedFormType,id:string,form:FormData,label=''):SavedFormRow => ({type,id,date:form.date,employee:person(type,form),label,...(type!=='write-up'?{store:(form as DigitalForm).store}:{})})
+function failure(caught:unknown):Message {
+  const message=caught instanceof Error?caught.message:''
+  if (/not found/i.test(message)) return {key:'formsWorkspace.notFound'}
+  if (/required|rejected|Check the date/.test(message)) return {key:'formsWorkspace.rejected'}
+  if (/too large/i.test(message)) return {key:'formsWorkspace.tooLarge'}
+  return {key:errorKey(caught)}
 }
 
-function WriteUpBook({ token, onLocked }: { token: string; onLocked: () => void }) {
-  const [view, setView] = useState<View>({ kind: 'list' })
-  const visible = useWorkspaceVisible()
-  const transitions = useWorkTransitions()
-  useShellTask('forms-record', { context: view.kind === 'saved' ? view.doc.form.date : view.kind === 'digital' ? `${view.doc.form.store} · ${view.doc.form.date}` : null })
-  const [list, setList] = useState<SavedFormRow[] | null>(null)
-  const [loadFailed, setLoadFailed] = useState(false)
-  const [status, setStatus] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [deleting, setDeleting] = useState<SavedFormRow | null>(null)
-  // KV lists can briefly lag a delete. Keep removed records out of every view in this session.
-  const deleted = useRef(new Set<string>())
-  const savedHere = useRef(new Map<string, SavedFormRow>())
-  const remember = (row: SavedFormRow) => savedHere.current.set(`${row.type}:${row.id}`, row)
+/** One retained forms controller; library browsing never replaces the active draft. */
+export default function WriteUps() {
+  const session=useManagerSession(), liveSession=useRef(session); liveSession.current=session
+  const {token}=session, visible=useWorkspaceVisible(), {t}=useInternalLanguage(), transitions=useWorkTransitions()
+  const mounted=useRef(true), requests=useRef({list:0,record:0}), mutationBusy=useRef(false)
+  const [library,setLibrary]=useState<Library>('saved'), [pane,setPane]=useState<'library'|'editor'|'record'>('library')
+  const paneRef=useRef(pane);paneRef.current=pane
+  const [unlocked,setUnlocked]=useState(false), [busy,setBusy]=useState(false), [opening,setOpening]=useState(false)
+  const [list,setList]=useState<SavedFormRow[]|null>(null), [loading,setLoading]=useState(false), [loadFailed,setLoadFailed]=useState(false)
+  const [filter,setFilter]=useState<SavedFormFilter>(NO_FILTER), [status,setStatus]=useState<Message|null>(null)
+  const [slot,setSlot]=useState<Slot|null>(null), slotRef=useRef(slot);slotRef.current=slot
+  const [activeDraft,setActiveDraft]=useState<Draft<FormDraftPayload<FormData>>|null>(null)
+  const [selection,setSelection]=useState<RecordSelection|null>(null), selectionRef=useRef(selection);selectionRef.current=selection
+  const [chooser,setChooser]=useState(false), [resume,setResume]=useState<ReadyFormDraftSource|null>(null), [deleting,setDeleting]=useState<SavedFormRow|null>(null)
+  const [draftRefresh,setDraftRefresh]=useState(0)
+  const heading=useRef<HTMLHeadingElement>(null)
+  const savedHere=useRef(new Map<string,SavedFormRow>()), deleted=useRef(new Set<string>())
+  const focusHeading=()=>requestAnimationFrame(()=>heading.current?.focus())
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;requests.current.list++;requests.current.record++}},[])
+  useEffect(()=>{
+    requests.current.list++;requests.current.record++;mutationBusy.current=false;setBusy(false);setOpening(false);setLoading(false)
+    setChooser(false);setResume(null);setDeleting(null);setStatus(null)
+    if(token)setUnlocked(true)
+  },[session.generation,token])
+  useEffect(()=>{
+    const follow=()=>{if(!visible)return;requests.current.record++;setOpening(false);setLibrary(libraryHash());setPane('library');focusHeading()}
+    follow();window.addEventListener('hashchange',follow);window.addEventListener('popstate',follow)
+    return()=>{window.removeEventListener('hashchange',follow);window.removeEventListener('popstate',follow)}
+  },[visible])
+  function navigate(event:MouseEvent<HTMLAnchorElement>,next:Library) {
+    if(event.metaKey||event.ctrlKey||event.altKey||event.shiftKey)return
+    event.preventDefault()
+    if(location.hash!==`#${next}`)history.pushState(history.state,'',`#${next}`)
+    requests.current.record++;setOpening(false);setLibrary(next);setPane('library');focusHeading()
+  }
+  function credential() {
+    const current=liveSession.current, generation=current.generation, value=current.token
+    return {token:value,live:()=>mounted.current&&!!value&&liveSession.current.token===value&&liveSession.current.generation===generation}
+  }
+  const refresh=useCallback(async()=>{
+    const generation=liveSession.current.generation, credential=liveSession.current.token
+    if(!credential)return
+    const request=++requests.current.list
+    const live=()=>mounted.current&&request===requests.current.list&&generation===liveSession.current.generation&&credential===liveSession.current.token
+    setLoading(true);setLoadFailed(false)
+    try {
+      const [writeups,forms]=await Promise.all([fetchWriteUps(credential),fetchDigitalForms(credential)])
+      if(!live())return
+      const merged=new Map<string,SavedFormRow>([...writeups.map(row=>({...row,type:'write-up' as const})),...forms].map(row=>[`${row.type}:${row.id}`,row]))
+      for(const [key,row] of savedHere.current)merged.set(key,row)
+      setList([...merged.values()].filter(row=>!deleted.current.has(`${row.type}:${row.id}`)).sort((a,b)=>b.date.localeCompare(a.date)||a.employee.localeCompare(b.employee)))
+    } catch(caught) {if(live()){setLoadFailed(true);if(caught instanceof StoreAuthError)liveSession.current.expire()}}
+    finally {if(live())setLoading(false)}
+  },[])
+  useEffect(()=>{if(token&&visible)void refresh()},[token,session.generation,visible,refresh])
+  const onActiveChange=useCallback((draft:Draft<FormDraftPayload<FormData>>|null)=>{setActiveDraft(draft);setDraftRefresh(value=>value+1)},[])
+  useShellTask('forms',{onLock:token?session.expire:undefined})
+  useShellTask('forms-context',{context:!token?null:pane==='editor'&&activeDraft?`${activeDraft.context.storeId} · ${activeDraft.context.businessDate}`:pane==='record'&&selection?.doc?`${selection.type==='write-up'?'':(selection.doc.form as DigitalForm).store+' · '}${selection.doc.form.date}`:null})
+  useNavigationProtection({dirty:false,deviceSaved:true,busy,leave:()=>{requests.current.record++;setPane('library');setChooser(false);setResume(null);setDeleting(null)}})
 
-  const pendingRequests = useRef(0)
-  const run = useCallback(
-    async (task: () => Promise<string | void>) => {
-      pendingRequests.current++
-      setBusy(true)
-      setStatus('')
-      try {
-        const message = await task()
-        if (message) setStatus(message)
-      } catch (caught) {
-        if (caught instanceof StoreAuthError) onLocked()
-        else setStatus((caught as Error).message)
-      } finally {
-        pendingRequests.current--
-        setBusy(pendingRequests.current > 0)
-      }
-    },
-    [onLocked],
-  )
-
-  const refresh = useCallback(
-    () =>
-      run(async () => {
-        setLoadFailed(false)
-        try {
-          const [writeUps, forms] = await Promise.all([fetchWriteUps(token), fetchDigitalForms(token)])
-          const merged = new Map<string, SavedFormRow>([...writeUps.map(w => ({ type: 'write-up' as const, ...w })), ...forms]
-            .map(row => [`${row.type}:${row.id}`, row] as const))
-          // Keep confirmed saves and labels visible while KV's list metadata propagates.
-          for (const [key, row] of savedHere.current) merged.set(key, row)
-          setList([...merged.values()]
-            .filter(row => !deleted.current.has(`${row.type}:${row.id}`))
-            .sort((a, b) => b.date.localeCompare(a.date) || a.employee.localeCompare(b.employee)))
-        } catch (caught) {
-          // Keep the last good list on screen so a failed refresh never reads as "no records".
-          if (!(caught instanceof StoreAuthError)) setLoadFailed(true)
-          throw caught
-        }
-      }),
-    [run, token],
-  )
-
-  useEffect(() => {
-    if (token && visible) refresh()
-  }, [refresh, token, visible])
-
-  const open = (row: SavedFormRow) => run(async () => setView(row.type === 'write-up'
-    ? { kind: 'saved', doc: await fetchWriteUp(row.id, token) }
-    : { kind: 'digital', doc: await fetchDigitalForm(row.id, token) }))
-  const confirmDelete = () => {
-    if (!deleting || busy) return
-    run(async () => {
-      await deleteSavedForm(deleting, token)
-      deleted.current.add(`${deleting.type}:${deleting.id}`)
-      savedHere.current.delete(`${deleting.type}:${deleting.id}`)
-      setList(rows => rows?.filter(row => row.type !== deleting.type || row.id !== deleting.id) ?? null)
-      setDeleting(null)
-      setView({ kind: 'list' })
-      return 'Form deleted.'
+  function begin(type:SavedFormType, initial?:Draft<FormDraftPayload<FormData>>) {
+    if(mutationBusy.current)return
+    setChooser(false);setResume(null)
+    void transitions.change(()=>{
+      setSlot({type,id:crypto.randomUUID(),initial});setActiveDraft(null);setPane('editor');setChooser(false);setResume(null);setStatus(null);focusHeading()
     })
   }
-  useNavigationProtection({ dirty: false, deviceSaved: true, busy, leave: () => setView({ kind: 'list' }) })
-  const back = () => { void transitions.change(() => {
-    setView({ kind: 'list' })
-    refresh()
-  }) }
-
-  return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
-        <h2 className="text-2xl font-bold text-gray-900">{view.kind === 'new' ? `New ${view.type === 'write-up' ? 'write-up' : DIGITAL_FORMS[view.type].title.toLowerCase()}` : 'Digital forms'}</h2>
-        <div className="flex flex-wrap gap-2">
-          {view.kind !== 'list' && (
-            <button type="button" disabled={busy} onClick={back} className={secondary}>
-              Back to list
-            </button>
-          )}
-          {view.kind !== 'list' && (
-            <button type="button" onClick={() => window.print()} className={secondary}>
-              Print
-            </button>
-          )}
-          {(view.kind === 'saved' || view.kind === 'digital') && <button type="button" disabled={busy} className={secondary} onClick={() => { setStatus(''); setDeleting(view.kind === 'saved'
-            ? { type: 'write-up', id: view.doc.id, date: view.doc.form.date, employee: view.doc.form.employee, label: view.doc.label }
-            : { type: view.doc.type, id: view.doc.id, date: view.doc.form.date, employee: digitalFormPerson(view.doc.type, view.doc.form), label: view.doc.label }); }}>Delete form</button>}
-        </div>
+  async function readRecord(row:Pick<SavedFormRow,'type'|'id'>,show=true) {
+    const auth=credential();if(!auth.token)return
+    const request=++requests.current.record
+    const live=()=>auth.live()&&request===requests.current.record
+    setOpening(true);setStatus(null)
+    if(show){setSelection({...row,doc:null});setPane('record');focusHeading()}
+    try {
+      const doc=row.type==='write-up'?await fetchWriteUp(row.id,auth.token):await fetchDigitalForm(row.id,auth.token)
+      if(live()){setSelection({...row,doc});savedHere.current.set(`${row.type}:${row.id}`,summary(row.type,row.id,doc.form,doc.label))}
+    } catch(caught) {if(live()){setStatus(failure(caught));if(caught instanceof StoreAuthError)liveSession.current.expire()}}
+    finally {if(live())setOpening(false)}
+  }
+  async function mutate(task:(auth:ReturnType<typeof credential>)=>Promise<void>) {
+    if(mutationBusy.current)return
+    const auth=credential();if(!auth.token)return
+    mutationBusy.current=true;setBusy(true);setStatus(null)
+    try {await task(auth)}
+    catch(caught){if(auth.live()){setStatus(failure(caught));if(caught instanceof StoreAuthError)liveSession.current.expire()}}
+    finally {if(auth.live()){mutationBusy.current=false;setBusy(false)}}
+  }
+  function save(type:SavedFormType,form:FormData,editor:FormEditorProps<FormData>) {
+    const activeSlot=slotRef.current, draftId=editor.draft.id, submitted=structuredClone(form)
+    void mutate(async auth=>{
+      let accepted=false
+      const same=()=>auth.live()&&slotRef.current===activeSlot
+      try {
+        let id:string,doc:DigitalFormDoc|undefined
+        if(type==='write-up')id=await saveWriteUp(submitted as WriteUpForm,auth.token)
+        else {doc=await saveDigitalForm(type,submitted as DigitalForm,auth.token);id=doc.id}
+        accepted=true
+        if(!same())return
+        // Acknowledge before a subsequent GET. Its failure can only offer GET retry.
+        editor.markSaved(id)
+        savedHere.current.set(`${type}:${id}`,summary(type,id,doc?.form??submitted,doc?.label??''))
+        setList(rows=>[summary(type,id,doc?.form??submitted,doc?.label??''),...(rows??[]).filter(row=>row.type!==type||row.id!==id)].sort((a,b)=>b.date.localeCompare(a.date)||a.employee.localeCompare(b.employee)))
+        const recordRequest=++requests.current.record
+        setSelection({type,id,doc:doc??null})
+        if(paneRef.current==='editor'){setPane('record');focusHeading()}
+        setStatus({key:'formsWorkspace.saveConfirmed'})
+        if(type==='write-up') {
+          try {
+            const saved=await fetchWriteUp(id,auth.token)
+            if(same()&&recordRequest===requests.current.record)setSelection({type,id,doc:saved})
+          } catch(caught) {
+            if(!same()||recordRequest!==requests.current.record)return
+            setStatus({key:'formsWorkspace.savedReadFailed'})
+            if(caught instanceof StoreAuthError)liveSession.current.expire()
+          }
+        }
+      } catch(caught) {
+        if(!same()||editor.draft.id!==draftId)return
+        if(caught instanceof StoreAuthError){liveSession.current.expire();return}
+        const reason=failure(caught)
+        setStatus(accepted?{key:'formsWorkspace.savedReadFailed'}:reason.key==='errors.unavailable'?{key:'formsWorkspace.unconfirmed'}:reason)
+      }
+    })
+  }
+  function labelRecord(label:string) {
+    const target=selectionRef.current;if(!target?.doc)return
+    void mutate(async auth=>{
+      let doc:WriteUpDoc|DigitalFormDoc
+      if(target.type==='write-up'){const acknowledged=await saveWriteUpLabel(target.id,label,auth.token);doc={...target.doc!,...acknowledged}}
+      else doc=await saveDigitalFormLabel(target.id,label,auth.token)
+      if(!auth.live())return
+      const row=summary(target.type,target.id,doc.form,doc.label);savedHere.current.set(`${target.type}:${target.id}`,row)
+      setList(rows=>rows?.map(value=>value.type===target.type&&value.id===target.id?row:value)??null)
+      if(selectionRef.current?.id===target.id&&selectionRef.current.type===target.type)setSelection({...target,doc})
+      setStatus({key:'formsWorkspace.labelSaved'})
+    })
+  }
+  function deleteRecord() {
+    const target=deleting;if(!target)return
+    void mutate(async auth=>{
+      await deleteSavedForm(target,auth.token)
+      if(!auth.live())return
+      const key=`${target.type}:${target.id}`;deleted.current.add(key);savedHere.current.delete(key)
+      setList(rows=>rows?.filter(row=>row.type!==target.type||row.id!==target.id)??null)
+      if(selectionRef.current?.id===target.id&&selectionRef.current.type===target.type){requests.current.record++;setSelection(null);setPane('library')}
+      setDeleting(null);setStatus({key:'formsWorkspace.deleted'});void refresh();focusHeading()
+    })
+  }
+  const recordValue=selection?.doc?asValue(selection.type,selection.doc.form):null
+  const printable=pane==='record'?recordValue:pane==='editor'&&activeDraft?asValue(slot!.type,activeDraft.payload.form):null
+  return <><InternalTheme><div className={styles.workspace}>
+    <div className={styles.screen}>
+      <div className={styles.titleRow}><h1>{t('shell.forms')}</h1>{token&&<Button data-forms-new onClick={()=>setChooser(true)} disabled={busy} variant="primary">{t('formsWorkspace.new')}</Button>}</div>
+      <nav aria-label={t('formsWorkspace.navigation')} className={styles.views}>{LIBRARIES.map(value=><a key={value} data-local-view="true" href={`#${value}`} aria-current={pane==='library'&&library===value?'page':undefined} onClick={event=>navigate(event,value)}>{t(`formsWorkspace.${value}`)}</a>)}</nav>
+      {token&&activeDraft&&pane!=='editor'&&<div className={styles.resumeBar}><p>{t('formsWorkspace.active',{type:t(`forms.type.${slot!.type}`),date:activeDraft.context.businessDate!,store:activeDraft.context.storeId})}</p><Button data-forms-return-draft onClick={()=>{setPane('editor');focusHeading()}}>{t('formsWorkspace.returnDraft')}</Button></div>}
+      <h2 ref={heading} tabIndex={-1} data-forms-heading className={styles.heading}>{pane==='editor'&&slot?t(`forms.type.${slot.type}`):pane==='record'?t('formsWorkspace.record'):t(`formsWorkspace.${library}`)}</h2>
+      {(library!=='blank'||pane!=='library')&&!token&&visible&&<CodeGate onUnlock={session.unlock} title={t('forms.savedTitle')}/>}
+      <div hidden={!token}>
+        {status&&<p role="status" className={styles.status}>{t(status.key,status.params)}</p>}
+        {unlocked&&<>
+          <section hidden={pane!=='library'||library!=='saved'} data-forms-library="saved"><div className={styles.actions}><Button disabled={busy||loading} onClick={()=>void refresh()}>{t('formsWorkspace.refresh')}</Button></div><SavedFormsList list={list} failed={loadFailed} busy={busy||loading} filter={filter} setFilter={setFilter} onOpen={row=>void readRecord(row)} onRetry={()=>void refresh()} onDelete={row=>{setStatus(null);setDeleting(row)}}/></section>
+          <section hidden={pane!=='library'||library!=='drafts'} data-forms-library="drafts"><FormDraftLibrary busy={busy} refreshKey={draftRefresh} onResume={source=>setResume(source)}/></section>
+          <section hidden={pane!=='editor'} data-form-editor>{slot&&<ActiveForm key={slot.id} slot={slot} busy={busy} onActiveChange={onActiveChange} onSave={save}/>}</section>
+          <section hidden={pane!=='record'} data-form-record data-form-record-type={selection?.type} data-form-record-id={selection?.id}>
+            <div className={styles.actions}><Button onClick={()=>{setPane('library');setLibrary('saved');void refresh();focusHeading()}}>{t('formsWorkspace.back')}</Button><Button data-forms-print-action disabled={!recordValue} onClick={()=>window.print()}>{t('common.print')}</Button>{selection?.doc&&<Button disabled={busy} onClick={()=>{setStatus(null);setDeleting(summary(selection.type,selection.id,selection.doc!.form,selection.doc!.label))}}>{t('formsWorkspace.deleteForm')}</Button>}</div>
+            {opening&&<p role="status">{t('common.loading')}</p>}
+            {!selection?.doc&&selection&&!opening&&<Button onClick={()=>void readRecord(selection)}>{t('formsWorkspace.retryRecord')}</Button>}
+            {selection?.doc&&recordValue&&<>
+              <LabelEditor key={`${selection.type}:${selection.id}`} doc={selection.doc} busy={busy} onSave={labelRecord}/>
+              <p className="my-3">{t('formsWorkspace.immutable')}</p>
+              {selection.type==='write-up'&&<p className="my-3">{t('formsWorkspace.storeUnavailable')}</p>}
+              <Paper emphasis="active"><FormContent value={recordValue} idPrefix="saved-form"/></Paper>
+            </>}
+          </section>
+        </>}
       </div>
-      {status && !(view.kind === 'list' && loadFailed) && (
-        <p role="status" className="mb-4 text-sm text-red-700 print:hidden">
-          {status}
-        </p>
-      )}
-
-      {view.kind === 'list' && <>
-        <section aria-label="Create a form" className="mb-8 print:hidden">
-          <p className="mb-3 text-sm text-gray-600">Create a digital form, review it, then save and print it. Saved forms are available to managers on any device.</p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {SAVED_FORM_TYPES.map(type => <button key={type} type="button" disabled={busy} onClick={() => { setStatus(''); setView({ kind: 'new', type }) }} className={`${secondary} text-left`}>New {type === 'write-up' ? 'write-up' : DIGITAL_FORMS[type].title.toLowerCase()}</button>)}
-          </div>
-        </section>
-        <SavedFormsList list={list} failed={loadFailed} busy={busy} onOpen={open} onRetry={refresh} onDelete={row => { setStatus(''); setDeleting(row) }} />
-      </>}
-      {view.kind === 'new' && view.type !== 'write-up' && <NewDigitalForm key={view.type} type={view.type} busy={busy} onSave={(form, markSaved) => run(async () => {
-        if (view.type === 'write-up') return
-        const doc = await saveDigitalForm(view.type, form, token)
-        markSaved(doc.id)
-        remember({ type: doc.type, id: doc.id, date: doc.form.date, employee: digitalFormPerson(doc.type, doc.form), store: doc.form.store, label: doc.label })
-        setView({ kind: 'digital', doc })
-        return 'Saved.'
-      })} />}
-      {view.kind === 'new' && view.type === 'write-up' && (
-        <FormDraftWorkspace formType="write-up" title="formDrafts.writeUpTitle" createForm={emptyForm} validateForm={isWriteUpDraft}>
-          {editor => (
-            <NewWriteUp
-              key={editor.draft.id}
-              editor={editor}
-              busy={busy}
-              onSave={form =>
-                run(async () => {
-                  const id = await saveWriteUp(form, token)
-                  editor.markSaved(id)
-                  remember({ type: 'write-up', id, date: form.date, employee: form.employee, label: '' })
-                  setView({ kind: 'saved', doc: await fetchWriteUp(id, token) })
-                  return 'Saved.'
-                })
-              }
-            />
-          )}
-        </FormDraftWorkspace>
-      )}
-      {view.kind === 'saved' && (
-        <>
-          <LabelEditor
-            key={view.doc.id}
-            doc={view.doc}
-            busy={busy}
-            onSave={label =>
-              run(async () => {
-                await saveWriteUpLabel(view.doc.id, label, token)
-                remember({ type: 'write-up', id: view.doc.id, date: view.doc.form.date, employee: view.doc.form.employee, label })
-                setView({ kind: 'saved', doc: { ...view.doc, label } })
-                return 'Label saved.'
-              })
-            }
-          />
-          <PaperForm form={view.doc.form} />
-        </>
-      )}
-      {view.kind === 'digital' && <>
-        <LabelEditor key={view.doc.id} doc={view.doc} busy={busy} onSave={label => run(async () => {
-          const doc = await saveDigitalFormLabel(view.doc.id, label, token)
-          remember({ type: doc.type, id: doc.id, date: doc.form.date, employee: digitalFormPerson(doc.type, doc.form), store: doc.form.store, label: doc.label })
-          setView({ kind: 'digital', doc })
-          return 'Label saved.'
-        })} />
-        <DigitalPaperForm type={view.doc.type} form={view.doc.form} />
-      </>}
-      {deleting && <DeleteFormDialog row={deleting} busy={busy} error={status} onCancel={() => { setDeleting(null); setStatus('') }} onConfirm={confirmDelete} />}
+      <section hidden={pane!=='library'||library!=='blank'} data-forms-library="blank"><BlankForms/></section>
+      {visible&&token&&chooser&&<Modal title={t('formsWorkspace.choose')} onClose={()=>setChooser(false)}><div className={styles.chooser}>{SAVED_FORM_TYPES.map(type=><Button key={type} data-forms-new-type={type} disabled={busy} onClick={()=>begin(type)}><span><strong>{t(`forms.type.${type}`)}</strong><span className="block font-normal mt-2">{t(`formsWorkspace.purpose.${type}`)}</span></span></Button>)}</div></Modal>}
+      {visible&&token&&resume&&<ResumeDialog source={resume} busy={busy} onClose={()=>setResume(null)} onResume={preparer=>begin(resume.formType,newDraft(resume.draft.context,preparer,resume.draft.payload,{source:resume.draft}))}/>}
+      {visible&&token&&deleting&&<Modal footer={false} title={t('forms.deleteTitle')} onClose={()=>{if(!busy){setDeleting(null);setStatus(null)}}}><p>{t(`forms.type.${deleting.type}`)} · {deleting.employee} · {deleting.date}{deleting.store&&` · ${deleting.store}`}</p><p className="my-3">{t('forms.deleteDescription')}</p>{status&&<p role="alert">{t(status.key,status.params)}</p>}<div className={styles.actions}><Button autoFocus disabled={busy} onClick={()=>setDeleting(null)}>{t('feedback.cancel')}</Button><Button variant="primary" disabled={busy} onClick={deleteRecord}>{t('forms.delete')}</Button></div></Modal>}
     </div>
-  )
+    </div></InternalTheme>
+    <div className={styles.print} data-forms-print hidden={!token||!printable}>{printable&&(printable.type==='write-up'?<WriteUpPaper form={printable.form}/>:<DigitalPaperForm type={printable.type} form={printable.form}/>)}</div>
+  </>
 }
 
-function DeleteFormDialog({ row, busy, error, onCancel, onConfirm }: { row: SavedFormRow; busy: boolean; error: string; onCancel: () => void; onConfirm: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null)
-  const { t } = useInternalLanguage()
-  useEffect(() => {
-    const element = dialog.current!
-    element.showModal()
-    return () => element.close()
-  }, [])
-  return (
-    <dialog ref={dialog} aria-labelledby="delete-form-title" aria-describedby="delete-form-description" onCancel={e => { e.preventDefault(); if (!busy) onCancel() }} className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl border border-gray-300 bg-white p-6 shadow-xl backdrop:bg-black/40 print:hidden">
-      <h2 id="delete-form-title" className="mb-3 text-xl font-bold text-gray-900">{t('forms.deleteTitle')}</h2>
-      <p className="mb-2 break-words text-gray-900">{t(`forms.type.${row.type}`)} · {row.employee} · {row.date}{row.store && ` · ${row.store}`}</p>
-      {row.label && <p className="mb-2 break-words text-sm text-gray-700">{row.label}</p>}
-      <p id="delete-form-description" className="text-sm text-gray-700">{t('forms.deleteDescription')}</p>
-      {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
-      <div className="mt-5 flex justify-end gap-3">
-        <button type="button" autoFocus disabled={busy} onClick={onCancel} className={secondary}>{t('feedback.cancel')}</button>
-        <button type="button" disabled={busy} onClick={onConfirm} className={primary}>{busy ? t('common.loading') : t('forms.delete')}</button>
-      </div>
-    </dialog>
-  )
+function ActiveForm({slot,busy,onActiveChange,onSave}:{slot:Slot;busy:boolean;onActiveChange:(draft:Draft<FormDraftPayload<FormData>>|null)=>void;onSave:(type:SavedFormType,form:FormData,editor:FormEditorProps<FormData>)=>void}) {
+  const validate=useCallback((value:unknown):value is FormData=>slot.type==='write-up'?isWriteUpDraft(value):isDigitalForm(value,slot.type),[slot.type])
+  return <FormDraftWorkspace<FormData> formType={slot.type} title={slot.type==='write-up'?'formDrafts.writeUpTitle':`formDrafts.${slot.type}Title`} initialDraft={slot.initial} onActiveChange={onActiveChange} busy={busy} validateForm={validate} createForm={(date,context)=>slot.type==='write-up'?emptyWriteUp(date):{...emptyDigitalForm(slot.type,date),store:context.store,preparedBy:context.preparer}}>
+    {editor=><Editor key={editor.draft.id} type={slot.type} editor={editor} busy={busy} onSave={form=>onSave(slot.type,form,editor)}/>}
+  </FormDraftWorkspace>
 }
-
-const field = 'mt-1 block w-full min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base font-normal text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
-
+function Editor({type,editor,busy,onSave}:{type:SavedFormType;editor:FormEditorProps<FormData>;busy:boolean;onSave:(form:FormData)=>void}) {
+  const {t}=useInternalLanguage(), [form,setForm]=useState(editor.draft.payload.form), [review,setReview]=useState(false), [attempted,setAttempted]=useState(false), [acknowledged,setAcknowledged]=useState<string|null>(null)
+  const issues=formIssues(asValue(type,form)), alreadySaved=!!editor.draft.payload.savedId&&editor.draft.payload.savedId!==acknowledged
+  const title=useRef<HTMLHeadingElement>(null)
+  const focus=()=>requestAnimationFrame(()=>title.current?.focus())
+  const change=(next:FormValue)=>{setForm(next.form);editor.persist(next.form)}
+  function submit(event:FormEvent) {
+    event.preventDefault();if(busy||alreadySaved)return
+    setAttempted(true)
+    if(issues.length){requestAnimationFrame(()=>focusField(`form-field-${issues[0].field}`));return}
+    if(review)onSave(form)
+    else {setReview(true);focus()}
+  }
+  return <form onSubmit={submit} noValidate>
+    <div className={styles.actions}><h3 ref={title} tabIndex={-1}>{t(review?'formsWorkspace.review':'formsWorkspace.edit')}</h3><Button data-forms-print-action onClick={()=>window.print()}>{t('common.print')}</Button></div>
+    {alreadySaved&&<div role="alert" className={styles.notice}><p>{t('formsWorkspace.alreadySaved')}</p><Button onClick={()=>{setAcknowledged(editor.draft.payload.savedId);setReview(false);focus()}}>{t('formsWorkspace.editNew')}</Button></div>}
+    {review&&<p className={styles.notice}>{t('formsWorkspace.immutable')}</p>}
+    {!review&&<p className="my-3">{t('formsWorkspace.requiredHelp')}</p>}
+    {attempted&&!review&&<ErrorSummary issues={issues.map(issue=>({fieldId:`form-field-${issue.field}`,message:issue.message}))}/>}
+    <Paper emphasis="active"><fieldset disabled={busy||alreadySaved} className="min-w-0"><div data-form-review={review||undefined}><FormContent value={asValue(type,form)} showContext={false} onChange={!review&&!alreadySaved?change:undefined} issues={attempted?issues:[]} onEditSection={review?section=>{setReview(false);requestAnimationFrame(()=>document.getElementById(`form-section-${section}`)?.focus())}:undefined}/></div></fieldset></Paper>
+    <div className={styles.actions}>{review&&<Button disabled={busy} onClick={()=>{setReview(false);focus()}}>{t('formsWorkspace.editAnswers')}</Button>}<Button type="submit" variant="primary" busy={busy} disabled={alreadySaved}>{t(review?'formsWorkspace.save':'formsWorkspace.reviewAction')}</Button></div>
+  </form>
+}
+function LabelEditor({doc,busy,onSave}:{doc:Pick<WriteUpDoc,'label'|'createdAt'|'labelUpdatedAt'>;busy:boolean;onSave:(label:string)=>void}) {
+  const {t}=useInternalLanguage(),[label,setLabel]=useState(doc.label)
+  return <form onSubmit={event=>{event.preventDefault();if(!busy&&label.trim()!==doc.label)onSave(label.trim())}} className={styles.labelEditor}>
+    <div><label htmlFor="forms-label">{t('formsWorkspace.label')}</label><p id="forms-label-help">{t('formsWorkspace.labelHelp')}</p><input id="forms-label" aria-describedby="forms-label-help" value={label} maxLength={120} onChange={event=>setLabel(event.target.value)}/></div><Button type="submit" disabled={busy||label.trim()===doc.label} variant="primary">{t('formsWorkspace.saveLabel')}</Button><p>{t('formsWorkspace.savedTime',{time:new Date(doc.createdAt).toLocaleString()})}{doc.labelUpdatedAt&&` · ${t('formsWorkspace.labelTime',{time:new Date(doc.labelUpdatedAt).toLocaleString()})}`}</p>
+  </form>
+}
+function BlankForms() {
+  const {t}=useInternalLanguage(),base=process.env.NEXT_PUBLIC_BASE_PATH??''
+  return <><p className="mb-5">{t('formsWorkspace.blankHelp')}</p><ul className={styles.blanks}>{BLANK_FORMS.map((form,index)=><li key={form.file}><span>{t(`formsWorkspace.blank.${index}` as Parameters<typeof t>[0])}</span><a href={blankFormHref(base,form.file)} download={!form.file.endsWith('.pdf')||undefined} target={form.file.endsWith('.pdf')?'_blank':undefined} rel={form.file.endsWith('.pdf')?'noopener':undefined}>{form.file.split('.').pop()!.toUpperCase()}<span className="sr-only"> · {t(`formsWorkspace.blank.${index}` as Parameters<typeof t>[0])}</span></a></li>)}</ul></>
+}
+function Modal({title,children,onClose,footer=true}:{title:string;children:ReactNode;onClose:()=>void;footer?:boolean}) {
+  const {t}=useInternalLanguage(), dialog=useRef<HTMLDialogElement>(null)
+  useEffect(()=>{const trigger=document.activeElement as HTMLElement|null,element=dialog.current!;element.showModal();return()=>{element.close();if(trigger?.isConnected)trigger.focus()}},[])
+  return <dialog ref={dialog} className={styles.modal} aria-label={title} onCancel={event=>{event.preventDefault();onClose()}}><h2>{title}</h2>{children}{footer&&<div className="mt-5"><Button onClick={onClose}>{t('feedback.cancel')}</Button></div>}</dialog>
+}
+function ResumeDialog({source,busy,onClose,onResume}:{source:ReadyFormDraftSource;busy:boolean;onClose:()=>void;onResume:(preparer:string)=>void}) {
+  const {t}=useInternalLanguage(),[preparer,setPreparer]=useState(source.draft.preparer)
+  return <Modal title={t('drafts.resumeCopy')} onClose={onClose}><form onSubmit={event=>{event.preventDefault();if(preparer.trim()&&!busy)onResume(preparer.trim())}}><p className="my-3">{t(`forms.type.${source.formType}`)} · {source.draft.context.storeId} · {source.draft.context.businessDate}</p><label htmlFor="forms-resume-preparer">{t('drafts.preparer')}</label><input id="forms-resume-preparer" value={preparer} maxLength={120} onChange={event=>setPreparer(event.target.value)}/><p className="my-3">{t('drafts.preparerHelp')}</p><Button type="submit" variant="primary" disabled={busy||!preparer.trim()}>{t('drafts.resumeCopy')}</Button></form></Modal>
+}
 /** Search/filter over the saved list; `list` null with `failed` means the last load did not arrive. */
-function SavedFormsList({ list, failed, busy, onOpen, onRetry, onDelete }: { list: SavedFormRow[] | null; failed: boolean; busy: boolean; onOpen: (row: SavedFormRow) => void; onRetry: () => void; onDelete: (row: SavedFormRow) => void }) {
+function SavedFormsList({ list, failed, busy, onOpen, onRetry, onDelete, filter, setFilter }: { list: SavedFormRow[] | null; failed: boolean; busy: boolean; onOpen: (row: SavedFormRow) => void; onRetry: () => void; onDelete: (row: SavedFormRow) => void; filter: SavedFormFilter; setFilter: (update: (filter: SavedFormFilter) => SavedFormFilter) => void }) {
   const { t } = useInternalLanguage()
-  const [filter, setFilter] = useState<SavedFormFilter>(NO_FILTER)
   const set = (patch: Partial<SavedFormFilter>) => setFilter(f => ({ ...f, ...patch }))
   const shown = list ? filterSavedForms(list, filter) : []
   return (
     <section aria-labelledby="saved-forms-title">
-      <h2 id="saved-forms-title" className="text-lg font-semibold text-gray-900 mb-3">{t('forms.savedTitle')}</h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
+      <h2 id="saved-forms-title" className="sr-only">{t('forms.savedTitle')}</h2>
+      <div className={styles.savedFilters}>
         <div>
           <label htmlFor="saved-forms-search" className="text-sm font-medium text-gray-700">{t('forms.search')}</label>
           <input id="saved-forms-search" type="search" value={filter.query} onChange={e => set({ query: e.target.value })} className={field} />
@@ -306,7 +313,7 @@ function SavedFormsList({ list, failed, busy, onOpen, onRetry, onDelete }: { lis
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <p role="status" aria-live="polite" className="text-sm text-gray-700">{list ? t('forms.count', { shown: shown.length, total: list.length }) : busy ? t('common.loading') : ''}</p>
-        {isFiltered(filter) && <button type="button" onClick={() => { setFilter(NO_FILTER); focusField('saved-forms-search') }} className={secondary}>{t('forms.clearFilters')}</button>}
+        {isFiltered(filter) && <button type="button" onClick={() => { setFilter(() => NO_FILTER); focusField('saved-forms-search') }} className={secondary}>{t('forms.clearFilters')}</button>}
       </div>
       {failed && (
         <div role="alert" className="mb-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
@@ -317,7 +324,7 @@ function SavedFormsList({ list, failed, busy, onOpen, onRetry, onDelete }: { lis
       {list && list.length === 0 && <EmptyState message={{ key: 'forms.none' }} />}
       {list && list.length > 0 && shown.length === 0 && <EmptyState message={{ key: 'forms.noMatches' }} />}
       {shown.length > 0 && (
-        <table className="w-full text-base border border-gray-200 rounded">
+        <div className={styles.savedTable}><table className="w-full text-base border border-gray-200 rounded">
           <thead className="bg-gray-50 text-left text-sm text-gray-700">
             <tr>
               <th className="px-3 py-2 font-medium">{t('forms.colDate')}</th>
@@ -345,215 +352,8 @@ function SavedFormsList({ list, failed, busy, onOpen, onRetry, onDelete }: { lis
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </section>
-  )
-}
-
-function NewWriteUp({ editor, busy, onSave }: { editor: FormEditorProps<WriteUpForm>; busy: boolean; onSave: (form: WriteUpForm) => void }) {
-  const { t } = useInternalLanguage()
-  const [form, setForm] = useState<WriteUpForm>(() => editor.draft.payload.form)
-  const savedId = editor.draft.payload.savedId
-  const [acknowledged, setAcknowledged] = useState<string | null>(null)
-  const confirmResave = !!savedId && savedId !== acknowledged
-  // Each edit goes straight to the device draft; the date belongs to the draft's context and stays fixed.
-  const change = (patch: Partial<WriteUpForm>) => {
-    const next = { ...form, ...patch, date: editor.draft.context.businessDate! }
-    setForm(next)
-    editor.persist(next)
-  }
-
-  function submit(event: FormEvent) {
-    event.preventDefault()
-    if (!busy && !confirmResave) onSave(form)
-  }
-
-  return (
-    <form onSubmit={submit}>
-      {confirmResave && (
-        <div role="alert" className="max-w-[8.5in] mx-auto mb-4 rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950 print:hidden">
-          <p>! {t('formDrafts.alreadySaved')}</p>
-          <button type="button" onClick={() => setAcknowledged(savedId)} className={`${secondary} mt-2 bg-white`}>{t('formDrafts.saveAnother')}</button>
-        </div>
-      )}
-      <PaperForm form={form} onChange={change} lockDate />
-      <div className="max-w-[8.5in] mx-auto mt-4 flex items-center justify-end gap-3 print:hidden">
-        <p className="text-sm text-gray-600">Once saved, the form can't be edited. Only its label can.</p>
-        <button type="submit" disabled={busy || confirmResave || !form.employee.trim() || !form.date} className={primary}>
-          {busy ? 'Saving…' : 'Save write-up'}
-        </button>
-      </div>
-    </form>
-  )
-}
-
-function LabelEditor({ doc, busy, onSave }: { doc: Pick<WriteUpDoc, 'label' | 'createdAt' | 'labelUpdatedAt'>; busy: boolean; onSave: (label: string) => void }) {
-  const [label, setLabel] = useState(doc.label)
-  return (
-    <form
-      onSubmit={e => {
-        e.preventDefault()
-        if (!busy) onSave(label.trim())
-      }}
-      className="max-w-[8.5in] mx-auto mb-4 flex flex-wrap items-end gap-2 print:hidden"
-    >
-      <label className="flex-1 min-w-60 text-sm font-medium text-gray-700">
-        Label <span className="font-normal text-gray-500">(managers only, not part of the form)</span>
-        <input
-          value={label}
-          maxLength={120}
-          onChange={e => setLabel(e.target.value)}
-          placeholder="e.g. Second attendance warning"
-          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-red-500"
-        />
-      </label>
-      <button type="submit" disabled={busy || label.trim() === doc.label} className={primary}>
-        Save label
-      </button>
-      <p className="w-full text-xs text-gray-500">
-        Saved {new Date(doc.createdAt).toLocaleString()}
-        {doc.labelUpdatedAt && ` · label updated ${new Date(doc.labelUpdatedAt).toLocaleString()}`}
-      </p>
-    </form>
-  )
-}
-
-// --- The paper form: mirrors docs/forms/25-1024 CHINA ROSE WRITE_UP_Form.xlsx (two sheets, Arial, bold boxes). ---
-
-type Change = (patch: Partial<WriteUpForm>) => void
-const line = 'border-0 border-b border-black bg-transparent px-1 font-normal focus:outline-none focus:bg-yellow-50 disabled:text-black'
-
-function Sheet({ children, pageBreak }: { children: ReactNode; pageBreak?: boolean }) {
-  return (
-    <div className={`max-w-[8.5in] mx-auto bg-white border border-gray-300 shadow-sm px-10 py-8 mb-6 font-[Arial,Helvetica,sans-serif] font-bold text-black print:border-0 print:shadow-none print:m-0 print:p-0 ${pageBreak ? 'print:break-before-page' : ''}`}>
-      <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/imgs/china-rose-logo.png`} alt="China Rose" className="h-9 mb-2" />
-      <h2 className="text-[25px] text-center border-b-2 border-black pb-2 mb-4 print:mb-2">RECORD OF EMPLOYEE CORRECTIVE ACTION</h2>
-      {children}
-      <p className="text-right text-xs mt-3">OCT, 2025</p>
-    </div>
-  )
-}
-
-function Box({ title, children }: { title?: string; children: ReactNode }) {
-  return (
-    <section className="border-2 border-black mb-4 print:mb-2">
-      {title && <h3 className="border-b-2 border-black px-2 py-2 text-lg print:py-1 print:text-base">{title}</h3>}
-      <div className="px-3 py-3 print:py-1">{children}</div>
-    </section>
-  )
-}
-
-function Check({ label, checked, onToggle }: { label: string; checked: boolean; onToggle?: () => void }) {
-  return (
-    <label className="flex items-center gap-2 text-lg">
-      {/* Not disabled when read-only: disabled checkboxes print grey, and the tick must stay legible. */}
-      <input type="checkbox" checked={checked} aria-readonly={!onToggle} onChange={onToggle ?? (() => {})} className={`size-5 accent-black ${onToggle ? '' : 'pointer-events-none'}`} />
-      {label}
-    </label>
-  )
-}
-
-function Area({ label, value, rows, onChange }: { label: string; value: string; rows: number; onChange?: (v: string) => void }) {
-  return (
-    <Box title={label}>
-      <textarea
-        aria-label={label.replace(/ :$/, '')}
-        value={value}
-        rows={rows}
-        maxLength={3000}
-        disabled={!onChange}
-        onChange={e => onChange?.(e.target.value)}
-        className="w-full resize-none bg-transparent font-normal text-base leading-10 focus:outline-none focus:bg-yellow-50 disabled:text-black print:hidden"
-      />
-      {/* A textarea prints only its visible rows, so paper gets the full text instead. */}
-      <p data-print-text className="hidden whitespace-pre-wrap break-words font-normal text-base leading-7 print:block" style={{ minHeight: `${rows * 1.75}rem` }}>
-        {value}
-      </p>
-    </Box>
-  )
-}
-
-/** Editable when `onChange` is given, otherwise a read-only copy of a saved write-up. */
-function PaperForm({ form, onChange, lockDate }: { form: WriteUpForm; onChange?: Change; lockDate?: boolean }) {
-  const readOnly = !onChange
-  const set = <K extends keyof WriteUpForm>(key: K) => (onChange ? (value: WriteUpForm[K]) => onChange({ [key]: value }) : undefined)
-  const toggle = (key: 'violations' | 'actions', id: string) =>
-    onChange ? () => onChange({ [key]: form[key].includes(id) ? form[key].filter(x => x !== id) : [...form[key], id] }) : undefined
-  const violation = (id: string) => VIOLATIONS.find(v => v.id === id)!.label
-  const action = (id: string) => ACTIONS.find(a => a.id === id)!.label
-
-  return (
-    <>
-      <Sheet>
-        <Box>
-          <label className="flex items-center gap-3 text-base mb-6 print:mb-2">
-            DATE
-            <input type="date" required value={form.date} disabled={readOnly || lockDate} onChange={e => set('date')?.(e.target.value)} className={`${line} w-48`} />
-          </label>
-          <div className="grid grid-cols-2 gap-10 text-base">
-            <label className="flex flex-col-reverse gap-1">
-              EMPLOYEE
-              <input required maxLength={60} value={form.employee} disabled={readOnly} onChange={e => set('employee')?.(e.target.value)} className={line} />
-            </label>
-            <label className="flex flex-col-reverse gap-1">
-              MANAGER / SUPERVISOR
-              <input maxLength={60} value={form.manager} disabled={readOnly} onChange={e => set('manager')?.(e.target.value)} className={line} />
-            </label>
-          </div>
-        </Box>
-        <Box>
-          <p className="text-[13px] leading-6">
-            This is a record of correction action taken to address infrractions of company policy, attendance, job performance
-            infractions, conduct or behavior infractions or other voilations of the operational policies, procedures or code of
-            conduct per operation guidance.
-          </p>
-        </Box>
-        <Box title="This corrective action is being taken for violation(s) of following conducts">
-          <div className="grid grid-cols-3 gap-x-4 gap-y-5 py-2 print:gap-y-2 print:py-0">
-            <Check label={violation('attendance')} checked={form.violations.includes('attendance')} onToggle={toggle('violations', 'attendance')} />
-            <Check label={violation('job-performance')} checked={form.violations.includes('job-performance')} onToggle={toggle('violations', 'job-performance')} />
-            <Check label={violation('others')} checked={form.violations.includes('others')} onToggle={toggle('violations', 'others')} />
-            <Check label={violation('conduct')} checked={form.violations.includes('conduct')} onToggle={toggle('violations', 'conduct')} />
-            <Check label={violation('company-policy')} checked={form.violations.includes('company-policy')} onToggle={toggle('violations', 'company-policy')} />
-            <label className="flex items-center gap-2 text-base">
-              SPECIFY :
-              <input maxLength={60} value={form.otherSpecify} disabled={readOnly} onChange={e => set('otherSpecify')?.(e.target.value)} className={`${line} min-w-0 flex-1`} />
-            </label>
-          </div>
-        </Box>
-        <Box title="Type of Warning / Actions by Company :">
-          <div className="grid grid-cols-3 gap-x-4 gap-y-5 py-2 print:gap-y-2 print:py-0">
-            <Check label={action('verbal')} checked={form.actions.includes('verbal')} onToggle={toggle('actions', 'verbal')} />
-            <Check label={action('written')} checked={form.actions.includes('written')} onToggle={toggle('actions', 'written')} />
-            <span />
-            <Check label={action('suspension')} checked={form.actions.includes('suspension')} onToggle={toggle('actions', 'suspension')} />
-            <Check label={action('termination')} checked={form.actions.includes('termination')} onToggle={toggle('actions', 'termination')} />
-          </div>
-        </Box>
-        <Area label="Incident Descriptions :" rows={4} value={form.incident} onChange={set('incident')} />
-      </Sheet>
-
-      <Sheet pageBreak>
-        <Area label="Incident Descriptions (Cont'd) :" rows={4} value={form.incidentCont} onChange={set('incidentCont')} />
-        <Area label="Expected Correction Action(s) from Manager / Supervisor :" rows={5} value={form.expected} onChange={set('expected')} />
-        <Area label="Employee Comments :" rows={5} value={form.employeeComments} onChange={set('employeeComments')} />
-        <Box>
-          {(
-            [
-              ['Employee Signature :', 'employeeSignature', 'employeeSignedDate'],
-              ['Manager Signature :', 'managerSignature', 'managerSignedDate'],
-            ] as const
-          ).map(([label, name, date]) => (
-            <div key={name} className="grid grid-cols-[13rem_1fr_auto_10rem] items-end gap-3 text-lg py-3">
-              <span>{label}</span>
-              <input aria-label={label.replace(' :', '')} maxLength={60} value={form[name]} disabled={readOnly} onChange={e => set(name)?.(e.target.value)} className={line} />
-              <span>Date</span>
-              <input type="date" aria-label={`${label.replace(' Signature :', '')} signed date`} value={form[date]} disabled={readOnly} onChange={e => set(date)?.(e.target.value)} className={line} />
-            </div>
-          ))}
-        </Box>
-      </Sheet>
-    </>
   )
 }

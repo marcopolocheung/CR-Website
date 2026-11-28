@@ -1,0 +1,15 @@
+.library { min-width: 0; }
+.library h2 { font-size: 2rem; margin-bottom: 12px; }
+.filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,14rem),1fr)); gap: 16px; margin-block: 20px; }
+.filters label { display: block; font-weight: 600; margin-bottom: 8px; }
+.filters :is(input,select) { width: 100%; max-width: 100%; min-width: 0; min-height: 48px; border: 1px solid var(--cr-control); background: white; padding: 8px; font-size: 1rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 16px; }
+.count { margin-block: 20px; }
+.rows { min-width: 0; }
+.rows li { padding-block: 20px; border-bottom: 1px solid var(--cr-line); overflow-wrap: anywhere; }
+.rows li:first-child { padding-top: 0; }.rows li:last-child { border-bottom: 0; padding-bottom: 0; }
+.rows h3 { font-family: var(--cr-body); font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; }
+.rows p { margin-block: 6px; }.rows code { display: block; overflow-wrap: anywhere; }
+.library details { margin-block: 24px; }.library summary { min-height: 48px; padding-block: 12px; font-weight: 600; cursor: pointer; }
+.library :is(button,input,select,summary):focus-visible { outline: 3px solid var(--cr-black); outline-offset: 3px; }
+.failure { padding: 12px; margin-block: 16px; border: 2px solid var(--cr-red); }
