@@ -9,6 +9,11 @@
 .filters input, .filters select { min-width: 0; width: 100%; max-width: 100%; min-height: 48px; padding: 8px; border: 1px solid var(--cr-control); }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 16px; }
 .edit { background: var(--cr-accent-wash); border: 1px solid var(--cr-accent-ink); padding: 16px; max-width: 720px; }
+.ask { margin-block: 20px; max-width: 880px; }
+.ask h2 { margin-top: 0; }
+.answer { border-left: 4px solid var(--cr-accent-ink); background: var(--cr-accent-wash); padding: 4px 16px; }
+.answer p { white-space: pre-wrap; }
+.covered { color: var(--cr-muted); }
 .table { overflow-x: auto; margin-bottom: 24px; }
 .table table { min-width: 620px; width: 100%; text-align: left; background: white; border: 1px solid var(--cr-control); }
 .table th, .table td { padding: 12px; border-bottom: 1px solid var(--cr-line); }

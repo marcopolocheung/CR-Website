@@ -1,4 +1,6 @@
 import { requestRecord, saveRequests, readRequestMutation } from './schedule-requests'
+import { answerCashQuestion, proposeScheduleChanges } from './assistant'
+import { scheduleAssistantRequestSchema } from '../../src/lib/scheduler/assistant'
 import { parseCashAmount } from '../../src/lib/cashout'
 import { businessDate, isStationId, isStoreId, STATION_STORES, type StationId, type StoreId } from '../../src/lib/internal-tools/contracts'
 import { canonicalJson } from '../../src/lib/internal-tools/json'
@@ -47,6 +49,8 @@ interface Env {
   /** Sales codes: each opens Toast sales for one store (the same value in both opens both). Once either is set, the manager code no longer opens sales. */
   SALES_CODE_CR3?: string
   SALES_CODE_CR2?: string
+  /** Optional Gemini API key for the manager assistant; unset leaves the assistant routes answering 503. */
+  GEMINI_API_KEY?: string
 }
 
 export type StoredWeek = {
@@ -89,6 +93,9 @@ const DOC_TTL_SECONDS = 31536000
 const WRITE_LIMIT_PER_HOUR = 60
 /** Gate guesses get their own budget so they can never lock out legitimate saves. */
 const VERIFY_LIMIT_PER_HOUR = 30
+/** Assistant calls cost money per request, and get their own budget so they can't use up saves. */
+const ASSISTANT_LIMIT_PER_HOUR = 30
+const ASSISTANT_BODY_CHARS = 200000
 
 export const RESTAURANTS = ['CR3-diningroom', 'CR3-kitchen', 'CR2-kitchen', 'CR2-diningroom'] as const
 
@@ -1174,32 +1181,21 @@ function json(data: unknown, status: number, request: Request, env: Env, extra?:
   })
 }
 
-async function checkWriteThrottle(env: Env, ip: string): Promise<boolean> {
+async function checkHourlyThrottle(env: Env, prefix: string, limit: number, ip: string): Promise<boolean> {
   try {
-    const key = `rl:${ip}:${new Date().toISOString().slice(0, 13)}`
+    const key = `${prefix}:${ip}:${new Date().toISOString().slice(0, 13)}`
     const raw = await env.SCHEDULES.get(key)
     const count = raw ? Number.parseInt(raw, 10) || 0 : 0
-    if (count >= WRITE_LIMIT_PER_HOUR) return false
+    if (count >= limit) return false
     await env.SCHEDULES.put(key, String(count + 1), { expirationTtl: 3600 })
     return true
   } catch {
     return true
   }
 }
-
+const checkWriteThrottle = (env: Env, ip: string) => checkHourlyThrottle(env, 'rl', WRITE_LIMIT_PER_HOUR, ip)
 /** Separate throttle for gate guesses (`GET /api/auth/verify`) — see VERIFY_LIMIT_PER_HOUR. */
-async function checkVerifyThrottle(env: Env, ip: string): Promise<boolean> {
-  try {
-    const key = `rlv:${ip}:${new Date().toISOString().slice(0, 13)}`
-    const raw = await env.SCHEDULES.get(key)
-    const count = raw ? Number.parseInt(raw, 10) || 0 : 0
-    if (count >= VERIFY_LIMIT_PER_HOUR) return false
-    await env.SCHEDULES.put(key, String(count + 1), { expirationTtl: 3600 })
-    return true
-  } catch {
-    return true
-  }
-}
+const checkVerifyThrottle = (env: Env, ip: string) => checkHourlyThrottle(env, 'rlv', VERIFY_LIMIT_PER_HOUR, ip)
 
 async function readBody(request: Request, maxChars = MAX_BODY_CHARS): Promise<unknown> {
   const text = await request.text()
@@ -1427,6 +1423,38 @@ export default {
         const result = await saveDirectory(env.INTERNAL_DB, store, await readBody(request, 300000))
         return json(result.ok ? { record: result.record, replayed: result.replayed } : result.body, result.ok ? 200 : result.status, request, env, noStore)
       } catch { return json({ schemaVersion: 1, error: { code: 'unavailable' } }, 503, request, env, noStore) }
+    }
+
+    // Manager assistant: reads cash history or proposes draft schedule edits. It never writes records.
+    const assistantMatch = path.match(/^\/api\/assistant\/(cash|schedule)$/)
+    if (assistantMatch && request.method === 'POST') {
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (!env.GEMINI_API_KEY) return json({ error: 'assistant_unconfigured' }, 503, request, env, noStore)
+      let body: unknown
+      try {
+        body = await readBody(request, ASSISTANT_BODY_CHARS)
+      } catch {
+        return json({ error: 'body_too_large' }, 413, request, env)
+      }
+      const cash = assistantMatch[1] === 'cash' ? body as { question?: unknown; to?: unknown } | null : null
+      const draft = assistantMatch[1] === 'schedule' ? scheduleAssistantRequestSchema.safeParse(body) : null
+      if (cash && (typeof cash.question !== 'string' || !cash.question.trim() || cash.question.length > 500
+        || typeof cash.to !== 'string' || !WEEK_RE.test(cash.to) || Number.isNaN(Date.parse(cash.to)))) return json({ error: 'invalid_body' }, 400, request, env)
+      if (!cash && !draft?.success) return json({ error: 'invalid_body' }, 400, request, env)
+      if (!(await checkHourlyThrottle(env, 'rla', ASSISTANT_LIMIT_PER_HOUR, clientIp(request)))) {
+        return json({ error: 'rate_limited' }, 429, request, env, { 'Retry-After': '3600' })
+      }
+      try {
+        if (draft?.success) return json(await proposeScheduleChanges(env.GEMINI_API_KEY, draft.data), 200, request, env, noStore)
+        const { question, to } = cash as { question: string; to: string }
+        const raws = await Promise.all(CASHOUT_STORES.flatMap(store => cashoutHistoryDates(to).map(date => env.SCHEDULES.get(cashoutKey(store, date)))))
+        const days = raws.flatMap(raw => { const doc = raw ? safeParse(raw) as CashoutDay | null : null; return doc?.sheet ? [doc] : [] })
+        return json(await answerCashQuestion(env.GEMINI_API_KEY, question.trim(), days, to), 200, request, env, noStore)
+      } catch {
+        return json({ error: 'assistant_failed' }, 502, request, env, noStore)
+      }
     }
 
     // Cash-out days: manager token for reads and writes — these are cash figures.
