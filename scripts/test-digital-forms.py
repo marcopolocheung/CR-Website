@@ -25,10 +25,12 @@ with sync_playwright() as p:
     def unlock():
         page.locator('#cashout-code').fill(TOKEN)
         page.get_by_role('button', name='Unlock', exact=True).click()
-        expect(page.get_by_role('button', name='New injury report', exact=True)).to_be_visible()
+        expect(page.get_by_role('button', name='New form', exact=True)).to_be_visible()
 
     def choose(title, index):
-        page.get_by_role('button', name='New ' + title, exact=True).click()
+        page.get_by_role('button', name='New form', exact=True).click()
+        page.locator('[data-forms-new-type="'+dict((title,kind) for kind,title in cases)[title]+'"]').click()
+        if page.get_by_role('dialog').is_visible(): page.get_by_role('dialog').locator('button').last.click()
         page.locator('#form-draft-store').select_option('CR2' if index % 2 else 'CR3')
         page.locator('#form-draft-date').fill(f'2026-11-0{index}')
         page.locator('#form-draft-preparer').fill('Acceptance manager')
@@ -41,37 +43,38 @@ with sync_playwright() as p:
         choose(title, index)
         page.get_by_role('button', name='Start new draft', exact=True).click()
         if kind == 'injury-report':
-            expect(page.get_by_role('button', name='Review form', exact=True)).to_be_disabled()
-            page.get_by_label('Injured person name *', exact=True).fill('Synthetic injured person')
-            page.get_by_label('Date of incident *', exact=True).fill('2026-11-01')
-            page.get_by_label('Describe the incident *', exact=True).fill(LONG)
+            page.get_by_role('button',name='Review form',exact=True).click()
+            expect(page.locator('[data-form-review]')).not_to_be_visible()
+            page.locator('[data-form-editor] #form-field-employee').fill('Synthetic injured person')
+            page.locator('[data-form-editor] #form-field-incidentDate').fill('2026-11-01')
+            page.locator('[data-form-editor] #form-field-description').fill(LONG)
             # Reload and resume a device copy before it has ever been saved to the server.
             page.once('dialog', lambda dialog: dialog.accept())
             page.reload()
             unlock()
             choose(title, index)
             page.get_by_role('button', name='Resume as a copy', exact=True).click()
-            expect(page.get_by_label('Describe the incident *', exact=True)).to_have_value(LONG)
+            expect(page.locator('[data-form-editor] #form-field-description')).to_have_value(LONG)
         elif kind == 'customer-complaint':
             page.get_by_role('checkbox', name='Rice cold', exact=True).check()
-            page.get_by_label('Additional comments', exact=True).fill('Synthetic cold rice complaint')
+            page.locator('[data-form-editor] #form-field-comments').fill('Synthetic cold rice complaint')
         elif kind == 'payroll-change-request':
-            page.get_by_label('Employee name *', exact=True).fill('Synthetic payroll employee')
-            page.get_by_label('Pay period ending date *', exact=True).fill('2026-11-03')
-            page.get_by_label('Pay short ($)', exact=True).fill('24.50')
-            page.get_by_label('Explanation', exact=True).fill('Synthetic missing shift')
+            page.locator('[data-form-editor] #form-field-employee').fill('Synthetic payroll employee')
+            page.locator('[data-form-editor] #form-field-periodEnd').fill('2026-11-03')
+            page.locator('[data-form-editor] #form-field-payShort').fill('24.50')
+            page.locator('[data-form-editor] #form-field-explanation').fill('Synthetic missing shift')
         else:
-            page.get_by_label('Employee name *', exact=True).fill('Synthetic' * 6)
-            page.get_by_label('Present rate ($) *', exact=True).fill('15.00')
-            page.get_by_label('Increase to ($) *', exact=True).fill('16.50')
-            page.get_by_label('Effective date *', exact=True).fill('2026-11-04')
+            page.locator('[data-form-editor] #form-field-employee').fill('Synthetic' * 6)
+            page.locator('[data-form-editor] #form-field-presentRate').fill('15.00')
+            page.locator('[data-form-editor] #form-field-proposedRate').fill('16.50')
+            page.locator('[data-form-editor] #form-field-effectiveDate').fill('2026-11-04')
         assert page.evaluate('document.documentElement.scrollWidth') <= 375
         page.get_by_role('button', name='Review form', exact=True).click()
         expect(page.get_by_role('button', name='Edit answers', exact=True)).to_be_visible()
         if kind == 'injury-report':
             page.emulate_media(media='print')
-            expect(page.locator('article')).to_contain_text('Line 44:')
-            assert page.locator('textarea').count() == 0
+            expect(page.locator('[data-forms-print]')).to_contain_text('Line 44:')
+            assert page.locator('[data-form-review] textarea').count() == 0
             page.emulate_media(media='screen')
         with page.expect_response(lambda response: response.url == api + '/api/forms' and response.request.method == 'POST') as response:
             page.get_by_role('button', name='Save form', exact=True).click()
@@ -79,9 +82,9 @@ with sync_playwright() as p:
         created.append({'type': kind, 'id': doc['id']})
         assert response.value.status == 201 and doc['form']['store'] == ('CR2' if index % 2 else 'CR3')
         assert doc['form']['preparedBy'] == 'Acceptance manager'
-        expect(page.get_by_text('Saved.', exact=True)).to_be_visible()
-        assert page.locator('article input, article textarea, article select').count() == 0
-        page.get_by_role('textbox', name='Label', exact=False).fill('Synthetic follow-up ' + str(index))
+        expect(page.get_by_role('status').filter(has_text='Saved.')).to_be_visible()
+        assert page.locator('[data-form-record] [data-form-content] input,[data-form-record] [data-form-content] textarea,[data-form-record] [data-form-content] select').count() == 0
+        page.locator('#forms-label').fill('Synthetic follow-up ' + str(index))
         page.get_by_role('button', name='Save label', exact=True).click()
         expect(page.get_by_text('Label saved.', exact=True)).to_be_visible()
         # Simulate lagging KV list metadata after the first save; the confirmed record stays visible.
@@ -89,9 +92,9 @@ with sync_playwright() as p:
             if route.request.method == 'GET': route.fulfill(status=200, json={'forms': []}, headers={'access-control-allow-origin': '*'})
             else: route.continue_()
         if index == 1: page.route(api + '/api/forms', stale_list)
-        page.get_by_role('button', name='Back to list', exact=True).click()
+        page.get_by_role('button', name='Back to saved forms', exact=True).click()
         expect(page.get_by_text(f'Showing {index} of {index}', exact=True)).to_be_visible()
-        expect(page.get_by_role('button', name='New write-up', exact=True)).to_be_enabled()
+        expect(page.get_by_role('button', name='New form', exact=True)).to_be_enabled()
         if index == 1: page.unroute(api + '/api/forms', stale_list)
         assert page.evaluate('document.documentElement.scrollWidth') <= 375
 
@@ -110,7 +113,7 @@ with sync_playwright() as p:
 
     # Reopen after reload, cancel deletion, fail a delete once, then retry successfully.
     page.get_by_role('button', name='Open Injury report for Synthetic injured person, 2026-11-01', exact=True).click()
-    expect(page.locator('article')).to_contain_text('Line 44:')
+    expect(page.locator('[data-form-record]')).to_contain_text('Line 44:')
     page.get_by_role('button', name='Delete form', exact=True).click()
     dialog = page.get_by_role('dialog')
     expect(dialog).to_contain_text('Synthetic injured person')

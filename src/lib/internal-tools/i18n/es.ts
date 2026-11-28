@@ -1,8 +1,14 @@
+import { formsSpanish } from './forms-entry'
+import { formsDraftSpanish } from './forms-drafts'
+import { formsWorkspaceSpanish } from './forms-workspace'
 import { planningSpanish } from './planning'
 import { hoursSpanish } from './special-hours'
 import type en from './en'
 const es: Record<keyof typeof en, string> = {
   ...hoursSpanish,
+  ...formsSpanish,
+  ...formsDraftSpanish,
+  ...formsWorkspaceSpanish,
   "inventoryViews.unknownIds": "ID desconocidos o retirados",
   "inventoryViews.workingCatalog": "Etiquetas: catálogo capturado del conteo de trabajo, revisión {revision}. Las versiones anteriores del catálogo del servidor no están disponibles; las columnas se unen por ID.",
   "inventoryViews.unavailableLabels": "No se pudo cargar el catálogo compartido actual. Los campos guardados se muestran por ID sin modificar, salvo que haya un catálogo del dispositivo para la misma fecha.",

@@ -1,0 +1,376 @@
+{
+  "scenarios": [
+    "Saved-first library and one New form action; all eleven original blank URLs/formats remain public without unlocking",
+    "Historical write-up stays read-only, original fields/signature names unchanged, label request is label-only and full English long-text paper remains compatible",
+    "All five existing types preserve requirements/raw canonical fields, separate read-only review sends no mutation, one POST saves and English PDFs include independent options/amounts/declarations/signatures/all forty narrative lines",
+    "Active draft values and byte-identical device copies survive library navigation, Back/Forward and Return to draft without POSTs",
+    "Dedicated Drafts discovers all form contexts, preserves corrupt downloadable source, reload requires unlock and Resume as a copy creates a fresh credential-free identity without replacing original bytes",
+    "Denied device storage retains raw text and refuses an unprotected lock/handoff",
+    "Confirmed write-up POST is retained before a failed follow-up read; loading/retrying the record never replays POST",
+    "Unconfirmed POST keeps the draft, directs the manager to saved forms and does not automatically retry",
+    "Late record detail response cannot hijack a newer library selection",
+    "Saved/Drafts/Blank/editor reflow at desktop/tablet/phone/320px enlarged Spanish with preserved work, keyboard focus and reduced motion",
+    "Latest saved-record selection wins and late 401 reads from a previous session cannot revoke a same-code unlock",
+    "Double-clicking Save issues one POST; a held acknowledgement from an expired generation cannot mark the reauthenticated draft saved or replay its write",
+    "Every newly saved draft identity requires a fresh explicit acknowledgement before creating another immutable record",
+    "Extensionless/slash/.html and direct Saved/Drafts/Blank/unknown hashes initialize without mutations"
+  ],
+  "page_errors": [],
+  "external_attempts": [],
+  "requests": [
+    {
+      "path": "/api/auth/verify",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups/oldwriteup",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups/oldwriteup/label",
+      "method": "PUT"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "POST"
+    },
+    {
+      "path": "/api/writeups/fixture001",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "POST"
+    },
+    {
+      "path": "/api/forms",
+      "method": "POST"
+    },
+    {
+      "path": "/api/forms",
+      "method": "POST"
+    },
+    {
+      "path": "/api/forms",
+      "method": "POST"
+    },
+    {
+      "path": "/api/auth/verify",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "POST"
+    },
+    {
+      "path": "/api/writeups/fixture006",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups/fixture006",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "POST"
+    },
+    {
+      "path": "/api/writeups/oldwriteup",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups/oldwriteup",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups/otherwrite",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups/oldwriteup",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "POST"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "POST"
+    },
+    {
+      "path": "/api/writeups/fixture001",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "POST"
+    },
+    {
+      "path": "/api/writeups/fixture002",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/verify",
+      "method": "GET"
+    },
+    {
+      "path": "/api/writeups",
+      "method": "GET"
+    },
+    {
+      "path": "/api/forms",
+      "method": "GET"
+    }
+  ],
+  "canonical_saved_forms": {
+    "write-up": {
+      "date": "2026-11-23",
+      "employee": "New Ana L\u00f3pez",
+      "manager": "New manager",
+      "violations": [
+        "attendance"
+      ],
+      "otherSpecify": "",
+      "actions": [
+        "written"
+      ],
+      "incident": "Line 01: Texto original \u2014 synthetic narrative, no translation.\nLine 02: Texto original \u2014 synthetic narrative, no translation.\nLine 03: Texto original \u2014 synthetic narrative, no translation.\nLine 04: Texto original \u2014 synthetic narrative, no translation.\nLine 05: Texto original \u2014 synthetic narrative, no translation.\nLine 06: Texto original \u2014 synthetic narrative, no translation.\nLine 07: Texto original \u2014 synthetic narrative, no translation.\nLine 08: Texto original \u2014 synthetic narrative, no translation.\nLine 09: Texto original \u2014 synthetic narrative, no translation.\nLine 10: Texto original \u2014 synthetic narrative, no translation.\nLine 11: Texto original \u2014 synthetic narrative, no translation.\nLine 12: Texto original \u2014 synthetic narrative, no translation.\nLine 13: Texto original \u2014 synthetic narrative, no translation.\nLine 14: Texto original \u2014 synthetic narrative, no translation.\nLine 15: Texto original \u2014 synthetic narrative, no translation.\nLine 16: Texto original \u2014 synthetic narrative, no translation.\nLine 17: Texto original \u2014 synthetic narrative, no translation.\nLine 18: Texto original \u2014 synthetic narrative, no translation.\nLine 19: Texto original \u2014 synthetic narrative, no translation.\nLine 20: Texto original \u2014 synthetic narrative, no translation.\nLine 21: Texto original \u2014 synthetic narrative, no translation.\nLine 22: Texto original \u2014 synthetic narrative, no translation.\nLine 23: Texto original \u2014 synthetic narrative, no translation.\nLine 24: Texto original \u2014 synthetic narrative, no translation.\nLine 25: Texto original \u2014 synthetic narrative, no translation.\nLine 26: Texto original \u2014 synthetic narrative, no translation.\nLine 27: Texto original \u2014 synthetic narrative, no translation.\nLine 28: Texto original \u2014 synthetic narrative, no translation.\nLine 29: Texto original \u2014 synthetic narrative, no translation.\nLine 30: Texto original \u2014 synthetic narrative, no translation.\nLine 31: Texto original \u2014 synthetic narrative, no translation.\nLine 32: Texto original \u2014 synthetic narrative, no translation.\nLine 33: Texto original \u2014 synthetic narrative, no translation.\nLine 34: Texto original \u2014 synthetic narrative, no translation.\nLine 35: Texto original \u2014 synthetic narrative, no translation.\nLine 36: Texto original \u2014 synthetic narrative, no translation.\nLine 37: Texto original \u2014 synthetic narrative, no translation.\nLine 38: Texto original \u2014 synthetic narrative, no translation.\nLine 39: Texto original \u2014 synthetic narrative, no translation.\nLine 40: Texto original \u2014 synthetic narrative, no translation.",
+      "incidentCont": "",
+      "expected": "Independent correction value",
+      "employeeComments": "",
+      "employeeSignature": "New Ana L\u00f3pez",
+      "employeeSignedDate": "",
+      "managerSignature": "New manager",
+      "managerSignedDate": ""
+    },
+    "injury-report": {
+      "type": "injury-report",
+      "form": {
+        "date": "2026-11-23",
+        "store": "CR2",
+        "preparedBy": "Acceptance manager",
+        "fields": {
+          "company": "",
+          "personType": "",
+          "employee": "Injured Jos\u00e9",
+          "phone": "",
+          "address": "",
+          "incidentDate": "2026-11-22",
+          "incidentTime": "",
+          "manager": "",
+          "firstResponse": "",
+          "emergencyResponse": [
+            "Called 911"
+          ],
+          "referenceNumber": "",
+          "paramedic": "",
+          "policeCase": "",
+          "officer": "",
+          "locationType": "",
+          "location": "",
+          "witness1": "",
+          "witness1Phone": "",
+          "witness1Address": "",
+          "witness2": "",
+          "witness2Phone": "",
+          "witness2Address": "",
+          "evidence": "",
+          "description": "Line 01: Texto original \u2014 synthetic narrative, no translation.\nLine 02: Texto original \u2014 synthetic narrative, no translation.\nLine 03: Texto original \u2014 synthetic narrative, no translation.\nLine 04: Texto original \u2014 synthetic narrative, no translation.\nLine 05: Texto original \u2014 synthetic narrative, no translation.\nLine 06: Texto original \u2014 synthetic narrative, no translation.\nLine 07: Texto original \u2014 synthetic narrative, no translation.\nLine 08: Texto original \u2014 synthetic narrative, no translation.\nLine 09: Texto original \u2014 synthetic narrative, no translation.\nLine 10: Texto original \u2014 synthetic narrative, no translation.\nLine 11: Texto original \u2014 synthetic narrative, no translation.\nLine 12: Texto original \u2014 synthetic narrative, no translation.\nLine 13: Texto original \u2014 synthetic narrative, no translation.\nLine 14: Texto original \u2014 synthetic narrative, no translation.\nLine 15: Texto original \u2014 synthetic narrative, no translation.\nLine 16: Texto original \u2014 synthetic narrative, no translation.\nLine 17: Texto original \u2014 synthetic narrative, no translation.\nLine 18: Texto original \u2014 synthetic narrative, no translation.\nLine 19: Texto original \u2014 synthetic narrative, no translation.\nLine 20: Texto original \u2014 synthetic narrative, no translation.\nLine 21: Texto original \u2014 synthetic narrative, no translation.\nLine 22: Texto original \u2014 synthetic narrative, no translation.\nLine 23: Texto original \u2014 synthetic narrative, no translation.\nLine 24: Texto original \u2014 synthetic narrative, no translation.\nLine 25: Texto original \u2014 synthetic narrative, no translation.\nLine 26: Texto original \u2014 synthetic narrative, no translation.\nLine 27: Texto original \u2014 synthetic narrative, no translation.\nLine 28: Texto original \u2014 synthetic narrative, no translation.\nLine 29: Texto original \u2014 synthetic narrative, no translation.\nLine 30: Texto original \u2014 synthetic narrative, no translation.\nLine 31: Texto original \u2014 synthetic narrative, no translation.\nLine 32: Texto original \u2014 synthetic narrative, no translation.\nLine 33: Texto original \u2014 synthetic narrative, no translation.\nLine 34: Texto original \u2014 synthetic narrative, no translation.\nLine 35: Texto original \u2014 synthetic narrative, no translation.\nLine 36: Texto original \u2014 synthetic narrative, no translation.\nLine 37: Texto original \u2014 synthetic narrative, no translation.\nLine 38: Texto original \u2014 synthetic narrative, no translation.\nLine 39: Texto original \u2014 synthetic narrative, no translation.\nLine 40: Texto original \u2014 synthetic narrative, no translation.",
+          "reportedBy": "Independent reporter",
+          "reportDate": ""
+        }
+      }
+    },
+    "customer-complaint": {
+      "type": "customer-complaint",
+      "form": {
+        "date": "2026-11-23",
+        "store": "CR3",
+        "preparedBy": "Acceptance manager",
+        "fields": {
+          "shift": "",
+          "customer": "Customer Mar\u00eda",
+          "service": [],
+          "quality": [
+            "Rice cold"
+          ],
+          "quantity": [],
+          "other": [],
+          "comments": "Line 01: Texto original \u2014 synthetic narrative, no translation.\nLine 02: Texto original \u2014 synthetic narrative, no translation.\nLine 03: Texto original \u2014 synthetic narrative, no translation.\nLine 04: Texto original \u2014 synthetic narrative, no translation.\nLine 05: Texto original \u2014 synthetic narrative, no translation.\nLine 06: Texto original \u2014 synthetic narrative, no translation.\nLine 07: Texto original \u2014 synthetic narrative, no translation.\nLine 08: Texto original \u2014 synthetic narrative, no translation.\nLine 09: Texto original \u2014 synthetic narrative, no translation.\nLine 10: Texto original \u2014 synthetic narrative, no translation.\nLine 11: Texto original \u2014 synthetic narrative, no translation.\nLine 12: Texto original \u2014 synthetic narrative, no translation.\nLine 13: Texto original \u2014 synthetic narrative, no translation.\nLine 14: Texto original \u2014 synthetic narrative, no translation.\nLine 15: Texto original \u2014 synthetic narrative, no translation.\nLine 16: Texto original \u2014 synthetic narrative, no translation.\nLine 17: Texto original \u2014 synthetic narrative, no translation.\nLine 18: Texto original \u2014 synthetic narrative, no translation.\nLine 19: Texto original \u2014 synthetic narrative, no translation.\nLine 20: Texto original \u2014 synthetic narrative, no translation.\nLine 21: Texto original \u2014 synthetic narrative, no translation.\nLine 22: Texto original \u2014 synthetic narrative, no translation.\nLine 23: Texto original \u2014 synthetic narrative, no translation.\nLine 24: Texto original \u2014 synthetic narrative, no translation.\nLine 25: Texto original \u2014 synthetic narrative, no translation.\nLine 26: Texto original \u2014 synthetic narrative, no translation.\nLine 27: Texto original \u2014 synthetic narrative, no translation.\nLine 28: Texto original \u2014 synthetic narrative, no translation.\nLine 29: Texto original \u2014 synthetic narrative, no translation.\nLine 30: Texto original \u2014 synthetic narrative, no translation.\nLine 31: Texto original \u2014 synthetic narrative, no translation.\nLine 32: Texto original \u2014 synthetic narrative, no translation.\nLine 33: Texto original \u2014 synthetic narrative, no translation.\nLine 34: Texto original \u2014 synthetic narrative, no translation.\nLine 35: Texto original \u2014 synthetic narrative, no translation.\nLine 36: Texto original \u2014 synthetic narrative, no translation.\nLine 37: Texto original \u2014 synthetic narrative, no translation.\nLine 38: Texto original \u2014 synthetic narrative, no translation.\nLine 39: Texto original \u2014 synthetic narrative, no translation.\nLine 40: Texto original \u2014 synthetic narrative, no translation.",
+          "resolution": "Independent customer resolution",
+          "manager": "",
+          "managerDate": ""
+        }
+      }
+    },
+    "payroll-change-request": {
+      "type": "payroll-change-request",
+      "form": {
+        "date": "2026-11-23",
+        "store": "CR2",
+        "preparedBy": "Acceptance manager",
+        "fields": {
+          "company": "",
+          "employeeNumber": "",
+          "employee": "Payroll Ren\u00e9",
+          "periodEnd": "2026-11-20",
+          "hoursShort": "",
+          "payShort": "24.50",
+          "otherDiscrepancy": "",
+          "explanation": "Line 01: Texto original \u2014 synthetic narrative, no translation.\nLine 02: Texto original \u2014 synthetic narrative, no translation.\nLine 03: Texto original \u2014 synthetic narrative, no translation.\nLine 04: Texto original \u2014 synthetic narrative, no translation.\nLine 05: Texto original \u2014 synthetic narrative, no translation.\nLine 06: Texto original \u2014 synthetic narrative, no translation.\nLine 07: Texto original \u2014 synthetic narrative, no translation.\nLine 08: Texto original \u2014 synthetic narrative, no translation.\nLine 09: Texto original \u2014 synthetic narrative, no translation.\nLine 10: Texto original \u2014 synthetic narrative, no translation.\nLine 11: Texto original \u2014 synthetic narrative, no translation.\nLine 12: Texto original \u2014 synthetic narrative, no translation.\nLine 13: Texto original \u2014 synthetic narrative, no translation.\nLine 14: Texto original \u2014 synthetic narrative, no translation.\nLine 15: Texto original \u2014 synthetic narrative, no translation.\nLine 16: Texto original \u2014 synthetic narrative, no translation.\nLine 17: Texto original \u2014 synthetic narrative, no translation.\nLine 18: Texto original \u2014 synthetic narrative, no translation.\nLine 19: Texto original \u2014 synthetic narrative, no translation.\nLine 20: Texto original \u2014 synthetic narrative, no translation.\nLine 21: Texto original \u2014 synthetic narrative, no translation.\nLine 22: Texto original \u2014 synthetic narrative, no translation.\nLine 23: Texto original \u2014 synthetic narrative, no translation.\nLine 24: Texto original \u2014 synthetic narrative, no translation.\nLine 25: Texto original \u2014 synthetic narrative, no translation.\nLine 26: Texto original \u2014 synthetic narrative, no translation.\nLine 27: Texto original \u2014 synthetic narrative, no translation.\nLine 28: Texto original \u2014 synthetic narrative, no translation.\nLine 29: Texto original \u2014 synthetic narrative, no translation.\nLine 30: Texto original \u2014 synthetic narrative, no translation.\nLine 31: Texto original \u2014 synthetic narrative, no translation.\nLine 32: Texto original \u2014 synthetic narrative, no translation.\nLine 33: Texto original \u2014 synthetic narrative, no translation.\nLine 34: Texto original \u2014 synthetic narrative, no translation.\nLine 35: Texto original \u2014 synthetic narrative, no translation.\nLine 36: Texto original \u2014 synthetic narrative, no translation.\nLine 37: Texto original \u2014 synthetic narrative, no translation.\nLine 38: Texto original \u2014 synthetic narrative, no translation.\nLine 39: Texto original \u2014 synthetic narrative, no translation.\nLine 40: Texto original \u2014 synthetic narrative, no translation.",
+          "nameChange": "",
+          "addressChange": "",
+          "taxChange": "",
+          "otherChange": "",
+          "employeeSignature": "Payroll Ren\u00e9",
+          "signedDate": "",
+          "manager": "",
+          "officeApproved": ""
+        }
+      }
+    },
+    "pay-rate-increase": {
+      "type": "pay-rate-increase",
+      "form": {
+        "date": "2026-11-23",
+        "store": "CR3",
+        "preparedBy": "Acceptance manager",
+        "fields": {
+          "employee": "Raise Zo\u00eb",
+          "employeeNumber": "",
+          "department": "",
+          "position": "",
+          "presentRate": "15.00",
+          "proposedRate": "16.50",
+          "payBasis": "Hourly",
+          "raiseDate": "",
+          "effectiveDate": "2026-12-01",
+          "reason": "Line 01: Texto original \u2014 synthetic narrative, no translation.\nLine 02: Texto original \u2014 synthetic narrative, no translation.\nLine 03: Texto original \u2014 synthetic narrative, no translation.\nLine 04: Texto original \u2014 synthetic narrative, no translation.\nLine 05: Texto original \u2014 synthetic narrative, no translation.\nLine 06: Texto original \u2014 synthetic narrative, no translation.\nLine 07: Texto original \u2014 synthetic narrative, no translation.\nLine 08: Texto original \u2014 synthetic narrative, no translation.\nLine 09: Texto original \u2014 synthetic narrative, no translation.\nLine 10: Texto original \u2014 synthetic narrative, no translation.\nLine 11: Texto original \u2014 synthetic narrative, no translation.\nLine 12: Texto original \u2014 synthetic narrative, no translation.\nLine 13: Texto original \u2014 synthetic narrative, no translation.\nLine 14: Texto original \u2014 synthetic narrative, no translation.\nLine 15: Texto original \u2014 synthetic narrative, no translation.\nLine 16: Texto original \u2014 synthetic narrative, no translation.\nLine 17: Texto original \u2014 synthetic narrative, no translation.\nLine 18: Texto original \u2014 synthetic narrative, no translation.\nLine 19: Texto original \u2014 synthetic narrative, no translation.\nLine 20: Texto original \u2014 synthetic narrative, no translation.\nLine 21: Texto original \u2014 synthetic narrative, no translation.\nLine 22: Texto original \u2014 synthetic narrative, no translation.\nLine 23: Texto original \u2014 synthetic narrative, no translation.\nLine 24: Texto original \u2014 synthetic narrative, no translation.\nLine 25: Texto original \u2014 synthetic narrative, no translation.\nLine 26: Texto original \u2014 synthetic narrative, no translation.\nLine 27: Texto original \u2014 synthetic narrative, no translation.\nLine 28: Texto original \u2014 synthetic narrative, no translation.\nLine 29: Texto original \u2014 synthetic narrative, no translation.\nLine 30: Texto original \u2014 synthetic narrative, no translation.\nLine 31: Texto original \u2014 synthetic narrative, no translation.\nLine 32: Texto original \u2014 synthetic narrative, no translation.\nLine 33: Texto original \u2014 synthetic narrative, no translation.\nLine 34: Texto original \u2014 synthetic narrative, no translation.\nLine 35: Texto original \u2014 synthetic narrative, no translation.\nLine 36: Texto original \u2014 synthetic narrative, no translation.\nLine 37: Texto original \u2014 synthetic narrative, no translation.\nLine 38: Texto original \u2014 synthetic narrative, no translation.\nLine 39: Texto original \u2014 synthetic narrative, no translation.\nLine 40: Texto original \u2014 synthetic narrative, no translation.",
+          "manager": "",
+          "managerDate": "",
+          "approvedBy": "",
+          "denialReason": ""
+        }
+      }
+    }
+  },
+  "viewports": [
+    1440,
+    768,
+    390,
+    320
+  ],
+  "limitations": [
+    "Synthetic APIs only",
+    "Physical touch/software keyboard, staff terminology and live services unverified"
+  ]
+}

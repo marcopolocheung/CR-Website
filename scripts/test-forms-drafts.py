@@ -46,16 +46,17 @@ with sync_playwright() as p:
         page.wait_for_load_state('networkidle')
         page.locator('#cashout-code').fill(TOKEN)
         page.get_by_role('button', name='Unlock', exact=True).click()
-        expect(page.get_by_role('button', name='New write-up', exact=True)).to_be_visible()
+        expect(page.get_by_role('button', name='New form', exact=True)).to_be_visible()
     def drafts():
         return page.evaluate(f'Object.entries(localStorage).filter(([k]) => k.startsWith("{PREFIX}")).map(([key, raw]) => ({{ key, raw }}))')
     def choose(store, date, preparer):
-        page.get_by_role('button', name='New write-up', exact=True).click()
+        page.get_by_role('button', name='New form', exact=True).click();page.locator('[data-forms-new-type=write-up]').click()
+        if page.get_by_role('dialog').is_visible(): page.get_by_role('dialog').locator('button').last.click()
         page.locator('#form-draft-store').select_option(store)
         page.locator('#form-draft-date').fill(date)
         page.locator('#form-draft-preparer').fill(preparer)
-    employee = lambda: page.locator('input[required][maxlength="60"]').first
-    incident = lambda: page.get_by_label('Incident Descriptions', exact=True)
+    employee = lambda: page.locator('[data-form-editor] #form-field-employee')
+    incident = lambda: page.locator('[data-form-editor] #form-field-incident')
 
     page.goto(base + '/internal/forms')
     unlock()
@@ -64,11 +65,11 @@ with sync_playwright() as p:
     choose('CR2', '2026-10-20', 'Manager A')
     page.get_by_role('button', name='Start new draft', exact=True).tap()
     expect(page.get_by_text('Working draft · CR2 · SW Military · 2026-10-20 · Manager A')).to_be_visible()
-    expect(page.locator('input[type="date"][required]')).to_have_value('2026-10-20')
-    expect(page.locator('input[type="date"][required]')).to_be_disabled()
+    expect(page.locator('[data-form-editor] #form-field-date')).to_have_value('2026-10-20')
+    expect(page.locator('[data-form-editor] #form-field-date')).to_have_attribute('readonly','')
     employee().fill('Ana López')
     incident().fill('Llegó tarde.\nSecond line')
-    expect(page.get_by_text('Saved on this device', exact=False)).to_be_visible()
+    expect(page.locator('[data-form-editor]').get_by_text('Saved on this device', exact=False)).to_be_visible()
     first = drafts()
     assert len(first) == 1, first
     value = json.loads(first[0]['raw'])
@@ -82,7 +83,7 @@ with sync_playwright() as p:
     expect(page.locator('#form-draft-preparer')).to_be_focused()
     page.locator('#form-draft-store').select_option('CR3')
     page.locator('#form-draft-preparer').fill('Manager B')
-    expect(page.get_by_text('No drafts for this task, store and date.')).to_be_visible()
+    expect(page.locator('[data-form-editor]').get_by_text('No drafts for this task, store and date.')).to_be_visible()
     page.get_by_role('button', name='Start new draft', exact=True).click()
     expect(employee()).to_have_value('')
     employee().fill('Carl')
@@ -90,15 +91,15 @@ with sync_playwright() as p:
     if page.get_by_role('dialog').is_visible():
         page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
     page.locator('#form-draft-store').select_option('CR2')
-    expect(page.get_by_text('Preparer: Manager A')).to_be_visible()
-    expect(page.get_by_text('Preparer: Manager B')).to_have_count(0)
+    expect(page.locator('[data-form-editor]').get_by_text('Preparer: Manager A')).to_be_visible()
+    expect(page.locator('[data-form-editor]').get_by_text('Preparer: Manager B')).to_have_count(0)
     # A cash-out draft for the same store/date is a different task and never appears here.
     assert all(json.loads(d['raw'])['context']['task'] == 'form' for d in drafts())
 
     # Scenario 2: reload keeps the draft; leaving asks first; corrupt and denied storage are explicit.
     page.reload(); unlock()
     choose('CR2', '2026-10-20', 'Manager C')
-    page.get_by_role('button', name='Resume as a copy', exact=True).click()
+    page.locator('[data-form-editor]').get_by_role('button', name='Resume as a copy', exact=True).click()
     expect(employee()).to_have_value('Ana López')
     expect(incident()).to_have_value('Llegó tarde.\nSecond line')
     incident().fill('Llegó tarde.\nSecond line\nThird line')
@@ -120,10 +121,10 @@ with sync_playwright() as p:
     other = context.new_page(); other.on('pageerror', lambda e: errors.append(str(e)))
     other.goto(base + '/internal/forms'); other.wait_for_load_state('networkidle')
     other.locator('#cashout-code').fill(TOKEN); other.get_by_role('button', name='Unlock', exact=True).click()
-    other.get_by_role('button', name='New write-up', exact=True).click()
+    other.get_by_role('button', name='New form', exact=True).click();other.locator('[data-forms-new-type=write-up]').click()
     other.locator('#form-draft-store').select_option('CR2'); other.locator('#form-draft-date').fill('2026-10-20'); other.locator('#form-draft-preparer').fill('Tab two')
-    other.get_by_role('button', name='Resume as a copy', exact=True).first.click()
-    other.locator('input[required][maxlength="60"]').first.fill('Other tab edit')
+    other.locator('[data-form-editor]').get_by_role('button', name='Resume as a copy', exact=True).first.click()
+    other.locator('[data-form-editor] #form-field-employee').fill('Other tab edit')
     expect(employee()).to_have_value('Ana López')
     other.close()
 
@@ -138,7 +139,7 @@ with sync_playwright() as p:
     expect(incident()).to_have_value('Typed while storage is full')  # cannot leave until the device copy saves
     page.evaluate('() => { Storage.prototype.setItem = window.realSetItem }')
     incident().fill('Typed after storage returned')
-    expect(page.get_by_text('Saved on this device', exact=False)).to_be_visible()
+    expect(page.locator('[data-form-editor]').get_by_text('Saved on this device', exact=False)).to_be_visible()
 
     # Corrupt source stays downloadable and untouched.
     cr2 = next(d['key'] for d in drafts() if json.loads(d['raw'])['context'] == {'task': 'form', 'formType': 'write-up', 'storeId': 'CR2', 'businessDate': '2026-10-20'})
@@ -147,10 +148,10 @@ with sync_playwright() as p:
     page.get_by_role('button', name='Choose another draft', exact=True).click()
     if page.get_by_role('dialog').is_visible():
         page.get_by_role('dialog').get_by_role('button', name='Confirm', exact=True).click()
-    page.get_by_role('button', name='Refresh drafts', exact=True).click()
-    expect(page.get_by_text('This draft could not be read.', exact=False)).to_be_visible()
+    page.locator('[data-form-editor]').get_by_role('button', name='Refresh drafts', exact=True).click()
+    expect(page.locator('[data-form-editor]').get_by_text('This draft could not be read.', exact=False)).to_be_visible()
     with page.expect_download() as dl:
-        page.locator('li', has_text='This draft could not be read.').get_by_role('button', name='Download original source', exact=True).click()
+        page.locator('[data-form-editor] li', has_text='This draft could not be read.').get_by_role('button', name='Download original source', exact=True).click()
     assert open(dl.value.path()).read() == '{broken write-up'
     assert page.evaluate('(k) => localStorage.getItem(k)', corrupt_key) == '{broken write-up'
 
@@ -160,28 +161,31 @@ with sync_playwright() as p:
     employee().fill('Dana')
     incident().fill('Kept through an expired code')
     mode['auth'] = False
-    page.get_by_role('button', name='Save write-up', exact=True).click()
+    page.get_by_role('button', name='Review form', exact=True).click();page.get_by_role('button', name='Save form', exact=True).click()
     expect(page.locator('#cashout-code')).to_be_visible()
     mode['auth'] = True
     page.locator('#cashout-code').fill(TOKEN); page.get_by_role('button', name='Unlock', exact=True).click()
+    expect(page.locator('[data-form-review]')).to_contain_text('Kept through an expired code')
+    page.get_by_role('button',name='Edit answers',exact=True).click()
     expect(incident()).to_have_value('Kept through an expired code')
     assert posts == []
 
     # Scenario 3: saving creates an immutable record once; the draft remembers it and resuming warns before a second record.
-    page.get_by_role('button', name='Save write-up', exact=True).click()
-    expect(page.get_by_text('Saved.', exact=True)).to_be_visible()
+    page.get_by_role('button',name='Review form',exact=True).click()
+    page.get_by_role('button', name='Save form', exact=True).click()
+    expect(page.get_by_role('status').filter(has_text='Saved.')).to_be_visible()
     assert len(posts) == 1 and posts[0]['employee'] == 'Dana' and posts[0]['date'] == '2026-10-20'
-    expect(page.get_by_label('Incident Descriptions', exact=True)).to_be_disabled()
+    assert page.locator('[data-form-record] [data-form-content] input,[data-form-record] [data-form-content] textarea').count()==0
     dana = [json.loads(d['raw']) for d in drafts() if d['raw'].startswith('{') and 'Dana' in d['raw']]
     assert len(dana) == 1 and dana[0]['payload']['savedId'] == 'saved00001', dana
-    page.get_by_role('button', name='Back to list', exact=True).click()
+    page.get_by_role('button', name='Back to saved forms', exact=True).click()
     choose('CR2', '2026-10-20', 'Manager E')
-    resume = page.locator('li', has_text='Preparer: Manager D').get_by_role('button', name='Resume as a copy', exact=True)
+    resume = page.locator('[data-form-editor] li', has_text='Preparer: Manager D').get_by_role('button', name='Resume as a copy', exact=True)
     resume.click()
-    expect(page.get_by_text('This draft was already saved as a write-up.', exact=False)).to_be_visible()
-    expect(page.get_by_role('button', name='Save write-up', exact=True)).to_be_disabled()
-    page.get_by_role('button', name='Edit as a new write-up', exact=True).click()
-    expect(page.get_by_role('button', name='Save write-up', exact=True)).to_be_enabled()
+    expect(page.get_by_text('This draft was already saved.', exact=False)).to_be_visible()
+    expect(page.get_by_role('button', name='Review form', exact=True)).to_be_disabled()
+    page.get_by_role('button', name='Edit as a new form', exact=True).click()
+    expect(page.get_by_role('button', name='Review form', exact=True)).to_be_enabled()
     assert len(posts) == 1, 'Resuming a saved draft must not create another record by itself'
     assert saved['saved00001']['form']['incident'] == 'Kept through an expired code'
 

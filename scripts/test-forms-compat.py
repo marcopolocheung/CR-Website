@@ -48,9 +48,11 @@ with sync_playwright() as p:
     page = context.new_page()
     page.on('pageerror', lambda e: errors.append(str(e)))
     page.goto(base + '/internal/forms')
+    page.evaluate('window.print=()=>window.dispatchEvent(new Event("beforeprint"))')
 
     # Scenario 1: every blank form link resolves with its original format.
-    links = page.locator('a[href*="/internal/forms/"]')
+    page.locator('nav a[href="#blank"]').click()
+    links = page.locator('[data-forms-library=blank] a[href*="/internal/forms/"]')
     hrefs = [links.nth(i).get_attribute('href') for i in range(links.count())]
     assert [h.rsplit('/', 1)[1] for h in hrefs] == BLANKS, hrefs
     for i, h in enumerate(hrefs):
@@ -62,19 +64,20 @@ with sync_playwright() as p:
         assert res.body()[:4] == (b'%PDF' if pdf else b'PK\x03\x04'), h
 
     # Scenario 2: an old saved write-up renders read-only and only its label changes.
-    page.locator('#cashout-code').fill(TOKEN)
+    page.locator('nav a[href="#saved"]').click()
+    page.locator('#cashout-code:visible').fill(TOKEN)
     page.get_by_role('button', name='Unlock', exact=True).click()
     expect(page.get_by_role('cell', name='Ana Lopez', exact=True)).to_be_visible()
     page.get_by_role('button', name='Open Write-up for Ana Lopez, 2026-01-05', exact=True).click()
-    expect(page.get_by_label('Incident Descriptions', exact=True)).to_have_value(LONG)
-    for field in ['Incident Descriptions', 'Employee Signature', 'Manager Signature']:
-        expect(page.get_by_label(field, exact=True)).to_be_disabled()
-    expect(page.get_by_label('Employee Signature', exact=True)).to_have_value('Ana Lopez')
-    expect(page.get_by_role('checkbox', name='ATTENDANCE')).to_be_checked()
-    expect(page.get_by_role('checkbox', name='TERMINATION')).not_to_be_checked()
-    page.get_by_role('checkbox', name='TERMINATION').click(force=True)
-    expect(page.get_by_role('checkbox', name='TERMINATION')).not_to_be_checked()
-    label = page.get_by_placeholder('e.g. Second attendance warning')
+    record = page.locator('[data-form-record]')
+    expect(record).to_contain_text(LONG)
+    expect(record).to_contain_text('Ana Lopez')
+    expect(record).to_contain_text('Bob')
+    expect(record).to_contain_text('Attendance')
+    expect(record).to_contain_text('Verbal')
+    assert record.locator('[data-form-content] input,[data-form-content] textarea,[data-form-content] select').count() == 0, 'Saved original is editable'
+    assert doc['form']['actions'] == ['verbal'] and doc['form']['violations'] == ['attendance','others']
+    label = page.locator('#forms-label')
     expect(label).to_have_value('First warning')
     label.fill('Second attendance warning')
     page.get_by_role('button', name='Save label', exact=True).click()
@@ -83,17 +86,19 @@ with sync_playwright() as p:
     assert doc['form'] == OLD['form'], 'Form contents changed'
 
     # Scenario 3: printing keeps every line of a long narrative and the signature fields, over two or more pages.
+    page.get_by_role('button',name='Print',exact=True).click()
     page.emulate_media(media='print')
     printed = page.locator('[data-print-text]').first
     expect(printed).to_be_visible()
     assert printed.inner_text().strip() == LONG, 'Printed narrative was truncated'
-    assert page.locator('textarea').first.is_hidden()
+    assert page.locator('[data-forms-print] textarea:visible').count() == 0
     expect(page.get_by_label('Employee Signature', exact=True)).to_be_visible()
     assert page.get_by_role('button', name='Save label').is_hidden()
     pdf = page.pdf(format='Letter')
     pages = pdf.count(b'/Type /Page') - pdf.count(b'/Type /Pages')
     assert pages >= 3, f'Expected the long narrative to flow onto extra pages, got {pages}'
     page.emulate_media(media='screen')
+    page.evaluate('window.dispatchEvent(new Event("afterprint"))')
 
     # Keyboard: the label editor is reachable and saves with Enter.
     label.focus()

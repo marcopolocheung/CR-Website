@@ -107,3 +107,8 @@ No resource creation, binding change, migration execution, or Worker deployment 
 - I/L/E/V: done/done/not_applicable/not_applicable. No Worker change.
 - Rollback: revert the commit. Write-up drafts stay in localStorage under `cr-internal-draft:` keys and are simply not shown by the older page.
 - Next owner/action: DEC-06 record, then FORM-06 reuses `FormDraftWorkspace` for each new form.
+
+
+## Step 13 frontend follow-up — November 27, 2026
+
+The [Step 13 checkpoint](../checkpoints/step-13.md) covers the saved-first library, dedicated device Drafts and public Blank forms views, one New form chooser, sectioned bilingual entry and read-only review for the five existing types. Canonical fields/options, immutable originals, copied draft identity/savedId, label-only changes, explicit deletion, recovery bytes and English paper output remain the compatibility boundary. The scoped implementation and local verification passed: aggregate 419 tests, new workspace 14 groups, existing forms/digital/recovery/shell/session suites, build/SEO and independent PDFs; see the checkpoint for actual evidence and limits. This follow-up does not advance unresolved attachment/amendment/signature/approval or staff-language/live-service milestones.

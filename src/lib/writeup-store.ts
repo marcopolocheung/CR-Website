@@ -58,9 +58,12 @@ export async function saveWriteUp(form: WriteUpForm, token: string): Promise<str
   throw errorFor(status)
 }
 
-export async function saveWriteUpLabel(id: string, label: string, token: string): Promise<void> {
-  const { status } = await requestJson(`/api/writeups/${id}/label`, token, { method: 'PUT', body: JSON.stringify({ label }) }, UNREACHABLE)
-  if (status === 200) return
+export async function saveWriteUpLabel(id: string, label: string, token: string): Promise<{label:string;labelUpdatedAt:string|null}> {
+  const { status, body } = await requestJson(`/api/writeups/${id}/label`, token, { method: 'PUT', body: JSON.stringify({ label }) }, UNREACHABLE)
+  if (status === 200) {
+    const acknowledgment=body as {label?:unknown;labelUpdatedAt?:unknown}|null
+    return {label:typeof acknowledgment?.label==='string'?acknowledgment.label:label,labelUpdatedAt:typeof acknowledgment?.labelUpdatedAt==='string'?acknowledgment.labelUpdatedAt:null}
+  }
   throw errorFor(status)
 }
 
