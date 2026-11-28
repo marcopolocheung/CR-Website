@@ -59,6 +59,8 @@ Backend activation is not established by source presence. Some historical task d
 | 12 | Order checklist, catalog and count-history separation | Step 12a merged [PR #202](https://github.com/marcopolocheung/CR-Website/pull/202) (`7c0aff9`); [checkpoint](checkpoints/step-12a.md), device/live review remains pending. Step 12b/backend and unit-policy milestones remain pending. |
 | 13 | Forms library and sectioned editors | Merged [PR #203](https://github.com/marcopolocheung/CR-Website/pull/203) (`410302d`); [checkpoint](checkpoints/step-13.md). Device/staff and live review remain pending. |
 | 14 | Unified manager scheduling workspace | Implemented and verified locally; [checkpoint](checkpoints/step-14.md), owner/device/live review pending. One browser-script failure on Reports already exists on `main` and is recorded. |
+| 14a | Company Files library and Imports link | Planned; [scope](files-library.md) and [DEC-03-FILES](tasks/DEC-03-FILES.md) approved 2026-11-27. Starts after Step 14 is reviewed and merged. |
+| 14b | Files on Forms, Cash close and Inventory | Planned; follows 14a review. |
 | 15 | Review against the schedule staff actually see | Full comparison/history review remains open; [dated restaurant hours items 1–6](checkpoints/special-hours.md) implemented and locally verified, staff/release gates pending |
 | 16 | Focused published staff schedule | Not started |
 | 17 | Real resume/attention/recent-work signals on Home | Not started |
@@ -230,6 +232,32 @@ Backend activation is not established by source presence. Some historical task d
 
 **Checks:** `scheduler:test`, `scheduler:requests:test`, Worker request tests when touched, `agent:test` for assistant integration, scheduler/request/agent browser scenarios. **Rollback:** preserve station IDs, assignments, links, drafts and publish records. Related briefs: [SCH-03](tasks/SCH-03.md), [SCH-07](tasks/SCH-07.md), [SCH-08](tasks/SCH-08.md).
 
+## 14a. Add the company Files library and Imports link
+
+**Change:** implement [DATA-06](tasks/DATA-06.md) for the owner-approved [company Files library](files-library.md) under [DEC-03-FILES](tasks/DEC-03-FILES.md). Add a Files destination to the internal shell: folders, labels, store filter, search, upload, versions, activity, rename/move, trash/restore and a named conflict dialog. Documents and immutable versions use `records` (family `attachment`) through `mutateRecord`. Extend it with optional guarded projection statements in the same D1 batch for the version record and `attachments` row. Objects go to private R2 with SHA-256 verification. Migration 0004 seeds policy `attachments-v1`. Routes sit behind the existing manager gate and write throttle and report `backend_unconfigured` when unbound. Add a shared `RelatedFiles` panel and use it in Imports: after a saved import, a manager may save the source spreadsheet, linked `import:<record id>`, and import history shows it.
+
+**Verify:**
+- Upload, list and download with byte-exact checksums; rejected types, sizes, checksums and names store nothing.
+- A same-base replace race: one success, one 409 with both dialog choices, the orphan object deleted.
+- An identical retry replays; a failed projection rolls back.
+- Trash and restore keep every version; each change adds one activity entry.
+- The unbound state reads "not set up"; reconciliation reports an orphan.
+- English/Spanish, keyboard, 375/768/1440 widths. Existing import saves and history are unchanged.
+
+**Review gate:** a manager can find, upload, replace and recover a file without help, and can tell whether it saved. Typed names are shown as entered labels, never identity. The owner has pre-approved updating `scripts/test-internal-shell.py`'s destination count from six to seven for Files, keeping existing coverage. No other existing test is edited to pass.
+
+**Checks:** new `files:test` in `check` and Worker `files.test.mjs` in `check:full`; `data:test` after the projection change; `imports:test`, `imports:worker:test`; `worker:build` with mirror review; build/SEO; new `scripts/test-internal-files.py` plus the shell and import browser scripts against the local Worker. **Rollback:** hide the destination and panel; keep all rows and objects (retention is forever); correct activated migrations forward. Starts only after Step 14 is reviewed and merged.
+
+## 14b. Link files from Forms, Cash close and Inventory
+
+**Change:** place `RelatedFiles` on saved forms and write-ups (`form:<id>`, `writeup:<id>`), saved cash closes (`cash-close:<store>:<date>`, only once a save exists) and CR3 inventory counts (`inventory-count:CR3:<date>`). Attaching uses the Step 14a upload path with the link and a default folder/label preset. No change to those tools' save paths, money arithmetic or count semantics.
+
+**Verify:** attach, list, download and trash from each tool. An unsaved form/cash/count offers no attach. Files attached in a tool appear in the library with their link, and vice versa. Drafts and mounted inputs survive opening the panel. English/Spanish and phone widths.
+
+**Review gate:** each tool's existing workflow is unchanged apart from the panel. Cash, forms and inventory math and outputs match before and after.
+
+**Checks:** `files:test`, Worker files tests, `forms:test`, `cashout:test`, build/SEO; forms, cash and inventory browser scripts plus `test-internal-files.py`. **Rollback:** remove the panels; linked files stay in the library.
+
 ## 15. Review what will change for staff
 
 **Change:** make publication review compare the proposed week with the version staff currently see: employee, day, previous shift, new shift and newly uncovered required positions. Keep publication state and hidden visibility distinct.
@@ -300,7 +328,7 @@ These are feature dependencies, not a reason to turn every visual step into a pl
 
 Keep cash within the approved notebook scope: fixed $100 per drawer; Count/Amount; Extra money; calculated comparisons and saved lookup. Cash approvals, physical-deposit workflow and mandatory discrepancy explanations remain deferred. Do not implement them to satisfy an obsolete schema.
 
-Cross-station employee conflict detection, advanced fairness/optimization, attachments/amendments/follow-up, supplier communication, waste/transfers, scanning and personal notifications remain later feature slices with their existing identity/unit/policy dependencies. Retain them in the backlog; they are not secretly required to approve the shared UI foundation.
+The owner moved file storage forward as the [company Files library](files-library.md) (Steps 14a/14b). Cross-station employee conflict detection, advanced fairness/optimization, form amendments/follow-up, supplier communication, waste/transfers, scanning and personal notifications remain later feature slices with their existing identity/unit/policy dependencies. Retain them in the backlog; they are not secretly required to approve the shared UI foundation.
 
 ## Verification commands and evidence
 
