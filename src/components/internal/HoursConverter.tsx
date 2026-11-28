@@ -208,7 +208,7 @@ export default function HoursConverter({token = ''}: {token?: string}) {
         </div>
       </div>
       <details open={stage === 'report'} data-hours-copies><summary>{tr('hoursStages.copies')}</summary>
-      <ImportHistory token={token} context={context} snapshot={snapshot} preparer={preparer} accepted={acknowledged && !mappingBlocked} busy={busy} hasWork={!!rows} onRestore={restoreSnapshot} />
+      <ImportHistory sources={csvFile ? [csvFile] : []} token={token} context={context} snapshot={snapshot} preparer={preparer} accepted={acknowledged && !mappingBlocked} busy={busy} hasWork={!!rows} onRestore={restoreSnapshot} />
       <ImportRecovery context={context} preparer={preparer} snapshot={snapshot} hasWork={!!(plant || startDate || endDate || preparer || csvFile || rows)} busy={busy} onRestore={restoreSnapshot} onSaved={setDeviceSaved} />
       </details>
       <p id="hc-status" role="status" className="mt-2 text-sm text-gray-600">{status ? tr(status.key, status.params) : null}</p>

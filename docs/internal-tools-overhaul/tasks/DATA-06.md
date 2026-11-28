@@ -4,12 +4,12 @@ parent: DATA
 title: "Implement attachment metadata, upload, and retrieval"
 priority: P1
 delivery_class: CODE_AND_EXTERNAL
-status: ready
-owner: unassigned
+status: implemented
+owner: Claude
 implementation_dependencies: [DATA-02, DATA-05, DEC-03-FILES]
 activation_dependencies: [DATA-03, REL-03, DATA-09]
-implementation: pending
-local_verification: pending
+implementation: done
+local_verification: done
 external_activation: pending
 live_verification: pending
 ---
@@ -97,13 +97,14 @@ Evidence specific to this task: the three task scenarios above must pass against
 
 | Milestone | State | Evidence required |
 | --- | --- | --- |
-| Implementation | pending | Scoped artifact, code, decision record, or execution plan reviewed. |
-| Local verification | pending | Commands/scenarios and observed results, or decision/protocol consistency review. |
+| Implementation | done | Step 14a: [checkpoint](../checkpoints/step-14a.md); `worker/src/files.ts`, migration 0004, guarded `projections` in `record-mutations.ts`. |
+| Local verification | done | `files:worker:test` (6, local D1+R2), `files:test` (6), `test-internal-files.py` (7 groups); see the checkpoint. |
 | External activation | pending | Environment, operation IDs, deployment/resource evidence, or staff-session execution. |
 | Live verification | pending | Observed target-environment behavior or staff acceptance with date and operator. |
 
 ## Handoff evidence
 
+- Step 14a (2026-11-27): implemented and locally verified for the company Files library ([checkpoint](../checkpoints/step-14a.md)). Production needs owner-run D1/R2 provisioning and binding review (DATA-03/REL-03/DATA-09); external and live milestones stay pending.
 - Commits/artifacts: none; this brief is planning documentation.
 - Checks performed: source inspection only; implementation scenarios not run.
 - Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.

@@ -9,11 +9,12 @@ const Dashboard = dynamic(() => import('./DashboardWorkspace'))
 const Bookkeeping = dynamic(() => import('./BookkeepingWorkspace'))
 const Inventory = dynamic(() => import('./InventoryWorkspace'))
 const Forms = dynamic(() => import('./FormsWorkspace'))
+const Files = dynamic(() => import('./FilesWorkspace'))
 const Reports = dynamic(() => import('./ReportsWorkspace'))
 const CashHistory = dynamic(() => import('./CashHistory'))
 const ImportHistory = dynamic(() => import('./ImportHistoryWorkspace'))
 const Scheduler = dynamic(() => import('../scheduler/SchedulerDemo'))
-const tools = { 'import-history': ImportHistory, 'cash-history': CashHistory, reports: Reports, dashboard: Dashboard, bookkeeping: Bookkeeping, inventory: Inventory, forms: Forms }
+const tools = { 'import-history': ImportHistory, 'cash-history': CashHistory, reports: Reports, dashboard: Dashboard, bookkeeping: Bookkeeping, inventory: Inventory, forms: Forms, files: Files }
 type Tool = keyof typeof tools
 export default function WorkspaceHost({ children }: { children: ReactNode }) {
   const path = usePathname().replace(/\/$/, '').replace(/\.html$/, '')

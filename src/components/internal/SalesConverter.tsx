@@ -322,7 +322,7 @@ export default function SalesConverter({
         </div>
       </div>
       <details open={stage === 'report'}><summary>{tr('salesStages.copies')}</summary>
-      <ImportHistory token={token} context={context} snapshot={snapshot} preparer={`${form.firstName} ${form.lastName}`.trim()} accepted={acknowledged} busy={busy} hasWork={!!review} onRestore={restoreSnapshot} />
+      <ImportHistory sources={Object.values(files).filter((file): file is File => !!file)} token={token} context={context} snapshot={snapshot} preparer={`${form.firstName} ${form.lastName}`.trim()} accepted={acknowledged} busy={busy} hasWork={!!review} onRestore={restoreSnapshot} />
       <ImportRecovery context={context} preparer={`${form.firstName} ${form.lastName}`.trim()} snapshot={snapshot}
         hasWork={Object.values(form).some(Boolean) || Object.values(files).some(Boolean) || !!review} busy={busy} onRestore={restoreSnapshot} onSaved={setDeviceSaved} />
       </details>

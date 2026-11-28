@@ -23,6 +23,7 @@ const destinations = [
   { id: 'schedule', icon: 'calendar', href: '/scheduler-demo' },
   { id: 'reports', icon: 'report', href: '/internal/reports' },
   { id: 'forms', icon: 'form', href: '/internal/forms' },
+  { id: 'files', icon: 'layers', href: '/internal/files' },
 ] as const
 const reportTabs = ['sales', 'hours', 'comparison']
 const base = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '')
@@ -43,7 +44,7 @@ export default function InternalShell({ children, themeClassName }: { children: 
   const scheduling = /(?:^|\/)scheduler-demo(?:\/[^/]+)?$/.test(pathname)
   const station = scheduling && isRestaurantId(pathname.split('/').pop()) ? pathname.split('/').pop() : null
   const section = scheduling ? 'schedule' : pathname.endsWith('/bookkeeping') ? (reportTabs.includes(hash) ? 'reports' : 'cash')
-    : pathname.endsWith('/cash-history') ? 'cash' : (pathname.endsWith('/reports') || pathname.endsWith('/import-history')) ? 'reports' : pathname.endsWith('/inventory') ? 'inventory' : pathname.endsWith('/forms') ? 'forms'
+    : pathname.endsWith('/cash-history') ? 'cash' : (pathname.endsWith('/reports') || pathname.endsWith('/import-history')) ? 'reports' : pathname.endsWith('/inventory') ? 'inventory' : pathname.endsWith('/forms') ? 'forms' : pathname.endsWith('/files') ? 'files'
     : pathname.endsWith('/qr-generator') ? 'qr' : pathname.endsWith('/ui-gallery') ? 'gallery' : 'dashboard'
   const taskId = station ? `schedule-${station}` : pathname.endsWith('/import-history') ? 'import-history' : pathname.endsWith('/cash-history') ? 'cash-history' : section === 'reports' && pathname.endsWith('/bookkeeping') ? hash : section
   const session = useManagerSession()

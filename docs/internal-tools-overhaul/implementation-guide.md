@@ -59,7 +59,7 @@ Backend activation is not established by source presence. Some historical task d
 | 12 | Order checklist, catalog and count-history separation | Step 12a merged [PR #202](https://github.com/marcopolocheung/CR-Website/pull/202) (`7c0aff9`); [checkpoint](checkpoints/step-12a.md), device/live review remains pending. Step 12b/backend and unit-policy milestones remain pending. |
 | 13 | Forms library and sectioned editors | Merged [PR #203](https://github.com/marcopolocheung/CR-Website/pull/203) (`410302d`); [checkpoint](checkpoints/step-13.md). Device/staff and live review remain pending. |
 | 14 | Unified manager scheduling workspace | Implemented and verified locally; [checkpoint](checkpoints/step-14.md), owner/device/live review pending. One browser-script failure on Reports already exists on `main` and is recorded. |
-| 14a | Company Files library and Imports link | Planned; [scope](files-library.md) and [DEC-03-FILES](tasks/DEC-03-FILES.md) approved 2026-11-27. Starts after Step 14 is reviewed and merged. |
+| 14a | Company Files library and Imports link | Implemented and verified locally; [checkpoint](checkpoints/step-14a.md), owner/device review pending. Local-only until the owner provisions D1/R2. |
 | 14b | Files on Forms, Cash close and Inventory | Planned; follows 14a review. |
 | 15 | Review against the schedule staff actually see | Full comparison/history review remains open; [dated restaurant hours items 1–6](checkpoints/special-hours.md) implemented and locally verified, staff/release gates pending |
 | 16 | Focused published staff schedule | Not started |

@@ -1,0 +1,10 @@
+test-internal-files exit=0 17s
+test-internal-shell exit=0 28s
+test-internal-session exit=0 13s
+test-internal-primitives exit=0 9s
+test-import-history exit=0 3s
+test-import-history-hub exit=0 9s
+test-import-retention exit=0 6s
+test-import-comparison exit=0 8s
+test-scheduler-workspace exit=0 34s
+DONE

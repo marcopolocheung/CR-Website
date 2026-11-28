@@ -3,8 +3,9 @@ import { useInternalLanguage } from './InternalLanguage'
 import type { ImportHistoryRecord } from '@/lib/converter/import-api'
 import { snapshotPeriod } from '@/lib/converter/import-history'
 import { Button } from './ui/controls'
+import RelatedFiles from './RelatedFiles'
 
-export default function ImportHistoryRecordCard({ record, busy, onResume }: { record: ImportHistoryRecord; busy: boolean; onResume: () => void }) {
+export default function ImportHistoryRecordCard({ record, busy, onResume, sources = [], preparer }: { record: ImportHistoryRecord; busy: boolean; onResume: () => void; sources?: File[]; preparer?: string }) {
   const { t, locale } = useInternalLanguage()
   const period = snapshotPeriod(record.data.snapshot)
   const date = (value: string) => {
@@ -29,5 +30,7 @@ export default function ImportHistoryRecordCard({ record, busy, onResume }: { re
         const a = document.createElement('a'); a.href = url; a.download = `${record.storeId}-${record.id}-reviewed-import.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
       }} className="mt-3">{t('importHistory.exportRecord')}</Button>
     </details>
+    <RelatedFiles link={{ kind: 'import', key: record.id }} storeId={record.storeId} folder={record.data.kind === 'sales' ? 'Imports/Sales' : 'Imports/Hours'}
+      labels={[record.data.kind]} sources={sources} preparer={preparer || record.data.reviewedBy} title="files.importSources" />
   </li>
 }
