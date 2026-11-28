@@ -33,7 +33,7 @@ import {
 import { fetchRoster, rosterFingerprint, saveRoster } from '@/lib/employee-store'
 import { fetchStaff, saveStaff, staffFingerprint, undoStaff, verifyStaffPassword, type StaffWriteResult } from '@/lib/staff-store'
 import { fetchTemplate, saveTemplate, templateFingerprint } from '@/lib/template-store'
-import { fetchGoldenMonth, fetchGoldenWeek, saveErrorMessage, type GoldenWeekDoc } from '@/lib/schedule-store'
+import { fetchGoldenMonth, fetchGoldenWeek, saveErrorMessage, StoreAuthError, type GoldenWeekDoc } from '@/lib/schedule-store'
 import { assignmentsFromPublishedWeek, buildPublishedWeek, layoutForPublication, publishedWeekFingerprint } from '@/lib/schedule-share'
 import { buildScheduleSnapshot } from '@/lib/schedule-snapshot'
 import { businessDate } from '@/lib/internal-tools/contracts'
@@ -76,6 +76,8 @@ import { GenerationReportBanner, GuidedFixPanel, HoursSummary, MonthStrip, Onboa
 import ScheduleWorkspace, { type ScheduleWorkspaceProps } from './ScheduleWorkspace'
 import StaffWorkspace, { type StaffWorkspaceProps } from './StaffWorkspace'
 import SchedulingAgent from './SchedulingAgent'
+import ScheduleAssistant from './ScheduleAssistant'
+import { prepareAssistantOps } from '@/lib/scheduler/assistant'
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
   const controller=useRef<HTMLDivElement>(null)
   const findElement=(id:string)=>controller.current?.querySelector<HTMLElement>(`[id="${CSS.escape(id)}"]`)??null
@@ -1843,6 +1845,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
             onEmployee={employeeId=>{setFocusEmployeeId(employeeId);setStaffQuery(employees.find(e=>e.id===employeeId)?.name??'');openEmployeeSettings()}}/>
         </fieldset>
       </section>
+      <details className={css.assistant} hidden={tab!=='schedule'} open><summary>{t('planning.ai.title')}</summary>{weekStart&&active&&managerCode&&<ScheduleAssistant key={`${requestStation}:${weekStart}:${session.generation}`}
+        input={{employees:scheduleEmployees,slots,assignments,exclusions}} weekStart={weekStart} draftKey={draftContext} token={managerCode} locale={requestLocale}
+        disabled={storeLoading||storeOffline||isGenerating||adjustment.busy||mutationBusy||ruleProblems.length>0||requestDirty||hoursBlocked}
+        onApply={ops=>{setExternalAvailability(false);void adjustment.run(input=>prepareAssistantOps(input,ops),autoAdjust,'planning.ai.done')}}
+        onRecord={(employeeId,date)=>{setRequestPrefill({id:crypto.randomUUID(),employeeId,date});changeView('requests',true)}}
+        onDenied={caught=>{if(caught instanceof StoreAuthError)session.expire()}}/>}</details>
       {AGENT_API&&<details className={css.assistant} hidden={tab!=='schedule'}><summary>{t('planning.assistant')}</summary>{weekStart&&active&&<SchedulingAgent key={`${requestStation}:${weekStart}:${session.generation}`} token={managerCode}
         context={{...agentHoursContext,stationId:requestStation,weekStart,employees,template,assignments:assignments.filter(item=>item.employeeId),requests:{phase:requestSource.phase,revision:requestSource.record?.revision??0,data:requestSource.record?.data??null}}}
         disabled={storeLoading||storeOffline||isGenerating||adjustment.busy||mutationBusy||ruleProblems.length>0||requestSource.phase!=='ready'||requestDirty||hoursBlocked}

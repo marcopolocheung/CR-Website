@@ -15,6 +15,7 @@ import { Button, Field, Paper } from './ui/controls'
 import { internalThemeClassName } from './ui/Theme'
 import { formatCents } from '@/lib/cashout'
 import styles from './cash-history.module.css'
+import { AssistantError, askCashQuestion, type AssistantFailure } from '@/lib/assistant-client'
 
 type Load<T> = { state: 'loading' | 'failed' | 'empty'; value?: never } | { state: 'ready'; value: T }
 const today = () => new Date().toLocaleDateString('en-CA')
@@ -96,6 +97,7 @@ function Lookup() {
           <Field id="cash-history-exact" label={t('cash.lookup.exact')} type="date" value={exact} onChange={e => setExact(e.target.value)} />
           <Button disabled={!businessDate(exact)} onClick={openExact}>{t('cash.lookup.open')}</Button>
         </Paper>
+        {session.token && <CashAsk key={session.generation} token={session.token} onDenied={denied} />}
         {!invalid && businessDate(to) && <section aria-label={t('cash.lookup.window')} data-lookup-window>
           <h2>{t('cash.lookup.windowLabel', {from:lookupDates(to)[29],to})}</h2>
           {history.state === 'loading' && <p role="status">{t('common.loading')}</p>}
@@ -133,4 +135,31 @@ function Lookup() {
       </section>}
     </div>
   </div>
+}
+
+type Ask = { phase: 'idle' | 'busy' } | { phase: 'done'; answer: string; covered: { from: string; to: string } | null } | { phase: 'failed'; reason: AssistantFailure }
+/** Read-only questions over the saved sheets; the answer is AI text, so it points back to the dates it used. */
+function CashAsk({ token, onDenied }: { token: string; onDenied: (caught: unknown) => void }) {
+  const { t } = useInternalLanguage()
+  const [question,setQuestion] = useState('')
+  const [ask,setAsk] = useState<Ask>({phase:'idle'})
+  const busy = ask.phase === 'busy'
+  return <Paper className={styles.ask}>
+    <form onSubmit={async e => {
+      e.preventDefault(); if (busy || !question.trim()) return
+      setAsk({phase:'busy'})
+      try { const reply = await askCashQuestion(question.trim(), today(), token); setAsk({phase:'done',answer:reply.answer,covered:reply.coveredDates}) }
+      catch (caught) { onDenied(caught); setAsk({phase:'failed',reason:caught instanceof AssistantError ? caught.reason : 'failed'}) }
+    }}>
+      <h2>{t('cash.ask.title')}</h2>
+      <Field id="cash-ask" label={t('cash.ask.label')} value={question} maxLength={500} onChange={e => setQuestion(e.target.value)} hint={t('cash.ask.hint')} />
+      <div className={styles.actions}><Button type="submit" variant="primary" busy={busy} disabled={busy || !question.trim()}>{t('cash.ask.submit')}</Button></div>
+    </form>
+    {busy && <p role="status">{t('cash.ask.busy')}</p>}
+    {ask.phase === 'done' && <div role="status" className={styles.answer} data-cash-answer>
+      <p>{ask.answer}</p>
+      <p className={styles.covered}>{ask.covered ? t('cash.ask.covered', ask.covered) : t('cash.ask.none')}</p>
+    </div>}
+    {ask.phase === 'failed' && <p role="alert">{t(`assistant.${ask.reason}`)}</p>}
+  </Paper>
 }

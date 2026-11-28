@@ -295,6 +295,21 @@ Activation for dashboard deploys: Worker → Settings → Triggers → Cron Trig
 Add → `0 * * * *` (hourly). `wrangler.toml` declares the same schedule for
 wrangler deploys.
 
+## Manager assistant (Gemini)
+
+Optional. Set the Worker secret `GEMINI_API_KEY` (a Google AI Studio API key) to turn on:
+
+- `POST /api/assistant/cash` `{ question, to }`: answers questions about the last 30 days of saved cash-out sheets for both stores. Read-only.
+- `POST /api/assistant/schedule` `{ text, weekStart, employees, slots, assignments }`: turns a sentence like "Maria called out Friday" into proposed steps (`callout`, `remove`, `place`). The scheduler applies them to the draft only after the manager chooses **Apply to draft**, through the normal adjustment and Undo.
+
+Both need the manager code and have their own limit of 30 calls per hour per IP (`429`). Without the secret they answer `503 assistant_unconfigured`, and the panels say the assistant isn't set up. Each call sends the question plus the needed staff names, shifts or cash figures to Google's Gemini API, using model `gemini-flash-latest` through its OpenAI-compatible endpoint. Use a key from a project with billing turned on: Google's terms let it use free-tier API content to improve its products. Neither route writes records.
+
+```sh
+wrangler secret put GEMINI_API_KEY --config worker/wrangler.toml
+```
+
+For local testing, put `GEMINI_API_KEY=...` in `worker/.dev.vars`.
+
 ## Deploy option A: dashboard paste (what you already did)
 
 1. Open Workers & Pages → `chinarose-schedule-api` → Edit code.
