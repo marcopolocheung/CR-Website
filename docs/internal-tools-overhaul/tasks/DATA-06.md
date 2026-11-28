@@ -4,9 +4,9 @@ parent: DATA
 title: "Implement attachment metadata, upload, and retrieval"
 priority: P1
 delivery_class: CODE_AND_EXTERNAL
-status: blocked
+status: ready
 owner: unassigned
-implementation_dependencies: [DATA-02, DATA-05, DEC-03]
+implementation_dependencies: [DATA-02, DATA-05, DEC-03-FILES]
 activation_dependencies: [DATA-03, REL-03, DATA-09]
 implementation: pending
 local_verification: pending
@@ -18,7 +18,7 @@ live_verification: pending
 
 ## Outcome and scope
 
-Implement private R2 objects with D1 attachment metadata and authorized record references.
+Implement private R2 objects with D1 attachment metadata and authorized record references. The first consumer is the company Files library ([files-library.md](../files-library.md)), delivered in implementation-guide Steps 14a/14b.
 
 Preserve legacy KV data, station defaults/fallbacks, encrypted link behavior, existing public/private boundaries, and old frontend response compatibility. Do not guess resource IDs, employee matches, supplier units, retention periods, or financial policies.
 
@@ -42,7 +42,7 @@ See [current-state inventory](../current-state.md) and [supporting research](../
 
 - [DATA-02](DATA-02.md) at `implemented` (or `complete`).
 - [DATA-05](DATA-05.md) at `implemented` (or `complete`).
-- [DEC-03](DEC-03.md) at `complete`.
+- [DEC-03-FILES](DEC-03-FILES.md) at `complete`: owner-approved keep-forever attachment policy `attachments-v1` (2026-11-27). Wider DEC-03 remains pending.
 
 **Needed to activate:**
 
@@ -107,6 +107,6 @@ Evidence specific to this task: the three task scenarios above must pass against
 - Commits/artifacts: none; this brief is planning documentation.
 - Checks performed: source inspection only; implementation scenarios not run.
 - Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.
-- Blockers: Business decision: DEC-03. Independent tasks remain available.
+- Blockers: none for local implementation; DEC-03-FILES approved 2026-11-27. Start after Step 14 is reviewed and merged.
 - External/live evidence: none. No feature is implemented, deployed, or verified by this documentation.
 - Next owner/action: unassigned; claim and synchronize the [tracker](../tracker.md) before editing.
