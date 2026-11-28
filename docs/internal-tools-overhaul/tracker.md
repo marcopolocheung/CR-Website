@@ -16,6 +16,8 @@ The [Step 12a checkpoint](checkpoints/step-12a.md) records the locally implement
 
 The [Step 13 checkpoint](checkpoints/step-13.md) records the forms-library and sectioned-editor frontend slice. The frontend slice is implemented and locally verified; existing FORM-01/02/07 evidence and unresolved FORM-03/UX-07/DEC-07 policy milestones remain separate.
 
+[DEC-03-FILES](tasks/DEC-03-FILES.md) records the owner's 2026-11-27 keep-forever policy for the [company Files library](files-library.md), which makes DATA-06 ready for local implementation in implementation-guide Steps 14a/14b. Wider DEC-03 and all external/live milestones remain pending.
+
 The [Step 11 checkpoint](checkpoints/step-11.md) records locally implemented and verified CR3 counting, filters and device-only progress. INV-01/03/10 remain pending for their wider durable-session, unit and historical-server scope. INV-02's requested global progress/filter/search slice is verified; its broader per-section reporting remains open. No external/live milestone is advanced.
 
 The [Step 03 checkpoint](checkpoints/step-03.md) records the locally verified shell/navigation slice of UX-02. Its broader context/shared-access lifecycle checklist remains for Step 04; no unrelated or external/live milestones are changed.
@@ -52,7 +54,7 @@ Dependency cells list stable IDs. Each brief specifies the milestone required. I
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | DATA-04 | Implement employee directory and legacy mappings | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-04](tasks/DATA-04.md) |
 | DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | implemented | Codex | D/D/P/P | [DATA-05](tasks/DATA-05.md) |
-| DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
+| DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03-FILES | DATA-03, REL-03, DATA-09 | ready | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
 | DATA-10 | Implement and verify backup/export/restore procedures | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-07, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-10](tasks/DATA-10.md) |
 | SCH-01 | Persist dated time off and temporary availability | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-01 | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [SCH-01](tasks/SCH-01.md) |
 | SCH-02 | Add manager-entered requests and review | P1 | `CODE_AND_EXTERNAL` | SCH-01, UX-03 | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [SCH-02](tasks/SCH-02.md) |
@@ -92,7 +94,6 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UX-07 | Standardize print layouts and bilingual output | P1 | `CODE_ONLY` | UX-01, DEC-07 | — | blocked | unassigned | P/P/NA/NA | [UX-07](tasks/UX-07.md) |
 | DATA-04 | Implement employee directory and legacy mappings | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-04](tasks/DATA-04.md) |
-| DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
 | DATA-08 | Rehearse migration and recovery in non-production | P0 | `EXTERNAL_ONLY` | DATA-03, DATA-07, DATA-02, DEC-03, REL-03 | — | blocked | unassigned | P/P/P/P | [DATA-08](tasks/DATA-08.md) |
 | DATA-09 | Execute production resource setup and verified cutover | P0 | `EXTERNAL_ONLY` | DATA-08, DEC-03 | — | blocked | unassigned | P/P/P/P | [DATA-09](tasks/DATA-09.md) |
 | DATA-10 | Implement and verify backup/export/restore procedures | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-07, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-10](tasks/DATA-10.md) |
@@ -148,6 +149,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | DEC-04-IMPORT | Approve explicit identity mappings for imports | P1 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-04-IMPORT](tasks/DEC-04-IMPORT.md) |
 | DATA-04-IMPORT | Persist reviewed import directory snapshots | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [DATA-04-IMPORT](tasks/DATA-04-IMPORT.md) |
 | DEC-03-IMPORT | Approve reviewed import history without raw uploads or disposal | P1 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-03-IMPORT](tasks/DEC-03-IMPORT.md) |
+| DEC-03-FILES | Approve keep-forever retention for the company files library | P1 | `DECISION` | — | — | complete | Claude | D/D/NA/NA | [DEC-03-FILES](tasks/DEC-03-FILES.md) |
 | SCH-06-IMPORT | Read published schedule estimates for import comparison | P1 | `CODE_ONLY` | DATA-04-IMPORT, DEC-01, DEC-04-IMPORT | — | complete | Codex | D/D/NA/NA | [SCH-06-IMPORT](tasks/SCH-06-IMPORT.md) |
 
 ## All tasks
@@ -173,7 +175,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | DATA-03 | Provision and bind non-production D1/R2 | P0 | `EXTERNAL_ONLY` | DATA-02 | — | ready | unassigned | P/P/P/P | [DATA-03](tasks/DATA-03.md) |
 | DATA-04 | Implement employee directory and legacy mappings | P0 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-04](tasks/DATA-04.md) |
 | DATA-05 | Implement atomic revisions and change history | P0 | `CODE_AND_EXTERNAL` | DATA-02 | DATA-03, REL-03, DATA-09 | implemented | Codex | D/D/P/P | [DATA-05](tasks/DATA-05.md) |
-| DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03 | DATA-03, REL-03, DATA-09 | blocked | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
+| DATA-06 | Implement attachment metadata, upload, and retrieval | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-03-FILES | DATA-03, REL-03, DATA-09 | ready | unassigned | P/P/P/P | [DATA-06](tasks/DATA-06.md) |
 | DATA-07 | Prepare KV export and reconciliation tooling | P0 | `CODE_ONLY` | DATA-01 | — | ready | unassigned | P/P/NA/NA | [DATA-07](tasks/DATA-07.md) |
 | DATA-08 | Rehearse migration and recovery in non-production | P0 | `EXTERNAL_ONLY` | DATA-03, DATA-07, DATA-02, DEC-03, REL-03 | — | blocked | unassigned | P/P/P/P | [DATA-08](tasks/DATA-08.md) |
 | DATA-09 | Execute production resource setup and verified cutover | P0 | `EXTERNAL_ONLY` | DATA-08, DEC-03 | — | blocked | unassigned | P/P/P/P | [DATA-09](tasks/DATA-09.md) |
@@ -241,6 +243,7 @@ Readiness does not authorize cloud execution. Verified targets, explicit executi
 | DEC-04-IMPORT | Approve explicit identity mappings for imports | P1 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-04-IMPORT](tasks/DEC-04-IMPORT.md) |
 | DATA-04-IMPORT | Persist reviewed import directory snapshots | P1 | `CODE_AND_EXTERNAL` | DATA-02, DATA-05, DEC-04-IMPORT | DATA-03, REL-03, DATA-09, REL-04 | implemented | Codex | D/D/P/P | [DATA-04-IMPORT](tasks/DATA-04-IMPORT.md) |
 | DEC-03-IMPORT | Approve reviewed import history without raw uploads or disposal | P1 | `DECISION` | — | — | complete | Codex | D/D/NA/NA | [DEC-03-IMPORT](tasks/DEC-03-IMPORT.md) |
+| DEC-03-FILES | Approve keep-forever retention for the company files library | P1 | `DECISION` | — | — | complete | Claude | D/D/NA/NA | [DEC-03-FILES](tasks/DEC-03-FILES.md) |
 | SCH-06-IMPORT | Read published schedule estimates for import comparison | P1 | `CODE_ONLY` | DATA-04-IMPORT, DEC-01, DEC-04-IMPORT | — | complete | Codex | D/D/NA/NA | [SCH-06-IMPORT](tasks/SCH-06-IMPORT.md) |
 
 ### Experience overhaul Step 08 — November 18, 2026
