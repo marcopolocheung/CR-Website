@@ -57,8 +57,8 @@ Backend activation is not established by source presence. Some historical task d
 | 10 | Shared import history and readable comparison reports | Merged [PR #196](https://github.com/marcopolocheung/CR-Website/pull/196); [local checkpoint](checkpoints/step-10.md). Device/staff and applicable backend/live gates remain separate. |
 | 11 | Inventory counting and explicit progress | Merged [PR #197](https://github.com/marcopolocheung/CR-Website/pull/197) (`00e0c63`); [checkpoint](checkpoints/step-11.md), device-only progress; physical-device/staff/live gates remain pending |
 | 12 | Order checklist, catalog and count-history separation | Step 12a merged [PR #202](https://github.com/marcopolocheung/CR-Website/pull/202) (`7c0aff9`); [checkpoint](checkpoints/step-12a.md), device/live review remains pending. Step 12b/backend and unit-policy milestones remain pending. |
-| 13 | Forms library and sectioned editors | Implemented and verified locally; [PR #203](https://github.com/marcopolocheung/CR-Website/pull/203), [checkpoint](checkpoints/step-13.md), owner/device/live review pending. |
-| 14 | Unified manager scheduling workspace | Not started |
+| 13 | Forms library and sectioned editors | Merged [PR #203](https://github.com/marcopolocheung/CR-Website/pull/203) (`410302d`); [checkpoint](checkpoints/step-13.md). Device/staff and live review remain pending. |
+| 14 | Unified manager scheduling workspace | Implemented and verified locally; [checkpoint](checkpoints/step-14.md), owner/device/live review pending. One browser-script failure on Reports already exists on `main` and is recorded. |
 | 15 | Review against the schedule staff actually see | Full comparison/history review remains open; [dated restaurant hours items 1–6](checkpoints/special-hours.md) implemented and locally verified, staff/release gates pending |
 | 16 | Focused published staff schedule | Not started |
 | 17 | Real resume/attention/recent-work signals on Home | Not started |

@@ -1,3 +1,5 @@
+import { schedulerScreenSpanish } from './scheduler-screen'
+import { scheduleShellSpanish } from './schedule-shell'
 import { formsSpanish } from './forms-entry'
 import { formsDraftSpanish } from './forms-drafts'
 import { formsWorkspaceSpanish } from './forms-workspace'
@@ -5,6 +7,8 @@ import { planningSpanish } from './planning'
 import { hoursSpanish } from './special-hours'
 import type en from './en'
 const es: Record<keyof typeof en, string> = {
+  ...schedulerScreenSpanish,
+  ...scheduleShellSpanish,
   ...hoursSpanish,
   ...formsSpanish,
   ...formsDraftSpanish,

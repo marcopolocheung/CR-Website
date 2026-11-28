@@ -97,6 +97,7 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 ## Handoff evidence
 
+- Step 14 (2026-11-27): [checkpoint](../checkpoints/step-14.md). Approved exceptions still reach generation and validation through the unified layout; planning and request browser scripts pass. Status unchanged.
 - Artifacts/evidence: [schedule-requests.md](../schedule-requests.md#sch-03-approved-exceptions-in-scheduling); `withApprovedRequests` in `src/lib/scheduler/requests.ts`, dated lookup in `validator.ts`, scheduler integration and messages.
 - Local checks: scheduler 129 (new SCH-03 scenario test), request domain/client 5; build, types, SEO pass. Request browser suite and existing scheduler-view browser suite pass with synthetic loopback fixtures.
 - Implementation/local verification done; no external operation. Frontend publication follows REL-04 after SCH-01/02 backend activation.

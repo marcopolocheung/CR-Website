@@ -15,6 +15,8 @@ import { employeeColorsFor } from './employee-colors'
 import RoleBadge from './RoleBadge'
 import { DayHoursControl } from './SpecialHours'
 import css from './planning.module.css'
+import { useSchedulerText } from './useSchedulerText'
+import { useWorkspaceVisible } from '@/components/internal/WorkspaceVisibility'
 
 function LockIcon({ locked }: { locked: boolean }) {
   return <svg data-lock-state={locked ? 'locked' : 'unlocked'} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
@@ -33,6 +35,10 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
   exclusions: readonly string[]; onRemove: (slotId: string) => void; onAllow: (key: string) => void
   onRequest: (employeeId: string, date: string) => void; onEmployee: (employeeId: string) => void; onAdjust: () => void
 }) {
+  const visible = useWorkspaceVisible()
+  const workspaceRef = useRef<HTMLDivElement>(null)
+  const find = (id:string) => workspaceRef.current?.querySelector<HTMLElement>(`#${CSS.escape(id)}`) ?? null
+  const text = useSchedulerText()
   const t = (key: string, params?: Record<string, string | number>) => translate(locale, key, params)
   const colorRegistry = useRef(new Map<string, string>())
   colorRegistry.current = employeeColorsFor(p.allEmployees.map(employee => employee.id), colorRegistry.current)
@@ -52,12 +58,12 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
   useEffect(() => { setSelected(null); setPersonId(null); setMenu(null); setMoving(null); setSelectedDate(''); drag.current = null }, [p.weekStart])
   useEffect(() => { if (busy) { setMenu(null); setMoving(null); drag.current = null } }, [busy])
   useEffect(() => {
-    if (!menu) return
+    if (!menu || !visible) return
     function dismiss(event: PointerEvent) { if (!menuRef.current?.contains(event.target as Node)) setMenu(null) }
-    function escape(event: KeyboardEvent) { if (event.key === 'Escape') { setMenu(null); document.getElementById(`planning-person-${menu}`)?.focus() } }
+    function escape(event: KeyboardEvent) { if (event.key === 'Escape') { setMenu(null); find(`planning-person-${menu}`)?.focus() } }
     document.addEventListener('pointerdown', dismiss); document.addEventListener('keydown', escape)
     return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', escape) }
-  }, [menu])
+  }, [menu, visible])
   if (!p.weekStart) return <p aria-live="polite">{t('planning.loading')}</p>
   const slotsById = new Map(p.slots.map(s => [s.id, s]))
   const name = (id?: string) => p.allEmployees.find(e => e.id === id)?.name ?? t('planning.open')
@@ -75,9 +81,14 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
   const generationReport = p.lastReport?.weekStart === p.weekStart ? p.lastReport : null
   const totalHours = p.stats.reduce((n, s) => n + s.hours, 0)
   const problems = p.violations.filter(v => v.code !== 'missing_assignment')
+  const issue = p.nextIssue
+  const issueBlocker = !!issue && (issue.id.includes('missing_assignment') || issue.id.startsWith('ready:'))
+  const issueCode = issue?.id.split(':')[1] ?? ''
+  const issueSlot = issue?.slot
+  const issueViolation = issue ? p.violations.find(v => issue.id.includes(v.code) && (!issueSlot || v.slotId === issueSlot.id)) : undefined
   const excludedHere = slot ? p.allEmployees.map(e => ({ id: e.id, key: exclusionKey(slot, e.id) })).filter(x => exclusions.includes(x.key)) : []
   function editPerson(id: string, date: string, triggerId?: string) {
-    returnFocus.current = triggerId ? document.getElementById(triggerId) : document.activeElement as HTMLElement | null
+    returnFocus.current = triggerId ? find(triggerId) : document.activeElement as HTMLElement | null
     setMenu(null); setPersonId(id); setSelectedDate(date)
     requestAnimationFrame(() => {
       if (!panelRef.current || panelRef.current.offsetParent === null) return
@@ -107,16 +118,17 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
     const day = new Date(`${value}T12:00:00Z`).toLocaleDateString(locale === 'es' ? 'es-US' : 'en-US', { weekday: 'short', timeZone: 'UTC' }).replace('.', '').toUpperCase()
     return `${day} ${Number(value.slice(-2))}`
   }
-  return <div className={css.planning} lang={locale} data-planning-workspace>
+  return <div ref={workspaceRef} className={`${css.planning} print:hidden`} lang={locale} data-planning-workspace>
     <div className={css.toolbar}>
-      <label className={css.toggle}><input type="checkbox" checked={auto} disabled={busy} onChange={e => onAuto(e.target.checked)} />{t('planning.auto')}</label>
-      <span>{t('planning.autoHelp')}</span>
       <div className={css.actions}>
+        <button disabled={blocked || p.storeLoading} onClick={p.onCopyPrior}>{t('planning.copy')}</button>
         <button disabled={blocked || p.ruleProblemCount > 0 || !p.activeEmployeeCount} onClick={p.onMake} className={!p.assignments.length ? css.primary : undefined}>{t(generating ? 'planning.generating' : 'planning.make')}</button>
         <button disabled={blocked || p.ruleProblemCount > 0} onClick={onAdjust}>{t('planning.adjust')}</button>
         <button disabled={busy || !p.historyLength} onClick={p.onUndo}>{t('planning.undo')}</button>
         <button disabled={busy || p.isGenerating || p.storeLoading || p.hoursBlocked || p.ruleProblemCount > 0 || (!p.assignments.length&&!p.canPublishEmpty)} onClick={p.onPublish} className={p.assignments.length||p.canPublishEmpty ? css.primary : undefined}>{t('planning.publish')}</button>
       </div>
+      <label className={css.toggle}><input type="checkbox" checked={auto} disabled={busy} onChange={e => onAuto(e.target.checked)} />{t('planning.auto')}</label>
+      <span>{t('planning.autoHelp')}</span>
     </div>
     <div id="planning-review" ref={reportRef} tabIndex={-1} className={css.feedback} aria-live="polite" aria-busy={busy || generating}>
       <strong>{t(generating ? 'planning.generating' : busy ? 'planning.busy' : report?.notice ?? (generationReport && generationReport.status !== 'failed' ? generationReport.status === 'unchanged' ? 'planning.unchanged' : 'planning.made' : 'planning.ready'))}</strong>
@@ -182,8 +194,27 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
             <button disabled={blocked} onClick={() => beginMove({ employeeId: assignment.employeeId, fromSlotId: slot.id })}>{t('planning.move', { name: name(assignment.employeeId) })}</button>
             <button disabled={blocked} onClick={() => onRemove(slot.id)}>{t('planning.remove')}</button><p className={css.hint}>{t('planning.removeHelp')}</p>
           </>}
+          <button disabled={blocked} onClick={() => p.onResetShift(`${slot.day}-${slot.period}`)}>{t('schedulerPlanning.restoreShift')}</button>
           {!!excludedHere.length && <section aria-label={t('planning.excluded')}><h3>{t('planning.excluded')}</h3>{excludedHere.map(x => <p key={x.key}>{name(x.id)} <button disabled={blocked} onClick={() => onAllow(x.key)}>{t('planning.allow')}</button></p>)}</section>}
         </> : <><h2>{t('planning.choose')}</h2><p>{t('planning.help')}</p></>}
+        <section id="planning-fix" className={css.fixes} tabIndex={-1} aria-live="polite">
+          <h3>{t('schedulerPlanning.fixes', {count:p.visibleIssueCount})}</h3>
+          {issue ? <>
+            <p className={issueBlocker ? css.blocker : css.hint}>{t(issueBlocker ? 'schedulerPlanning.mustFix' : 'schedulerPlanning.canSkip')}</p>
+            <p>{issue.employee && <strong>{issue.employee.name} · </strong>}{issueSlot ? slotLabel(issueSlot.id) : null}{issue.relatedSlot && <> · {slotLabel(issue.relatedSlot.id)}</>}</p>
+            <p>{issueViolation ? issueViolation.code==='missing_assignment'?t('planning.needs'):t(`planning.problem.${issueViolation.code}`) : issueCode.startsWith('no_') ? text('Nobody is free and trained for this position. Review availability or add qualified staff.') : issueCode.startsWith('insufficient_') ? text('There is not enough available staff to cover this shift. Review staff availability and required positions.') : issueCode==='invalid_locked_assignment' ? text('Review kept placements against availability and employee rules.') : text('Review staff availability, positions, and weekly limits before rebuilding.')}</p>
+            <p>{text(issue.detail)}</p>
+            <details><summary>{text('Original English')}</summary><p lang="en">{issue.title}</p><p lang="en">{issue.detail}</p></details>
+            <button disabled={blocked || !issueSlot} onClick={() => { if(issueSlot){setSelected(issueSlot.id);setPersonId(null)} p.onChooseEmployee() }}>{t('schedulerPlanning.chooseEmployee')}</button>
+            {p.canAddEmployee && <button disabled={blocked} onClick={p.onAddEmployee}>{text('Add employee')}</button>}
+            <button disabled={blocked || issueBlocker} onClick={p.onIgnoreIssue}>{t('schedulerPlanning.ignore')}</button>
+            {p.guidedChoosing && issueSlot && <div className={css.candidates}>
+              {p.fixCandidates.length ? p.fixCandidates.map(e => <button disabled={blocked} key={e.id} onClick={() => p.onPickEmployee(e.id)}>{e.name}</button>) : <p>{t('schedulerPlanning.noCandidates')}</p>}
+              {!!p.fixExcluded.length && <details><summary>{t('schedulerPlanning.excludedCandidates',{count:p.fixExcluded.length})}</summary><ul>{p.fixExcluded.map(x=><li key={x.employee.id}>{x.employee.name}: {text(x.reason)===x.reason&&locale==='es' ? <><span>{text('Review staff availability, positions, and weekly limits before rebuilding.')}</span><details><summary>{text('Original English')}</summary><span lang="en">{x.reason}</span></details></> : text(x.reason)}</li>)}</ul></details>}
+            </div>}
+          </> : <p>{t('schedulerPlanning.noFixes')}</p>}
+          {!!p.ignoredIssueCount && <button disabled={blocked} onClick={p.onShowIgnored}>{t('schedulerPlanning.showSkipped',{count:p.ignoredIssueCount})}</button>}
+        </section>
         {!!gaps.length && <section className={css.gaps}><h3>{t('planning.gaps', { count: gaps.length })}</h3>{gaps.map(s => <button key={s.id} onClick={() => { setSelected(s.id); setPersonId(null); setMenu(null) }}>{slotLabel(s.id)} →</button>)}</section>}
       </aside>
     </div>
@@ -200,16 +231,24 @@ export default function PlanningWorkspace({ data: p, locale, auto, onAuto, busy,
         </div>
       })}</div>
     </section>
+    {generationReport && <details className={css.report}><summary>{t('schedulerPlanning.generationReport')}</summary>
+      <p>{t(`planning.goal.${generationReport.variant}`)} · {generationReport.filled} · {generationReport.at}</p>
+      <p>{text('Covered positions: {count}',{count:generationReport.filled})}</p><details><summary>{text('Original English')}</summary><p lang="en">{generationReport.detail}</p></details><button onClick={p.onDismissReport}>{t('schedulerPlanning.dismiss')}</button>
+    </details>}
+    <details className={css.report}><summary>{t('planning.hoursEach')}</summary><div className={css.tableScroll}><table><thead><tr><th>{text('Name')}</th><th>{text('Hours')}</th><th>{text('Day')}</th><th>{text('Shift')}</th></tr></thead><tbody>{p.stats.map(stat => <tr key={stat.employeeId}><th>{stat.name}</th><td>{stat.hours.toFixed(1)}</td><td>{stat.days}</td><td>{stat.shifts}</td></tr>)}</tbody></table></div></details>
+    <details className={css.report}><summary>{t('schedulerPlanning.generatedChanges',{count:p.changes.length})}</summary>
+      {p.changes.map(change=><div key={change.slotId}><p>{slotLabel(change.slotId)}</p><details><summary>{text('Original English')}</summary><p lang="en">{change.text}</p></details></div>)}
+      <button disabled={blocked || !p.changes.length} onClick={p.onRestoreEverything}>{t('planning.restore')}</button>
+    </details>
     <details className={css.tools}><summary>{t('planning.more')}</summary><fieldset disabled={busy || p.isGenerating}>
       <label>{t('planning.strategy')}<select aria-label={t('planning.strategy')} value={p.selectedVariant} onChange={e => p.onVariantChange(e.target.value as ScheduleVariant)}>{scheduleVariants.map(variant => <option key={variant.id} value={variant.id}>{t(`planning.goal.${variant.id}`)}</option>)}</select></label>
-      <button onClick={p.onPrint} disabled={!p.schedulePassing}>{t('planning.print')}</button><button onClick={p.onCopyPrior} disabled={p.storeLoading}>{t('planning.copy')}</button>
+      <button onClick={p.onPrint} disabled={!p.schedulePassing}>{t('planning.print')}</button>
       <button onClick={p.onAskClearWeek}>{t('planning.clear')}</button>
-      <button onClick={p.onRestoreEverything} disabled={!p.changes.length}>{t('planning.restore')}</button>
       {p.canAddEmployee && <button onClick={p.onAskReset}>{t('planning.reset')}</button>}
       {p.canAddEmployee && p.confirmingReset && <div role="group" aria-label={t('planning.resetConfirm')}><p>{t('planning.resetConfirm')}</p><button onClick={p.onReset}>{t('planning.reset')}</button><button onClick={p.onCancelReset}>{t('planning.cancel')}</button></div>}
       {p.confirmingClearWeek && <div role="group" aria-label={t('planning.clearConfirm')}><p>{t('planning.clearConfirm')}</p><button onClick={p.onClearWeek}>{t('planning.clear')}</button><button onClick={p.onCancelClearWeek}>{t('planning.cancel')}</button></div>}
       <details><summary>{t('planning.month')}</summary><MonthStrip monthKey={p.monthKey} weekStart={p.weekStart} monthWeeks={p.monthWeeks} weeks={p.weeks} weekStatus={p.weekStatus} onSelectWeek={p.onSelectWeek} onSelectMonth={p.onSelectMonth} onToggleWeek={p.onToggleWeek} liveWeeks={p.liveMonthWeeks} currentState={p.publishState} editedWeeks={p.otherWeeksWithEdits} /></details>
-      <details><summary>{t('planning.messages')}</summary>{p.diagnostics.map((message, i) => <p key={i}>{message}</p>)}</details>
+      <details><summary>{t('planning.messages')}</summary><p>{text('Review the original generation notes below for additional details.')}</p><details><summary>{text('Original English')}</summary>{p.diagnostics.map((message,i)=><p key={i} lang="en">{message}</p>)}</details></details>
     </fieldset></details>
   </div>
 }

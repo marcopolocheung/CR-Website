@@ -16,9 +16,9 @@ import type { SpecialHoursSource } from './useSpecialHours'
 import { planningDate } from './planning-format'
 import css from './special-hours.module.css'
 
-export default function HoursEditor({ date, week, anchor, station, locale, source, base, assignments, employees,
+export default function HoursEditor({ active=true,date, week, anchor, station, locale, source, base, assignments, employees,
   locked, activeReviews, onClose, onApplied, onDirty, onBusy, onUnlock }: {
-  date: string | null; week: string; anchor: HTMLElement | null; station: StationId; locale: Locale
+  active?:boolean; date: string | null; week: string; anchor: HTMLElement | null; station: StationId; locale: Locale
   source: SpecialHoursSource; base: StaffingSlot[]; assignments: ScheduleAssignment[]; employees: Employee[]
   locked: boolean; activeReviews: readonly HoursReviewRecord[]; onClose: () => void
   onApplied: (results: readonly HoursResult[], page: SpecialHoursPage) => void
@@ -27,6 +27,7 @@ export default function HoursEditor({ date, week, anchor, station, locale, sourc
 }) {
   const t = (key: string, params?: Record<string, string | number>) => translate(locale, key, params)
   const token = useManagerCode()
+  useEffect(()=>{if(!token)setUnlockPassword('')},[token])
   const [snapshot, setSnapshot] = useState(source.page!)
   const initial = useRef(snapshot.events.find(e => e.data.date === date)?.data)
   const [selected, setSelected] = useState<string[]>(date ? [date] : [])
@@ -72,6 +73,7 @@ export default function HoursEditor({ date, week, anchor, station, locale, sourc
     return () => { mounted.current = false; onDirty(false); onBusy(false) }
   }, [onDirty, onBusy])
   useLayoutEffect(() => {
+    if(!active)return
     const trigger = anchor?.isConnected ? anchor : document.getElementById('set-week-hours')
     trigger?.setAttribute('aria-expanded', 'true'); trigger?.setAttribute('aria-controls', 'restaurant-hours-editor')
     panel.current?.querySelector<HTMLElement>('input:not(:disabled),button:not(:disabled)')?.focus({ preventScroll: true })
@@ -113,7 +115,7 @@ export default function HoursEditor({ date, week, anchor, station, locale, sourc
       trigger?.setAttribute('aria-expanded', 'false'); trigger?.removeAttribute('aria-controls')
       if (restoreFocus.current) requestAnimationFrame(() => { if (trigger?.isConnected) trigger.focus({ preventScroll: true }) })
     }
-  }, [anchor])
+  }, [anchor,active])
 
   async function apply() {
     if (running.current || locked || invalid || !plans.length || (!uncertain && (source.phase !== 'ready' || !plans.some(p => p.needsApply)))) return
@@ -164,8 +166,8 @@ export default function HoursEditor({ date, week, anchor, station, locale, sourc
     finally {running.current=false;if(mounted.current)setUnlocking(false)}
   }
   const batch = attempt.current
-  return createPortal(<section ref={panel} id="restaurant-hours-editor" role="region" aria-labelledby="restaurant-hours-title"
-    data-hours-editor lang={locale} className={css.editor} style={position} aria-busy={saving||unlocking}>
+  return createPortal(<section hidden={!active} inert={!active} ref={panel} id="restaurant-hours-editor" role="region" aria-labelledby="restaurant-hours-title"
+    data-hours-editor lang={locale} className={css.editor} style={active?position:{...position,display:'none'}} aria-busy={saving||unlocking}>
     <h2 id="restaurant-hours-title" className={css.heading}>{t('hours.title')}</h2>
     <p className={css.date}>{multiple ? t('hours.selectedDates', { count: selected.length }) : planningDate(date!, locale)}</p>
     <p className={css.scope}>{t('hours.scope', { store: STATION_STORES[station] })}</p>

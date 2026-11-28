@@ -12,6 +12,7 @@ export function useScheduleRequests(station: StationId, token: string) {
   const [checkedAt, setCheckedAt] = useState(0)
   const epoch = useRef(0)
   const reload = useCallback(async () => {
+    if(!token)return null
     const generation = ++epoch.current
     setPhase('loading')
     try {
@@ -24,7 +25,7 @@ export function useScheduleRequests(station: StationId, token: string) {
       return null
     }
   }, [station, token])
-  useEffect(() => { setRecord(null); setCheckedAt(0); void reload(); return () => { epoch.current++ } }, [reload])
+  useEffect(() => { void reload(); return () => { epoch.current++ } }, [reload])
   const accept = useCallback((next: RequestRecord) => {
     epoch.current++
     setRecord(current => current && current.revision > next.revision ? current : next)

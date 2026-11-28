@@ -1,5 +1,6 @@
 'use client'
 
+import { useSchedulerText } from './useSchedulerText'
 import { type PublishState } from '@/lib/scheduler'
 import { Icon as SharedIcon } from '@/components/internal/ui/Icon'
 export function FlipSwitch({
@@ -46,10 +47,11 @@ export const publishStateMeta: Record<PublishState, { short: string; long: strin
 }
 
 export function PublishStateBadge({ state }: { state: PublishState }) {
+  const text = useSchedulerText()
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${publishStateMeta[state].badge}`}>
       <span aria-hidden="true" className={`h-2 w-2 rounded-full ${publishStateMeta[state].dot}`} />
-      {publishStateMeta[state].long}
+      {text(publishStateMeta[state].long)}
     </span>
   )
 }
@@ -73,19 +75,20 @@ export function Button({
   loading?: boolean
   title?: string
 }) {
+  const text = useSchedulerText()
   const className =
     tone === 'primary'
-      ? 'inline-flex items-center justify-center gap-2 rounded bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
-      : 'inline-flex items-center justify-center gap-2 rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
+      ? 'inline-flex items-center justify-center gap-2 rounded-none bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
+      : 'inline-flex items-center justify-center gap-2 rounded-none border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
 
   return (
-    <button type="button" className={className} onClick={onClick} disabled={disabled || loading} aria-busy={loading} title={title}>
+    <button type="button" className={`${className} min-h-11`} onClick={onClick} disabled={disabled || loading} aria-busy={loading} title={title ? text(title) : undefined}>
       {loading ? (
         <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
       ) : (
         <Icon name={icon} />
       )}
-      {children}
+      {typeof children === 'string' ? text(children) : children}
       {badge !== undefined && badge > 0 && (
         <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-200 px-1.5 text-xs font-bold text-amber-950">
           {badge}
@@ -108,13 +111,14 @@ export function IconButton({
   disabled?: boolean
   tone?: 'plain' | 'accent'
 }) {
+  const text = useSchedulerText()
   const className =
     tone === 'accent'
-      ? 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
-      : 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
+      ? 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded border border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
+      : 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900'
 
   return (
-    <button type="button" className={className} onClick={onClick} disabled={disabled} aria-label={label} title={label}>
+    <button type="button" className={`${className} min-h-11`} onClick={onClick} disabled={disabled} aria-label={text(label)} title={text(label)}>
       <Icon name={icon} />
     </button>
   )
@@ -129,11 +133,12 @@ export function Disclosure({
   tone?: 'default' | 'quiet'
   children: React.ReactNode
 }) {
+  const text = useSchedulerText()
   if (tone === 'quiet') {
     return (
       <details className="px-1">
         <summary className="cursor-pointer py-1 text-sm text-zinc-500 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">
-          {summary}
+          {text(summary)}
         </summary>
         <div className="py-2">{children}</div>
       </details>
@@ -143,7 +148,7 @@ export function Disclosure({
   return (
     <details className="rounded-lg border border-zinc-200 bg-white shadow-sm">
       <summary className="cursor-pointer px-4 py-3 font-semibold text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">
-        {summary}
+        {text(summary)}
       </summary>
       <div className="border-t border-zinc-100 px-4 py-3">{children}</div>
     </details>

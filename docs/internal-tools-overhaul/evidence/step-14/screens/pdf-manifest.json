@@ -1,0 +1,22 @@
+[
+  {
+    "station": "CR3-diningroom",
+    "pages": 1,
+    "bytes": 126824
+  },
+  {
+    "station": "CR3-kitchen",
+    "pages": 1,
+    "bytes": 127160
+  },
+  {
+    "station": "CR2-kitchen",
+    "pages": 1,
+    "bytes": 127158
+  },
+  {
+    "station": "CR2-diningroom",
+    "pages": 1,
+    "bytes": 126821
+  }
+]

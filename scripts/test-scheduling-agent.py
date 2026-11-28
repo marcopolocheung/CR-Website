@@ -73,9 +73,9 @@ def start_agent(directory, worker_port):
 
 
 def unlock(page):
-    page.get_by_label('Manager code', exact=True).fill(TOKEN)
-    page.get_by_role('button', name='Open the scheduler', exact=True).click()
+    fixtures.unlock(page)
     expect(page.get_by_text('Loading your saved schedule…', exact=True)).not_to_be_visible()
+    page.locator('details').filter(has=page.locator('summary',has_text='Scheduling assistant')).locator('summary').first.click()
     page.get_by_role('button', name='Open assistant', exact=True).click()
     expect(page.get_by_role('button', name='Make proposal', exact=True)).to_be_enabled()
 
@@ -130,8 +130,8 @@ def main():
 
             # A newer manual draft rejects the old proposal and remains on the board.
             schedule = page.locator('#scheduler-panel-schedule')
-            schedule.get_by_role('button', name='Make schedule', exact=True).first.click()
-            chips = schedule.get_by_role('button', name='Move Sample Employee out of', exact=False)
+            schedule.get_by_role('button', name='Build week', exact=True).first.click()
+            chips = fixtures.filled_cells(page)
             expect(chips).to_have_count(7)
             page.get_by_role('button', name='Use proposal', exact=True).click()
             expect(assistant.get_by_role('alert')).to_contain_text('Your week changed')

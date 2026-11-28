@@ -63,9 +63,9 @@ def open_page(browser, url, width=1440, station='CR3-diningroom', failure=None):
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(f'{url}/scheduler-demo/{station}.html')
     page.wait_for_load_state('networkidle')
-    page.get_by_label('Manager code', exact=True).fill('fixture-password')
-    page.get_by_role('button', name='Open the scheduler', exact=True).click()
+    views.unlock(page)
     page.wait_for_load_state('networkidle')
+    page.get_by_role('tab', name='Requests', exact=True).click()
     panel = page.locator('#schedule-requests')
     panel.get_by_role('button', name='Time off requests', exact=False).click()
     return context, page, panel, store, errors
@@ -80,13 +80,13 @@ def fill_entry(panel, reason='Original spoken request'):
 def check_flow(browser, url, artifacts):
     context, page, panel, store, errors = open_page(browser, url)
     fill_entry(panel)
-    panel.get_by_role('button', name='Español', exact=True).click()
+    page.get_by_role('group',name='Language / Idioma',exact=True).get_by_role('button', name='Español', exact=True).click()
     expect(panel.get_by_label('Solicitud original / motivo (opcional)', exact=True)).to_have_value('Original spoken request')
     expect(panel.get_by_label('Fecha inicial', exact=True)).to_have_value('2026-10-31')
-    panel.get_by_role('button', name='English', exact=True).click()
-    # Existing scheduler link protection includes pending request text.
-    page.once('dialog', lambda dialog: dialog.dismiss())
-    page.get_by_role('link', name='Internal tools / Herramientas internas', exact=True).click()
+    page.get_by_role('group',name='Language / Idioma',exact=True).get_by_role('button', name='English', exact=True).click()
+    # Shared internal navigation retains pending request text without a destructive leave.
+    page.get_by_role('tab', name='Schedule', exact=True).click()
+    page.get_by_role('tab', name='Requests', exact=True).click()
     expect(panel.get_by_label('Original request / reason (optional)', exact=True)).to_have_value('Original spoken request')
     store.failure = 'unavailable'
     panel.get_by_role('button', name='Save pending request', exact=True).click()
@@ -136,7 +136,7 @@ def check_mobile_and_absent(browser, url, artifacts):
     panel.get_by_label('Available from', exact=True).fill('23:00')
     panel.get_by_label('Available until', exact=True).fill('02:00')
     panel.get_by_label('Ends the next day', exact=True).check()
-    panel.get_by_role('button', name='Español', exact=True).click()
+    page.get_by_role('group',name='Language / Idioma',exact=True).get_by_role('button', name='Español', exact=True).click()
     save = panel.get_by_role('button', name='Guardar solicitud pendiente', exact=True)
     save.focus()
     save.press('Enter')
@@ -149,7 +149,8 @@ def check_mobile_and_absent(browser, url, artifacts):
     context, page, panel, store, errors = open_page(browser, url, failure='unconfigured')
     expect(panel.get_by_text('Request storage is not active', exact=False)).to_be_visible()
     expect(panel.get_by_role('button', name='Save pending request', exact=True)).to_be_disabled()
-    expect(page.get_by_role('button', name='Make schedule', exact=True).first).to_be_enabled()
+    page.get_by_role('tab', name='Schedule', exact=True).click()
+    expect(page.get_by_role('button', name='Build week', exact=True).first).to_be_enabled()
     assert not store.attempts and not errors
     context.close()
 

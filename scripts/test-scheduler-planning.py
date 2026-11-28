@@ -117,8 +117,7 @@ def open_planning(browser, url, kitchen=False, width=1500, request_failure=None,
     page.on('pageerror', lambda error: errors.append(str(error)))
     station = 'CR3-kitchen' if kitchen else 'CR3-diningroom'
     page.goto(f'{url}/scheduler-demo/{station}.html', wait_until='networkidle')
-    page.get_by_label('Manager code', exact=True).fill('fixture-password')
-    page.get_by_role('button', name='Open the scheduler', exact=True).click()
+    views.unlock(page)
     expect(page.locator('#planning-review')).to_contain_text('28/28 required spots covered')
     return context, page, store, errors
 
@@ -206,6 +205,7 @@ def check_planning(browser, url, artifacts):
     expect(page.locator('#planning-review')).to_contain_text('28/28 required spots covered · 0 kept')
     assert store.request_writes[-1] == store.request_writes[-2]
     assert not store.writes, 'approval must not publish'
+    page.get_by_role('tab', name='Schedule', exact=True).click()
     page.get_by_role('button', name='Undo', exact=True).click()
     assert snapshot(page) == unchanged
     assert store.record['data']['requests'][0]['status'] == 'approved'
@@ -228,14 +228,15 @@ def check_planning(browser, url, artifacts):
     team_search = page.locator('#planning-team').get_by_role('searchbox')
     team_search.fill('Jules')
     stable = snapshot(page)
-    page.get_by_label('Layout', exact=True).select_option('new')
-    page.get_by_label('Layout', exact=True).select_option('workspace')
+    views.staff_tab(page).click()
+    page.get_by_role('tab', name='Requests', exact=True).click()
+    page.get_by_role('tab', name='Schedule', exact=True).click()
     expect(team_search).to_have_value('Jules')
     assert snapshot(page) == stable
-    page.get_by_role('group', name='English / Español').get_by_role('button', name='Español').click()
+    page.get_by_role('group', name='Language / Idioma', exact=True).get_by_role('button', name='Español').click()
     expect(page.get_by_role('checkbox', name='Ajuste automático', exact=True)).not_to_be_checked()
     assert snapshot(page) == stable
-    page.get_by_role('group', name='English / Español').get_by_role('button', name='English').click()
+    page.get_by_role('group', name='Language / Idioma', exact=True).get_by_role('button', name='English').click()
     # Existing publication conflict/retry path remains explicit.
     page.get_by_role('button', name='Publish to staff', exact=True).click()
     store.fail_next_save = True
@@ -248,7 +249,7 @@ def check_planning(browser, url, artifacts):
     page.screenshot(path=str(artifacts / 'planning-desktop.png'), full_page=True)
     page.get_by_role('tab', name='Staff & rules', exact=True).click()
     page.emulate_media(media='print')
-    expect(page.locator('#scheduler-panel-schedule')).to_be_visible()
+    expect(page.locator('[data-scheduler-print]')).to_be_visible()
     expect(page.locator('#scheduler-panel-settings')).not_to_be_visible()
     page.emulate_media(media='screen')
     page.get_by_role('tab', name='Schedule', exact=True).click()
@@ -257,11 +258,11 @@ def check_planning(browser, url, artifacts):
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'{width}px page overflow'
         if width == 390:
             page.screenshot(path=str(artifacts / 'planning-phone.png'), full_page=True)
-        page.get_by_role('group', name='English / Español').get_by_role('button', name='Español').click()
+        page.get_by_role('group', name='Language / Idioma', exact=True).get_by_role('button', name='Español').click()
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'{width}px Spanish page overflow'
         if width == 390:
             page.screenshot(path=str(artifacts / 'planning-phone-spanish.png'), full_page=True)
-        page.get_by_role('group', name='English / Español').get_by_role('button', name='English').click()
+        page.get_by_role('group', name='Language / Idioma', exact=True).get_by_role('button', name='English').click()
     # Tap/select placement works on a narrow screen, without native drag.
     page.locator('#planning-team').get_by_role('button', name='Place Jules', exact=True).click()
     cashier.click()
@@ -303,6 +304,7 @@ def check_external_and_cancellation(browser, url):
     item['review'] = {'by': 'Other Fixture Manager', 'at': item['enteredAt'], 'reason': ''}
     store.record['revision'] += 1
     requests.get_by_role('button', name='Reload requests', exact=True).click()
+    page.get_by_role('tab', name='Schedule', exact=True).click()
     expect(page.get_by_text('Availability changed.', exact=False)).to_be_visible()
     assert snapshot(page) == before
     page.get_by_role('button', name='Adjust schedule', exact=True).click()
@@ -405,7 +407,7 @@ def check_optional_requests(browser, url):
     for failure in ['backend_unconfigured', 'unavailable']:
         context, page, store, errors = open_planning(browser, url, request_failure=failure)
         expect(page.get_by_text('Load confirmed requests before placing or adjusting.', exact=False)).to_have_count(0)
-        expect(page.get_by_role('button', name='Make schedule', exact=True)).to_be_enabled()
+        expect(page.get_by_role('button', name='Build week', exact=True)).to_be_enabled()
         adjust = page.get_by_role('button', name='Adjust schedule', exact=True)
         expect(adjust).to_be_enabled()
         before = snapshot(page)
@@ -426,6 +428,7 @@ def check_optional_requests(browser, url):
     page.get_by_label('Assign employee', exact=True).select_option('')
     expect(page.locator('#planning-review')).to_contain_text('27/28 required spots covered')
     requests = page.locator('#schedule-requests')
+    page.get_by_role('tab', name='Requests', exact=True).click()
     requests.get_by_role('button', name='Time off requests', exact=False).click()
     store.request_failure = 'unavailable'
     page.evaluate('''() => {
@@ -444,6 +447,7 @@ def check_request_shortcut_cancel(browser, url):
     page.get_by_role('button', name='Record callout / availability request', exact=True).click()
     requests = page.locator('#schedule-requests')
     requests.get_by_label('Original request / reason (optional)', exact=True).fill('Unfinished original')
+    page.get_by_role('tab', name='Schedule', exact=True).click()
     page.locator('#planning-team').get_by_role('button', name='Ana', exact=True).click()
     page.get_by_role('button', name='Record callout / availability request', exact=True).click()
     expect(requests.get_by_label('Requested for', exact=True)).to_have_value('sample-0')

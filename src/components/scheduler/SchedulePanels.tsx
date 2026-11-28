@@ -1,5 +1,7 @@
 'use client'
 
+import { useSchedulerText } from './useSchedulerText'
+
 import {
   currentWeekStart,
   formatDayLabel,
@@ -21,19 +23,20 @@ export function OnboardingBanner({
   activeEmployeeCount: number
   onDismiss: () => void
 }) {
+  const text = useSchedulerText()
   return (
-    <section className="rounded-lg border border-sky-200 bg-sky-50 p-4 shadow-sm print:hidden" aria-label="Getting started">
+    <section className="rounded-lg border border-sky-200 bg-sky-50 p-4 shadow-sm print:hidden" aria-label={text("Getting started")}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-sky-950">Getting started</h2>
-          <p className="mt-1 text-sm text-sky-900">Four steps to a published schedule:</p>
+          <h2 className="text-lg font-semibold text-sky-950">{text("Getting started")}</h2>
+          <p className="mt-1 text-sm text-sky-900">{text("Four steps to a published schedule:")}</p>
         </div>
-        <IconButton icon="close" label="Dismiss getting-started tips" onClick={onDismiss} />
+        <IconButton icon="close" label={text("Dismiss getting-started tips")} onClick={onDismiss} />
       </div>
       <div className="mt-3 space-y-2">
-        <ChecklistItem complete={activeEmployeeCount > 0} label="Add everyone working this week in Employee settings" />
+        <ChecklistItem complete={activeEmployeeCount > 0} label={text("Add everyone working this week in Employee settings")} />
         <ChecklistItem complete={false} label={'Press "Make schedule" to build the week'} />
-        <ChecklistItem complete={false} label="Review any issues shown above the schedule" />
+        <ChecklistItem complete={false} label={text("Review any issues shown above the schedule")} />
         <ChecklistItem complete={false} label={'Press "Publish to staff" when it looks right'} />
       </div>
     </section>
@@ -76,6 +79,7 @@ export function GuidedFixPanel({
   /** The new layout keeps the action bar's dark button the only primary; the panel stays secondary. */
   emphasizeChoose?: boolean
 }) {
+  const text = useSchedulerText()
   if (!nextIssue) {
     return (
       <section className="rounded-lg border border-green-300 bg-green-50 p-4 shadow-sm print:hidden">
@@ -85,18 +89,16 @@ export function GuidedFixPanel({
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold text-green-950">
-              {hasSchedule ? 'Nothing left to fix' : 'Ready when you are'}
+              {hasSchedule ? text("Nothing left to fix") : text("Ready when you are")}
             </h2>
             <p className="mt-1 text-sm text-green-900">
               {hasSchedule
-                ? 'Every spot is filled and nobody is double-booked.'
-                : 'Press Make schedule. Anything that needs a decision will show up here, one at a time.'}
+                ? text("Every spot is filled and nobody is double-booked.")
+                : text("Press Make schedule. Anything that needs a decision will show up here, one at a time.")}
             </p>
           </div>
           {ignoredCount > 0 && (
-            <Button onClick={onShowIgnored} icon="undo">
-              Show {ignoredCount} skipped
-            </Button>
+            <Button onClick={onShowIgnored} icon="undo">{text("Show")}{' '}{ignoredCount}{' '}{text("skipped")}</Button>
           )}
         </div>
       </section>
@@ -112,8 +114,7 @@ export function GuidedFixPanel({
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className={`text-sm font-semibold ${isBlocker ? 'text-red-900' : 'text-amber-900'}`}>
-            Fix {position} of {totalCount}
+          <p className={`text-sm font-semibold ${isBlocker ? 'text-red-900' : 'text-amber-900'}`}>{text("Fix")}{' '}{position}{' '}{text("of")}{' '}{totalCount}
             {ignoredCount > 0 && ` · ${ignoredCount} skipped`}
           </p>
           <p className="mt-1">
@@ -123,38 +124,29 @@ export function GuidedFixPanel({
               }`}
             >
               <Icon name={isBlocker ? 'warning' : 'target'} />
-              {isBlocker ? 'Must fix before printing' : 'You can skip this'}
+              {isBlocker ? text("Must fix before printing") : text("You can skip this")}
             </span>
           </p>
           <h2 className={`mt-1 text-lg font-semibold ${isBlocker ? 'text-red-950' : 'text-amber-950'}`}>{nextIssue.title}</h2>
           <p className={`mt-1 text-sm ${isBlocker ? 'text-red-900' : 'text-amber-900'}`}>{nextIssue.detail}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button tone={emphasizeChoose ? 'primary' : 'plain'} onClick={onChooseEmployee} icon="target" disabled={!nextIssue.slot}>
-            Choose employee
-          </Button>
+          <Button tone={emphasizeChoose ? 'primary' : 'plain'} onClick={onChooseEmployee} icon="target" disabled={!nextIssue.slot}>{text("Choose employee")}</Button>
           {canAddEmployee && (
-            <Button onClick={onAddEmployee} icon="plus">
-              Add employee
-            </Button>
+            <Button onClick={onAddEmployee} icon="plus">{text("Add employee")}</Button>
           )}
-          <Button onClick={onIgnore} icon="close" disabled={isBlocker} title={isBlocker ? 'An empty spot must be filled — skipping would hide missing cover.' : 'Skip this for now.'}>
-            Ignore for now
-          </Button>
+          <Button onClick={onIgnore} icon="close" disabled={isBlocker} title={isBlocker ? text("An empty spot must be filled — skipping would hide missing cover.") : text("Skip this for now.")}>{text("Ignore for now")}</Button>
         </div>
       </div>
       {isBlocker && (
-        <p className="mt-2 text-xs font-medium text-red-900">
-          Empty spots block printing. Skipping is turned off so missing cover stays visible.
-        </p>
+        <p className="mt-2 text-xs font-medium text-red-900">{text("Empty spots block printing. Skipping is turned off so missing cover stays visible.")}</p>
       )}
 
       {choosing && nextIssue.slot && (
         <div className="mt-4 rounded border border-amber-300 bg-white p-3">
           {candidates.length > 0 ? (
             <>
-              <p className="text-sm font-semibold text-zinc-900">
-                Who should work {weekStart ? formatDayLabel(weekStart, nextIssue.slot.day) : nextIssue.slot.day} {periodLabels[nextIssue.slot.period]} as {nextIssue.slot.label}?
+              <p className="text-sm font-semibold text-zinc-900">{text("Who should work")}{' '}{weekStart ? formatDayLabel(weekStart, nextIssue.slot.day) : nextIssue.slot.day} {periodLabels[nextIssue.slot.period]}{' '}{text("as")}{' '}{nextIssue.slot.label}?
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {candidates.map((candidate) => (
@@ -169,12 +161,10 @@ export function GuidedFixPanel({
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-zinc-500">Everyone here is free and trained for this position.</p>
+              <p className="mt-2 text-xs text-zinc-500">{text("Everyone here is free and trained for this position.")}</p>
               {excluded.length > 0 && (
                 <details className="mt-2">
-                  <summary className="cursor-pointer text-xs font-semibold text-zinc-700 hover:text-zinc-900">
-                    Why {excluded.length} other{excluded.length === 1 ? '' : 's'} can&apos;t cover this
-                  </summary>
+                  <summary className="cursor-pointer text-xs font-semibold text-zinc-700 hover:text-zinc-900">{text("Why")}{' '}{excluded.length}{' '}{text("other")}{' '}{excluded.length === 1 ? '' : 's'}{' '}{text("can't cover this")}</summary>
                   <ul className="mt-1 space-y-1 text-xs text-zinc-600">
                     {excluded.map(({ employee, reason }) => (
                       <li key={employee.id}>
@@ -189,8 +179,8 @@ export function GuidedFixPanel({
             <>
               <p className="text-sm text-zinc-700">
                 {canAddEmployee
-                  ? 'Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.'
-                  : 'Nobody on the crew is free and trained for this spot. Open the shift below to move someone else in.'}
+                  ? text("Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.")
+                  : text("Nobody on the crew is free and trained for this spot. Open the shift below to move someone else in.")}
               </p>
               {excluded.length > 0 && (
                 <ul className="mt-2 space-y-1 text-xs text-zinc-600">
@@ -234,22 +224,21 @@ export function MonthStrip({
   currentState: PublishState | null
   editedWeeks: string[]
 }) {
+  const text = useSchedulerText()
   if (!monthKey) return null
   return (
     <div className="min-w-0">
       <div className="flex flex-wrap items-center gap-2">
-        <IconButton icon="chevronLeft" label="Previous month" onClick={() => onSelectMonth(shiftMonth(monthKey, -1))} />
+        <IconButton icon="chevronLeft" label={text("Previous month")} onClick={() => onSelectMonth(shiftMonth(monthKey, -1))} />
         <h3 className="min-w-36 text-center text-base font-bold">{monthLabel(monthKey)}</h3>
-        <IconButton icon="chevronRight" label="Next month" onClick={() => onSelectMonth(shiftMonth(monthKey, 1))} />
+        <IconButton icon="chevronRight" label={text("Next month")} onClick={() => onSelectMonth(shiftMonth(monthKey, 1))} />
         <button
           type="button"
           className="ml-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
           onClick={() => onSelectMonth(monthKeyForWeek(currentWeekStart()))}
-        >
-          This month
-        </button>
+        >{text("This month")}</button>
       </div>
-      <div className="mt-2 grid w-full min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5" role="listbox" aria-label="Weeks in this month">
+      <div className="mt-2 grid w-full min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5" role="listbox" aria-label={text("Weeks in this month")}>
         {monthWeeks.map((week) => {
           const list = weeks[week] ?? emptyAssignments
           const status = statusForWeek(weekStatus, week, list)
@@ -279,13 +268,12 @@ export function MonthStrip({
                 <span className="block truncate text-xs font-semibold text-zinc-900">{formatWeekRange(week)}</span>
                 <span className="mt-0.5 flex items-center gap-1 text-[11px] text-zinc-600">
                   <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${publishStateMeta[state].dot}`} />
-                  {publishStateMeta[state].short} · {filled} filled
-                </span>
+                  {text(publishStateMeta[state].short)} · {filled}{' '}{text("filled")}</span>
               </button>
               <FlipSwitch
                 on={status === 'on'}
                 onFlip={() => onToggleWeek(week, status === 'on' ? 'off' : 'on')}
-                label={`Show week of ${formatWeekRange(week)} to staff when published`}
+                label={text('Show week of {week} to staff when published',{week:formatWeekRange(week)})}
               />
             </div>
           )
@@ -304,6 +292,7 @@ export function GenerationReportBanner({
   onDismiss: () => void
   details?: string[]
 }) {
+  const text = useSchedulerText()
   const failed = report.status === 'failed'
   return (
     <div
@@ -332,13 +321,11 @@ export function GenerationReportBanner({
           type="button"
           className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={onDismiss}
-        >
-          Dismiss
-        </button>
+        >{text("Dismiss")}</button>
       </div>
       {details.length > 0 && (
         <details className="mt-2">
-          <summary className="cursor-pointer text-xs font-semibold text-zinc-700 hover:text-zinc-900">Details</summary>
+          <summary className="cursor-pointer text-xs font-semibold text-zinc-700 hover:text-zinc-900">{text("Details")}</summary>
           <ul className="mt-1 space-y-1 text-xs text-zinc-700">
             {details.map((message, index) => (
               <li key={`${message}-${index}`}>{message}</li>
@@ -351,9 +338,10 @@ export function GenerationReportBanner({
 }
 
 export function HoursSummary({ stats, employees }: { stats: ScheduleStats[]; employees: Employee[] }) {
+  const text = useSchedulerText()
   const working = stats.filter((stat) => stat.shifts > 0)
   if (working.length === 0) {
-    return <p className="text-sm text-zinc-600">Make a schedule to see how the hours land.</p>
+    return <p className="text-sm text-zinc-600">{text("Make a schedule to see how the hours land.")}</p>
   }
 
   const mostHours = Math.max(...working.map((stat) => stat.hours))
@@ -373,7 +361,7 @@ export function HoursSummary({ stats, employees }: { stats: ScheduleStats[]; emp
             <li key={stat.employeeId} className="flex items-center gap-3 py-1.5 text-sm">
               <span className="w-24 shrink-0 truncate font-medium text-zinc-900">
                 {stat.name}
-                {overloaded && <span className="ml-1 font-bold text-red-700">· over</span>}
+                {overloaded && <span className="ml-1 font-bold text-red-700">{text("· over")}</span>}
               </span>
               <span aria-hidden="true" className={`h-1.5 min-w-0 flex-1 rounded-full ${overloaded ? 'bg-red-100' : 'bg-zinc-100'}`}>
                 <span
@@ -382,18 +370,17 @@ export function HoursSummary({ stats, employees }: { stats: ScheduleStats[]; emp
                 />
               </span>
               <span className={`w-20 shrink-0 text-right font-semibold tabular-nums ${overloaded ? 'text-red-800' : 'text-zinc-900'}`}>
-                {stat.hours.toFixed(1)}h{maxHours !== undefined && <span className="font-normal text-zinc-600"> / {maxHours}h</span>}
+                {stat.hours.toFixed(1)}{' '}{text("h")}{' '}{maxHours !== undefined && <span className="font-normal text-zinc-600"> / {maxHours}{' '}{text("h")}</span>}
               </span>
               <span className={`w-20 shrink-0 text-right text-xs ${overloaded ? 'font-semibold text-red-700' : 'text-zinc-500'}`}>
-                {stat.days}d · {stat.shifts} shift{stat.shifts === 1 ? '' : 's'}
+                {stat.days}{text("d ·")} {stat.shifts} {text("shift")}{stat.shifts === 1 ? '' : 's'}
               </span>
             </li>
           )
         })}
       </ul>
       {idle.length > 0 && (
-        <p className="mt-2 text-xs text-zinc-500">
-          Not working this week: {idle.map((stat) => stat.name).join(', ')}
+        <p className="mt-2 text-xs text-zinc-500">{text("Not working this week:")}{' '}{idle.map((stat) => stat.name).join(', ')}
         </p>
       )}
     </div>

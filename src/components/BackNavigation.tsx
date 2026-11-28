@@ -32,7 +32,7 @@ export function BackNavigation({ fallbackHref = '/', label = 'Back', inline = fa
 /** Internal pages put their translated control inside the shared shell header. */
 export default function SiteBackNavigation() {
   const pathname = usePathname().replace(/\.html$/, '').replace(/\/$/, '')
-  if (/(?:^|\/)internal(?:\/|$)/.test(pathname)) return null
+  if (/(?:^|\/)(?:internal|scheduler-demo)(?:\/|$)/.test(pathname)) return null
   const fallbackHref = /\/scheduler-demo\//.test(pathname) ? '/scheduler-demo'
     : pathname.endsWith('/scheduler-demo') || pathname.endsWith('/scheduler-prototype') ? '/internal' : '/'
   return <BackNavigation fallbackHref={fallbackHref} />

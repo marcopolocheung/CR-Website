@@ -139,10 +139,11 @@ with sync_playwright() as p:
         page.locator('#tab-hours').click();assert page.locator('#hc-file').evaluate('e=>e.files[0].name')=='synthetic-hours.csv'
         assert page.evaluate('window.shellOriginalFile===document.querySelector("#hc-file").files[0]')
         assert page.evaluate('window.shellMountedSentinel')=='retained'
-        nav(page,'schedule').click();expect(page.get_by_role('dialog')).to_be_visible()
-        page.get_by_role('dialog').get_by_role('button',name='Cancel',exact=True).click()
-        selected(page,'reports');expect(page.locator('#hc-start')).to_have_value('2026-11-01')
-        record(variant,'Native same-document Cash/Reports links preserve mounted cash/sales/hours fields and File object; legacy tabs synchronize selected nav/context; canceling departure to Schedule preserves edits')
+        # Step 14 moved Schedule inside the shell: opening it is not a departure, so no dialog, and mounted work survives the round trip.
+        nav(page,'schedule').click();selected(page,'schedule');expect(page.get_by_role('dialog')).to_have_count(0)
+        page.go_back();selected(page,'reports');expect(page.locator('#hc-start')).to_have_value('2026-11-01')
+        assert page.evaluate('window.shellOriginalFile===document.querySelector("#hc-file").files[0]')
+        record(variant,'Native same-document Cash/Reports links preserve mounted cash/sales/hours fields and File object; legacy tabs synchronize selected nav/context; opening Schedule inside the shell and returning preserves edits without a departure dialog')
         if variant.endswith('.html'):
             # Lock checkpoints all visited tools now; use a fresh cash-only context
             # rather than claiming incomplete sales/hours inputs are recoverable.
@@ -214,22 +215,22 @@ with sync_playwright() as p:
     record('inventory/enlarged shell','Actual CR3-only inventory context; raw 3B/2T count retained across local lock/unlock; 320px/200% Spanish shell controls and nav reflow without overflow')
     ctx.close()
     ctx,page=workspace()
+    # Step 14: station URLs open inside the shared shell behind the shared manager gate; public staff URLs stay outside it.
     for station in ('CR2-kitchen','CR2-diningroom','CR3-kitchen','CR3-diningroom'):
         visit(page,'/scheduler-demo/'+station)
-        expect(page.locator('#demo-gate-code')).to_be_visible()
-        expect(page.get_by_role('link',name='Internal tools / Herramientas internas',exact=True)).to_be_visible()
-        assert page.locator('[data-internal-shell]').count()==0
+        selected(page,'schedule');expect(page.get_by_label('Manager code',exact=True)).to_be_visible()
+        assert page.locator('[data-internal-shell]').count()==1
         visit(page,'/schedule/'+station)
         assert page.locator('[data-internal-shell]').count()==0
         expect(page.locator('h1')).to_be_visible()
     visit(page,'/internal');nav(page,'schedule').focus();page.keyboard.press('Enter');page.wait_for_load_state('networkidle')
-    expect(page.locator('#demo-gate-code')).to_be_visible()
-    page.get_by_role('link',name='Internal tools / Herramientas internas',exact=True).click();page.wait_for_load_state('networkidle');selected(page,'dashboard')
-    record('schedule adapter/shared links','Schedule entry remains gated in its original route group; four station manager/public URLs remain reachable, return adapter leads home; no shared permission or public-reader rewrite')
+    selected(page,'schedule');expect(page.get_by_label('Manager code',exact=True)).to_be_visible()
+    nav(page,'dashboard').click();page.wait_for_load_state('networkidle');selected(page,'dashboard')
+    record('schedule adapter/shared links','Four station manager URLs open inside the shared shell behind the shared manager gate and public staff URLs stay outside it; keyboard entry from Home and shell navigation back to Dashboard work; no public-reader rewrite')
     browser_version=browser.version;ctx.close();browser.close()
 assert not errors,errors
 assert not external,external
-sources=[*ROOT.glob('src/components/internal/*.tsx'),*ROOT.glob('src/components/internal/ui/*.*'),ROOT/'src/components/internal/shell.module.css',ROOT/'src/app/(order-shell)/internal/layout.tsx',ROOT/'src/app/(order-shell)/scheduler-demo/layout.tsx',ROOT/'src/lib/internal-tools/i18n/en.ts',ROOT/'src/lib/internal-tools/i18n/es.ts',Path(__file__).resolve()]
+sources=[*ROOT.glob('src/components/internal/*.tsx'),*ROOT.glob('src/components/internal/ui/*.*'),ROOT/'src/components/internal/shell.module.css',ROOT/'src/app/(order-shell)/(internal-tools)/layout.tsx',ROOT/'src/lib/internal-tools/i18n/en.ts',ROOT/'src/lib/internal-tools/i18n/es.ts',Path(__file__).resolve()]
 manifest={'baseCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'sourceFilesSha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in sources if f.suffix in ('.tsx','.ts','.css','.py')},'browser':browser_version,'frontend':args.base,'api':'http://127.0.0.1:8787 (intercepted)','scenarios':results,'screenshots':images,'pageErrors':errors,'externalAttempts':external,'apiRequests':requests}
 (args.artifacts/'results.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print(f'PASS Step 03: {len(results)} scenarios; {len(images)} screenshots; 0 page errors/external attempts; synthetic GET/OPTIONS only')

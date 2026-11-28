@@ -1,0 +1,10 @@
+.access, .picker { padding: clamp(16px, 3vw, 32px); }
+.access form { margin: 0; border-radius: 0; border-color: var(--cr-control); box-shadow: 2px 3px #0002; }
+.access input, .access button { border-radius: 0; }
+.picker h1 { font-family: var(--cr-display-font), Georgia, serif; font-size: clamp(32px, 4vw, 46px); font-weight: 650; line-height: 1.2; }
+.picker > p { margin-top: 12px; }
+.stations { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 20px; margin: 24px 0; list-style: none; padding: 0; }
+.stations li { min-width: 0; }
+.station { display: flex; align-items: center; min-height: 64px; padding: 16px; color: var(--cr-accent-ink); font-size: 20px; font-weight: 600; text-decoration: underline; }
+.staffView { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 12px; border: 1px solid var(--cr-control); font-weight: 600; }
+@media print { .access, .picker { display: none; } }

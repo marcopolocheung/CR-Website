@@ -1,10 +1,11 @@
 'use client'
 
-export type SchedulerView = 'schedule' | 'settings'
+export type SchedulerView = 'schedule' | 'settings' | 'requests'
 
 const views = [
   { id: 'schedule', label: 'Schedule' },
-  { id: 'settings', label: 'Employee settings' },
+  { id: 'settings', label: 'Staff & rules' },
+  { id:'requests',label:'Time off & availability' },
 ] as const
 
 export default function SchedulerNavigation({
@@ -21,7 +22,7 @@ export default function SchedulerNavigation({
   neutral?: boolean
 }) {
   return (
-    <div role="tablist" aria-label="Scheduler views" className="grid grid-cols-2 gap-2 print:hidden">
+    <div role="tablist" aria-label="Scheduler views" className="grid grid-cols-3 gap-2 print:hidden">
       {views.map(({ id, label }, index) => (
         <button
           key={id}

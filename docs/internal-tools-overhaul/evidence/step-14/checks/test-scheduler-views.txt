@@ -1,0 +1,1 @@
+Scheduler view checks passed. Screenshots: /tmp/cr-step14-artifacts/views

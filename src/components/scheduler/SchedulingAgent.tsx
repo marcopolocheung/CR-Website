@@ -1,5 +1,7 @@
 'use client'
 
+import { useSchedulerText } from './useSchedulerText'
+
 import { useEffect, useRef, useState } from 'react'
 import { AGENT_API, AgentApiError, agentRequest, createAgentRun } from '@/lib/scheduler/agent-client'
 import { contextFingerprint, type AgentContext, type AgentRunView } from '@/lib/scheduler/agent-contracts'
@@ -15,6 +17,7 @@ const button = 'min-h-11 rounded-lg border border-zinc-300 bg-white px-4 text-ba
 export default function SchedulingAgent({ context, token, disabled, onApply }: {
   context: AgentContext; token: string; disabled: boolean; onApply: (assignments: ScheduleAssignment[]) => void
 }) {
+  const text = useSchedulerText()
   const key = `cr-scheduling-agent:${context.stationId}:${context.weekStart}`
   const [goal, setGoal] = useState<AgentRunView['goal']>('balanced')
   const [run, setRun] = useState<AgentRunView | null>(null)
@@ -109,44 +112,43 @@ export default function SchedulingAgent({ context, token, disabled, onApply }: {
   return (
     <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4 print:hidden" aria-labelledby="scheduling-agent-title">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div><h2 id="scheduling-agent-title" className="text-lg font-semibold text-zinc-900">Scheduling assistant</h2>
-          <p className="text-sm text-zinc-600">Build, check, and compare proposals while keeping your locked spots.</p></div>
-        <button type="button" className={button} onClick={() => setExpanded(value => !value)} aria-expanded={expanded}>{expanded ? 'Hide assistant' : 'Open assistant'}</button>
+        <div><h2 id="scheduling-agent-title" className="text-lg font-semibold text-zinc-900">{text("Scheduling assistant")}</h2>
+          <p className="text-sm text-zinc-600">{text("Build, check, and compare proposals while keeping your locked spots.")}</p></div>
+        <button type="button" className={button} onClick={() => setExpanded(value => !value)} aria-expanded={expanded}>{expanded ? text("Hide assistant") : text("Open assistant")}</button>
       </div>
       {expanded && <>
         <div className="flex flex-wrap items-end gap-4">
-          <label className="grid flex-1 gap-2 text-base font-medium text-zinc-900">Goal for this week
-            <select value={goal} onChange={event => setGoal(event.target.value as AgentRunView['goal'])} disabled={busy || waiting}
+          <label className="grid flex-1 gap-2 text-base font-medium text-zinc-900">{text("Goal for this week")}<select value={goal} onChange={event => setGoal(event.target.value as AgentRunView['goal'])} disabled={busy || waiting}
               className="min-h-11 rounded-lg border border-zinc-300 bg-white px-3 text-base">
-              {Object.entries(goals).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {Object.entries(goals).map(([value, label]) => <option key={value} value={value}>{text(label)}</option>)}
             </select>
           </label>
           <button type="button" className={button} onClick={() => void make()} disabled={disabled || busy || waiting} aria-busy={busy || waiting}>
-            {waiting ? 'Comparing proposals…' : 'Make proposal'}
+            {waiting ? text("Comparing proposals…") : text("Make proposal")}
           </button>
         </div>
-        {disabled && <p className="text-sm text-amber-950">! Load the saved crew, fix shift rules, and reload requests before making or using a proposal.</p>}
-        {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">✕ {error}</p>}
-        {notice && <p role="status" className="rounded-lg border border-green-300 bg-green-50 p-4 text-green-900">{notice}</p>}
+        {disabled && <p className="text-sm text-amber-950">{text("! Load the saved crew, fix shift rules, and reload requests before making or using a proposal.")}</p>}
+        {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">✕ {text(error)}</p>}
+        {notice && <p role="status" className="rounded-lg border border-green-300 bg-green-50 p-4 text-green-900">{text(notice)}</p>}
         {run && <div className="space-y-4" aria-live="polite">
           <p className="font-medium text-zinc-900">{run.status === 'review' ? '✓ Ready for review · ' : run.status === 'blocked' || run.status === 'failed' ? '! Needs attention · ' : ''}{run.summary}</p>
           {!!run.problems.length && <ul className="list-disc space-y-2 pl-5 text-red-900">{run.problems.map((problem, index) => <li key={index}>{problem}</li>)}</ul>}
           {proposal && <>
-            <p className="text-sm tabular-nums text-zinc-700">{proposal.metrics.totalHours} scheduled hours · {proposal.metrics.hourSpread} hour spread · Goal: {goals[run.goal]}</p>
-            <details><summary className="min-h-11 cursor-pointer py-3 font-medium text-zinc-900">Review {changes.length} changed spots</summary>
-              <div className="overflow-x-auto"><table className="w-full text-left text-sm text-zinc-900"><thead><tr><th className="p-2">Spot</th><th className="p-2">Current</th><th className="p-2">Proposed</th></tr></thead>
+            <p className="text-sm tabular-nums text-zinc-700">{proposal.metrics.totalHours} {text("scheduled hours ·")} {proposal.metrics.hourSpread} {text("hour spread · Goal:")} {text(goals[run.goal])}</p>
+            <details><summary className="min-h-11 cursor-pointer py-3 font-medium text-zinc-900">{text("Review")} {changes.length} {text("changed spots")}</summary>
+              <div className="overflow-x-auto"><table className="w-full text-left text-sm text-zinc-900"><thead><tr><th className="p-2">{text("Spot")}</th><th className="p-2">{text("Current")}</th><th className="p-2">{text("Proposed")}</th></tr></thead>
                 <tbody>{changes.map(item => {
                   const slot = slots.find(s => s.id === item.slotId)
                   return <tr key={item.slotId} className="border-t border-zinc-200"><td className="p-2">{slot ? `${slot.day} ${slot.period} · ${slot.label}` : item.slotId}</td>
-                    <td className="p-2">{context.employees.find(e => e.id === item.previous)?.name ?? 'Open'}</td><td className="p-2">{context.employees.find(e => e.id === item.proposed)?.name ?? 'Open'}</td></tr>
+                    <td className="p-2">{context.employees.find(e => e.id === item.previous)?.name ?? text("Open")}</td><td className="p-2">{context.employees.find(e => e.id === item.proposed)?.name ?? text("Open")}</td></tr>
                 })}</tbody></table></div>
             </details>
           </>}
           {!applied && (run.status === 'review' || run.status === 'accepted') && <div className="flex flex-wrap gap-4">
-            <button type="button" className={button} onClick={() => void decide(true)} disabled={disabled || busy}>Use proposal</button>
-            {run.status === 'review' && <button type="button" className={button} onClick={() => void decide(false)} disabled={busy}>Dismiss proposal</button>}
+            <button type="button" className={button} onClick={() => void decide(true)} disabled={disabled || busy}>{text("Use proposal")}</button>
+            {run.status === 'review' && <button type="button" className={button} onClick={() => void decide(false)} disabled={busy}>{text("Dismiss proposal")}</button>}
           </div>}
-          <details><summary className="min-h-11 cursor-pointer py-3 text-sm font-medium text-zinc-900">See work log</summary>
+          <details><summary className="min-h-11 cursor-pointer py-3 text-sm font-medium text-zinc-900">{text("See work log")}</summary>
             <ol className="list-decimal space-y-2 pl-5 text-sm text-zinc-700">{run.events.map((event, index) => <li key={index}>{event.message}</li>)}</ol>
           </details>
         </div>}

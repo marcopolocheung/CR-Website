@@ -38,17 +38,17 @@ def check(browser, url, artifacts):
     store = SnapshotStore()
     context, page, _, errors = views.open_scheduler(browser, url, 'CR3-diningroom', store=store)
     schedule = page.locator('#scheduler-panel-schedule')
-    schedule.get_by_role('button', name='Make schedule', exact=True).click()
+    schedule.get_by_role('button', name='Build week', exact=True).click()  # Classic 'Make schedule' became Build week in Step 14
     schedule.get_by_role('button', name='Publish to staff', exact=True).first.click()
     page.get_by_role('button', name='Publish', exact=True).click()
     expect(page.get_by_text('Published. Staff now see this week.', exact=True)).to_be_visible()
-    page.get_by_role('button', name='Close', exact=True).click()
+    page.get_by_role('button', name='Close', exact=True).first.click()  # the unified board also has an Edit person Close
     key = next(key for key in store.saved if key[0].startswith('/api/schedule/'))
     original = copy.deepcopy(store.saved[key])
     assert original['snapshot']['slots'][0]['end'] == 960
 
     # Save a time-only edit; its published assignment indexes and layout hash are unchanged.
-    page.get_by_role('tab', name='Employee settings', exact=True).click()
+    views.staff_tab(page).click()  # Classic 'Employee settings' tab became Staff & rules
     settings = page.locator('#scheduler-panel-settings')
     settings.locator('summary').filter(has_text='Shift rules').click()
     settings.get_by_label('Spot end time hour', exact=True).first.select_option('3')

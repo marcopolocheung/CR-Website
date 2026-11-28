@@ -1,0 +1,8 @@
+.staff { min-width:0; }
+.staff :is(button,input,select,textarea,details,section,li) { border-radius:0; }
+.staff :is(button,summary,select,input:not([type=checkbox])) { min-height:44px; }
+.staff :is(input,select,textarea) { max-width:100%; min-width:0; font:inherit; }
+.staff label { min-width:0; }
+.staff :is(p,span,legend,button,summary) { overflow-wrap:anywhere; }
+.staff :is(button,summary,input,select):focus-visible { outline:3px solid var(--cr-accent-ink,#1b6460); outline-offset:3px; }
+@media(max-width:500px) { .staff :global(.grid-cols-2) { grid-template-columns:minmax(0,1fr); } }

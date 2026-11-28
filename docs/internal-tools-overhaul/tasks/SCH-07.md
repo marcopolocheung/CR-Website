@@ -98,6 +98,7 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 ## Handoff evidence
 
+- Step 14 (2026-11-27): [checkpoint](../checkpoints/step-14.md). Manager planning view delivered in both languages; the staff/tablet day view remains for Step 16, so this task stays open. Status unchanged.
 - Commits/artifacts: none; this brief is planning documentation.
 - Checks performed: source inspection only; implementation scenarios not run.
 - Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.

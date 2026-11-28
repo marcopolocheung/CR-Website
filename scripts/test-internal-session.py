@@ -372,20 +372,21 @@ with sync_playwright() as p:
     record('late response generation', 'A held cash write acknowledged after another tool expires access and the same code reauthenticates cannot mark the current draft server-saved, revoke the new session or replay the write')
     ctx.close()
 
-    # Existing station gates remain independent from an internal manager unlock.
+    # Step 14: Schedule shares the internal manager unlock and shell. Crew editing still needs the separate
+    # staff password; test-scheduler-views.py asserts that after a manager unlock.
     ctx, page, mode = workspace()
     visit(page, '/internal/bookkeeping'); unlock(page)
     go(page, 'dashboard')
-    nav(page, 'schedule').click()
-    expect(page.locator('#demo-gate-code')).to_be_visible()
-    assert page.locator('[data-internal-shell]').count() == 0
-    record('scheduler boundary', 'Internal shared unlock does not grant the separate scheduler gate; public/crew permission adapters remain independent')
+    nav(page, 'schedule').click(); selected(page, 'schedule')
+    expect(page.get_by_label('Manager code', exact=True)).to_have_count(0)
+    assert page.locator('[data-internal-shell]').count() == 1
+    record('scheduler boundary', 'Schedule opens inside the shared shell under the existing manager unlock with no second manager gate; the separate crew staff password is asserted in test-scheduler-views.py')
     browser_version = browser.version
     ctx.close(); browser.close()
 
 assert not errors, errors
 assert not external, external
-sources = [*ROOT.glob('src/components/internal/*.tsx'), *ROOT.glob('src/components/internal/*.ts'), *ROOT.glob('src/lib/internal-tools/*session*'), *ROOT.glob('src/lib/internal-tools/work-transitions*'), *ROOT.glob('src/lib/internal-tools/i18n/*.ts'), *ROOT.glob('src/app/(order-shell)/internal/**/*.tsx'), ROOT / 'src/lib/cashout-store.ts', Path(__file__).resolve()]
+sources = [*ROOT.glob('src/components/internal/*.tsx'), *ROOT.glob('src/components/internal/*.ts'), *ROOT.glob('src/lib/internal-tools/*session*'), *ROOT.glob('src/lib/internal-tools/work-transitions*'), *ROOT.glob('src/lib/internal-tools/i18n/*.ts'), *ROOT.glob('src/app/(order-shell)/(internal-tools)/internal/**/*.tsx'), ROOT / 'src/lib/cashout-store.ts', Path(__file__).resolve()]
 manifest = {'baseCommit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
             'sourceFilesSha256': {str(file.relative_to(ROOT)): hashlib.sha256(file.read_bytes()).hexdigest() for file in sources if file.is_file()},
             'browser': browser_version, 'frontend': args.base + args.prefix, 'api': 'http://127.0.0.1:8787 (intercepted)',

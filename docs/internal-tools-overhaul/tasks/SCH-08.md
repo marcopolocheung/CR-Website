@@ -97,6 +97,7 @@ No resource creation, binding change, migration execution, or Worker deployment 
 
 ## Handoff evidence
 
+- Step 14 (2026-11-27): [checkpoint](../checkpoints/step-14.md). Copying, locks, undo, visibility and printing regressions pass in the Step 14 browser scripts; public-read and encrypted legacy link evidence is still needed, so this task stays open. Status unchanged.
 - Commits/artifacts: none; this brief is planning documentation.
 - Checks performed: source inspection only; implementation scenarios not run.
 - Remaining steps: claim task, verify prerequisites, execute applicable checklists, and record milestone evidence.

@@ -44,7 +44,15 @@ import type { HoursResult } from '@/lib/scheduler/hours-batch'
 import type { SpecialHoursPage } from '@/lib/scheduler/special-hours'
 import { HoursBanner, HoursStationStatus, HoursSummary as SpecialHoursSummary } from './SpecialHours'
 import { RESTAURANTS, isRestaurantId, isScheduleOnlyRestaurant } from '@/data/restaurants'
-import { useManagerCode } from './DemoGate'
+import { useManagerSession } from '@/components/internal/ManagerSession'
+import { useInternalLanguage } from '@/components/internal/InternalLanguage'
+import { useWorkspaceVisible } from '@/components/internal/WorkspaceVisibility'
+import { useShellTask } from '@/components/internal/ShellTask'
+import { useNavigationProtection } from '@/components/internal/NavigationProtection'
+import { InternalTheme } from '@/components/internal/ui/Theme'
+import { managerSession, SessionChangedError } from '@/lib/internal-tools/manager-session'
+import css from './scheduler-workspace.module.css'
+import { useSchedulerText } from './useSchedulerText'
 import { DEFAULT_STATION, isStationId, type Locale } from '@/lib/internal-tools/contracts'
 import { LOCALE_STORAGE_KEY, translate } from '@/lib/internal-tools/i18n'
 import RequestsPanel from './RequestsPanel'
@@ -69,6 +77,8 @@ import ScheduleWorkspace, { type ScheduleWorkspaceProps } from './ScheduleWorksp
 import StaffWorkspace, { type StaffWorkspaceProps } from './StaffWorkspace'
 import SchedulingAgent from './SchedulingAgent'
 export default function SchedulerDemo({ restaurantId }: { restaurantId?: string } = {}) {
+  const controller=useRef<HTMLDivElement>(null)
+  const findElement=(id:string)=>controller.current?.querySelector<HTMLElement>(`[id="${CSS.escape(id)}"]`)??null
   const restaurantName = restaurantId && isRestaurantId(restaurantId) ? RESTAURANTS[restaurantId].name : null
   // Schedule-only stations (CR3 Kitchen) ship default rules; their crew lives on the Worker.
   // The crew (`/api/staff`) is one per station, shared by every week, with the
@@ -111,6 +121,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // The staff password, once accepted, for this page view only — never stored. It is the editing
   // privilege for CR3 Kitchen's crew and rules; the manager code alone does not unlock them.
   const [staffPassword, setStaffPassword] = useState('')
+  const crewAttempt=useRef(0)
+  const [employeeDraftTouched,setEmployeeDraftTouched]=useState(false)
   const staffUnlocked = staffPassword !== ''
   const [passwordInput, setPasswordInput] = useState('')
   const [checkingPassword, setCheckingPassword] = useState(false)
@@ -194,7 +206,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [selectedVariant, setSelectedVariant] = useState<ScheduleVariant>('balanced')
   const [tab, setTab] = useState<SchedulerView>('schedule')
   // The new layout is the default; Classic is a per-device choice for managers who prefer it.
-  const [layout, setLayout] = useState<SchedulerLayout>('new')
+  const layout = 'workspace' as const
   const [autoAdjust, setAutoAdjust] = useState(true)
   const [focusEmployeeId, setFocusEmployeeId] = useState<string>()
   const [requestPrefill, setRequestPrefill] = useState<{ id: string; employeeId: string; date: string } | null>(null)
@@ -236,7 +248,16 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const [layoutMismatchWeeks, setLayoutMismatchWeeks] = useState<Record<string, boolean>>({})
   const [liveMonthWeeks, setLiveMonthWeeks] = useState<Record<string, boolean>>({})
   const [copyingPrior, setCopyingPrior] = useState(false)
-  const managerCode = useManagerCode()
+  const session = useManagerSession()
+  const managerCode = session.token
+  const visible = useWorkspaceVisible()
+  const {locale: requestLocale, choose: setRequestLocale} = useInternalLanguage()
+  const active = visible && !!managerCode
+  const sessionRef = useRef(session); sessionRef.current = session
+  const viewRef = useRef(active); viewRef.current = active
+  const contextRef = useRef({weekStart, generation: session.generation}); contextRef.current = {weekStart,generation:session.generation}
+  const setupFlight = useRef(false)
+  const [publishBusy, setPublishBusy] = useState(false)
   const requestStation = isStationId(restaurantId) ? restaurantId : DEFAULT_STATION
   const requestSource = useScheduleRequests(requestStation, managerCode)
   const hoursSource = useSpecialHours(requestStation, weekStart, managerCode)
@@ -252,11 +273,11 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setHoursDraftReviews(old=>old[weekStart]!==undefined?old:{...old,[weekStart]:Object.fromEntries(page.events.map(event=>[
       event.data.date,page.reviews.find(r=>r.data.stationId===requestStation&&r.data.date===event.data.date)??null]))})
   },[hoursSource.phase,hoursSource.page,weekStart,requestStation])
-  const [requestLocale, setRequestLocale] = useState<Locale>('en')
   const [requestDirty, setRequestDirty] = useState(false)
-  useEffect(() => { try { if (localStorage.getItem(LOCALE_STORAGE_KEY) === 'es') setRequestLocale('es') } catch { /* optional preference */ } }, [])
+  const [requestBusy, setRequestBusy] = useState(false)
   const [savingSetup, setSavingSetup] = useState(false)
   const [setupError, setSetupError] = useState('')
+  const [retryLoad,setRetryLoad] = useState(0)
   const [setupNotice, setSetupNotice] = useState('')
   const templateDirty = !templateLoaded
       ? false
@@ -309,14 +330,15 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   const requestsUnconfirmed = requestSource.phase === 'failed' || requestSource.phase === 'uncertain'
   const ruleProblems = useMemo(() => templateProblems(template), [template])
   const t = (key: string) => translate(requestLocale, key)
-  const draftContext = JSON.stringify([restaurantId, weekStart, layout, tab, employees, template, assignments,
+  const text=useSchedulerText()
+  const draftContext = JSON.stringify([restaurantId, weekStart, session.generation, active, employees, template, assignments,
     exclusions, requestSource.record?.revision, hoursSource.page?.events, activeHoursReviews, slots])
   const currentDraftContext = useRef(draftContext)
   currentDraftContext.current = draftContext
   const adjustment = useDraftAdjustment({
     input: { employees: scheduleEmployees, slots, assignments, exclusions },
     contextKey: `${draftContext}:${isGenerating}`, scope: `${restaurantId}:${weekStart}`,
-    disabled: layout !== 'workspace' || !weekStart || !rosterLoaded || !templateLoaded || !!rosterLoadError || !!templateLoadError ||
+    disabled: !active || !weekStart || !rosterLoaded || !templateLoaded || !!rosterLoadError || !!templateLoadError ||
       isGenerating || !!staffLoadError || ruleProblems.length > 0 || hoursBlocked,
     onCommit: (next, nextExclusions) => { commitSchedule('draft before adjustment', next); setExclusions([...nextExclusions]) },
   })
@@ -442,9 +464,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
           publishedFingerprint: publishedDoc ? publishedWeekFingerprint(publishedDoc.week, publishedDoc.snapshot) : null,
           visibleOnScreen: weekVisibility === 'on',
         })
-  const otherWeeksWithEdits = Object.keys(weeks).filter(
-    (week) => week !== weekStart && assignmentFingerprint(weeks[week] ?? []) !== (publishedBaselines[week] ?? ''),
-  )
+  const otherWeeksWithEdits = [...new Set([...Object.keys(weeks),...Object.keys(rosters),...Object.keys(templates),...Object.keys(weekStatus)])].filter(week=>week!==weekStart&&(
+    assignmentFingerprint(weeks[week]??[])!==(publishedBaselines[week]??'') ||
+    !!rosters[week]&&rosterFingerprint(rosters[week])!==(rosterSnapshots[week]??rosterFingerprint(defaultRoster)) ||
+    !!templates[week]&&templateFingerprint(templates[week])!==(templateSnapshots[week]??templateFingerprint(defaultTemplateForRestaurant(restaurantId))) ||
+    weekStatus[week]!==undefined&&weekStatus[week]!== (publishedWeeks[week]?.visible?'on':'off')
+  ))
   // Edits made on this screen since the week was loaded or published — not drift in the staff list.
   const currentWeekUnpublished =
     Boolean(weekStart) &&
@@ -473,7 +498,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     setWeekStart(start)
     setMonthKey(monthKeyForWeek(start))
     setOnboardingDismissed(readOnboardingDismissed())
-    setLayout(readLayoutPreference())
+
   }, [])
 
   useEffect(() => {
@@ -519,6 +544,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }, [restaurantId])
 
   useEffect(() => {
+    if (!managerCode || (defaultRosterLoaded&&!rosterLoadError)) return
     let cancelled = false
     setRosterLoadError('')
     setDefaultRosterLoaded(false)
@@ -545,12 +571,12 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [restaurantId, scheduleOnly, managerCode])
+  }, [restaurantId, scheduleOnly, managerCode, retryLoad])
 
   // Schedule-only crew: load the saved crew (one per station, shared by every
   // week). No saved crew yet means the station's saved roster, which stays editable.
   useEffect(() => {
-    if (!scheduleOnly) return
+    if (!scheduleOnly || !managerCode || (staffLoaded&&!staffLoadError)) return
     let cancelled = false
     setStaffLoadError('')
     setStaffLoaded(false)
@@ -578,9 +604,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [restaurantId, scheduleOnly, managerCode])
+  }, [restaurantId, scheduleOnly, managerCode, retryLoad])
 
   useEffect(() => {
+    if (!managerCode || (defaultTemplateLoaded&&!templateLoadError)) return
     let cancelled = false
     setTemplateLoadError('')
     setDefaultTemplateLoaded(false)
@@ -607,10 +634,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [restaurantId, scheduleOnly])
+  }, [restaurantId, scheduleOnly, managerCode, retryLoad])
 
   useEffect(() => {
-    if (!weekStart || !defaultRosterLoaded || rosterLoadedWeeks[weekStart]) return
+    if (!managerCode || !weekStart || !defaultRosterLoaded || rosterLoadedWeeks[weekStart]) return
     let cancelled = false
     if (scheduleOnly) {
       setRosterLoadedWeeks((current) => ({ ...current, [weekStart]: true }))
@@ -641,10 +668,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [weekStart, restaurantId, defaultRosterLoaded, defaultRoster, rosterLoadedWeeks, scheduleOnly, managerCode])
+  }, [weekStart, restaurantId, defaultRosterLoaded, defaultRoster, rosterLoadedWeeks, scheduleOnly, managerCode, retryLoad])
 
   useEffect(() => {
-    if (!weekStart || !defaultTemplateLoaded || templateLoadedWeeks[weekStart]) return
+    if (!managerCode || !weekStart || !defaultTemplateLoaded || templateLoadedWeeks[weekStart]) return
     let cancelled = false
     fetchTemplate(restaurantId, weekStart)
       .then((doc) => {
@@ -671,10 +698,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [weekStart, restaurantId, defaultTemplateLoaded, defaultTemplate, templateLoadedWeeks])
+  }, [weekStart, restaurantId, defaultTemplateLoaded, defaultTemplate, templateLoadedWeeks, managerCode, retryLoad])
 
   useEffect(() => {
-    if (!weekStart) return
+    if (!managerCode || !weekStart || publishedWeeks[weekStart] !== undefined) return
     let cancelled = false
     fetchGoldenWeek(weekStart, restaurantId)
       .then((doc) => {
@@ -692,7 +719,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [weekStart, restaurantId])
+  }, [weekStart, restaurantId, managerCode])
 
   useEffect(() => {
     if (!weekStart || !rosterLoaded || !templateLoaded || hoursSource.phase==='loading' || hydratedWeeks[weekStart]) return
@@ -723,7 +750,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }, [weekStart, restaurantId, rosterLoaded, templateLoaded, publishedWeeks, hydratedWeeks, slots, employees, weeks, hoursSource.phase])
 
   useEffect(() => {
-    if (!monthKey) return
+    if (!active || !monthKey) return
     let cancelled = false
     // The month list only returns weeks staff can see — that is what "Live" means in the week strip.
     fetchGoldenMonth(monthKey, 0, restaurantId)
@@ -741,36 +768,50 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     return () => {
       cancelled = true
     }
-  }, [monthKey, restaurantId])
+  }, [monthKey, restaurantId, active])
 
-  // Closing the tab, reloading, or following a link drops every edit that is not published or saved.
-  useEffect(() => {
-    if (!hasUnsavedWork) return
-    const message = 'You have changes that are not published or saved. Leave anyway?'
-    function warnOnUnload(event: BeforeUnloadEvent) {
-      event.preventDefault()
-      event.returnValue = ''
+  // The host retains controllers during private navigation and lock. No device copy is claimed.
+  const working = hasUnsavedWork || (employeePanelOpen && (employeeDraftTouched || !!draft.name.trim()))
+  const mutationBusy = savingSetup || publishBusy || hoursBusy || checkingPassword || requestBusy
+  useNavigationProtection({scope:`schedule:${requestStation}`,dirty:working,deviceSaved:false,busy:mutationBusy,
+    checkpoint:()=>!mutationBusy,leave:()=>{setStaffPassword('');setPasswordInput('')}})
+  useShellTask(`schedule-${requestStation}`, {context: active ? `${restaurantName ?? requestStation} · ${weekStart ? planningWeek(weekStart,dateForDay(weekStart,'Saturday'),requestLocale) : t('planning.loading')} · ${t(currentPublishState ? `planning.status.${currentPublishState}` : 'planning.status.draft')}` : null})
+  useEffect(()=>{
+    crewAttempt.current++;setStaffPassword('');setPasswordInput('');setCheckingPassword(false)
+    generationJobs.current.cancel();adjustment.cancel();setIsGenerating(false)
+  },[session.generation])
+  useEffect(()=>{
+    if(!active){generationJobs.current.cancel();adjustment.cancel();setIsGenerating(false)}
+  },[active])
+  function writeLocation(week:string,view:SchedulerView,replace=false) {
+    const url=new URL(window.location.href)
+    if(week)url.searchParams.set('week',week)
+    url.searchParams.delete('hoursDate')
+    url.hash=view==='settings'?'staff':view
+    if(url.href===window.location.href)return
+    if(replace)window.history.replaceState(window.history.state,'',url)
+    else window.history.pushState(window.history.state,'',url)
+  }
+  // Tabs and jump helpers place focus themselves; only shortcuts from the board ask to focus the panel.
+  function changeView(next:SchedulerView,focusPanel=false) {
+    if(!active||mutationBusy)return
+    if(hoursDirty||hoursBusy){setSetupNotice(t('hours.finishFirst'));return}
+    setHoursEditor(null);setTab(next);writeLocation(weekStart,next)
+    if(focusPanel)requestAnimationFrame(()=>findElement(`scheduler-panel-${next}`)?.focus({preventScroll:true}))
+  }
+  useEffect(()=>{
+    if(!active)return
+    const sync=()=>{
+      const url=new URL(window.location.href)
+      const next:SchedulerView=url.hash==='#staff'?'settings':url.hash==='#requests'?'requests':'schedule'
+      if(mutationBusy||hoursDirty){writeLocation(weekStart,tab,true);return}
+      const requested=url.searchParams.get('week')??''
+      if(businessDate(requested)&&new Date(`${requested}T00:00:00Z`).getUTCDay()===0&&requested!==weekStart)goToWeek(requested,false)
+      setTab(next)
     }
-    // In-app links swap the page without an unload, so they need their own check.
-    function warnOnLink(event: MouseEvent) {
-      const link = (event.target as Element | null)?.closest?.('a[href]')
-      if (!link || link.getAttribute('target') === '_blank' || event.defaultPrevented) return
-      const href = link.getAttribute('href') ?? ''
-      if (href.startsWith('#') || href.startsWith('sms:') || href.startsWith('mailto:')) return
-      if(hoursBusy){event.preventDefault();event.stopPropagation();return}
-      if (!window.confirm(message)) {
-        event.preventDefault()
-        event.stopPropagation()
-      }
-    }
-    window.addEventListener('beforeunload', warnOnUnload)
-    document.addEventListener('click', warnOnLink, true)
-    return () => {
-      window.removeEventListener('beforeunload', warnOnUnload)
-      document.removeEventListener('click', warnOnLink, true)
-    }
-  }, [hasUnsavedWork,hoursBusy])
-
+    sync();window.addEventListener('hashchange',sync);window.addEventListener('popstate',sync)
+    return()=>{window.removeEventListener('hashchange',sync);window.removeEventListener('popstate',sync)}
+  },[active,mutationBusy,hoursDirty,weekStart])
   function dismissOnboarding() {
     setOnboardingDismissed(true)
     try {
@@ -795,10 +836,10 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
   // Ctrl/Cmd+Z undoes the last change — but never while typing, where the browser's own undo applies.
   const undoRef = useRef(undoLastChange)
-  undoRef.current = undoLastChange
+  undoRef.current = ()=>{if(!mutationBusy)undoLastChange()}
   useEffect(() => {
     function undoOnShortcut(event: KeyboardEvent) {
-      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.key.toLowerCase() !== 'z') return
+      if (!viewRef.current || !(event.ctrlKey || event.metaKey) || event.shiftKey || event.key.toLowerCase() !== 'z') return
       const target = event.target as HTMLElement | null
       if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
       event.preventDefault()
@@ -823,8 +864,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   // Staff and rules travel with the week: opening a week with no saved list yet
   // copies the list and rules from the week being left, so week 1 (11 staff) and
   // week 2 (12 staff) stay independent.
-  function goToWeek(nextWeekStart: string) {
-    if (!nextWeekStart || nextWeekStart === weekStart) return
+  function goToWeek(nextWeekStart: string, updateHistory = true) {
+    if (!active || mutationBusy || !nextWeekStart || nextWeekStart === weekStart) return
     if(hoursDirty||hoursBusy){setSetupNotice(translate(requestLocale,'hours.finishFirst'));return}
     adjustment.cancel(); generationJobs.current.cancel(); setIsGenerating(false)
     setExternalAvailability(false)
@@ -835,6 +876,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       setTemplateRevs((current) => (current[nextWeekStart] !== undefined ? current : { ...current, [nextWeekStart]: 0 }))
     }
     setWeekStart(nextWeekStart)
+    if(updateHistory) writeLocation(nextWeekStart,tab)
     setHoursEditor(null)
     setMonthKey(monthKeyForWeek(nextWeekStart))
     setDiagnostics([])
@@ -890,7 +932,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   async function copyPriorWeek() {
-    if (!weekStart || copyingPrior) return
+    if (!active || !weekStart || copyingPrior || mutationBusy) return
+    const origin={...contextRef.current}
     const prior = shiftWeek(weekStart, -1)
     setCopyingPrior(true)
     let source: ScheduleAssignment[]
@@ -902,6 +945,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     } finally {
       setCopyingPrior(false)
     }
+    if (!viewRef.current || origin.weekStart!==contextRef.current.weekStart || origin.generation!==contextRef.current.generation) return
     if (source.length === 0) {
       setDiagnostics(['Last week has nothing to copy — it was never made or published.'])
       return
@@ -1002,8 +1046,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   function openEmployeeSettings(showRules = false) {
-    setTab('settings')
-    const disclosure = rulesDisclosure.current ?? document.getElementById('scheduler-rules') as HTMLDetailsElement | null
+    changeView('settings')
+    const disclosure = rulesDisclosure.current ?? findElement('scheduler-rules') as HTMLDetailsElement | null
     if (showRules && disclosure) {
       disclosure.open = true
       requestAnimationFrame(() => {
@@ -1011,7 +1055,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
         disclosure.scrollIntoView({ block: 'start' })
       })
     } else {
-      document.getElementById('scheduler-tab-settings')?.focus()
+      findElement('scheduler-tab-settings')?.focus()
     }
   }
 
@@ -1030,13 +1074,13 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
 
   function fixNextIssue() {
     if (!nextIssue) return
-    setTab('schedule')
+    changeView('schedule')
     setGuidedChoosing(true)
     openSlot(nextIssue.slot?.id)
     const shiftKey = nextIssue.slot ? `${nextIssue.slot.day}-${nextIssue.slot.period}` : null
     if (shiftKey) {
       requestAnimationFrame(() => {
-        document.getElementById(`${shiftKey}-detail`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        findElement(`${shiftKey}-detail`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       })
     }
   }
@@ -1481,10 +1525,16 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
    * Returns false and shows why when anything fails; parts saved before the failure stay saved.
    */
   async function saveSetup({ alsoRules = false } = {}): Promise<boolean> {
-    if (!weekStart || storeLoading) return false
+    if (!active || !weekStart || storeLoading || setupFlight.current) return false
+    const current=managerSession.capture(managerCode)
+    const origin={...contextRef.current}
+    const check=()=>{current();if(origin.weekStart!==contextRef.current.weekStart)throw new SessionChangedError()}
+    setupFlight.current=true
+    if(scheduleOnly&&(staffDirty||templateDirty)&&!staffUnlocked){setSetupError(text('Unlock Staff & rules before saving crew or rule changes.'));setupFlight.current=false;return false}
     // An empty list shown after a failed load must never overwrite the saved staff.
     if (rosterLoadError || staffLoadError) {
       setSetupError('The staff list did not load, so saving is off. Reload the page and try again.')
+      setupFlight.current=false
       return false
     }
     setSetupError('')
@@ -1494,17 +1544,17 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     try {
       if (rosterDirty) {
         const result = await saveRoster(employees, rosterRev, managerCode, restaurantId, target)
-        setRosterSaved(target, result.rev, result.updatedAt, rosterFingerprint(employees))
+        check();setRosterSaved(target, result.rev, result.updatedAt, rosterFingerprint(employees))
       }
       if (staffDirty && staffDraft) {
         what = 'crew'
-        applyStaffResult(await saveStaff(staffDraft, staffRev, staffPassword, restaurantId))
+        const saved=await saveStaff(staffDraft, staffRev, staffPassword, restaurantId);check();applyStaffResult(saved)
       }
       if ((templateDirty || (alsoRules && templateRev === 0)) && ruleProblems.length === 0) {
         what = 'shift rules'
         // CR3 Kitchen rules are the password holder's to change; publishing a week still saves them with the manager code.
-        const result = await saveTemplate(template, templateRev, scheduleOnly && staffPassword ? staffPassword : managerCode, restaurantId, target)
-        setTemplateSaved(target, result.rev, result.updatedAt, templateFingerprint(template))
+        const result = await saveTemplate(template, templateRev, scheduleOnly && staffPassword ? staffPassword : managerCode, restaurantId, target, scheduleOnly && staffPassword ? 'staff' : 'manager')
+        check();setTemplateSaved(target, result.rev, result.updatedAt, templateFingerprint(template))
         if (result.preservedPublication) {
           const publication = result.preservedPublication
           setPublishedWeeks(current => ({ ...current, [target]: publication }))
@@ -1512,13 +1562,13 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
       }
       return true
     } catch (caught) {
-      setSetupError(saveErrorMessage(caught, what))
+      if(!(caught instanceof SessionChangedError))setSetupError(saveErrorMessage(caught, what))
       return false
-    }
+    } finally {setupFlight.current=false}
   }
 
   async function saveSetupNow() {
-    if (savingSetup || setupParts.length === 0) return
+    if (!active || setupFlight.current || savingSetup || setupParts.length === 0) return
     setSavingSetup(true)
     const saved = await saveSetup()
     setSavingSetup(false)
@@ -1526,29 +1576,36 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
   }
 
   async function unlockCrewEditing(password = passwordInput): Promise<string|null> {
-    if (!password || checkingPassword) return translate(requestLocale,'hours.unlockFailed')
+    if (!active || !password || checkingPassword) return translate(requestLocale,'hours.unlockFailed')
+    const generation=session.generation
+    const attempt=++crewAttempt.current
     setCheckingPassword(true)
     setSetupError('')
     try {
       await verifyStaffPassword(password, restaurantId)
+      if(generation!==sessionRef.current.generation||attempt!==crewAttempt.current)throw new SessionChangedError()
       setStaffPassword(password)
       setPasswordInput('')
       return null
     } catch (caught) {
+      if(caught instanceof SessionChangedError)return caught.message
       const message=saveErrorMessage(caught, 'crew').replace('That code was not accepted', 'That staff password was not accepted')
       setSetupError(message)
       return message
     } finally {
-      setCheckingPassword(false)
+      if(attempt===crewAttempt.current)setCheckingPassword(false)
     }
   }
 
   async function undoCrewSave() {
-    if (savingSetup || !staffCanUndo) return
+    if (!active || savingSetup || !staffCanUndo) return
+    const generation=session.generation
     setSavingSetup(true)
     setSetupError('')
     try {
-      applyStaffResult(await undoStaff(staffRev, staffPassword, restaurantId))
+      const result=await undoStaff(staffRev, staffPassword, restaurantId)
+      if(generation!==sessionRef.current.generation)return
+      applyStaffResult(result)
       setSetupNotice('Undid the last saved crew change.')
     } catch (caught) {
       setSetupError(saveErrorMessage(caught, 'crew'))
@@ -1557,31 +1614,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     }
   }
 
-  function changeLayout(next: SchedulerLayout) {
-    if(hoursDirty||hoursBusy){setSetupNotice(translate(requestLocale,'hours.finishFirst'));return}
-    setHoursEditor(null)
-    adjustment.cancel(); generationJobs.current.cancel(); setIsGenerating(false)
-    setLayout(next)
-    try { window.localStorage.setItem(layoutStorageKey, next) } catch { /* view preference only */ }
-  }
-
-  function toggleLayout() {
-    if(hoursDirty||hoursBusy){setSetupNotice(translate(requestLocale,'hours.finishFirst'));return}
-    setHoursEditor(null)
-    setLayout((current) => {
-      const next: SchedulerLayout = current === 'classic' ? 'new' : 'classic'
-      try {
-        window.localStorage.setItem(layoutStorageKey, next)
-      } catch {
-        // The choice still applies for this visit; only remembering it fails.
-      }
-      return next
-    })
-  }
-
   const requestsPanel = (
     <RequestsPanel key={requestStation} source={requestSource} employees={employees} weekStart={weekStart} token={managerCode}
-      locale={requestLocale} onLocaleChange={setRequestLocale} onDirtyChange={setRequestDirty} prefill={requestPrefill} hideLanguage={layout === 'workspace'}
+      locale={requestLocale} onLocaleChange={setRequestLocale} onDirtyChange={setRequestDirty} onBusyChange={setRequestBusy} prefill={requestPrefill} hideLanguage
       onApproved={request => setPendingApproval({ request, week: weekStart, layout })} />
   )
   // Ordinary weeks retain the legacy assistant wire shape. Dated-hours weeks
@@ -1671,10 +1706,7 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     onDismissReport: () => setLastReport(null),
     onCancelMove: cancelMove,
     onReviewRules: () => openEmployeeSettings(true),
-    onPrint: () => {
-      flushSync(() => setTab('schedule'))
-      window.print()
-    },
+    onPrint: () => { if(active) window.print() },
     onResetShift: restoreShift,
     onOpenShift: setOpenShiftKey,
     onAssign: setEmployeeAssignment,
@@ -1704,9 +1736,9 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     gapSlot,
     weekStart,
     canAddEmployee,
-    onDraftChange: setDraft,
-    onAddEmployee: addEmployee,
-    onAddCustomRole: addCustomRoleToDraft,
+    onDraftChange: value=>{setEmployeeDraftTouched(true);setDraft(value)},
+    onAddEmployee: ()=>{addEmployee();setEmployeeDraftTouched(false)},
+    onAddCustomRole: value=>{setEmployeeDraftTouched(true);addCustomRoleToDraft(value)},
     onToggleEmployeePanel: () => setEmployeePanelOpen((open) => !open),
     onUpdateEmployee: updateEmployee,
     onRemoveEmployee: removeEmployee,
@@ -1743,8 +1775,8 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     onSave: () => void saveSetupNow(),
     onUndo: undoLastChange,
     onBack: () => {
-      setTab('schedule')
-      document.getElementById('scheduler-tab-schedule')?.focus()
+      changeView('schedule')
+      findElement('scheduler-tab-schedule')?.focus()
     },
     template,
     ruleProblems,
@@ -1760,840 +1792,72 @@ export default function SchedulerDemo({ restaurantId }: { restaurantId?: string 
     onUseDefaultTemplate: restoreDefaultTemplate,
   }
 
-  return (
-    <PlanningShell enabled={layout === 'workspace'} locale={requestLocale} onSchedule={() => setTab('schedule')}>
-    <div className={layout === 'workspace' ? undefined : 'bg-zinc-100 text-zinc-950'} data-scheduler-content inert={hoursBusy}>
-      <header className="border-b border-zinc-200 bg-white">
-        <div className="px-4 py-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                {restaurantName ? `${restaurantName} · Scheduler` : 'Scheduler'}
-              </p>
-              <h1 className="text-2xl font-bold md:text-3xl">{layout === 'workspace' ? t('planning.title') : layout === 'new' ? 'Weekly schedule' : 'Weekly staff schedule'}</h1>
-              {currentPublishState && (
-                <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600">
-                  {layout === 'workspace' ? <span>{t(`planning.status.${currentPublishState}`)}</span> : <PublishStateBadge state={currentPublishState} />}
-                  {otherWeeksWithEdits.length > 0 && (
-                    <span>
-                      {otherWeeksWithEdits.length} other week{otherWeeksWithEdits.length === 1 ? '' : 's'} with unpublished changes
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-3 print:hidden">
-              <Link
-                href={restaurantId ? `/schedule/${restaurantId}` : '/schedule'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                title="View the published staff schedule in a new tab"
-              >
-                {layout === 'workspace' ? t('planning.staffView') : 'View schedule'}<span className="sr-only"> (opens in a new tab)</span>
-              </Link>
-              {layout === 'workspace' && <div role="group" aria-label="English / Español" className="flex gap-2">
-                {(['en', 'es'] as const).map(locale => <button key={locale} className="min-h-11 border border-zinc-400 bg-white px-3" aria-pressed={requestLocale === locale} lang={locale}
-                  onClick={() => { setRequestLocale(locale); try { localStorage.setItem(LOCALE_STORAGE_KEY, locale) } catch { /* preference only */ } }}>{locale === 'en' ? 'English' : 'Español'}</button>)}
-              </div>}
-              <label className="flex min-h-11 items-center gap-2 text-sm">{t('planning.layout')}
-                <select aria-label={t('planning.layout')} className="min-h-11 border border-zinc-400 bg-white px-3" value={layout} onChange={e => changeLayout(e.target.value as SchedulerLayout)}>
-                  <option value="new">{t('planning.current')}</option><option value="classic">{t('planning.classic')}</option><option value="workspace">{t('planning.workspace')}</option>
-                </select>
-              </label>
-              <div hidden={layout === 'workspace'} className="flex items-center gap-2 text-sm text-zinc-700">
-                <span>Classic layout: {layout === 'classic' ? 'On' : 'Off'}</span>
-                <FlipSwitch on={layout === 'classic'} onFlip={toggleLayout} label="Use the classic layout" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="space-y-3 px-4 pb-4">
-          <SchedulerNavigation
-            view={tab}
-            settingsDirty={setupParts.length > 0}
-            onChange={next=>{if(hoursDirty||hoursBusy){setSetupNotice(t('hours.finishFirst'));return}setHoursEditor(null);setTab(next)}}
-            labels={layout === 'workspace' ? { schedule: t('planning.schedule'), settings: t('planning.settings') } : layout === 'new' ? { schedule: 'Schedule', settings: 'Staff & rules' } : undefined}
-            neutral={layout !== 'classic'}
-          />
-          <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-            <div className="flex min-w-0 items-center gap-1" aria-label="Selected week">
-              <IconButton icon="chevronLeft" label={layout === 'workspace' ? t('planning.previous') : 'Previous week'} onClick={() => goToWeek(shiftWeek(weekStart, -1))} disabled={!weekStart} />
-              <p className="min-w-0 px-2 text-center text-base font-semibold" aria-live="polite">
-                {weekStart ? layout === 'workspace' ? planningWeek(weekStart, dateForDay(weekStart, 'Saturday'), requestLocale) : formatWeekRange(weekStart) : 'Loading week…'}
-              </p>
-              <IconButton icon="chevronRight" label={layout === 'workspace' ? t('planning.next') : 'Next week'} onClick={() => goToWeek(shiftWeek(weekStart, 1))} disabled={!weekStart} />
-            </div>
-            <button type="button" id="set-week-hours" aria-expanded={false} disabled={!weekStart||scheduleWorkspace.hoursDisabled}
-              className="min-h-11 border border-zinc-500 bg-white px-3 py-2 text-sm font-semibold text-[#1b6460]"
-              onClick={event=>openHoursEditor(null,event.currentTarget)}>{t('hours.setHours')}</button>
-            {weekStart && weekStart !== currentWeekStart() && (
-              <Button onClick={() => goToWeek(currentWeekStart())} icon="reset">{layout === 'workspace' ? t('planning.thisWeek') : 'This week'}</Button>
-            )}
-          </div>
+  return <div ref={controller} data-scheduler-station={requestStation} hidden={!active} inert={!active}>
+    <InternalTheme><div className={css.screen} data-scheduler-content>
+      <header className={css.header}>
+        <h1>{t('planning.title')}</h1>
+        <div className={css.actions}>
+          <Link href="/scheduler-demo">{text('Change station')}</Link>
+          <Link href={`/schedule/${requestStation}`} target="_blank" rel="noopener noreferrer">{t('planning.staffView')}<span className="sr-only"> {text('(opens in a new tab)')}</span></Link>
+          <button type="button" onClick={()=>window.print()} disabled={!schedulePassing || mutationBusy}>{t('planning.print')}</button>
         </div>
       </header>
-
-      <main className="mx-auto w-full max-w-none min-w-0 space-y-4 overflow-x-clip px-4 py-5">
-        <div className="print:hidden"><HoursBanner source={hoursSource} pending={resolvedHours.pending} locale={requestLocale} onReview={openHours}/></div>
-        {hoursSource.phase==='ready'&&hoursSource.page&&hoursSource.page.events.length>0&&<div className="print:hidden"><HoursStationStatus page={hoursSource.page} week={weekStart} station={requestStation} base={baseSlots} reviews={activeHoursReviews} locale={requestLocale} onReview={openHours}/></div>}
-        <div className="hidden print:block"><SpecialHoursSummary days={resolvedHours.days} locale={requestLocale}/></div>
-          {storeLoading && (
-            <section className="rounded-lg border border-zinc-300 bg-zinc-50 p-4 shadow-sm print:hidden" role="status">
-              <h2 className="text-sm font-semibold text-zinc-900">Loading your saved schedule…</h2>
-              <p className="mt-1 text-sm text-zinc-600">
-                Showing the starting setup until your saved staff list, rules, and published week load. Saving waits
-                until they do, so nothing on the server gets overwritten.
-              </p>
-            </section>
-          )}
-
-          {!storeLoading && storeOffline && (
-            <section className="rounded-lg border border-amber-500 bg-amber-50 p-4 shadow-sm print:hidden" role="alert">
-              <h2 className="text-sm font-semibold text-amber-950">Could not reach the server</h2>
-              <p className="mt-1 text-sm text-amber-900">
-                What you see below is the starting setup, not your saved data — your staff, rules, and published
-                weeks are still safe on the server. Do not save over them. Check your connection, then try again.
-              </p>
-              <button
-                type="button"
-                className="mt-3 inline-flex items-center gap-2 rounded border border-amber-700 bg-white px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                onClick={() => window.location.reload()}
-              >
-                Try again
-              </button>
-            </section>
-          )}
-
-          {tab === 'settings' && isNewStation && (
-            <section className="rounded-lg border border-sky-300 bg-sky-50 p-4 shadow-sm print:hidden">
-              <h2 className="text-sm font-semibold text-sky-950">New station — add your staff to begin</h2>
-              <p className="mt-1 text-sm text-sky-900">
-                Nothing is saved for{restaurantName ? ` ${restaurantName}` : ' this station'} yet. The shifts below are the usual
-                China Rose setup. Add each person below, then press Save changes.
-              </p>
-            </section>
-          )}
-
-          {tab === 'schedule' && sharing && weekStart && ruleProblems.length === 0 && (
-            <fieldset disabled={adjustment.busy || isGenerating || hoursBlocked}><PublishPanel
-              snapshot={hoursSnapshot}
-              canPublishEmpty={canPublishEmpty}
-              weekStart={weekStart}
-              weekLabel={formatWeekRange(weekStart)}
-              slots={slots}
-              employees={scheduleEmployees}
-              assignments={assignments}
-              visible={weekVisibility === 'on'}
-              onVisibilityChange={(status) => setWeekVisibility(weekStart, status)}
-              onClose={() => setSharing(false)}
-              restaurantId={restaurantId}
-              restaurantName={restaurantName ?? undefined}
-              unsavedSetup={setupParts}
-              onSaveSetup={() => saveSetup({ alsoRules: true })}
-              onPublished={(doc) => {
-                adjustment.clearReport()
-                setPublishedWeeks((current) => ({ ...current, [weekStart]: doc }))
-                setPublishedBaselines((current) => ({ ...current, [weekStart]: assignmentFingerprint(assignments) }))
-                setLiveMonthWeeks((current) => ({ ...current, [weekStart]: doc.visible }))
-                setLayoutMismatchWeeks((current) => ({ ...current, [weekStart]: false }))
-                void hoursSource.reload()
-              }}
-            /></fieldset>
-          )}
-
-          {(setupParts.length > 0 || setupError || setupNotice) && (
-            <section
-              className={`flex flex-col gap-2 rounded-lg border p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between print:hidden ${
-                setupError ? 'border-red-300 bg-red-50' : setupParts.length > 0 ? 'border-amber-400 bg-amber-50' : 'border-green-300 bg-green-50'
-              }`}
-              role="status"
-            >
-              <p className="text-sm text-zinc-900">
-                {setupError ? (
-                  <span className="font-medium text-red-900">{setupError}</span>
-                ) : setupParts.length > 0 ? (
-                  <>
-                    <span className="font-semibold">Unsaved {setupParts.join(' and ')}.</span> They stay when you switch views. Save before leaving the page.
-                  </>
-                ) : (
-                  <span className="font-medium text-green-900">{setupNotice}</span>
-                )}
-              </p>
-              {setupParts.length > 0 && tab === 'schedule' && (
-                <Button
-                  tone={layout === 'classic' ? 'primary' : 'plain'}
-                  onClick={() => openEmployeeSettings(ruleProblems.length > 0)}
-                  icon="target"
-                >
-                  {layout === 'classic' ? 'Review employee settings' : 'Open staff & rules'}
-                </Button>
-              )}
-            </section>
-          )}
-
-          {layout === 'classic' && diagnostics.length > 0 && (
-            <div aria-live="polite" className="print:hidden">
-              <Disclosure summary={`Messages (${diagnostics.length})`} tone="quiet">
-                <ul className="space-y-1 text-sm text-zinc-700">
-                  {diagnostics.map((message, index) => (
-                    <li key={`${message}-${index}`}>{message}</li>
-                  ))}
-                </ul>
-              </Disclosure>
-            </div>
-          )}
-
-          <section
-            id="scheduler-panel-schedule"
-            role="tabpanel"
-            aria-labelledby="scheduler-tab-schedule"
-            tabIndex={0}
-            className={`space-y-4 ${tab !== 'schedule' ? 'hidden print:block' : ''}`}
-          >
-          {layout === 'classic' ? <>
-          <div className="print:hidden">
-            <h2 className="text-xl font-semibold">Schedule</h2>
-            <p className="mt-1 mb-3 text-sm text-zinc-600">Build the week, check each shift, then publish it to staff.</p>
-          <div className="flex flex-wrap items-center gap-2 print:hidden">
-            <Button
-              tone="primary"
-              onClick={() => void generate()}
-              icon="spark"
-              loading={isGenerating}
-              disabled={activeEmployeeCount === 0 || isGenerating || hoursBlocked}
-              title={activeEmployeeCount === 0 ? 'Add someone to the staff list first.' : 'Build the week from the staff list.'}
-            >
-              {isGenerating ? 'Making schedule…' : 'Make schedule'}
-            </Button>
-            <Button
-              onClick={() => setSharing((open) => !open)}
-              icon="share"
-              disabled={!weekStart || storeLoading || ruleProblems.length > 0 || hoursBlocked}
-              title={
-                storeLoading
-                  ? 'Waiting for your saved data to load.'
-                  : ruleProblems.length > 0
-                    ? 'Fix the shift rules marked in red first.'
-                    : 'Send this week to the staff schedule page.'
-              }
-            >
-              Publish to staff
-            </Button>
-            <Button
-              onClick={undoLastChange}
-              icon="undo"
-              disabled={history.length === 0}
-              title={history[0] ? `Undo ${history[0].label} (Ctrl+Z)` : 'Nothing to undo yet.'}
-            >
-              Undo
-            </Button>
-            {keptCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                <Icon name="lock" />
-                Keep: {keptCount}
-              </span>
-            )}
-            <span aria-hidden="true" className="mx-1 hidden h-8 w-px bg-zinc-200 sm:block" />
-            <Disclosure summary="More actions" tone="quiet">
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                  How to build the week
-            <select
-              className="rounded border border-zinc-300 bg-white px-2 py-2 text-sm text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-              aria-label="How to build the week"
-              value={selectedVariant}
-              onChange={(event) => setSelectedVariant(event.target.value as ScheduleVariant)}
-              disabled={isGenerating}
-              title={`${scheduleVariants.find((variant) => variant.id === selectedVariant)?.description} Anyone marked Keep stays put.`}
-            >
-              {scheduleVariants.map((variant) => (
-                <option key={variant.id} value={variant.id}>
-                  {variant.label}
-                </option>
-              ))}
-            </select>
-                </label>
-                <Button
-                  onClick={() => {
-                    flushSync(() => setTab('schedule'))
-                    window.print()
-                  }}
-                  icon="print"
-                  disabled={!schedulePassing}
-                  title={!schedulePassing ? 'Fill every required spot before printing.' : 'Print this week.'}
-                >
-                  Print
-                </Button>
-                {confirmingReset ? (
-                  <span className="inline-flex flex-wrap items-center gap-2 rounded border border-red-300 bg-red-50 px-2 py-1">
-                    <span className="text-xs font-semibold text-red-900">Clear everything? You can undo.</span>
-                    <button
-                      type="button"
-                      className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                      onClick={reset}
-                    >
-                      Yes, start over
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                      onClick={() => setConfirmingReset(false)}
-                    >
-                      Cancel
-                    </button>
-                  </span>
-                ) : (
-                  <Button onClick={() => setConfirmingReset(true)} icon="reset">
-                    Start over
-                  </Button>
-                )}
-              </div>
-            </Disclosure>
-          </div>
-          </div>
-          {ruleProblems.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-300 bg-red-50 p-3 print:hidden" role="alert">
-              <p className="text-sm text-red-900">Fix {ruleProblems.length} shift rule problem{ruleProblems.length === 1 ? '' : 's'} before publishing.</p>
-              <Button onClick={() => openEmployeeSettings(true)} icon="target">Review shift rules</Button>
-            </div>
-          )}
-          {activeEmployeeCount === 0 && !storeLoading && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-4 print:hidden">
-              <p className="text-sm text-zinc-700">Add employees in Employee settings before making a schedule.</p>
-              <Button onClick={() => openEmployeeSettings()} icon="plus">Open employee settings</Button>
-            </div>
-          )}
-          <GuidedFixPanel
-            nextIssue={nextIssue}
-            weekStart={weekStart}
-            issueCount={visibleFixIssues.length}
-            totalCount={fixIssues.length}
-            ignoredCount={ignoredCount}
-            candidates={fixCandidates}
-            excluded={fixExcluded}
-            choosing={guidedChoosing}
-            hasSchedule={assignments.length > 0}
-            onChooseEmployee={fixNextIssue}
-            onPickEmployee={chooseForIssue}
-            onAddEmployee={() => addEmployeeForSlot(nextIssue?.slot)}
-            onIgnore={ignoreNextIssue}
-            onShowIgnored={showIgnoredIssues}
-            canAddEmployee={!scheduleOnly || staffUnlocked}
-          />
-
-          <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-            <div className="print:hidden">
-            <Disclosure summary="Month view and week visibility" tone="quiet">
-            <MonthStrip
-              monthKey={monthKey}
-              weekStart={weekStart}
-              monthWeeks={monthWeeks}
-              weeks={weeks}
-              weekStatus={weekStatus}
-              onSelectWeek={goToWeek}
-              onSelectMonth={goToMonth}
-              onToggleWeek={setWeekVisibility}
-              liveWeeks={liveMonthWeeks}
-              currentState={currentPublishState}
-              editedWeeks={otherWeeksWithEdits}
-            />
-            </Disclosure>
-            </div>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg font-semibold">{weekStart ? formatWeekRange(weekStart) : 'Weekly schedule'}</h3>
-              <div className="flex flex-wrap items-center gap-2 print:hidden">
-                    <button
-                  type="button"
-                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                  onClick={copyPriorWeek}
-                  disabled={!weekStart}
-                  title="Copy last week's assignments into this week."
-                >
-                  Copy last week
-                </button>
-                {confirmingClearWeek ? (
-                  <span className="inline-flex flex-wrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      className="rounded bg-red-800 px-2 py-1 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                      onClick={clearWeek}
-                    >
-                      Yes, clear
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                      onClick={() => setConfirmingClearWeek(false)}
-                    >
-                      Cancel
-                    </button>
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                    onClick={() => setConfirmingClearWeek(true)}
-                    disabled={!weekStart || assignments.length === 0}
-                    title="Remove every assignment from this week. You can undo."
-                  >
-                    Clear week
-                  </button>
-                )}
-              </div>
-            </div>
-            <p className="mt-1 text-sm text-zinc-600 print:hidden">
-              Click a name to move it, then click where it goes. Open a shift to pick someone — picks stay put when you
-              make the schedule again.
-              {weekStart && publishedWeeks[weekStart] && (
-                <> Last published: {formatUpdatedAt(publishedWeeks[weekStart]?.updatedAt)}.</>
-              )}
-            </p>
-
-            {weekStart && layoutMismatchWeeks[weekStart] && assignments.length === 0 && (
-              <div className="mt-3 rounded border border-amber-500 bg-amber-50 p-3 text-sm text-amber-950" role="alert">
-                <p className="font-semibold">This week is published, but with different shift rules — so it is not shown here.</p>
-                <p className="mt-1">
-                  Staff still see the published version. Making and publishing a schedule here replaces it.
-                  <button type="button" className="ml-1 rounded font-semibold underline focus-visible:outline focus-visible:outline-2" onClick={() => openEmployeeSettings(true)}>Review shift rules</button> first.
-                </p>
-              </div>
-            )}
-            {weekStart && currentPublishState && currentPublishState !== 'live' && (assignments.length > 0 || currentPublishState === 'hidden') && (
-              <div
-                className="mt-3 flex flex-col gap-2 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between print:hidden"
-                role="status"
-              >
-                <p>
-                  {currentPublishState === 'hidden'
-                    ? 'Published, but turned off — staff cannot see this week. Turn it on, then publish.'
-                    : currentPublishState === 'changed'
-                      ? 'You have changes staff cannot see yet. Publish to send them.'
-                      : 'Staff cannot see this week yet. Publish it when it looks right.'}
-                </p>
-                <Button onClick={() => setSharing(true)} icon="share" disabled={storeLoading}>
-                  Publish to staff
-                </Button>
-              </div>
-            )}
-
-            {movingEmployee && (
-              <div
-                className="mt-3 flex flex-col gap-2 rounded border border-green-300 bg-green-50 p-3 sm:flex-row sm:items-center sm:justify-between print:hidden"
-                role="status"
-              >
-                <p className="flex items-center gap-2 text-sm font-semibold text-green-950">
-                  <Icon name="move" />
-                  Moving {movingEmployee.name}. Click a green spot to put them there.
-                </p>
-                <Button onClick={cancelMove} icon="close">
-                  Cancel move
-                </Button>
-              </div>
-            )}
-            {lastReport && lastReport.weekStart === weekStart && (
-              <GenerationReportBanner report={lastReport} onDismiss={() => setLastReport(null)} />
-            )}
-            <WeeklyScheduleBoard
-              hoursDays={scheduleWorkspace.hoursDays} hoursPending={resolvedHours.pending} hoursDisabled={scheduleWorkspace.hoursDisabled}
-              onEditHours={openHours} hoursLocale={requestLocale}
-              slots={slots}
-              weekStart={weekStart}
-              hasSchedule={assignments.length > 0}
-              employees={scheduleEmployees}
-              assignments={assignments}
-              assignmentMap={assignmentMap}
-              violations={violations}
-              openShiftKey={openShiftKey}
-              activeMove={activeMove}
-              changedSlotIds={changedSlotIds}
-              highlightedSlotIds={highlightedSlotIds}
-              onResetShift={restoreShift}
-              dragOverSlotId={dragOverSlotId}
-              dropFeedback={dropFeedback}
-              movePreviews={movePreviews}
-              onOpenShift={setOpenShiftKey}
-              onAssign={setEmployeeAssignment}
-              onLock={setLocked}
-              onDragStart={startAssignmentDrag}
-              onDragEnd={endAssignmentDrag}
-              onDragOverSlot={previewDropSlot}
-              onDragLeaveSlot={clearDropPreview}
-              onDropAssignment={moveAssignmentTo}
-              onActivateSlot={activateSlot}
-              roles={availableRoles}
-            />
-          </section>
-
-          {changes.length > 0 && (
-            <div className="print:hidden">
-              <Disclosure summary={`Changes since you made the schedule (${changes.length})`}>
-                <ul className="space-y-1 text-sm text-zinc-700">
-                  {changes.map((change) => (
-                    <li key={change.slotId}>{change.text}</li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  className="mt-3 inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                  onClick={restoreEverything}
-                >
-                  <Icon name="reset" />
-                  Put the whole week back
-                </button>
-              </Disclosure>
-            </div>
-          )}
-
-          <div className="space-y-1 pt-2 print:hidden">
-            <Disclosure summary="Hours for each person" tone="quiet">
-              <HoursSummary stats={stats} employees={employees} />
-            </Disclosure>
-
-          </div>
-          {!scheduleOnly && !onboardingDismissed && assignments.length === 0 && (
-            <Disclosure summary="How to make a schedule" tone="quiet">
-              <OnboardingBanner activeEmployeeCount={activeEmployeeCount} onDismiss={dismissOnboarding} />
-            </Disclosure>
-          )}
-          </> : <>
-              {ruleProblems.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-300 bg-red-50 p-3 print:hidden" role="alert">
-                  <p className="text-sm text-red-900">Fix {ruleProblems.length} shift rule problem{ruleProblems.length === 1 ? '' : 's'} before publishing.</p>
-                  <Button onClick={() => openEmployeeSettings(true)} icon="target">Review shift rules</Button>
-                </div>
-              )}
-              {activeEmployeeCount === 0 && !storeLoading && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-4 print:hidden">
-                  <p className="text-sm text-zinc-700">Add employees in Staff &amp; rules before making a schedule.</p>
-                  <Button onClick={() => openEmployeeSettings()} icon="plus">Open staff &amp; rules</Button>
-                </div>
-              )}
-              <div hidden={layout === 'workspace'}><ScheduleWorkspace {...scheduleWorkspace} /></div>
-              <div hidden={layout !== 'workspace'}>
-                {externalAvailability && <p role="status" className="my-3 border border-amber-500 bg-amber-50 p-3">{t('planning.external')}</p>}
-                <PlanningWorkspace data={scheduleWorkspace} locale={requestLocale} auto={autoAdjust} onAuto={setAutoAdjust}
-                  busy={adjustment.busy} disabled={storeLoading || storeOffline || hoursBlocked} report={adjustment.report} error={adjustment.error}
-                  onPlace={placeInWorkspace} exclusions={exclusions} onRemove={removeFromWorkspace} onAllow={allowInWorkspace} onAdjust={() => { setExternalAvailability(false); void adjustment.run(input => input.assignments, true) }}
-                  onRequest={(employeeId, date) => {
-                    setRequestPrefill({ id: crypto.randomUUID(), employeeId, date })
-                    requestAnimationFrame(() => document.getElementById('schedule-requests')?.scrollIntoView({ block: 'start' }))
-                  }}
-                  onEmployee={employeeId => {
-                    setFocusEmployeeId(employeeId)
-                    setStaffQuery(employees.find(e => e.id === employeeId)?.name ?? '')
-                    openEmployeeSettings()
-                  }} />
-              </div>
-          </>}
-          </section>
-
-          <section id="scheduler-panel-settings" role="tabpanel" aria-labelledby="scheduler-tab-settings" tabIndex={0} hidden={tab !== 'settings'} className="space-y-4 print:hidden">
-          {layout === 'classic' ? <>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold">Employee settings</h2>
-                <p className="mt-1 text-sm text-zinc-600">Set who can work, their availability, and their weekly limits.</p>
-                <p className="mt-1 text-sm text-zinc-600">
-                  {scheduleOnly ? 'Crew changes apply to every week. Shift rules apply to the selected week.' : 'Employee settings and shift rules apply to the selected week only.'}
-                  {' '}Switch views anytime; your edits stay here until you leave the page.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button tone="primary" onClick={() => void saveSetupNow()} icon="check" loading={savingSetup} disabled={setupParts.length === 0 || storeLoading || ruleProblems.length > 0} title={ruleProblems.length > 0 ? 'Fix the shift rules below before saving.' : undefined}>Save changes</Button>
-                <Button onClick={undoLastChange} icon="undo" disabled={history.length === 0}>Undo</Button>
-                <Button onClick={() => { setTab('schedule'); document.getElementById('scheduler-tab-schedule')?.focus() }} icon="chevronRight">Back to schedule</Button>
-              </div>
-            </div>
-            {ruleProblems.length > 0 && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-300 bg-red-50 p-3" role="alert">
-                <p className="text-sm text-red-900">Fix {ruleProblems.length} shift rule problem{ruleProblems.length === 1 ? '' : 's'} before saving.</p>
-                <Button onClick={() => openEmployeeSettings(true)} icon="target">Review shift rules</Button>
-              </div>
-            )}
-          <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-semibold">Employees</h3>
-                <p className="mt-0.5 text-sm text-zinc-600">
-                  {activeEmployeeCount} working, {employees.length - activeEmployeeCount} off the list
-                </p>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  {scheduleOnly
-                    ? `One crew for every week. Last saved: ${formatUpdatedAt(staffUpdatedAt)}${staffDirty ? ' · unsaved changes' : ''}`
-                    : `Last saved: ${formatUpdatedAt(rosterUpdatedAt)}${rosterDirty ? ' · unsaved changes' : ''} · changes stay in this week only`}
-                </p>
-              </div>
-              {(!scheduleOnly || staffUnlocked) && (
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <Button icon={employeePanelOpen ? 'close' : 'plus'} onClick={() => setEmployeePanelOpen((open) => !open)}>
-                    {employeePanelOpen ? 'Close employee form' : 'Add employee'}
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {rosterLoadError && <p className="mt-2 text-xs font-medium text-amber-800">{rosterLoadError}</p>}
-            {scheduleOnly && staffLoadError && <p className="mt-2 text-xs font-medium text-amber-800">{staffLoadError}</p>}
-
-            {scheduleOnly && (
-              <div className="mt-3 flex flex-wrap items-center gap-2 rounded border border-zinc-200 bg-zinc-50 p-3">
-                <p className="min-w-0 flex-1 text-xs text-zinc-600">
-                  {staffUnlocked
-                    ? 'Editing the crew and shift rules. Crew changes apply to every week.'
-                    : 'The crew and shift rules are locked. Enter the staff password to edit them.'}
-                </p>
-                {staffUnlocked ? (
-                  <button
-                    type="button"
-                    className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                    onClick={() => setStaffPassword('')}
-                  >
-                    Lock
-                  </button>
-                ) : (
-                  <form
-                    className="flex gap-2"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      void unlockCrewEditing()
-                    }}
-                  >
-                    <input
-                      className="w-40 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                      type="password"
-                      autoComplete="off"
-                      value={passwordInput}
-                      onChange={(event) => setPasswordInput(event.target.value)}
-                      placeholder="Staff password"
-                      aria-label="Staff password"
-                    />
-                    <button
-                      type="submit"
-                      className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                      disabled={!passwordInput || checkingPassword}
-                    >
-                      {checkingPassword ? 'Checking…' : 'Unlock editing'}
-                    </button>
-                  </form>
-                )}
-                {staffUnlocked && (
-                  <button
-                    type="button"
-                    className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                    onClick={() => void undoCrewSave()}
-                    disabled={!staffCanUndo || savingSetup || staffDirty}
-                    title={staffDirty ? 'Save or undo your unsaved edits first.' : staffCanUndo ? 'Bring back the crew as it was before the last save.' : 'No saved crew change to undo.'}
-                  >
-                    Undo last crew save
-                  </button>
-                )}
-              </div>
-            )}
-
-            {employeePanelOpen && (!scheduleOnly || staffUnlocked) && (
-              <EmployeeForm
-                draft={draft}
-                gapSlot={gapSlot}
-                weekStart={weekStart}
-                canAddEmployee={canAddEmployee}
-                roles={availableRoles}
-                onDraftChange={setDraft}
-                onAdd={addEmployee}
-                onAddCustomRole={addCustomRoleToDraft}
-              />
-            )}
-
-            {!scheduleOnly && (
-            <div className="mt-3">
-            <Disclosure summary="Staff list tools" tone="quiet">
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-zinc-600">Mistake? Go back to the station’s saved staff list.</p>
-              <button
-                type="button"
-                className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                onClick={restoreDefaultRoster}
-                disabled={isDefaultRoster}
-                title={
-                  isDefaultRoster
-                    ? 'Already using the saved staff list.'
-                    : 'Replace this week’s staff list with the station’s saved list. You can undo, then save to keep it.'
-                }
-              >
-                Use saved staff list
-              </button>
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3">
-              <p className="text-xs text-zinc-600">Start fresh with an empty list. Undo brings everyone back.</p>
-              {confirmingClearStaff ? (
-                <span className="inline-flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded bg-red-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                    onClick={clearStaff}
-                  >
-                    Yes, clear all
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                    onClick={() => setConfirmingClearStaff(false)}
-                  >
-                    Cancel
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                  onClick={() => setConfirmingClearStaff(true)}
-                  disabled={employees.length === 0}
-                  title="Remove everyone from the staff list. You can undo, then save to keep it."
-                >
-                  Clear staff list
-                </button>
-              )}
-            </div>
-
-            <div className="mt-3 border-t border-zinc-100 pt-3">
-              <Disclosure summary={`Saved staff lists (${staffSnapshots.length})`} tone="quiet">
-                <p className="text-xs text-zinc-600">Keep a copy of a staff list on this device and bring it back anytime.</p>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                    value={snapshotName}
-                    onChange={(event) => setSnapshotName(event.target.value)}
-                    placeholder={`Name this list (${employees.length} staff)`}
-                    aria-label="Snapshot name"
-                  />
-                  <button
-                    type="button"
-                    className="shrink-0 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                    onClick={saveStaffSnapshot}
-                    disabled={employees.length === 0}
-                    title="Save a copy of the current staff list on this device."
-                  >
-                    Save
-                  </button>
-                </div>
-                {staffSnapshots.length > 0 && (
-                  <ul className="mt-2 space-y-2">
-                    {staffSnapshots.map((snapshot) => (
-                      <li key={snapshot.id} className="flex items-center justify-between gap-2 rounded border border-zinc-200 bg-zinc-50 px-2.5 py-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-semibold text-zinc-900">{snapshot.name}</p>
-                          <p className="text-xs text-zinc-500">{snapshot.employees.length} staff · {formatUpdatedAt(snapshot.savedAt)}</p>
-                        </div>
-                        <div className="flex shrink-0 gap-1.5">
-                          <button
-                            type="button"
-                            className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                            onClick={() => restoreStaffSnapshot(snapshot)}
-                            title={`Replace the staff list with “${snapshot.name}”. You can undo.`}
-                          >
-                            Restore
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                            onClick={() => deleteStaffSnapshot(snapshot.id)}
-                            title={`Delete “${snapshot.name}”.`}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Disclosure>
-            </div>
-            </Disclosure>
-            </div>
-            )}
-
-            <div className="mt-3 border-t border-zinc-100 pt-3">
-              <label className="block text-sm font-medium text-zinc-800">
-                <span className="sr-only">Search staff</span>
-                <input
-                  className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                  value={staffQuery}
-                  onChange={(event) => setStaffQuery(event.target.value)}
-                  placeholder={employees.length > 8 ? `Search ${employees.length} staff by name or position` : 'Search by name or position'}
-                />
-              </label>
-              <p className="mt-2 text-sm font-semibold text-zinc-800">
-                Everyone on the list ({filteredEmployees.length}/{employees.length})
-              </p>
-              <div className="mt-3 grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredEmployees.map((employee) => (
-                    <EmployeeCard
-                      key={employee.id}
-                      employee={employee}
-                      stat={staffStatsById.get(employee.id)}
-                      roles={availableRoles}
-                      onUpdate={updateEmployee}
-                      onRemove={removeEmployee}
-                      readOnly={scheduleOnly && !staffUnlocked}
-                    />
-                  ))}
-                  {filteredEmployees.length === 0 && (
-                    <p className="text-sm text-zinc-600">Nobody matches &ldquo;{staffQuery.trim()}&rdquo;.</p>
-                  )}
-              </div>
-            </div>
-          </section>
-          <details ref={rulesDisclosure} className="rounded-lg border border-zinc-200 bg-white shadow-sm">
-            <summary className="cursor-pointer px-4 py-3 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">
-              Shift rules{ruleProblems.length > 0 ? ` (${ruleProblems.length} to fix)` : ''}
-            </summary>
-            <p className="px-4 pb-3 text-sm text-zinc-600">Change the positions and times needed for the selected week.</p>
-            <TemplateEditor
-              template={template}
-              roles={availableRoles}
-              readOnly={scheduleOnly && !staffUnlocked}
-              problems={ruleProblems}
-              onChange={(next) => {
-                remember('changed schedule rules')
-                setTemplate(next)
-              }}
-              onUseDefault={restoreDefaultTemplate}
-              isDefaultTemplate={isDefaultTemplate}
-              dirty={templateDirty}
-              loadError={templateLoadError}
-              restaurantId={restaurantId}
-              updatedAt={templateUpdatedAt}
-            />
-          </details>
-          </> : <StaffWorkspace {...staffWorkspace} />}
-          </section>
-          {AGENT_API && <div hidden={tab !== 'schedule'} className="print:hidden">
-          <details open={layout !== 'workspace'}>
-          <summary hidden={layout !== 'workspace'} className="min-h-11 cursor-pointer py-3 font-semibold">{t('planning.assistant')}</summary>
-          {weekStart && <SchedulingAgent key={`${requestStation}:${weekStart}`} token={managerCode}
-            context={{ ...agentHoursContext, stationId: requestStation, weekStart, employees, template, assignments: assignments.filter(item => item.employeeId),
-              requests: { phase: requestSource.phase, revision: requestSource.record?.revision ?? 0, data: requestSource.record?.data ?? null } }}
-            disabled={storeLoading || storeOffline || isGenerating || adjustment.busy || ruleProblems.length > 0 || requestSource.phase !== 'ready' || requestDirty || hoursBlocked}
-            onApply={(next) => {
-              adjustment.clearReport()
-              commitSchedule('schedule before assistant proposal', next)
-              setGeneratedAssignments(cloneAssignmentList(next))
-              setWeekStatus(current => ({ ...current, [weekStart]: 'on' }))
-              setIgnoredIssueIds([])
-              setDiagnostics(['Assistant proposal added to the draft. Review the board, then publish when ready.'])
-            }} />}
-          </details>
-          </div>}
-          <div hidden={tab !== 'schedule'} className="print:hidden">{requestsPanel}</div>
-      </main>
-      {hoursEditor&&rosterLoaded&&templateLoaded&&!storeOffline&&hoursSource.page&&<HoursEditor key={`${requestStation}:${weekStart}:${hoursEditor.date??'week'}`}
-        date={hoursEditor.date} week={weekStart} anchor={hoursEditor.anchor} station={requestStation} locale={requestLocale}
-        source={hoursSource} base={baseSlots} assignments={assignments} employees={employees} locked={scheduleOnly&&!staffUnlocked}
-        activeReviews={activeHoursReviews} onClose={()=>setHoursEditor(null)} onDirty={setHoursDirty} onBusy={setHoursBusy}
-        onApplied={applyHours} onUnlock={unlockCrewEditing}/>}
-
+      <SchedulerNavigation view={tab} settingsDirty={setupParts.length>0} onChange={changeView}
+        labels={{schedule:t('planning.schedule'),settings:t('planning.settings'),requests:text('Requests')}} neutral />
+      <div className={css.week} aria-label={text('Selected week')}>
+        <button type="button" aria-label={t('planning.previous')} disabled={!weekStart||mutationBusy} onClick={()=>goToWeek(shiftWeek(weekStart,-1))}>←</button>
+        <p aria-live="polite">{weekStart ? planningWeek(weekStart,dateForDay(weekStart,'Saturday'),requestLocale) : t('planning.loading')}</p>
+        <button type="button" aria-label={t('planning.next')} disabled={!weekStart||mutationBusy} onClick={()=>goToWeek(shiftWeek(weekStart,1))}>→</button>
+        {weekStart!==currentWeekStart()&&<button type="button" disabled={mutationBusy} onClick={()=>goToWeek(currentWeekStart())}>{t('planning.thisWeek')}</button>}
+        <button type="button" id="set-week-hours" aria-expanded={!!hoursEditor} disabled={!weekStart||scheduleWorkspace.hoursDisabled||mutationBusy} onClick={event=>openHoursEditor(null,event.currentTarget)}>{t('hours.setHours')}</button>
+      </div>
+      <p className={css.status} role="status">{working ? text('Draft for this visit. Reloading or closing this tab loses unsaved changes.') : currentPublishState ? t(`planning.status.${currentPublishState}`) : text('Not published')}
+        {otherWeeksWithEdits.length>0&&<span> · {otherWeeksWithEdits.length} {text('other weeks with unpublished changes')}</span>}
+      </p>
+      <HoursBanner source={hoursSource} pending={resolvedHours.pending} locale={requestLocale} onReview={openHours}/>
+      {hoursSource.phase==='ready'&&hoursSource.page&&hoursSource.page.events.length>0&&<HoursStationStatus page={hoursSource.page} week={weekStart} station={requestStation} base={baseSlots} reviews={activeHoursReviews} locale={requestLocale} onReview={openHours}/>}
+      {storeLoading&&<p role="status">{text('Loading your saved schedule…')}</p>}
+      {!storeLoading&&storeOffline&&<div className={css.warning} role="alert"><p>{text('Could not reach the server. Your working copy is retained. Saving is unavailable until the saved setup loads.')}</p><button onClick={()=>{if(rosterLoadError){setDefaultRosterLoaded(false);setRosterLoadedWeeks(current=>({...current,[weekStart]:false}))}if(templateLoadError){setDefaultTemplateLoaded(false);setTemplateLoadedWeeks(current=>({...current,[weekStart]:false}))}if(staffLoadError)setStaffLoaded(false);setRetryLoad(value=>value+1)}}>{text('Try again')}</button></div>}
+      {(setupParts.length>0||setupError||setupNotice)&&<div className={css.notice} role="status">
+        <p>{setupError ? text(setupError) : setupNotice ? text(setupNotice) : text('Staff or rule changes are unsaved. They stay when you switch views.')}</p>
+        {setupParts.length>0&&tab!=='settings'&&<button onClick={()=>openEmployeeSettings(ruleProblems.length>0)}>{t('planning.settings')}</button>}
+      </div>}
+      {tab==='settings'&&isNewStation&&<p className={css.notice}>{text('New station — add your staff to begin')}</p>}
+      <section id="scheduler-panel-schedule" role="tabpanel" aria-labelledby="scheduler-tab-schedule" tabIndex={-1} hidden={tab!=='schedule'}>
+        {externalAvailability&&<p role="status" className={css.warning}>{t('planning.external')}</p>}
+        {ruleProblems.length>0&&<div role="alert" className={css.warning}><p>{text('Fix shift rules before building or publishing.')}</p><button onClick={()=>openEmployeeSettings(true)}>{text('Review shift rules')}</button></div>}
+        {!storeLoading&&activeEmployeeCount===0&&<p className={css.notice}><button onClick={()=>openEmployeeSettings()}>{text('Add employees in Staff & rules before making a schedule.')}</button></p>}
+        {sharing&&weekStart&&ruleProblems.length===0&&<fieldset disabled={adjustment.busy||isGenerating||hoursBlocked}><PublishPanel snapshot={hoursSnapshot} canPublishEmpty={canPublishEmpty}
+          weekStart={weekStart} weekLabel={formatWeekRange(weekStart)} slots={slots} employees={scheduleEmployees} assignments={assignments}
+          visible={weekVisibility==='on'} onVisibilityChange={status=>setWeekVisibility(weekStart,status)} onClose={()=>setSharing(false)}
+          restaurantId={restaurantId} restaurantName={restaurantName??undefined} unsavedSetup={setupParts}
+          onSaveSetup={()=>saveSetup({alsoRules:true})} onBusyChange={setPublishBusy}
+          onPublished={doc=>{adjustment.clearReport();setPublishedWeeks(current=>({...current,[weekStart]:doc}));setPublishedBaselines(current=>({...current,[weekStart]:assignmentFingerprint(assignments)}));setLiveMonthWeeks(current=>({...current,[weekStart]:doc.visible}));setLayoutMismatchWeeks(current=>({...current,[weekStart]:false}));void hoursSource.reload()}}/>
+        </fieldset>}
+        <fieldset disabled={mutationBusy}>
+          <PlanningWorkspace data={scheduleWorkspace} locale={requestLocale} auto={autoAdjust} onAuto={setAutoAdjust} busy={adjustment.busy}
+            disabled={!active||storeLoading||storeOffline||hoursBlocked} report={adjustment.report} error={adjustment.error}
+            onPlace={placeInWorkspace} exclusions={exclusions} onRemove={removeFromWorkspace} onAllow={allowInWorkspace}
+            onAdjust={()=>{setExternalAvailability(false);void adjustment.run(input=>input.assignments,true)}}
+            onRequest={(employeeId,date)=>{setRequestPrefill({id:crypto.randomUUID(),employeeId,date});changeView('requests',true)}}
+            onEmployee={employeeId=>{setFocusEmployeeId(employeeId);setStaffQuery(employees.find(e=>e.id===employeeId)?.name??'');openEmployeeSettings()}}/>
+        </fieldset>
+      </section>
+      {AGENT_API&&<details className={css.assistant} hidden={tab!=='schedule'}><summary>{t('planning.assistant')}</summary>{weekStart&&active&&<SchedulingAgent key={`${requestStation}:${weekStart}:${session.generation}`} token={managerCode}
+        context={{...agentHoursContext,stationId:requestStation,weekStart,employees,template,assignments:assignments.filter(item=>item.employeeId),requests:{phase:requestSource.phase,revision:requestSource.record?.revision??0,data:requestSource.record?.data??null}}}
+        disabled={storeLoading||storeOffline||isGenerating||adjustment.busy||mutationBusy||ruleProblems.length>0||requestSource.phase!=='ready'||requestDirty||hoursBlocked}
+        onApply={next=>{adjustment.clearReport();commitSchedule('schedule before assistant proposal',next);setGeneratedAssignments(cloneAssignmentList(next));setWeekStatus(current=>({...current,[weekStart]:'on'}));setIgnoredIssueIds([]);setDiagnostics(['Assistant proposal added to the draft. Review the board, then publish when ready.'])}}/>}</details>}
+      <section id="scheduler-panel-settings" role="tabpanel" aria-labelledby="scheduler-tab-settings" tabIndex={-1} hidden={tab!=='settings'}><fieldset disabled={mutationBusy||storeLoading||storeOffline}><StaffWorkspace {...staffWorkspace}/></fieldset></section>
+      <section id="scheduler-panel-requests" role="tabpanel" aria-labelledby="scheduler-tab-requests" tabIndex={-1} hidden={tab!=='requests'}>{requestsPanel}</section>
+    </div></InternalTheme>
+    <div className={css.paper} data-scheduler-print hidden={!active}>
+      <header><h1>{restaurantName??requestStation} — Weekly schedule</h1><p>{weekStart?formatWeekRange(weekStart):''} · {currentPublishState??'draft'}</p></header>
+      <SpecialHoursSummary days={resolvedHours.days} locale="en"/>
+      <ScheduleWorkspace {...scheduleWorkspace} hoursLocale="en"/>
     </div>
-    </PlanningShell>
-  )
+    {hoursEditor&&rosterLoaded&&templateLoaded&&!storeOffline&&hoursSource.page&&<HoursEditor key={`${requestStation}:${weekStart}:${hoursEditor.date??'week'}`} active={active}
+      date={hoursEditor.date} week={weekStart} anchor={hoursEditor.anchor} station={requestStation} locale={requestLocale} source={hoursSource} base={baseSlots}
+      assignments={assignments} employees={employees} locked={scheduleOnly&&!staffUnlocked} activeReviews={activeHoursReviews}
+      onClose={()=>setHoursEditor(null)} onDirty={setHoursDirty} onBusy={setHoursBusy} onApplied={applyHours} onUnlock={unlockCrewEditing}/>}
+  </div>
 }

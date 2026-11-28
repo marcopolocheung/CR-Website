@@ -7,6 +7,7 @@ address, then run: python scripts/test-scheduler-views.py --url http://127.0.0.1
 import argparse
 import copy
 import json
+import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -91,120 +92,112 @@ class FixtureStore:
         })
 
 
+def unlock(page):
+    """Shared manager gate; a visit already unlocked by another tool skips it."""
+    code = page.get_by_label('Manager code', exact=True)
+    if code.is_visible():
+        code.fill('fixture-password')
+        code.locator('xpath=ancestor::form').locator('button[type="submit"]').click()
+    expect(page.get_by_role('tab', name='Schedule', exact=True)).to_be_visible()
+    page.wait_for_load_state('networkidle')
+
+
 def open_scheduler(browser, url, station, width=1440, layout='classic', store=None):
     context = browser.new_context(viewport={'width': width, 'height': 1000})
+    # Legacy preferences must be inert; retain them to prove compatibility.
     if layout:
-        context.add_init_script(
-            f"try {{ localStorage.setItem('chinarose.scheduler.layout', {json.dumps(layout)}) }} catch (e) {{}}"
-        )
+        context.add_init_script(f"localStorage.setItem('chinarose.scheduler.layout', {json.dumps(layout)})")
     store = store or FixtureStore()
     context.route('**/*', store.route)
     page = context.new_page()
     page.set_default_timeout(10000)
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
-    page.goto(f'{url}/scheduler-demo/{station}.html')
-    page.wait_for_load_state('networkidle')
-    page.get_by_label('Manager code', exact=True).fill('fixture-password')
-    page.get_by_role('button', name='Open the scheduler', exact=True).click()
-    expect(page.get_by_role('tab', name='Schedule', exact=True)).to_be_visible()
+    page.goto(f'{url}/scheduler-demo/{station}.html', wait_until='networkidle')
+    unlock(page)
     expect(page.get_by_text('Loading your saved schedule…', exact=True)).not_to_be_visible()
-    page.wait_for_load_state('networkidle')
     return context, page, store, errors
+
+
+def staff_tab(page):
+    return page.get_by_role('tab', name=re.compile(r'^Staff & rules'))
+
+
+def open_employee(settings):
+    row = settings.get_by_role('listitem').filter(has_text='Sample Employee')
+    row.get_by_role('button', name='Edit', exact=True).click()
+    return row
+
+
+def filled_cells(page):
+    return page.locator('[data-planning-slot]:not([data-employee-id=""])')
 
 
 def check_dining(browser, url, artifacts):
     context, page, store, errors = open_scheduler(browser, url, 'CR3-diningroom')
-    schedule = page.locator('#scheduler-panel-schedule')
-    settings = page.locator('#scheduler-panel-settings')
-    schedule_tab = page.get_by_role('tab', name='Schedule', exact=True)
-    settings_tab = page.get_by_role('tab', name='Employee settings', exact=True)
-    expect(schedule).to_be_visible()
-    expect(settings).not_to_be_visible()
+    schedule, settings = page.locator('#scheduler-panel-schedule'), page.locator('#scheduler-panel-settings')
+    schedule_tab, settings_tab = page.get_by_role('tab', name='Schedule', exact=True), staff_tab(page)
+    requests_tab = page.get_by_role('tab', name=re.compile(r'^Requests'))
+    expect(schedule).to_be_visible(); expect(settings).not_to_be_visible()
     expect(page.get_by_role('button', name='Save changes', exact=True)).not_to_be_visible()
-    expect(page.get_by_label('How to build the week')).not_to_be_visible()
-    # Arrow keys and Home/End activate tabs, retain focus, and expose the right panel.
-    schedule_tab.focus()
-    schedule_tab.press('ArrowRight')
-    expect(settings_tab).to_be_focused()
-    expect(settings_tab).to_have_attribute('aria-selected', 'true')
-    expect(page.get_by_role('button', name='Make schedule', exact=True)).not_to_be_visible()
-    expect(page.get_by_role('button', name='Publish to staff', exact=True)).not_to_be_visible()
-    expect(page.get_by_role('button', name='Save changes', exact=True)).to_be_disabled()
-    expect(settings.locator('summary', has_text='Staff list tools').locator('..')).not_to_have_attribute('open', '')
-    settings_tab.press('Home')
-    expect(schedule_tab).to_be_focused()
-    schedule_tab.press('ArrowLeft')
-    expect(settings_tab).to_be_focused()
-    settings_tab.press('Home')
-    schedule_tab.press('End')
-    expect(settings_tab).to_be_focused()
-    # Expanded controls, entered values, search and dirty status survive switching.
-    settings.get_by_text('Edit availability', exact=True).click()
+    # Three-view keyboard navigation retains accessible selection and focus.
+    schedule_tab.focus(); schedule_tab.press('ArrowRight')
+    expect(settings_tab).to_be_focused(); expect(settings_tab).to_have_attribute('aria-selected', 'true')
+    expect(schedule.get_by_role('button', name='Build week', exact=True)).not_to_be_visible()
+    settings_tab.press('End'); expect(requests_tab).to_be_focused()
+    requests_tab.press('Home'); expect(schedule_tab).to_be_focused()
+    schedule_tab.press('ArrowLeft'); expect(requests_tab).to_be_focused()
+    requests_tab.press('Home'); schedule_tab.press('ArrowRight')
+    expect(settings.get_by_role('button', name='Save changes', exact=True)).to_be_disabled()
+    row = open_employee(settings)
     settings.get_by_label('Max days (1–7)').fill('6')
     settings.get_by_role('textbox', name='Search staff').fill('Sample')
-    page.get_by_role('button', name='Back to schedule', exact=True).click()
+    settings.get_by_role('button', name='Back to schedule', exact=True).click()
     expect(schedule_tab).to_be_focused()
-    expect(page.get_by_role('tab', name='Employee settings Unsaved changes')).to_be_visible()
-    expect(page.get_by_role('button', name='Review employee settings')).to_be_visible()
-    page.get_by_role('button', name='Review employee settings').click()
+    expect(settings_tab).to_contain_text('Unsaved changes')
+    settings_tab.click()
     expect(settings.get_by_label('Max days (1–7)')).to_have_value('6')
     expect(settings.get_by_role('textbox', name='Search staff')).to_have_value('Sample')
-    expect(settings.get_by_text('Edit availability', exact=True).locator('..')).to_have_attribute('open', '')
-    # A failed save keeps edits; a deliberate retry uses the server revision.
+    # Failed save retains exact edits; explicit retry follows existing revision handling.
     store.fail_next_save = True
-    page.get_by_role('button', name='Save changes', exact=True).click()
+    settings.get_by_role('button', name='Save changes', exact=True).click()
     expect(page.get_by_text('Someone else', exact=False)).to_be_visible()
     expect(settings.get_by_label('Max days (1–7)')).to_have_value('6')
-    page.get_by_role('button', name='Save changes', exact=True).click()
-    expect(page.get_by_role('button', name='Save changes', exact=True)).to_be_disabled()
-    # Rule errors remain discoverable even when their disclosure is closed.
-    rules = settings.locator('details').filter(has=page.locator('summary', has_text='Shift rules'))
+    settings.get_by_role('button', name='Save changes', exact=True).click()
+    expect(settings.get_by_role('button', name='Save changes', exact=True)).to_be_disabled()
+    rules = settings.locator('#scheduler-rules')
     rules.locator('summary').first.click()
     settings.get_by_label('Label for this spot', exact=True).first.fill('')
     rules.locator('summary').first.click()
-    expect(page.get_by_role('button', name='Save changes', exact=True)).to_be_disabled()
-    page.get_by_role('button', name='Back to schedule', exact=True).click()
+    expect(settings.get_by_role('button', name='Save changes', exact=True)).to_be_disabled()
+    settings.get_by_role('button', name='Back to schedule', exact=True).click()
     expect(schedule.get_by_role('button', name='Publish to staff', exact=True)).to_be_disabled()
     schedule.get_by_role('button', name='Review shift rules', exact=True).click()
     expect(rules.locator('summary').first).to_be_focused()
-    expect(settings.get_by_label('Label for this spot', exact=True).first).to_be_visible()
     settings.get_by_label('Label for this spot', exact=True).first.fill('Morning coverage')
-    # An unfinished new employee form is retained too.
     settings.get_by_role('button', name='Add employee', exact=True).click()
     settings.get_by_label('Employee name', exact=True).fill('Unfinished draft')
-    page.get_by_role('button', name='Back to schedule', exact=True).click()
-    page.get_by_role('tab', name='Employee settings', exact=True).click()
+    settings.get_by_role('button', name='Back to schedule', exact=True).click(); settings_tab.click()
     expect(settings.get_by_label('Employee name', exact=True)).to_have_value('Unfinished draft')
     settings.get_by_role('button', name='Close employee form', exact=True).click()
-    rules.locator('summary').first.click()
-    # Week controls are shared; changing weeks in settings carries the same date to Schedule.
     week = page.locator('[aria-label="Selected week"] p').inner_text()
     page.get_by_role('button', name='Next week', exact=True).click()
     expect(page.locator('[aria-label="Selected week"] p')).not_to_have_text(week)
-    next_week = page.locator('[aria-label="Selected week"] p').inner_text()
-    page.get_by_role('button', name='Back to schedule', exact=True).click()
-    expect(schedule.get_by_role('heading', name=next_week, exact=True)).to_be_visible()
-    # Generate, switch views, then publish using the existing path.
-    schedule.get_by_role('button', name='Make schedule', exact=True).click()
-    expect(schedule.get_by_role('button', name='Make schedule', exact=True)).to_be_enabled()
-    chips = schedule.get_by_role('button', name='Move Sample Employee out of', exact=False)
-    expect(chips).to_have_count(7)
-    page.get_by_role('tab', name='Employee settings', exact=True).click()
-    page.get_by_role('button', name='Back to schedule', exact=True).click()
-    expect(chips).to_have_count(7)
-    schedule.get_by_role('button', name='Publish to staff', exact=True).first.click()
+    settings.get_by_role('button', name='Back to schedule', exact=True).click()
+    schedule.get_by_role('button', name='Build week', exact=True).click()
+    expect(filled_cells(page)).to_have_count(7)
+    settings_tab.click(); settings.get_by_role('button', name='Back to schedule', exact=True).click()
+    expect(filled_cells(page)).to_have_count(7)
+    schedule.get_by_role('button', name='Publish to staff', exact=True).click()
     page.get_by_role('button', name='Publish', exact=True).click()
     expect(page.get_by_text('Published. Staff now see this week.', exact=True)).to_be_visible()
-    page.get_by_role('button', name='Close', exact=True).click()
-    # Browser printing from settings still prints the schedule and hides employee parameters.
+    page.get_by_role('button', name='Close', exact=True).first.click()
     page.screenshot(path=str(artifacts / 'schedule-desktop.png'), full_page=True)
-    page.get_by_role('tab', name='Employee settings', exact=True).click()
-    page.screenshot(path=str(artifacts / 'settings-desktop.png'), full_page=True)
+    settings_tab.click(); page.screenshot(path=str(artifacts / 'settings-desktop.png'), full_page=True)
     page.emulate_media(media='print')
-    expect(schedule).to_be_visible()
+    expect(page.locator('[data-scheduler-print]')).to_be_visible()
     expect(settings).not_to_be_visible()
-    expect(chips).to_have_count(7)
+    expect(page.locator('[data-scheduler-print]')).to_contain_text('Sample Employee')
     page.emulate_media(media='screen')
     assert not errors, errors
     assert any(key[0].startswith('/api/schedule/') for key in store.writes)
@@ -213,24 +206,23 @@ def check_dining(browser, url, artifacts):
 
 def check_mobile_kitchen(browser, url, artifacts):
     context, page, store, errors = open_scheduler(browser, url, 'CR3-kitchen', width=375)
-    page.get_by_role('tab', name='Employee settings', exact=True).click()
-    settings = page.locator('#scheduler-panel-settings')
+    staff_tab(page).click(); settings = page.locator('#scheduler-panel-settings')
     expect(settings.get_by_text('One crew for every week.', exact=False)).to_be_visible()
     expect(settings.get_by_role('button', name='Add employee', exact=True)).not_to_be_visible()
-    settings.locator('summary', has_text='Shift rules').click()
+    settings.locator('#scheduler-rules summary').first.click()
     expect(settings.get_by_role('heading', name='Shift rules (locked)')).to_be_visible()
     settings.get_by_label('Staff password', exact=True).fill('fixture-password')
     settings.get_by_role('button', name='Unlock editing', exact=True).click()
     expect(settings.get_by_role('button', name='Add employee', exact=True)).to_be_visible()
     settings.get_by_role('button', name='Lock', exact=True).click()
     expect(settings.get_by_role('button', name='Add employee', exact=True)).not_to_be_visible()
-    settings.locator('summary', has_text='Shift rules').click()
+    settings.locator('#scheduler-rules summary').first.click()
     for width in (320, 375, 768):
         page.set_viewport_size({'width': width, 'height': 900})
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Settings overflow at {width}px'
         page.get_by_role('tab', name='Schedule', exact=True).click()
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Schedule overflow at {width}px'
-        page.get_by_role('tab', name='Employee settings', exact=True).click()
+        staff_tab(page).click()
     page.set_viewport_size({'width': 375, 'height': 900})
     page.screenshot(path=str(artifacts / 'settings-mobile.png'), full_page=True)
     page.get_by_role('tab', name='Schedule', exact=True).click()
@@ -242,54 +234,40 @@ def check_mobile_kitchen(browser, url, artifacts):
 
 def check_qualification_publishing(browser, url):
     context, page, store, errors = open_scheduler(browser, url, 'CR3-kitchen')
-    schedule = page.locator('#scheduler-panel-schedule')
-    settings = page.locator('#scheduler-panel-settings')
-    schedule.get_by_role('button', name='Make schedule', exact=True).click()
-    expect(schedule.get_by_role('button', name='Move Sample Employee out of', exact=False)).to_have_count(7)
-    schedule.get_by_role('button', name='Publish to staff', exact=True).first.click()
+    schedule, settings = page.locator('#scheduler-panel-schedule'), page.locator('#scheduler-panel-settings')
+    schedule.get_by_role('button', name='Build week', exact=True).click()
+    expect(filled_cells(page)).to_have_count(7)
+    schedule.get_by_role('button', name='Publish to staff', exact=True).click()
     page.get_by_role('button', name='Publish', exact=True).click()
     expect(page.get_by_text('Published. Staff now see this week.', exact=True)).to_be_visible()
-    page.get_by_role('button', name='Close', exact=True).click()
-
-    # A later crew edit can invalidate assignments already in a published week.
-    page.get_by_role('tab', name='Employee settings', exact=True).click()
+    page.get_by_role('button', name='Close', exact=True).first.click()
+    staff_tab(page).click()
     settings.get_by_label('Staff password', exact=True).fill('fixture-password')
     settings.get_by_role('button', name='Unlock editing', exact=True).click()
+    open_employee(settings)
     positions = settings.get_by_role('group', name='Positions Sample Employee can work')
     expect(settings.get_by_label('New hire (any position, still limited by max days)', exact=True)).not_to_be_checked()
-    positions.get_by_label('Dishwasher', exact=True).check()
-    positions.get_by_label('Cook', exact=True).uncheck()
-    page.get_by_role('button', name='Back to schedule', exact=True).click()
-    schedule.get_by_role('button', name='Publish to staff', exact=True).first.click()
+    positions.get_by_label('Dishwasher', exact=True).check(); positions.get_by_label('Cook', exact=True).uncheck()
+    settings.get_by_role('button', name='Back to schedule', exact=True).click()
+    schedule.get_by_role('button', name='Publish to staff', exact=True).click()
     warning = page.get_by_role('alert').filter(has_text='Fix these position assignments before publishing:')
-    expect(warning).to_be_visible()
-    expect(warning.get_by_role('listitem')).to_have_count(7)
+    expect(warning).to_be_visible(); expect(warning.get_by_role('listitem')).to_have_count(7)
     expect(warning).to_contain_text('Sample Employee is not qualified')
     publish = page.get_by_role('button', name='Publish updates', exact=True)
     expect(publish).to_be_disabled()
     assert len(store.writes) == 1, 'Blocked publishing must not save crew, rules, or schedule'
-
-    # Managers can hide an incorrect week, but cannot turn it back on unchanged.
     page.get_by_role('button', name='Off', exact=True).click()
-    expect(warning).not_to_be_visible()
-    expect(publish).to_be_enabled()
-    publish.click()
+    expect(warning).not_to_be_visible(); expect(publish).to_be_enabled(); publish.click()
     expect(page.get_by_text('Saved. This week stays hidden from staff until you turn it on.', exact=True)).to_be_visible()
     published = [doc for key, doc in store.saved.items() if key[0].startswith('/api/schedule/')]
     assert len(published) == 1 and published[0]['visible'] is False
     page.get_by_role('button', name='On', exact=True).click()
-    expect(warning).to_be_visible()
-    expect(publish).to_be_disabled()
-    page.get_by_role('button', name='Close', exact=True).click()
-
-    # Restoring the qualification enables publishing the existing assignments.
-    page.get_by_role('tab', name='Employee settings', exact=True).click()
-    positions.get_by_label('Cook', exact=True).check()
-    page.get_by_role('button', name='Back to schedule', exact=True).click()
-    schedule.get_by_role('button', name='Publish to staff', exact=True).first.click()
-    expect(warning).not_to_be_visible()
-    expect(publish).to_be_enabled()
-    publish.click()
+    expect(warning).to_be_visible(); expect(publish).to_be_disabled()
+    page.get_by_role('button', name='Close', exact=True).first.click()
+    staff_tab(page).click(); positions.get_by_label('Cook', exact=True).check()
+    settings.get_by_role('button', name='Back to schedule', exact=True).click()
+    schedule.get_by_role('button', name='Publish to staff', exact=True).click()
+    expect(warning).not_to_be_visible(); expect(publish).to_be_enabled(); publish.click()
     expect(page.get_by_text('Published. Staff now see this week.', exact=True)).to_be_visible()
     published = [doc for key, doc in store.saved.items() if key[0].startswith('/api/schedule/')]
     assert len(published) == 1 and published[0]['visible'] is True
@@ -298,105 +276,73 @@ def check_qualification_publishing(browser, url):
 
 
 def check_new_layout(browser, url, artifacts):
-    context, page, store, errors = open_scheduler(browser, url, 'CR3-diningroom', layout=None)
+    """Current/Classic assertions become unified-layout parity checks, retaining their behaviors."""
+    context, page, store, errors = open_scheduler(browser, url, 'CR3-diningroom', layout='classic')
     schedule = page.locator('#scheduler-panel-schedule')
-    # New layout is the default, with plain tab labels and the switch off.
-    expect(page.get_by_role('heading', name='Weekly schedule', exact=True)).to_be_visible()
     expect(page.get_by_role('tab', name='Staff & rules', exact=True)).to_be_visible()
-    expect(page.get_by_role('tab', name='Employee settings', exact=True)).not_to_be_visible()
-    expect(page.get_by_role('switch', name='Use the classic layout')).to_have_attribute('aria-checked', 'false')
-    # One dark button on an empty week; rare actions live in More.
-    primary = page.locator('#scheduler-panel-schedule button.bg-zinc-900:visible')
-    expect(primary).to_have_count(1)
-    expect(primary).to_have_text('Make schedule')
-    more = schedule.locator('summary', has_text='More').first
-    more.click()
-    expect(schedule.get_by_role('button', name='Copy last week', exact=True).first).to_be_visible()
-    expect(schedule.get_by_role('button', name='Clear week', exact=True)).to_be_disabled()
-    expect(schedule.get_by_role('button', name='Print', exact=True)).to_be_visible()
-    more.click()
-    page.screenshot(path=str(artifacts / 'schedule-new-empty-desktop.png'), full_page=True)
-    # Build the week, then leave one required spot empty to make a problem.
-    schedule.get_by_role('button', name='Make schedule', exact=True).first.click()
-    chips = schedule.get_by_role('button', name='Move Sample Employee out of', exact=False)
-    expect(chips).to_have_count(7)
-    expect(schedule.get_by_role('button', name='✓ All spots filled', exact=True)).to_be_visible()
-    primary = page.locator('#scheduler-panel-schedule button.bg-zinc-900:visible')
-    expect(primary).to_have_count(1)
-    expect(primary).to_have_text('Publish to staff')
-    schedule.get_by_role('button', name='Morning', exact=True).first.click()
-    page.locator('#Sunday-AM-detail select').first.select_option('')
-    expect(chips).to_have_count(6)
-    expect(schedule.get_by_role('button', name='1 to fix', exact=True)).to_be_visible()
-    expect(page.locator('#schedule-fix')).to_contain_text('Fix 1 of 1')
-    # The problem pill takes focus to the fix panel.
-    schedule.get_by_role('button', name='1 to fix', exact=True).click()
-    expect(page.locator('#schedule-fix')).to_be_focused()
-    # Flipping the switch keeps the unsaved assignment and undo history.
-    page.get_by_role('switch', name='Use the classic layout').click()
-    expect(page.get_by_role('heading', name='Weekly staff schedule', exact=True)).to_be_visible()
-    expect(chips).to_have_count(6)
-    expect(page.get_by_role('button', name='Undo', exact=True).first).to_be_enabled()
-    page.get_by_role('switch', name='Use the classic layout').click()
-    expect(page.get_by_role('heading', name='Weekly schedule', exact=True)).to_be_visible()
-    expect(chips).to_have_count(6)
-    # Publishing still goes through the existing panel.
-    schedule.get_by_role('button', name='Publish to staff', exact=True).click()
-    page.get_by_role('button', name='Publish', exact=True).click()
-    expect(page.get_by_text('Published. Staff now see this week.', exact=True)).to_be_visible()
-    page.get_by_role('button', name='Close', exact=True).first.click()
-    expect(schedule.get_by_role('button', name='Published ✓', exact=True)).to_be_disabled()
-    # Staff & rules is reachable and keeps every staff field behind Edit.
-    page.get_by_role('tab', name='Staff & rules', exact=True).click()
-    settings = page.locator('#scheduler-panel-settings')
-    expect(page.get_by_role('heading', name='Staff & rules', exact=True)).to_be_visible()
-    row = settings.get_by_role('listitem').filter(has_text='Sample Employee')
-    expect(row).to_contain_text('Server')
-    expect(row).to_contain_text('this week')
+    expect(page.get_by_role('tab', name='Requests', exact=True)).to_be_visible()
+    expect(page.get_by_role('switch', name='Use the classic layout')).to_have_count(0)
+    expect(page.get_by_label('Layout', exact=True)).to_have_count(0)
+    expect(schedule.get_by_role('button', name='Build week', exact=True)).to_be_visible()
+    expect(schedule.get_by_role('button', name='Copy previous week', exact=True)).to_be_visible()
+    page.screenshot(path=str(artifacts / 'schedule-unified-empty-desktop.png'), full_page=True)
+    schedule.get_by_role('button', name='Build week', exact=True).click()
+    expect(filled_cells(page)).to_have_count(7)
+    page.get_by_role('checkbox', name='Auto-adjust', exact=True).uncheck()
+    page.locator('[data-planning-slot] button').first.click()
+    page.get_by_label('Assign employee', exact=True).select_option('')
+    expect(filled_cells(page)).to_have_count(6)
+    fix = page.locator('#planning-fix')
+    expect(fix).to_be_visible()
+    expect(fix.get_by_role('button', name='Ignore for now', exact=True)).to_be_disabled()
+    fix.get_by_role('button', name='Choose employee', exact=True).click()
+    fix.get_by_role('button', name='Sample Employee', exact=True).click()
+    expect(filled_cells(page)).to_have_count(7)
+    schedule.get_by_role('button', name='Undo', exact=True).click()
+    expect(filled_cells(page)).to_have_count(6)
+    page.get_by_role('button', name='Restore generated shift', exact=True).click()
+    expect(filled_cells(page)).to_have_count(7)
+    schedule.get_by_role('button', name='Undo', exact=True).click()
+    expect(filled_cells(page)).to_have_count(6)
+    stable = page.locator('[data-planning-slot]').evaluate_all('(cells)=>cells.map(c=>c.dataset.employeeId)')
+    staff_tab(page).click(); page.get_by_role('tab', name='Requests', exact=True).click()
+    page.get_by_role('tab', name='Schedule', exact=True).click()
+    assert page.locator('[data-planning-slot]').evaluate_all('(cells)=>cells.map(c=>c.dataset.employeeId)') == stable
+    expect(schedule.get_by_role('button', name='Undo', exact=True)).to_be_enabled()
+    schedule.get_by_role('button', name='Undo', exact=True).click()
+    expect(filled_cells(page)).to_have_count(7)
+    staff_tab(page).click(); settings=page.locator('#scheduler-panel-settings')
+    row=settings.get_by_role('listitem').filter(has_text='Sample Employee')
+    expect(row).to_contain_text('Server'); expect(row).to_contain_text('this week')
     expect(settings.get_by_label('Sample Employee working')).to_be_checked()
     expect(settings.get_by_label('Max days (1–7)')).not_to_be_visible()
     row.get_by_role('button', name='Edit', exact=True).click()
     expect(settings.get_by_label('Max days (1–7)')).to_be_visible()
     row.get_by_role('button', name='Close', exact=True).click()
     expect(settings.get_by_label('Max days (1–7)')).not_to_be_visible()
-    # Staff list tools and device copies live in More.
     settings.locator('summary', has_text='More').first.click()
     expect(settings.get_by_role('button', name='Use saved staff list', exact=True)).to_be_visible()
     expect(settings.get_by_text('Copies on this device (0)', exact=True)).to_be_visible()
     settings.locator('summary', has_text='More').first.click()
-    # A rules problem points at the rules section instead of re-opening the view.
-    rules = page.locator('#scheduler-rules')
-    rules.locator('summary').first.click()
-    settings.get_by_label('Label for this spot', exact=True).first.fill('')
-    rules.locator('summary').first.click()
-    expect(settings.get_by_role('button', name='Review shift rules', exact=True)).to_be_visible()
+    rules=settings.locator('#scheduler-rules'); rules.locator('summary').first.click()
+    settings.get_by_label('Label for this spot', exact=True).first.fill(''); rules.locator('summary').first.click()
     settings.get_by_role('button', name='Review shift rules', exact=True).click()
-    expect(rules).to_have_attribute('open', '')
-    expect(rules.locator('summary').first).to_be_focused()
+    expect(rules).to_have_attribute('open',''); expect(rules.locator('summary').first).to_be_focused()
     settings.get_by_label('Label for this spot', exact=True).first.fill('Morning coverage')
-    # An edit makes Save changes available again.
     settings.get_by_label('Sample Employee working').uncheck()
     expect(settings.get_by_role('button', name='Save changes', exact=True)).to_be_enabled()
-    expect(page.get_by_role('tab', name='Staff & rules Unsaved changes', exact=True)).to_be_visible()
+    expect(staff_tab(page)).to_contain_text('Unsaved changes')
     settings.get_by_label('Sample Employee working').check()
-    page.screenshot(path=str(artifacts / 'staff-rules-desktop.png'), full_page=True)
-    page.get_by_role('tab', name='Schedule', exact=True).click()
-    page.screenshot(path=str(artifacts / 'schedule-new-desktop.png'), full_page=True)
-    page.set_viewport_size({'width': 375, 'height': 900})
-    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'New layout overflow at 375px'
-    page.screenshot(path=str(artifacts / 'schedule-new-mobile.png'), full_page=True)
-    # The per-device choice survives a reload.
-    page.set_viewport_size({'width': 1440, 'height': 1000})
-    page.get_by_role('switch', name='Use the classic layout').click()
-    assert page.evaluate("localStorage.getItem('chinarose.scheduler.layout')") == 'classic'
-    page.on('dialog', lambda dialog: dialog.accept())
-    page.reload()
-    page.wait_for_load_state('networkidle')
-    page.get_by_label('Manager code', exact=True).fill('fixture-password')
-    page.get_by_role('button', name='Open the scheduler', exact=True).click()
-    expect(page.get_by_role('heading', name='Weekly staff schedule', exact=True)).to_be_visible()
-    expect(page.get_by_role('switch', name='Use the classic layout')).to_have_attribute('aria-checked', 'true')
-    assert not errors, errors
+    page.screenshot(path=str(artifacts/'staff-rules-desktop.png'),full_page=True)
+    page.get_by_role('tab',name='Schedule',exact=True).click()
+    page.set_viewport_size({'width':375,'height':900})
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    page.screenshot(path=str(artifacts/'schedule-unified-mobile.png'),full_page=True)
+    # Legacy choice remains inert on reload; no draft or credential serialization is added.
+    page.on('dialog', lambda dialog: dialog.accept()); page.reload(wait_until='networkidle'); unlock(page)
+    expect(page.get_by_label('Layout',exact=True)).to_have_count(0)
+    assert page.evaluate("localStorage.getItem('chinarose.scheduler.layout')")=='classic'
+    assert not errors,errors
     context.close()
 
 

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { BackNavigation } from '@/components/BackNavigation'
+import { isRestaurantId } from '@/data/restaurants'
 import { useManagerSession } from './ManagerSession'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
@@ -39,10 +40,12 @@ export default function InternalShell({ children, themeClassName }: { children: 
     update(); window.addEventListener('hashchange', update); window.addEventListener('popstate', update)
     return () => { window.removeEventListener('hashchange', update); window.removeEventListener('popstate', update) }
   }, [pathname])
-  const section = pathname.endsWith('/bookkeeping') ? (reportTabs.includes(hash) ? 'reports' : 'cash')
+  const scheduling = /(?:^|\/)scheduler-demo(?:\/[^/]+)?$/.test(pathname)
+  const station = scheduling && isRestaurantId(pathname.split('/').pop()) ? pathname.split('/').pop() : null
+  const section = scheduling ? 'schedule' : pathname.endsWith('/bookkeeping') ? (reportTabs.includes(hash) ? 'reports' : 'cash')
     : pathname.endsWith('/cash-history') ? 'cash' : (pathname.endsWith('/reports') || pathname.endsWith('/import-history')) ? 'reports' : pathname.endsWith('/inventory') ? 'inventory' : pathname.endsWith('/forms') ? 'forms'
     : pathname.endsWith('/qr-generator') ? 'qr' : pathname.endsWith('/ui-gallery') ? 'gallery' : 'dashboard'
-  const taskId = pathname.endsWith('/import-history') ? 'import-history' : pathname.endsWith('/cash-history') ? 'cash-history' : section === 'reports' && pathname.endsWith('/bookkeeping') ? hash : section
+  const taskId = station ? `schedule-${station}` : pathname.endsWith('/import-history') ? 'import-history' : pathname.endsWith('/cash-history') ? 'cash-history' : section === 'reports' && pathname.endsWith('/bookkeeping') ? hash : section
   const session = useManagerSession()
   // Start loading Toast sales for the sales code's stores as soon as it's entered, so Reports opens ready.
   const sales = useSyncExternalStore(salesSession.subscribe, salesSession.getSnapshot, salesSession.getSnapshot)
@@ -58,7 +61,7 @@ export default function InternalShell({ children, themeClassName }: { children: 
   const detailed = (section === 'forms' && access?.onLock ? (tasks['forms-context'] ?? tasks['forms-record']) : undefined)
     ?? (section === 'reports' && pathname.endsWith('/reports') && session.token ? tasks['reports-context'] : undefined)
   const { t } = useInternalLanguage()
-  const context = detailed?.context ?? metadata?.context
+  const context = section === 'schedule' && !session.token ? undefined : detailed?.context ?? metadata?.context
   const title = t(`shell.${section}` as TranslationKey)
   const items = useMemo(() => destinations.map(item => ({ ...item, icon: item.icon as IconName,
     href: /\/bookkeeping(?:\.html)?\/?$/.test(localPath) && item.id === 'cash'
@@ -91,7 +94,7 @@ export default function InternalShell({ children, themeClassName }: { children: 
     <header ref={header} className={`${themeClassName} ${styles.header}`} data-internal-banner data-shell-chrome>
       <Link className={styles.brand} href={`${base}/internal`}>CHINA ROSE <span>/ {t('shell.identity')}</span></Link>
       <div className={styles.controls}>
-        <BackNavigation inline label={t('navigation.back')} fallbackHref={section === 'dashboard' ? '/' : '/internal'} />
+        <BackNavigation inline label={t('navigation.back')} fallbackHref={station ? '/scheduler-demo' : section === 'dashboard' ? '/' : '/internal'} />
         <LanguageControls appearance="shell" />
         <Button onClick={() => setHelp(true)} aria-haspopup="dialog">{t('shell.help')}</Button>
         <Button icon="lock" data-shell-lock disabled={!session.token} onClick={session.lock}

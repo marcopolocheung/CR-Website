@@ -1,5 +1,7 @@
 'use client'
 
+import { useSchedulerText } from './useSchedulerText'
+
 import {
   DAYS,
   PERIODS,
@@ -40,6 +42,7 @@ export function TimeField({
   disabled?: boolean
   ariaLabel: string
 }) {
+  const text = useSchedulerText()
   const hour24 = Math.floor(value / 60)
   const minute = value % 60
   const period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM'
@@ -91,8 +94,8 @@ export function TimeField({
         disabled={disabled}
         onChange={(event) => emit(hour12, minute, event.target.value as 'AM' | 'PM')}
       >
-        <option value="AM">AM</option>
-        <option value="PM">PM</option>
+        <option value="AM">{text("AM")}</option>
+        <option value="PM">{text("PM")}</option>
       </select>
     </span>
   )
@@ -127,18 +130,16 @@ export function TemplateEditor({
   readOnly?: boolean
   problems: RuleProblem[]
 }) {
+  const text = useSchedulerText()
   if (readOnly) {
     return (
       <section className="border-t border-zinc-100 p-4 print:hidden">
-        <h3 className="font-semibold">Shift rules (locked)</h3>
-        <p className="mt-0.5 text-sm text-zinc-600">
-          The spots below are locked for this station — enter the staff password in Employee settings above to change this week’s rules. You build
-          the week by putting the crew into them and moving people around.
-        </p>
+        <h3 className="font-semibold">{text("Shift rules (locked)")}</h3>
+        <p className="mt-0.5 text-sm text-zinc-600">{text("The spots below are locked for this station — enter the staff password in Employee settings above to change this week’s rules. You build the week by putting the crew into them and moving people around.")}</p>
         <div className="mt-3 space-y-3">
           {DAYS.map((day) => (
             <div key={day} className="rounded border border-zinc-200 p-2.5">
-              <h4 className="text-sm font-semibold text-zinc-900">{day}</h4>
+              <h4 className="text-sm font-semibold text-zinc-900">{text(day)}</h4>
               <ul className="mt-1 space-y-1 text-xs text-zinc-700">
                 {template[day].map((slot, index) => (
                   <li key={index} className="flex flex-wrap items-center gap-2">
@@ -148,9 +149,9 @@ export function TemplateEditor({
                       {formatTime(slot.start)} – {formatTime(slot.end)}
                     </span>
                     {slot.required ? (
-                      <span className="font-semibold text-zinc-900">required</span>
+                      <span className="font-semibold text-zinc-900">{text("required")}</span>
                     ) : (
-                      <span className="text-zinc-400">optional</span>
+                      <span className="text-zinc-400">{text("optional")}</span>
                     )}
                   </li>
                 ))}
@@ -183,15 +184,10 @@ export function TemplateEditor({
     <section className="border-t border-zinc-100 p-4 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-semibold">Shift rules</h3>
-          <p className="mt-0.5 text-sm text-zinc-600">Who the restaurant needs on each shift for this week. Add, remove, or change any spot.</p>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            Extra 12-7 / 4-7 help goes here as an added spot with exact times (e.g. Mid 12:00 PM - 4:00 PM,
-            Evening 4:00 PM - 7:00 PM) on top of the core AM/PM spots.
-          </p>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            Last saved: {formatUpdatedAt(updatedAt)}{dirty ? ' · unsaved changes — use Save changes above' : ''} · changes stay in this week only
-          </p>
+          <h3 className="font-semibold">{text("Shift rules")}</h3>
+          <p className="mt-0.5 text-sm text-zinc-600">{text("Who the restaurant needs on each shift for this week. Add, remove, or change any spot.")}</p>
+          <p className="mt-0.5 text-xs text-zinc-500">{text("Extra 12-7 / 4-7 help goes here as an added spot with exact times (e.g. Mid 12:00 PM - 4:00 PM, Evening 4:00 PM - 7:00 PM) on top of the core AM/PM spots.")}</p>
+          <p className="mt-0.5 text-xs text-zinc-500">{text("Last saved:")}{' '}{formatUpdatedAt(updatedAt)}{dirty ? text('· unsaved changes — use Save changes above') : ''}{' '}{text("· changes stay in this week only")}</p>
         </div>
         <div className="flex shrink-0 gap-2">
           <button
@@ -201,21 +197,19 @@ export function TemplateEditor({
             disabled={isDefaultTemplate}
             title={
               isDefaultTemplate
-                ? 'Already using the starting rules.'
-                : 'Replace this week’s rules with the starting rules. You can undo, then save to keep them.'
+                ? text('Already using the starting rules.')
+                : text('Replace this week’s rules with the starting rules. You can undo, then save to keep them.')
             }
-          >
-            Use starting rules
-          </button>
+          >{text("Use starting rules")}</button>
         </div>
       </div>
       {loadError && <p className="mt-2 text-xs font-medium text-amber-800">{loadError}</p>}
       {problems.length > 0 && (
         <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-xs text-red-900" role="alert">
-          <p className="font-semibold">Fix {problems.length === 1 ? 'this spot' : `these ${problems.length} spots`} before saving:</p>
+          <p className="font-semibold">{text("Fix")}{' '}{problems.length === 1 ? text('this spot') : text('these {count} spots',{count:problems.length})}{' '}{text("before saving:")}</p>
           <ul className="mt-1 list-disc pl-4">
             {problems.map((problem) => (
-              <li key={`${problem.day}-${problem.index}`}>{problem.message}</li>
+              <li key={`${problem.day}-${problem.index}`}><span>{text('{date}, spot {number}: review the label, position and start/end times.',{date:text(problem.day),number:problem.index+1})}</span><details><summary>{text('Original English')}</summary><p lang="en">{problem.message}</p></details></li>
             ))}
           </ul>
         </div>
@@ -231,17 +225,15 @@ export function TemplateEditor({
         {DAYS.map((day) => (
           <div key={day} className="rounded border border-zinc-200 p-2.5">
             <div className="flex items-center justify-between gap-2">
-              <h4 className="text-sm font-semibold text-zinc-900">{day}</h4>
+              <h4 className="text-sm font-semibold text-zinc-900">{text(day)}</h4>
               <button
                 type="button"
                 className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                 onClick={() => addSlot(day)}
-              >
-                + Add spot
-              </button>
+              >{text("+ Add spot")}</button>
             </div>
             <div className="mt-2 space-y-2">
-              {template[day].length === 0 && <p className="text-xs text-zinc-500">No spots this day.</p>}
+              {template[day].length === 0 && <p className="text-xs text-zinc-500">{text("No spots this day.")}</p>}
               {template[day].map((slot, index) => (
                 <div
                   key={index}
@@ -271,23 +263,23 @@ export function TemplateEditor({
                       const slug = normalizeRoleSlug(event.target.value)
                       updateSlot(day, index, { role: slug || slot.role })
                     }}
-                    placeholder="Post"
-                    title="Pick a post or type any new one (e.g. Sushi Chef) — it is saved with the rules."
-                    aria-label="Post for this spot"
+                    placeholder={text("Post")}
+                    title={text("Pick a post or type any new one (e.g. Sushi Chef) — it is saved with the rules.")}
+                    aria-label={text("Post for this spot")}
                   />
                   <input
                     className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs"
                     value={slot.label}
                     onChange={(event) => updateSlot(day, index, { label: event.target.value })}
-                    placeholder="Label"
-                    aria-label="Label for this spot"
+                    placeholder={text("Label")}
+                    aria-label={text("Label for this spot")}
                   />
                   <TimeField
                     ariaLabel="Spot start time"
                     value={slot.start}
                     onChange={(totalMinutes) => updateSlot(day, index, { start: totalMinutes })}
                   />
-                  <span aria-hidden="true" className="text-xs text-zinc-500">to</span>
+                  <span aria-hidden="true" className="text-xs text-zinc-500">{text("to")}</span>
                   <TimeField
                     ariaLabel="Spot end time"
                     value={slot.end}
@@ -298,16 +290,12 @@ export function TemplateEditor({
                       type="checkbox"
                       checked={slot.required}
                       onChange={(event) => updateSlot(day, index, { required: event.target.checked })}
-                    />
-                    Required
-                  </label>
+                    />{text("Required")}</label>
                   <button
                     type="button"
                     className="ml-auto rounded border border-red-300 bg-white px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                     onClick={() => removeSlot(day, index)}
-                  >
-                    Remove
-                  </button>
+                  >{text("Remove")}</button>
                 </div>
               ))}
             </div>
