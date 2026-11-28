@@ -5,10 +5,12 @@ import { formsDraftEnglish } from './forms-drafts'
 import { formsWorkspaceEnglish } from './forms-workspace'
 import { planningEnglish } from './planning'
 import { hoursEnglish } from './special-hours'
+import { filesEnglish } from './files'
 const en = {
   ...schedulerScreenEnglish,
   ...scheduleShellEnglish,
   ...hoursEnglish,
+  ...filesEnglish,
   ...formsEnglish,
   ...formsDraftEnglish,
   ...formsWorkspaceEnglish,

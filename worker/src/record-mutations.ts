@@ -1,6 +1,6 @@
 import { canonicalJson } from '../../src/lib/internal-tools/json'
 export { canonicalJson } from '../../src/lib/internal-tools/json'
-import type { D1Database } from '@cloudflare/workers-types'
+import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types'
 import {
   apiError, businessDate, ERROR_STATUS, isStationId, isStoreId, operationId, recordId, revision,
   SCHEMA_VERSION, STATION_STORES, utcTimestamp,
@@ -17,6 +17,8 @@ export type MutationContext = MutationTarget & {
   stationId?: StationId
   context: DateContext
 }
+/** SQL condition plus its binds that is true only after this operation's receipt claim succeeded. */
+export type Projection = { sql: string; binds: string[] }
 export type MutationResult<T extends Json> = { ok: true; record: RecordEnvelope<T>; replayed: boolean }
   | { ok: false; status: number; body: ErrorEnvelope }
 const families: readonly RecordFamily[] = ['employee','membership','employee-mapping','schedule','schedule-request','cash-close','catalog','count','order','receipt','stock-event','import','form','follow-up','attachment']
@@ -53,6 +55,8 @@ export async function mutateRecord<T extends Json>(
   context: MutationContext,
   mutation: MutationEnvelope<T>,
   validate: (data: T) => FieldIssue[],
+  /** Domain rows written in the same batch; each must apply only `WHERE ${guard.sql}` (true once the claim succeeded). */
+  projections?: (guard: Projection) => D1PreparedStatement[],
 ): Promise<MutationResult<T>> {
   if (mutation?.schemaVersion !== SCHEMA_VERSION) return failed(apiError('unsupported_schema'))
   if (!isStoreId(context.storeId) || !families.includes(context.family) || !recordId(context.id)
@@ -109,7 +113,8 @@ export async function mutateRecord<T extends Json>(
         (SELECT revision FROM records WHERE store_id=? AND family=? AND id=? AND revision=? AND updated_at=? AND data_json=?),?,?,result_json
       FROM mutation_operations WHERE ${receiptWhere}`)
       .bind(mutation.baseRevision, ...recordKeys, nextRevision, now, data, now, canonicalJson(context.actor), ...identity)
-    const results = await db.batch([claim, insert, update, event])
+    const extra = projections?.({ sql: claimExists, binds: identity }) ?? []
+    const results = await db.batch([claim, insert, update, event, ...extra])
     if (results[0].meta.changes === 0) {
       const current = await db.prepare('SELECT revision FROM records WHERE store_id=? AND family=? AND id=?').bind(...recordKeys).first<{ revision: number }>()
       return failed(apiError('revision_conflict', { currentRevision: revision(current?.revision ?? 0)! }))

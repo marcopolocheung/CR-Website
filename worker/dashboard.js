@@ -170,9 +170,9 @@ function requestTransitionIssue(previous, next, preparer) {
   if (next.requests.length !== before.length) return "preserve_original_request";
   const changed = before.filter((item, i) => canonicalJson(item) !== canonicalJson(next.requests[i]));
   if (changed.length !== 1) return "one_request_per_operation";
-  const old = changed[0], current = next.requests[before.indexOf(old)];
-  if (old.status !== "pending" || current.status === "pending" || current.review?.by !== preparer) return "review_provenance_required";
-  return canonicalJson({ ...current, status: old.status, review: old.review }) === canonicalJson(old) ? null : "preserve_original_request";
+  const old = changed[0], current2 = next.requests[before.indexOf(old)];
+  if (old.status !== "pending" || current2.status === "pending" || current2.review?.by !== preparer) return "review_provenance_required";
+  return canonicalJson({ ...current2, status: old.status, review: old.review }) === canonicalJson(old) ? null : "preserve_original_request";
 }
 __name(requestTransitionIssue, "requestTransitionIssue");
 
@@ -200,7 +200,7 @@ function replay(prior, request) {
   return prior.request_json === request ? { ok: true, record: JSON.parse(prior.result_json), replayed: true } : failed(apiError("operation_reused"));
 }
 __name(replay, "replay");
-async function mutateRecord(db, context, mutation, validate) {
+async function mutateRecord(db, context, mutation, validate, projections) {
   if (mutation?.schemaVersion !== SCHEMA_VERSION) return failed(apiError("unsupported_schema"));
   if (!isStoreId(context.storeId) || !families.includes(context.family) || !recordId(context.id) || !recordId(context.callerScope) || !recordId(context.action) || !validDateContext(context.context) || context.stationId !== void 0 && (!isStationId(context.stationId) || STATION_STORES[context.stationId] !== context.storeId) || !operationId(mutation.operationId) || revision(mutation.baseRevision) === null || mutation.baseRevision >= Number.MAX_SAFE_INTEGER || !context.actor || (context.actor.kind === "entered-label" ? typeof context.actor.label !== "string" || !context.actor.label.trim() : context.actor.kind !== "authenticated" || typeof context.actor.subject !== "string" || !context.actor.subject.trim())) {
     return failed(apiError("validation_failed"));
@@ -227,7 +227,7 @@ async function mutateRecord(db, context, mutation, validate) {
     const now = utcTimestamp((/* @__PURE__ */ new Date()).toISOString());
     const nextRevision = revision(mutation.baseRevision + 1);
     const data = canonicalJson(mutation.data);
-    const envelope2 = {
+    const envelope3 = {
       schemaVersion: SCHEMA_VERSION,
       family: context.family,
       id: recordId(context.id),
@@ -239,7 +239,7 @@ async function mutateRecord(db, context, mutation, validate) {
       updatedAt: now,
       data: mutation.data
     };
-    const createResult = canonicalJson(envelope2);
+    const createResult = canonicalJson(envelope3);
     const recordKeys = [context.storeId, context.family, context.id];
     const claim = db.prepare(`INSERT INTO mutation_operations
       (caller_scope,store_id,family,record_id,action,operation_id,request_json,result_json)
@@ -273,10 +273,11 @@ async function mutateRecord(db, context, mutation, validate) {
       SELECT caller_scope,store_id,family,record_id,action,operation_id,?,
         (SELECT revision FROM records WHERE store_id=? AND family=? AND id=? AND revision=? AND updated_at=? AND data_json=?),?,?,result_json
       FROM mutation_operations WHERE ${receiptWhere}`).bind(mutation.baseRevision, ...recordKeys, nextRevision, now, data, now, canonicalJson(context.actor), ...identity);
-    const results = await db.batch([claim, insert, update, event]);
+    const extra = projections?.({ sql: claimExists, binds: identity }) ?? [];
+    const results = await db.batch([claim, insert, update, event, ...extra]);
     if (results[0].meta.changes === 0) {
-      const current = await db.prepare("SELECT revision FROM records WHERE store_id=? AND family=? AND id=?").bind(...recordKeys).first();
-      return failed(apiError("revision_conflict", { currentRevision: revision(current?.revision ?? 0) }));
+      const current2 = await db.prepare("SELECT revision FROM records WHERE store_id=? AND family=? AND id=?").bind(...recordKeys).first();
+      return failed(apiError("revision_conflict", { currentRevision: revision(current2?.revision ?? 0) }));
     }
     const saved = await receipt(db, identity);
     if (!saved) return failed(apiError("unavailable"));
@@ -553,8 +554,8 @@ function resolveSpecialHours(base, events, reviews, station) {
     const day = base.filter((slot) => slot.date === event.data.date);
     const review = reviews.find((r) => r.data.stationId === station && r.data.date === event.data.date);
     const effective = review ? reviewedDaySlots(day, review.data) : null;
-    const current = review && review.data.eventRevision === event.revision && canonicalJson(review.data.event) === canonicalJson(event.data);
-    if (!current || effective === null) pending.push(event.data.date);
+    const current2 = review && review.data.eventRevision === event.revision && canonicalJson(review.data.event) === canonicalJson(event.data);
+    if (!current2 || effective === null) pending.push(event.data.date);
     if (effective !== null && review) {
       slots = slots.filter((slot) => slot.date !== event.data.date).concat(effective);
       days.push({ ...review.data.event, eventRevision: review.data.eventRevision, reviewRevision: review.revision });
@@ -906,8 +907,645 @@ function isWorkbookOutput(value) {
 }
 __name(isWorkbookOutput, "isWorkbookOutput");
 
+// ../src/lib/internal-tools/i18n/scheduler-screen.ts
+var schedulerScreenEnglish = {
+  "schedulerScreen.StaffRules": "Staff & rules",
+  "schedulerScreen.SetWhoCanWorkTheirAvailabilityAndTheirWeeklyLimits": "Set who can work, their availability, and their weekly limits.",
+  "schedulerScreen.SwitchViewsAnytimeYourEditsStayHereUntilYouLeaveThePage": "Switch views anytime; your edits stay here until you leave the page.",
+  "schedulerScreen.SaveChanges": "Save changes",
+  "schedulerScreen.Undo": "Undo",
+  "schedulerScreen.BackToSchedule": "Back to schedule",
+  "schedulerScreen.More": "More",
+  "schedulerScreen.MistakeGoBackToTheStationSSavedStaffList": "Mistake? Go back to the station\u2019s saved staff list.",
+  "schedulerScreen.UseSavedStaffList": "Use saved staff list",
+  "schedulerScreen.StartFreshWithAnEmptyListUndoBringsEveryoneBack": "Start fresh with an empty list. Undo brings everyone back.",
+  "schedulerScreen.YesClearAll": "Yes, clear all",
+  "schedulerScreen.Cancel": "Cancel",
+  "schedulerScreen.RemoveEveryoneFromTheStaffListYouCanUndoThenSaveToKeepIt": "Remove everyone from the staff list. You can undo, then save to keep it.",
+  "schedulerScreen.ClearStaffList": "Clear staff list",
+  "schedulerScreen.KeepACopyOfAStaffListOnThisDeviceAndBringItBackAnytime": "Keep a copy of a staff list on this device and bring it back anytime.",
+  "schedulerScreen.SnapshotName": "Snapshot name",
+  "schedulerScreen.SaveACopyOfTheCurrentStaffListOnThisDevice": "Save a copy of the current staff list on this device.",
+  "schedulerScreen.Save": "Save",
+  "schedulerScreen.Staff": "staff \xB7",
+  "schedulerScreen.Restore": "Restore",
+  "schedulerScreen.Delete": "Delete",
+  "schedulerScreen.Fix": "Fix",
+  "schedulerScreen.ShiftRuleProblem": "shift rule problem",
+  "schedulerScreen.BeforeSaving": "before saving.",
+  "schedulerScreen.ReviewShiftRules": "Review shift rules",
+  "schedulerScreen.Lock": "Lock",
+  "schedulerScreen.StaffPassword": "Staff password",
+  "schedulerScreen.UndoLastCrewSave": "Undo last crew save",
+  "schedulerScreen.Employees": "Employees",
+  "schedulerScreen.Working": "working,",
+  "schedulerScreen.OffTheList": "off the list",
+  "schedulerScreen.SearchStaff": "Search staff",
+  "schedulerScreen.EveryoneOnTheList": "Everyone on the list (",
+  "schedulerScreen.OffTheListb1b2b": "Off the list",
+  "schedulerScreen.Working3b4df": "Working",
+  "schedulerScreen.ShiftRules": "Shift rules",
+  "schedulerScreen.ChangeThePositionsAndTimesNeededForTheSelectedWeek": "Change the positions and times needed for the selected week.",
+  "schedulerScreen.Only": "only",
+  "schedulerScreen.Am": "AM",
+  "schedulerScreen.Pm": "PM",
+  "schedulerScreen.Hours": "Hours",
+  "schedulerScreen.Off": "Off",
+  "schedulerScreen.To": "to",
+  "schedulerScreen.Custom": "Custom",
+  "schedulerScreen.AddHours": "+ Add hours",
+  "schedulerScreen.Replace": "Replace",
+  "schedulerScreen.WithStandardHalves": "with standard halves?",
+  "schedulerScreen.UseStandard": "Use standard",
+  "schedulerScreen.AmPmBoxesOnlyShowOverlapChangingThemResetsToStandardHalves": "\u2014 AM/PM boxes only show overlap; changing them resets to standard halves.",
+  "schedulerScreen.EmployeeName": "Employee name",
+  "schedulerScreen.Name": "Name",
+  "schedulerScreen.Positions": "Positions",
+  "schedulerScreen.NewPositionEGSushiChef": "New position (e.g. Sushi Chef)",
+  "schedulerScreen.AddACustomPosition": "Add a custom position",
+  "schedulerScreen.AddAnyPositionYouNeedItBecomesAvailableEverywhereOnThisPage": "Add any position you need \u2014 it becomes available everywhere on this page.",
+  "schedulerScreen.AddPosition": "Add position",
+  "schedulerScreen.Availability": "Availability",
+  "schedulerScreen.PickAmPmPerDayFor127Or47WorkersCustomizeHoursThenFineTunePerDay127Span": "Pick AM/PM per day. For 12-7 or 4-7 workers, customize hours then fine-tune per-day. 12-7 spans both halves: keep doubles on if they can take one morning plus one dinner spot the same day.",
+  "schedulerScreen.MaxDays17": "Max days (1\u20137)",
+  "schedulerScreen.MaxHoursOptional": "Max hours (optional)",
+  "schedulerScreen.NoLimit": "No limit",
+  "schedulerScreen.CanWorkDoubles": "Can work doubles",
+  "schedulerScreen.NewHireCanBePlacedInAnyPositionStillLimitedByMaxDays": "New hire (can be placed in any position, still limited by max days)",
+  "schedulerScreen.SaveEmployee": "Save employee",
+  "schedulerScreen.NewHire": "New hire",
+  "schedulerScreen.Max": "Max",
+  "schedulerScreen.Days": "days",
+  "schedulerScreen.Priority": "\xB7 Priority",
+  "schedulerScreen.OnlyAs": "Only as:",
+  "schedulerScreen.Remove": "Remove",
+  "schedulerScreen.FromTheStaffList": "from the staff list?",
+  "schedulerScreen.YesRemove": "Yes, remove",
+  "schedulerScreen.RemoveFromStaffList": "Remove from staff list",
+  "schedulerScreen.CanWork": "can work",
+  "schedulerScreen.NoPositionsPickedSo": "No positions picked, so",
+  "schedulerScreen.CannotBeScheduled": "cannot be scheduled.",
+  "schedulerScreen.MaxHours": "Max hours",
+  "schedulerScreen.Doubles": "Doubles",
+  "schedulerScreen.NewHireAnyPositionStillLimitedByMaxDays": "New hire (any position, still limited by max days)",
+  "schedulerScreen.Priority886cb": "Priority",
+  "schedulerScreen.SuspendedNotScheduledOnTheseDates": "Suspended (not scheduled on these dates)",
+  "schedulerScreen.From": "From",
+  "schedulerScreen.Through": "Through",
+  "schedulerScreen.ClearSuspension": "Clear suspension",
+  "schedulerScreen.EditAvailability": "Edit availability",
+  "schedulerScreen.OnTheseShifts": "On these shifts",
+  "schedulerScreen.IsOnlyScheduledInThePositionPickedHereOtherShiftsUseEveryPositionAbove": "is only scheduled in the position picked here. Other shifts use every position above.",
+  "schedulerScreen.Day": "Day",
+  "schedulerScreen.Shift": "Shift",
+  "schedulerScreen.Position": "Position",
+  "schedulerScreen.ShiftRulesLocked": "Shift rules (locked)",
+  "schedulerScreen.TheSpotsBelowAreLockedForThisStationEnterTheStaffPasswordInEmployeeSet": "The spots below are locked for this station \u2014 enter the staff password in Employee settings above to change this week\u2019s rules. You build the week by putting the crew into them and moving people around.",
+  "schedulerScreen.Required": "required",
+  "schedulerScreen.Optional": "optional",
+  "schedulerScreen.WhoTheRestaurantNeedsOnEachShiftForThisWeekAddRemoveOrChangeAnySpot": "Who the restaurant needs on each shift for this week. Add, remove, or change any spot.",
+  "schedulerScreen.Extra12747HelpGoesHereAsAnAddedSpotWithExactTimesEGMid1200Pm400PmEveni": "Extra 12-7 / 4-7 help goes here as an added spot with exact times (e.g. Mid 12:00 PM - 4:00 PM, Evening 4:00 PM - 7:00 PM) on top of the core AM/PM spots.",
+  "schedulerScreen.LastSaved": "Last saved:",
+  "schedulerScreen.ChangesStayInThisWeekOnly": "\xB7 changes stay in this week only",
+  "schedulerScreen.UseStartingRules": "Use starting rules",
+  "schedulerScreen.BeforeSavinga0568": "before saving:",
+  "schedulerScreen.AddSpot": "+ Add spot",
+  "schedulerScreen.NoSpotsThisDay": "No spots this day.",
+  "schedulerScreen.Post": "Post",
+  "schedulerScreen.PickAPostOrTypeAnyNewOneEGSushiChefItIsSavedWithTheRules": "Pick a post or type any new one (e.g. Sushi Chef) \u2014 it is saved with the rules.",
+  "schedulerScreen.PostForThisSpot": "Post for this spot",
+  "schedulerScreen.Label": "Label",
+  "schedulerScreen.LabelForThisSpot": "Label for this spot",
+  "schedulerScreen.Requiredeed6b": "Required",
+  "schedulerScreen.SchedulingAssistant": "Scheduling assistant",
+  "schedulerScreen.BuildCheckAndCompareProposalsWhileKeepingYourLockedSpots": "Build, check, and compare proposals while keeping your locked spots.",
+  "schedulerScreen.GoalForThisWeek": "Goal for this week",
+  "schedulerScreen.LoadTheSavedCrewFixShiftRulesAndReloadRequestsBeforeMakingOrUsingAProp": "! Load the saved crew, fix shift rules, and reload requests before making or using a proposal.",
+  "schedulerScreen.ScheduledHours": "scheduled hours \xB7",
+  "schedulerScreen.HourSpreadGoal": "hour spread \xB7 Goal:",
+  "schedulerScreen.Review": "Review",
+  "schedulerScreen.ChangedSpots": "changed spots",
+  "schedulerScreen.Spot": "Spot",
+  "schedulerScreen.Current": "Current",
+  "schedulerScreen.Proposed": "Proposed",
+  "schedulerScreen.UseProposal": "Use proposal",
+  "schedulerScreen.DismissProposal": "Dismiss proposal",
+  "schedulerScreen.SeeWorkLog": "See work log",
+  "schedulerScreen.CrewChangesApplyToEveryWeekShiftRulesApplyToTheSelectedWeek": "Crew changes apply to every week. Shift rules apply to the selected week.",
+  "schedulerScreen.StaffAndShiftRulesApplyToTheSelectedWeekOnly": "Staff and shift rules apply to the selected week only.",
+  "schedulerScreen.FixTheShiftRulesBelowBeforeSaving": "Fix the shift rules below before saving.",
+  "schedulerScreen.AlreadyUsingTheSavedStaffList": "Already using the saved staff list.",
+  "schedulerScreen.ReplaceThisWeekSStaffListWithTheStationSSavedListYouCanUndoThenSaveToK": "Replace this week\u2019s staff list with the station\u2019s saved list. You can undo, then save to keep it.",
+  "schedulerScreen.EditingTheCrewAndShiftRulesCrewChangesApplyToEveryWeek": "Editing the crew and shift rules. Crew changes apply to every week.",
+  "schedulerScreen.TheCrewAndShiftRulesAreLockedEnterTheStaffPasswordToEditThem": "The crew and shift rules are locked. Enter the staff password to edit them.",
+  "schedulerScreen.Checking": "Checking\u2026",
+  "schedulerScreen.UnlockEditing": "Unlock editing",
+  "schedulerScreen.SaveOrUndoYourUnsavedEditsFirst": "Save or undo your unsaved edits first.",
+  "schedulerScreen.BringBackTheCrewAsItWasBeforeTheLastSave": "Bring back the crew as it was before the last save.",
+  "schedulerScreen.NoSavedCrewChangeToUndo": "No saved crew change to undo.",
+  "schedulerScreen.CloseEmployeeForm": "Close employee form",
+  "schedulerScreen.AddEmployee": "Add employee",
+  "schedulerScreen.SearchByNameOrPosition": "Search by name or position",
+  "schedulerScreen.OffThisWeek": "off this week",
+  "schedulerScreen.Close": "Close",
+  "schedulerScreen.Edit": "Edit",
+  "schedulerScreen.NobodyOnTheListYet": "Nobody on the list yet.",
+  "schedulerScreen.HideAssistant": "Hide assistant",
+  "schedulerScreen.OpenAssistant": "Open assistant",
+  "schedulerScreen.ComparingProposals": "Comparing proposals\u2026",
+  "schedulerScreen.MakeProposal": "Make proposal",
+  "schedulerScreen.Open": "Open",
+  "schedulerScreen.BalanceTheWeek": "Balance the week",
+  "schedulerScreen.ReduceDoubleShifts": "Reduce double shifts",
+  "schedulerScreen.KeepThisDraftFamiliar": "Keep this draft familiar",
+  "schedulerScreen.EvenOutHours": "Even out hours",
+  "schedulerScreen.ProposalDismissedYourScheduleIsUnchanged": "Proposal dismissed. Your schedule is unchanged.",
+  "schedulerScreen.TheAgentCouldNotAcceptThisProposalTryAgain": "The agent could not accept this proposal. Try again.",
+  "schedulerScreen.YourWeekChangedWhileTheProposalWasBeingCheckedMakeANewProposalToKeepTh": "Your week changed while the proposal was being checked. Make a new proposal to keep those changes.",
+  "schedulerScreen.TheProposalNoLongerPassesTheScheduleChecksMakeANewProposal": "The proposal no longer passes the schedule checks. Make a new proposal.",
+  "schedulerScreen.ProposalAddedToYourDraftUseUndoToRestoreThePreviousSchedulePublishWhen": "\u2713 Proposal added to your draft. Use Undo to restore the previous schedule. Publish when you are ready for staff to see it.",
+  "schedulerScreen.ReadyForReview": "\u2713 Ready for review \xB7",
+  "schedulerScreen.NeedsAttention": "! Needs attention \xB7",
+  "schedulerScreen.ChangeStation": "Change station",
+  "schedulerScreen.OpensInANewTab": "(opens in a new tab)",
+  "schedulerScreen.SelectedWeek": "Selected week",
+  "schedulerScreen.DraftForThisVisitReloadingOrClosingThisTabLosesUnsavedChanges": "Draft for this visit. Reloading or closing this tab loses unsaved changes.",
+  "schedulerScreen.NotPublished": "Not published",
+  "schedulerScreen.OtherWeeksWithUnpublishedChanges": "other weeks with unpublished changes",
+  "schedulerScreen.LoadingYourSavedSchedule": "Loading your saved schedule\u2026",
+  "schedulerScreen.CouldNotReachTheServerYourWorkingCopyIsRetainedSavingIsUnavailableUnti": "Could not reach the server. Your working copy is retained. Saving is unavailable until the saved setup loads.",
+  "schedulerScreen.TryAgain": "Try again",
+  "schedulerScreen.StaffOrRuleChangesAreUnsavedTheyStayWhenYouSwitchViews": "Staff or rule changes are unsaved. They stay when you switch views.",
+  "schedulerScreen.NewStationAddYourStaffToBegin": "New station \u2014 add your staff to begin",
+  "schedulerScreen.FixShiftRulesBeforeBuildingOrPublishing": "Fix shift rules before building or publishing.",
+  "schedulerScreen.AddEmployeesInStaffRulesBeforeMakingASchedule": "Add employees in Staff & rules before making a schedule.",
+  "schedulerScreen.GettingStarted": "Getting started",
+  "schedulerScreen.FourStepsToAPublishedSchedule": "Four steps to a published schedule:",
+  "schedulerScreen.DismissGettingStartedTips": "Dismiss getting-started tips",
+  "schedulerScreen.AddEveryoneWorkingThisWeekInEmployeeSettings": "Add everyone working this week in Employee settings",
+  "schedulerScreen.ReviewAnyIssuesShownAboveTheSchedule": "Review any issues shown above the schedule",
+  "schedulerScreen.Show": "Show",
+  "schedulerScreen.Skipped": "skipped",
+  "schedulerScreen.Of": "of",
+  "schedulerScreen.ChooseEmployee": "Choose employee",
+  "schedulerScreen.IgnoreForNow": "Ignore for now",
+  "schedulerScreen.EmptySpotsBlockPrintingSkippingIsTurnedOffSoMissingCoverStaysVisible": "Empty spots block printing. Skipping is turned off so missing cover stays visible.",
+  "schedulerScreen.WhoShouldWork": "Who should work",
+  "schedulerScreen.As": "as",
+  "schedulerScreen.EveryoneHereIsFreeAndTrainedForThisPosition": "Everyone here is free and trained for this position.",
+  "schedulerScreen.Why": "Why",
+  "schedulerScreen.Other": "other",
+  "schedulerScreen.CanTCoverThis": "can't cover this",
+  "schedulerScreen.PreviousMonth": "Previous month",
+  "schedulerScreen.NextMonth": "Next month",
+  "schedulerScreen.ThisMonth": "This month",
+  "schedulerScreen.WeeksInThisMonth": "Weeks in this month",
+  "schedulerScreen.Filled": "filled",
+  "schedulerScreen.Dismiss": "Dismiss",
+  "schedulerScreen.Details": "Details",
+  "schedulerScreen.MakeAScheduleToSeeHowTheHoursLand": "Make a schedule to see how the hours land.",
+  "schedulerScreen.Over": "\xB7 over",
+  "schedulerScreen.H": "h",
+  "schedulerScreen.D": "d \xB7",
+  "schedulerScreen.Shiftdbd79": "shift",
+  "schedulerScreen.NotWorkingThisWeek": "Not working this week:",
+  "schedulerScreen.Live": "Live",
+  "schedulerScreen.Hidden": "Hidden",
+  "schedulerScreen.StaffSeeThisWeek": "Staff see this week",
+  "schedulerScreen.ChangesNotPublishedYet": "Changes not published yet",
+  "schedulerScreen.UnpublishedChanges": "Unpublished changes",
+  "schedulerScreen.PublishedButHiddenFromStaff": "Published but hidden from staff",
+  "schedulerScreen.NotPublishedStaffCannotSeeIt": "Not published \u2014 staff cannot see it",
+  "schedulerScreen.NothingLeftToFix": "Nothing left to fix",
+  "schedulerScreen.ReadyWhenYouAre": "Ready when you are",
+  "schedulerScreen.EverySpotIsFilledAndNobodyIsDoubleBooked": "Every spot is filled and nobody is double-booked.",
+  "schedulerScreen.PressMakeScheduleAnythingThatNeedsADecisionWillShowUpHereOneAtATime": "Press Make schedule. Anything that needs a decision will show up here, one at a time.",
+  "schedulerScreen.MustFixBeforePrinting": "Must fix before printing",
+  "schedulerScreen.YouCanSkipThis": "You can skip this",
+  "schedulerScreen.AnEmptySpotMustBeFilledSkippingWouldHideMissingCover": "An empty spot must be filled \u2014 skipping would hide missing cover.",
+  "schedulerScreen.SkipThisForNow": "Skip this for now.",
+  "schedulerScreen.NobodyOnTheListIsFreeAndTrainedForThisSpotAddSomeoneOrOpenTheShiftBelo": "Nobody on the list is free and trained for this spot. Add someone, or open the shift below to override it.",
+  "schedulerScreen.NobodyOnTheCrewIsFreeAndTrainedForThisSpotOpenTheShiftBelowToMoveSomeo": "Nobody on the crew is free and trained for this spot. Open the shift below to move someone else in.",
+  "schedulerScreen.AddANameToSave": "Add a name to save.",
+  "schedulerScreen.PickAtLeastOnePositionOrMarkThemANewHireToSave": "Pick at least one position, or mark them a new hire, to save.",
+  "schedulerScreen.SaveThisPersonToTheStaffList": "Save this person to the staff list.",
+  "schedulerScreen.AlreadyUsingTheStartingRules": "Already using the starting rules.",
+  "schedulerScreen.ReplaceThisWeekSRulesWithTheStartingRulesYouCanUndoThenSaveToKeepThem": "Replace this week\u2019s rules with the starting rules. You can undo, then save to keep them.",
+  "schedulerScreen.ThisSpot": "this spot",
+  "schedulerScreen.UnsavedChangesUseSaveChangesAbove": "\xB7 unsaved changes \u2014 use Save changes above",
+  "schedulerScreen.AllDays": "All days",
+  "schedulerScreen.Mornings": "Mornings",
+  "schedulerScreen.Dinners": "Dinners",
+  "schedulerScreen.Weekdays": "Weekdays",
+  "schedulerScreen.Weekends": "Weekends",
+  "schedulerScreen.NoAvailabilitySet": "No availability set",
+  "schedulerScreen.AnyDay": "Any day",
+  "schedulerScreen.Mornings77d0a": "mornings",
+  "schedulerScreen.Dinnerscb7b2": "dinners",
+  "schedulerScreen.MixedHours": "mixed hours",
+  "schedulerScreen.Sunday": "Sunday",
+  "schedulerScreen.Monday": "Monday",
+  "schedulerScreen.Tuesday": "Tuesday",
+  "schedulerScreen.Wednesday": "Wednesday",
+  "schedulerScreen.Thursday": "Thursday",
+  "schedulerScreen.Friday": "Friday",
+  "schedulerScreen.Saturday": "Saturday",
+  "schedulerScreen.Sun": "Sun",
+  "schedulerScreen.Mon": "Mon",
+  "schedulerScreen.Tue": "Tue",
+  "schedulerScreen.Wed": "Wed",
+  "schedulerScreen.Thu": "Thu",
+  "schedulerScreen.Fri": "Fri",
+  "schedulerScreen.Sat": "Sat",
+  "schedulerScreen.MaxCountDays": "Max {count} days",
+  "schedulerScreen.MaxHoursH": "Max {hours} h",
+  "schedulerScreen.PriorityRank": "Priority {rank}",
+  "schedulerScreen.SuspendedDates": "Suspended {dates}",
+  "schedulerScreen.OnlyRoles": "Only {roles}",
+  "schedulerScreen.CopiesOnThisDeviceCount": "Copies on this device ({count})",
+  "schedulerScreen.NameThisListCountStaff": "Name this list ({count} staff)",
+  "schedulerScreen.CountStaffSaved": "{count} staff \xB7 {saved}",
+  "schedulerScreen.ReplaceTheStaffListWithNameYouCanUndo": "Replace the staff list with \u201C{name}\u201D. You can undo.",
+  "schedulerScreen.DeleteName": "Delete \u201C{name}\u201D.",
+  "schedulerScreen.FixCountShiftRuleProblemsBeforeSaving": "Fix {count} shift rule problems before saving.",
+  "schedulerScreen.WorkingWorkingInactiveOffTheList": "{working} working, {inactive} off the list",
+  "schedulerScreen.OneCrewForEveryWeekLastSavedSavedDirty": "One crew for every week. Last saved: {saved}{dirty}",
+  "schedulerScreen.LastSavedSavedDirtyChangesStayInThisWeekOnly": "Last saved: {saved}{dirty} \xB7 changes stay in this week only",
+  "schedulerScreen.UnsavedChanges": " \xB7 unsaved changes",
+  "schedulerScreen.SearchCountStaffByNameOrPosition": "Search {count} staff by name or position",
+  "schedulerScreen.HoursHDaysDThisWeek": "{hours}h \xB7 {days}d this week",
+  "schedulerScreen.NameWorking": "{name} working",
+  "schedulerScreen.NobodyMatchesQuery": "Nobody matches \u201C{query}\u201D.",
+  "schedulerScreen.CountToFix": " ({count} to fix)",
+  "schedulerScreen.RemoveNameFromTheStaffList": "Remove {name} from the staff list?",
+  "schedulerScreen.PositionsNameCanWork": "Positions {name} can work",
+  "schedulerScreen.NoPositionsPickedSoNameCannotBeScheduled": "No positions picked, so {name} cannot be scheduled.",
+  "schedulerScreen.1ScheduledFirst": "1 (scheduled first)",
+  "schedulerScreen.5ScheduledLast": "5 (scheduled last)",
+  "schedulerScreen.RankNormal": "{rank} (normal)",
+  "schedulerScreen.OnlyOnePositionOnAShiftCount": "Only one position on a shift{count}",
+  "schedulerScreen.RemoveDayPeriodRule": "Remove {day} {period} rule",
+  "schedulerScreen.ShowWeekOfWeekToStaffWhenPublished": "Show week of {week} to staff when published",
+  "schedulerScreen.TheseCountSpots": "these {count} spots",
+  "schedulerScreen.Requests": "Requests",
+  "schedulerScreen.PublishWeekStationToStaff": "Publish {week}{station} to staff",
+  "schedulerScreen.ForStation": " for {station}",
+  "schedulerScreen.CountFilledSpotsWillBeIncludedStaffSeeItOnTheStaffSchedulePageNoLinksO": "{count} filled spots will be included. Staff see it on the staff schedule page \u2014 no links or codes.",
+  "schedulerScreen.LastPublishedSaved": "Last published: {saved}.",
+  "schedulerScreen.Never": "never",
+  "schedulerScreen.YourUnsavedPartsWillSaveFirst": "Your unsaved {parts} will save first.",
+  "schedulerScreen.And": "and",
+  "schedulerScreen.StaffList": "staff list",
+  "schedulerScreen.ShiftRules65b82": "shift rules",
+  "schedulerScreen.WhatToCallIt": "What to call it",
+  "schedulerScreen.StaffCanSeeThisWeek": "Staff can see this week",
+  "schedulerScreen.On": "On",
+  "schedulerScreen.Publishing": "Publishing\u2026",
+  "schedulerScreen.Publish": "Publish",
+  "schedulerScreen.PublishUpdates": "Publish updates",
+  "schedulerScreen.StaffSeeTheLatestVersion": "Staff see the latest version.",
+  "schedulerScreen.YouHaveChangesStaffCannotSeeYet": "You have changes staff cannot see yet.",
+  "schedulerScreen.NotOnTheServerYetPublishingCreatesIt": "Not on the server yet \u2014 publishing creates it.",
+  "schedulerScreen.FixThesePositionAssignmentsBeforePublishing": "Fix these position assignments before publishing:",
+  "schedulerScreen.MakeAScheduleForThisWeekFirst": "Make a schedule for this week first.",
+  "schedulerScreen.CheckingWhatIsOnTheServer": "Checking what is on the server...",
+  "schedulerScreen.TextMyContacts": "Text my contacts",
+  "schedulerScreen.OpensYourPhoneSMessagingAppWithTheScheduleLinkReadyToSend": "Opens your phone's messaging app with the schedule link ready to send.",
+  "schedulerScreen.CouldNotReachTheServerYouCanStillEditPublishingWillTryAgain": "Could not reach the server. You can still edit \u2014 publishing will try again.",
+  "schedulerScreen.PublishedStaffNowSeeThisWeek": "Published. Staff now see this week.",
+  "schedulerScreen.SavedThisWeekStaysHiddenFromStaffUntilYouTurnItOn": "Saved. This week stays hidden from staff until you turn it on.",
+  "schedulerScreen.ThisWeekIsNotOnTheServerYetPressPublishAgainToCreateIt": "This week is not on the server yet. Press Publish again to create it.",
+  "schedulerScreen.SomeoneElsePublishedThisWeekFirstPressPublishAgainToReplaceItWithYourC": "Someone else published this week first. Press Publish again to replace it with your copy.",
+  "schedulerScreen.DoublesAllowed": "Doubles allowed",
+  "schedulerScreen.OriginalEnglish": "Original English",
+  "schedulerScreen.ThisEmployeeIsNotQualifiedForThisPosition": "This employee is not qualified for this position.",
+  "schedulerScreen.NobodyIsFreeAndTrainedForThisPositionReviewAvailabilityOrAddQualifiedS": "Nobody is free and trained for this position. Review availability or add qualified staff.",
+  "schedulerScreen.ThereIsNotEnoughAvailableStaffToCoverThisShiftReviewStaffAvailabilityA": "There is not enough available staff to cover this shift. Review staff availability and required positions.",
+  "schedulerScreen.ReviewKeptPlacementsAgainstAvailabilityAndEmployeeRules": "Review kept placements against availability and employee rules.",
+  "schedulerScreen.ReviewStaffAvailabilityPositionsAndWeeklyLimitsBeforeRebuilding": "Review staff availability, positions, and weekly limits before rebuilding.",
+  "schedulerScreen.PickSomeoneForThisSpotOrAddANewEmployeeWithTheRightRoleAndAvailability": "Pick someone for this spot, or add a new employee with the right role and availability.",
+  "schedulerScreen.PickSomeoneFreeThenCheckAvailabilityInTheStaffList": "Pick someone free then \u2014 check availability in the staff list.",
+  "schedulerScreen.PickSomeoneTrainedForThisPositionOrAddTheRoleToThemInTheStaffList": "Pick someone trained for this position, or add the role to them in the staff list.",
+  "schedulerScreen.TurnThemBackOnInTheStaffListOrPickSomeoneElse": "Turn them back on in the staff list, or pick someone else.",
+  "schedulerScreen.MoveOneOfTheTwoShiftsToSomeoneElseIfTheOverlapComesFromShiftTimesLikeT": "Move one of the two shifts to someone else. If the overlap comes from shift times (like the Friday manager starting at 3pm while mornings end at 4pm), adjusting the times in the rules fixes it for everyone.",
+  "schedulerScreen.MoveAShiftToSomeoneElseOrRaiseTheWeeklyDayLimitInTheStaffList": "Move a shift to someone else, or raise the weekly day limit in the staff list.",
+  "schedulerScreen.MoveAShiftToSomeoneElseOrRaiseTheWeeklyShiftLimitInTheStaffList": "Move a shift to someone else, or raise the weekly shift limit in the staff list.",
+  "schedulerScreen.MoveAShiftToSomeoneElseOrRaiseTheWeeklyHourLimitInTheStaffList": "Move a shift to someone else, or raise the weekly hour limit in the staff list.",
+  "schedulerScreen.GiveOneOfTheTwoShiftsToSomeoneElseOrAllowDoublesForThemInTheStaffList": "Give one of the two shifts to someone else, or allow doubles for them in the staff list.",
+  "schedulerScreen.GiveOneOfTheirDoubleShiftsToSomeoneElseOrRaiseTheirDoubleLimitInTheSta": "Give one of their double shifts to someone else, or raise their double limit in the staff list.",
+  "schedulerScreen.TheseTwoShouldNotWorkTheSameShiftMoveOneOfThem": "These two should not work the same shift. Move one of them.",
+  "schedulerScreen.ASpotYouMarkedKeepChangedConfirmItStillWorks": "A spot you marked Keep changed. Confirm it still works.",
+  "schedulerScreen.AddAvailabilityAddStaffOrLoosenALimitThenMakeTheScheduleAgain": "Add availability, add staff, or loosen a limit \u2014 then make the schedule again.",
+  "schedulerScreen.ReleaseTheKeepMarkOrFixThatPersonSAvailabilityRoleOrLimits": "Release the Keep mark, or fix that person\u2019s availability, role, or limits.",
+  "schedulerScreen.AddSomeoneWithThatRoleAndAvailabilityOrTurnAnInactivePersonBackOn": "Add someone with that role and availability, or turn an inactive person back on.",
+  "schedulerScreen.AddStaffOrAvailabilityForThatShiftOrRemoveASpotFromTheRules": "Add staff or availability for that shift, or remove a spot from the rules.",
+  "schedulerScreen.NobodyOnTheListCanCoverThisAddSomeoneOrTurnAnInactivePersonBackOn": "Nobody on the list can cover this. Add someone, or turn an inactive person back on.",
+  "schedulerScreen.NotTrained": "not trained",
+  "schedulerScreen.Suspended": "suspended",
+  "schedulerScreen.NotFree": "not free",
+  "schedulerScreen.OverLimit": "over limit",
+  "schedulerScreen.DoubleThatDay": "double that day",
+  "schedulerScreen.AlreadyWorkingThen": "already working then",
+  "schedulerScreen.NotWithTeammate": "not with teammate",
+  "schedulerScreen.BreaksARule": "breaks a rule",
+  "schedulerScreen.AnyDayAnyShift": "Any day, any shift",
+  "schedulerScreen.MorningShifts": "Morning shifts",
+  "schedulerScreen.DinnerShifts": "Dinner shifts",
+  "schedulerScreen.Midday127": "Midday 12-7",
+  "schedulerScreen.Evening47": "Evening 4-7",
+  "schedulerScreen.WeekdayDinnerShifts": "Weekday dinner shifts",
+  "schedulerScreen.SaturdayAndSunday": "Saturday and Sunday",
+  "schedulerScreen.GenerationResult": "Generation result",
+  "schedulerScreen.CoveredPositionsCount": "Covered positions: {count}",
+  "schedulerScreen.ReviewTheOriginalGenerationNotesBelowForAdditionalDetails": "Review the original generation notes below for additional details.",
+  "schedulerScreen.DateSpotNumberReviewTheLabelPositionAndStartEndTimes": "{date}, spot {number}: review the label, position and start/end times.",
+  "schedulerScreen.UnlockStaffRulesBeforeSavingCrewOrRuleChanges": "Unlock Staff & rules before saving crew or rule changes."
+};
+
+// ../src/lib/internal-tools/i18n/schedule-shell.ts
+var scheduleShellEnglish = {
+  "scheduleShell.pickStation": "Choose a station",
+  "scheduleShell.stationHelp": "Each station keeps its own staff, rules and published weeks.",
+  "scheduleShell.staffView": "View staff schedules",
+  "scheduleShell.newTab": "opens in a new tab",
+  "scheduleShell.unlock": "Open scheduling",
+  "scheduleShell.CR3-diningroom": "CR3 Dining Room",
+  "scheduleShell.CR3-kitchen": "CR3 Kitchen",
+  "scheduleShell.CR2-kitchen": "CR2 Kitchen",
+  "scheduleShell.CR2-diningroom": "CR2 Dining Room",
+  "shell.context.schedule": "Choose a station and week in Schedule.",
+  "shell.help.schedule": "Build or copy a week, then use the shift panel to assign staff and fix gaps. Staff & rules and Requests keep their edits while you switch views. Drafts last for this visit; publish explicitly when the week is ready for staff."
+};
+
+// ../src/lib/internal-tools/i18n/forms-entry.ts
+var formsEnglish = {
+  "formsEntry.originalDeclaration": "Original form wording (English)",
+  "formsEntry.jump": "Jump to section",
+  "formsEntry.required": "Required",
+  "formsEntry.optional": "Optional",
+  "formsEntry.notProvided": "Not provided",
+  "formsEntry.editSection": "Edit {section}",
+  "formsEntry.choose": "Select\u2026",
+  "formsEntry.recordedSignature": "Signature/name fields contain recorded text. Print for any required handwritten signatures.",
+  "formsEntry.requiredError": "Enter this required field.",
+  "formsEntry.dateError": "Enter a valid calendar date.",
+  "formsEntry.timeError": "Enter a valid time.",
+  "formsEntry.moneyError": "Enter a nonnegative amount with up to seven digits and two decimal places.",
+  "formsEntry.lengthError": "Use no more than {max} characters.",
+  "formsEntry.choiceError": "Choose an available option.",
+  "formsEntry.valueError": "Check this value.",
+  "formsEntry.formError": "This form contains unsupported fields or values. Keep the draft and review its recovery copy.",
+  "formsEntry.context": "Form details",
+  "formsEntry.store": "Store",
+  "formsEntry.date": "Form date",
+  "formsEntry.preparedBy": "Prepared by",
+  "formsEntry.section.writeup-details": "Employee and manager",
+  "formsEntry.section.writeup-actions": "Violations and corrective actions",
+  "formsEntry.section.writeup-incident": "Incident details",
+  "formsEntry.section.writeup-correction": "Expected correction",
+  "formsEntry.section.writeup-comments": "Employee comments",
+  "formsEntry.section.writeup-signatures": "Signature/name fields",
+  "formsEntry.section.customer-complaint-0": "Complaint details",
+  "formsEntry.section.customer-complaint-1": "Customer service",
+  "formsEntry.section.customer-complaint-2": "Food quality",
+  "formsEntry.section.customer-complaint-3": "Food quantity and other concerns",
+  "formsEntry.section.customer-complaint-4": "Follow-up",
+  "formsEntry.section.pay-rate-increase-0": "Employee details",
+  "formsEntry.section.pay-rate-increase-1": "Proposed increase",
+  "formsEntry.section.pay-rate-increase-2": "Manager and office review",
+  "formsEntry.section.payroll-change-request-0": "Employee and pay period",
+  "formsEntry.section.payroll-change-request-1": "Payroll discrepancy",
+  "formsEntry.section.payroll-change-request-2": "Change information on payroll",
+  "formsEntry.section.payroll-change-request-3": "Signatures and approvals",
+  "formsEntry.section.injury-report-0": "Injured person",
+  "formsEntry.section.injury-report-1": "Incident and first response",
+  "formsEntry.section.injury-report-2": "Witnesses and evidence",
+  "formsEntry.section.injury-report-3": "Report",
+  "formsEntry.field.write-up.date": "Date",
+  "formsEntry.field.write-up.employee": "Employee",
+  "formsEntry.field.write-up.manager": "Manager / supervisor",
+  "formsEntry.field.write-up.violations": "Violations",
+  "formsEntry.field.write-up.otherSpecify": "Other violation: specify",
+  "formsEntry.field.write-up.actions": "Corrective actions",
+  "formsEntry.field.write-up.incident": "Incident Descriptions",
+  "formsEntry.field.write-up.incidentCont": "Incident Descriptions (Cont'd)",
+  "formsEntry.field.write-up.expected": "Expected Correction Action(s) from Manager / Supervisor",
+  "formsEntry.field.write-up.employeeComments": "Employee Comments",
+  "formsEntry.field.write-up.employeeSignature": "Employee Signature",
+  "formsEntry.field.write-up.employeeSignedDate": "Employee signed date",
+  "formsEntry.field.write-up.managerSignature": "Manager Signature",
+  "formsEntry.field.write-up.managerSignedDate": "Manager signed date",
+  "formsEntry.field.shift": "Shift of complaint",
+  "formsEntry.field.customer": "Customer name",
+  "formsEntry.field.service": "Customer service concerns",
+  "formsEntry.field.quality": "Food quality concerns",
+  "formsEntry.field.quantity": "Food quantity concerns",
+  "formsEntry.field.other": "Other concerns",
+  "formsEntry.field.comments": "Additional comments",
+  "formsEntry.field.resolution": "Action taken / resolution",
+  "formsEntry.field.managerDate": "Manager date",
+  "formsEntry.field.employee": "Employee name",
+  "formsEntry.field.employeeNumber": "Employee number",
+  "formsEntry.field.department": "Department",
+  "formsEntry.field.position": "Position",
+  "formsEntry.field.presentRate": "Present rate ($)",
+  "formsEntry.field.proposedRate": "Increase to ($)",
+  "formsEntry.field.payBasis": "Pay basis",
+  "formsEntry.field.raiseDate": "Date of raise",
+  "formsEntry.field.effectiveDate": "Effective date",
+  "formsEntry.field.reason": "Reason / performance review",
+  "formsEntry.field.approvedBy": "Approved by",
+  "formsEntry.field.denialReason": "Application denied for the following reasons",
+  "formsEntry.field.company": "Company",
+  "formsEntry.field.periodEnd": "Pay period ending date",
+  "formsEntry.field.hoursShort": "Hours short",
+  "formsEntry.field.payShort": "Pay short ($)",
+  "formsEntry.field.otherDiscrepancy": "Other discrepancy",
+  "formsEntry.field.explanation": "Explanation",
+  "formsEntry.field.nameChange": "Name change",
+  "formsEntry.field.addressChange": "Address change",
+  "formsEntry.field.taxChange": "Tax withholding change",
+  "formsEntry.field.otherChange": "Other change",
+  "formsEntry.field.employeeSignature": "Employee signature / name",
+  "formsEntry.field.signedDate": "Employee signed date",
+  "formsEntry.field.officeApproved": "Office approved",
+  "formsEntry.field.personType": "Injured person type",
+  "formsEntry.field.phone": "Contact phone",
+  "formsEntry.field.address": "Address",
+  "formsEntry.field.incidentDate": "Date of incident",
+  "formsEntry.field.incidentTime": "Time of incident",
+  "formsEntry.field.firstResponse": "First reaction to incident",
+  "formsEntry.field.emergencyResponse": "Emergency services contacted",
+  "formsEntry.field.referenceNumber": "911 reference number",
+  "formsEntry.field.paramedic": "Name of paramedic",
+  "formsEntry.field.policeCase": "Police case number",
+  "formsEntry.field.officer": "Name of officer",
+  "formsEntry.field.locationType": "Location of incident",
+  "formsEntry.field.location": "Where did the incident happen?",
+  "formsEntry.field.witness1": "First witness name",
+  "formsEntry.field.witness1Phone": "First witness phone",
+  "formsEntry.field.witness1Address": "First witness address",
+  "formsEntry.field.witness2": "Second witness name",
+  "formsEntry.field.witness2Phone": "Second witness phone",
+  "formsEntry.field.witness2Address": "Second witness address",
+  "formsEntry.field.evidence": "Evidence and where it is kept",
+  "formsEntry.field.description": "Describe the incident",
+  "formsEntry.field.reportedBy": "Report filled by",
+  "formsEntry.field.reportDate": "Report date",
+  "formsEntry.field.injury-report.employee": "Injured person name",
+  "formsEntry.field.customer-complaint.manager": "Shift manager name",
+  "formsEntry.field.pay-rate-increase.manager": "Store manager",
+  "formsEntry.field.payroll-change-request.manager": "Manager approved",
+  "formsEntry.field.injury-report.manager": "Manager on duty",
+  "formsEntry.option.AM": "AM",
+  "formsEntry.option.PM": "PM",
+  "formsEntry.option.Incorrect credit card charges": "Incorrect credit card charges",
+  "formsEntry.option.Rude food server": "Rude food server",
+  "formsEntry.option.Rude cashier": "Rude cashier",
+  "formsEntry.option.Rude shift leader / manager": "Rude shift leader / manager",
+  "formsEntry.option.Too salty": "Too salty",
+  "formsEntry.option.Strange taste": "Strange taste",
+  "formsEntry.option.Too much sauce": "Too much sauce",
+  "formsEntry.option.Sauce not enough": "Sauce not enough",
+  "formsEntry.option.Meat too tough": "Meat too tough",
+  "formsEntry.option.Meat not done": "Meat not done",
+  "formsEntry.option.Rice too hard": "Rice too hard",
+  "formsEntry.option.Rice burnt": "Rice burnt",
+  "formsEntry.option.Rice raw": "Rice raw",
+  "formsEntry.option.Rice cold": "Rice cold",
+  "formsEntry.option.Meat cold": "Meat cold",
+  "formsEntry.option.Meat not enough": "Meat not enough",
+  "formsEntry.option.Vegetables not enough": "Vegetables not enough",
+  "formsEntry.option.Rice not enough": "Rice not enough",
+  "formsEntry.option.Table / chair dirty": "Table / chair dirty",
+  "formsEntry.option.Floor dirty": "Floor dirty",
+  "formsEntry.option.Restroom smells / messy": "Restroom smells / messy",
+  "formsEntry.option.Dining room too hot": "Dining room too hot",
+  "formsEntry.option.Dining room dirty": "Dining room dirty",
+  "formsEntry.option.Other": "Other",
+  "formsEntry.option.Hourly": "Hourly",
+  "formsEntry.option.Salary": "Salary",
+  "formsEntry.option.Employee": "Employee",
+  "formsEntry.option.Customer": "Customer",
+  "formsEntry.option.Called 911": "Called 911",
+  "formsEntry.option.Called police": "Called police",
+  "formsEntry.option.Inside the store": "Inside the store",
+  "formsEntry.option.Outside the store": "Outside the store",
+  "formsEntry.option.attendance": "Attendance",
+  "formsEntry.option.job-performance": "Job performance",
+  "formsEntry.option.conduct": "Conduct / behavior",
+  "formsEntry.option.company-policy": "Company policy",
+  "formsEntry.option.others": "Other violations",
+  "formsEntry.option.verbal": "Verbal",
+  "formsEntry.option.written": "Written",
+  "formsEntry.option.suspension": "Suspension",
+  "formsEntry.option.termination": "Termination"
+};
+
+// ../src/lib/internal-tools/i18n/forms-drafts.ts
+var formsDraftEnglish = {
+  "formsDrafts.title": "Drafts on this device",
+  "formsDrafts.deviceOnly": "These drafts are stored on this device. Resume as a copy keeps the original draft.",
+  "formsDrafts.search": "Search person, preparer or store",
+  "formsDrafts.type": "Draft form type",
+  "formsDrafts.allTypes": "All form types",
+  "formsDrafts.store": "Draft store",
+  "formsDrafts.allStores": "All stores",
+  "formsDrafts.from": "Drafts from date",
+  "formsDrafts.to": "Drafts to date",
+  "formsDrafts.refresh": "Refresh drafts",
+  "formsDrafts.clear": "Clear draft filters",
+  "formsDrafts.empty": "No unfinished form drafts on this device.",
+  "formsDrafts.noMatches": "No unfinished drafts match these filters.",
+  "formsDrafts.unavailable": "Device draft storage could not be read completely. Any displayed drafts came from the readable part; retry or keep your current work open.",
+  "formsDrafts.count": "Showing {shown} of {total} unfinished drafts",
+  "formsDrafts.person": "Person: {person}",
+  "formsDrafts.noPerson": "No person entered",
+  "formsDrafts.preparer": "Preparer: {preparer}",
+  "formsDrafts.updated": "Saved on this device {time}",
+  "formsDrafts.resume": "Resume as a copy",
+  "formsDrafts.savedCopies": "Already-saved copies on this device ({count})",
+  "formsDrafts.savedCopy": "This draft was saved as record {id}. Resuming does not save another record automatically.",
+  "formsDrafts.recovery": "Form draft recovery sources ({count})",
+  "formsDrafts.unreadable": "This form draft cannot be resumed. Its original bytes are preserved and can be downloaded.",
+  "formsDrafts.unknownType": "Unknown form type",
+  "formsDrafts.download": "Download original source",
+  "formsDrafts.upgraded": "This older draft can be resumed as a copy. Its original bytes stay unchanged."
+};
+
+// ../src/lib/internal-tools/i18n/forms-workspace.ts
+var formsWorkspaceEnglish = {
+  "formsWorkspace.new": "New form",
+  "formsWorkspace.refresh": "Refresh saved forms",
+  "formsWorkspace.alreadySaved": "This draft was already saved. Editing as a new form creates a separate record; the saved original stays unchanged.",
+  "formsWorkspace.navigation": "Forms views",
+  "formsWorkspace.saved": "Saved forms",
+  "formsWorkspace.drafts": "Drafts",
+  "formsWorkspace.blank": "Blank forms",
+  "formsWorkspace.active": "{type} \xB7 {store} \xB7 {date} is open on this device.",
+  "formsWorkspace.returnDraft": "Return to draft",
+  "formsWorkspace.record": "Saved form",
+  "formsWorkspace.choose": "What do you need to record?",
+  "formsWorkspace.purpose.write-up": "Document employee conduct, performance or corrective action.",
+  "formsWorkspace.purpose.injury-report": "Record an injury and the response.",
+  "formsWorkspace.purpose.customer-complaint": "Record a customer concern and action taken.",
+  "formsWorkspace.purpose.payroll-change-request": "Record a payroll discrepancy or requested change.",
+  "formsWorkspace.purpose.pay-rate-increase": "Record a proposed pay increase for review.",
+  "formsWorkspace.back": "Back to saved forms",
+  "formsWorkspace.deleteForm": "Delete form",
+  "formsWorkspace.edit": "Enter answers",
+  "formsWorkspace.review": "Review answers",
+  "formsWorkspace.reviewAction": "Review form",
+  "formsWorkspace.save": "Save form",
+  "formsWorkspace.editAnswers": "Edit answers",
+  "formsWorkspace.editNew": "Edit as a new form",
+  "formsWorkspace.requiredHelp": "Required fields are marked. Optional answers can be left blank.",
+  "formsWorkspace.immutable": "Once saved, the form contents cannot be edited. Managers can change its label or separately delete the saved form. Print for any required handwritten signatures; typed names do not confirm a signature or approval.",
+  "formsWorkspace.saveConfirmed": "Saved. The existing form fields were accepted.",
+  "formsWorkspace.savedReadFailed": "Saved, but the saved copy could not be loaded. Retry loading the saved form; do not submit it again.",
+  "formsWorkspace.retryRecord": "Retry loading saved form",
+  "formsWorkspace.unconfirmed": "Save was not confirmed. Your draft is retained. Check saved forms before trying to save again; another attempt may create a separate record.",
+  "formsWorkspace.notFound": "That saved form was not found. It may have been deleted. Return to saved forms and refresh.",
+  "formsWorkspace.rejected": "The form was rejected. Check required fields, dates, amounts and text lengths, then try again.",
+  "formsWorkspace.unknownField": "Check this form before continuing.",
+  "formsWorkspace.tooLarge": "This form is too large. Shorten the text and try again.",
+  "formsWorkspace.label": "Label",
+  "formsWorkspace.labelHelp": "Managers only; not part of the form.",
+  "formsWorkspace.saveLabel": "Save label",
+  "formsWorkspace.labelSaved": "Label saved.",
+  "formsWorkspace.savedTime": "Saved {time}",
+  "formsWorkspace.labelTime": "Label updated {time}",
+  "formsWorkspace.deleted": "Form deleted.",
+  "formsWorkspace.storeUnavailable": "Store metadata is unavailable for this saved write-up. No store is inferred from device drafts.",
+  "formsWorkspace.blankHelp": "PDFs open in the browser. Excel and Word files download. These are the original blank paper forms.",
+  "formsWorkspace.blank.0": "Hiring application",
+  "formsWorkspace.blank.1": "New hire packet",
+  "formsWorkspace.blank.2": "Payroll change request",
+  "formsWorkspace.blank.3": "Pay rate increase application",
+  "formsWorkspace.blank.4": "Paycheck deduction approval (drawer short)",
+  "formsWorkspace.blank.5": "Employee write-up (corrective action)",
+  "formsWorkspace.blank.6": "Injury report",
+  "formsWorkspace.blank.7": "Customer complaint form",
+  "formsWorkspace.blank.8": "Daily cash difference record",
+  "formsWorkspace.blank.9": "CR3 inventory list",
+  "formsWorkspace.blank.10": "CR3 daily preparation list"
+};
+
 // ../src/lib/internal-tools/i18n/planning.ts
 var planningEnglish = {
+  "schedulerPlanning.restoreShift": "Restore generated shift",
+  "schedulerPlanning.fixes": "{count} to fix",
+  "schedulerPlanning.mustFix": "Must fix before printing",
+  "schedulerPlanning.canSkip": "You can skip this warning",
+  "schedulerPlanning.chooseEmployee": "Choose employee",
+  "schedulerPlanning.ignore": "Ignore for now",
+  "schedulerPlanning.noCandidates": "Nobody is free and trained for this spot. Review employee rules or choose a different assignment.",
+  "schedulerPlanning.excludedCandidates": "Why {count} others cannot cover this",
+  "schedulerPlanning.noFixes": "No remaining issues to review.",
+  "schedulerPlanning.showSkipped": "Show {count} skipped",
+  "schedulerPlanning.generationReport": "Generation report",
+  "schedulerPlanning.dismiss": "Dismiss",
+  "schedulerPlanning.generatedChanges": "Changes since generation ({count})",
   "planning.lockPlacement": "Lock assignment",
   "planning.unlockPlacement": "Unlock assignment",
   "planning.remove": "Remove from this shift",
@@ -960,14 +1598,14 @@ var planningEnglish = {
   "planning.auto": "Auto-adjust",
   "planning.autoHelp": "Keep your placements. Adjust the rest.",
   "planning.adjust": "Adjust schedule",
-  "planning.make": "Make schedule",
+  "planning.make": "Build week",
   "planning.publish": "Publish to staff",
   "planning.undo": "Undo",
   "planning.busy": "Adjusting the week\u2026",
   "planning.covered": "{filled}/{required} required spots covered \xB7 {kept} kept",
   "planning.more": "More actions",
   "planning.print": "Print",
-  "planning.copy": "Copy last week",
+  "planning.copy": "Copy previous week",
   "planning.clear": "Clear week",
   "planning.clearConfirm": "Clear this week\u2019s assignments?",
   "planning.cancel": "Cancel",
@@ -1041,7 +1679,7 @@ var hoursEnglish = {
   "hours.edit": "Hours for",
   "hours.button": "Hours",
   "hours.title": "Restaurant hours",
-  "hours.scope": "Applies to dining and kitchen at {store}. Each station is reviewed and published separately.",
+  "hours.scope": "Applies to dining and kitchen at {store}.",
   "hours.normal": "Normal hours",
   "hours.closed": "Closed all day",
   "hours.early": "Close early",
@@ -1058,11 +1696,37 @@ var hoursEnglish = {
   "hours.keep": "Keep",
   "hours.unassigned": "Unassigned",
   "hours.removed": "Assignments removed: {count}. Includes {kept} kept assignments. Other assignments are unchanged.",
-  "hours.apply": "Save hours & update this draft",
+  "hours.apply": "Apply",
   "hours.applying": "Saving\u2026",
   "hours.cancel": "Cancel",
   "hours.retry": "Retry same save",
   "hours.reload": "Reload latest",
+  "hours.setHours": "Set hours",
+  "hours.moreDays": "Apply to more days",
+  "hours.allWeek": "All week",
+  "hours.clearDates": "Clear selection",
+  "hours.selectDate": "Select {date} for hours",
+  "hours.selectedDates": "{count} dates selected",
+  "hours.applyDays": "Apply to {count} days",
+  "hours.changeLabels": "Change labels",
+  "hours.retryRemaining": "Retry remaining dates",
+  "hours.confirmed": "Saved",
+  "hours.notConfirmed": "Not confirmed",
+  "hours.batchPartial": "{count} of {total} dates saved. This draft has not been updated.",
+  "hours.batchUpdated": "Hours applied to {count} dates. {removed}",
+  "hours.resetCleanup": "Uses the new closing time for {count} dates with custom cleanup finishes.",
+  "hours.reloaded": "Latest hours loaded. Review your choices and Apply.",
+  "hours.finishFirst": "Apply or cancel your hours changes before switching views or dates.",
+  "hours.bulkCleanup": "Existing cleanup times stay when hours are unchanged. Changed hours use the closing-time defaults. Adjust cleanup for individual dates as needed.",
+  "hours.options": "More options",
+  "hours.finishOptions": "Employee finish times",
+  "hours.finishHelp": "Keep a later finish for cleanup, up to the normal shift end.",
+  "hours.effect.normal": "Uses normal shift times. Removed assignments are not restored automatically.",
+  "hours.effect.closed": "Removes shifts from the selected dates in this draft.",
+  "hours.effect.early": "Shortens shifts that run past closing and removes later shifts. More options allows cleanup time.",
+  "hours.customFinishes": "Custom employee finish times are set in More options.",
+  "hours.removeSummary": "Removes {count} assigned shifts, including {kept} marked Keep.",
+  "hours.publishHelp": "Saving updates this draft. Publish each station when ready to update staff schedules.",
   "hours.saved": "Hours saved. Review the draft and publish when ready.",
   "hours.undo": "Undo restores this draft. Saved restaurant hours remain and may need review again.",
   "hours.pending": "Restaurant hours need review before making, adjusting or publishing this week.",
@@ -1078,7 +1742,11 @@ var hoursEnglish = {
   "hours.unavailable": "Special hours could not be checked. Reload before making, adjusting or publishing a schedule.",
   "hours.unconfigured": "Special hours are not available on this server yet.",
   "hours.loading": "Checking restaurant hours\u2026",
-  "hours.locked": "Unlock this station\u2019s staff editing in Staff & rules before updating its hours review.",
+  "hours.locked": "Enter the staff password here to edit hours.",
+  "hours.password": "Staff password",
+  "hours.unlock": "Unlock hours",
+  "hours.checkingPassword": "Checking\u2026",
+  "hours.unlockFailed": "Could not unlock editing. Try again.",
   "hours.invalid": "Choose a valid closing time and finish time for every affected shift.",
   "hours.unauthorized": "Your access could not be confirmed. Reopen the scheduler with the current manager code.",
   "hours.updated": "Draft updated for {date}. {removed}",
@@ -1087,16 +1755,142 @@ var hoursEnglish = {
   "hours.allClosed": "The restaurant is closed every day this week."
 };
 
+// ../src/lib/internal-tools/i18n/files.ts
+var filesEnglish = {
+  "shell.files": "Files",
+  "files.title": "Files",
+  "files.filters": "Filter files",
+  "files.search": "Search by name",
+  "files.store": "Store",
+  "files.bothStores": "CR2 + CR3",
+  "files.label": "Label",
+  "files.anyLabel": "Any label",
+  "files.showTrash": "Show trash",
+  "files.upload": "Upload file",
+  "files.uploadTitle": "Upload a file",
+  "files.allowed": "Excel, CSV, PDF, Word or photos, up to {size}. Company files only; no ID, bank or medical documents.",
+  "files.file": "File",
+  "files.chooseStore": "Choose a store",
+  "files.folder": "Folder",
+  "files.folderHint": "e.g. Ordering/Suppliers",
+  "files.labels": "Labels",
+  "files.labelsHint": "Separate with commas",
+  "files.yourName": "Your name",
+  "files.uploadSubmit": "Upload",
+  "files.uploading": "Uploading\u2026",
+  "files.uploaded": "Saved to Files.",
+  "files.replaced": "New version saved.",
+  "files.changed": "File details saved.",
+  "files.trashed": "Moved to trash.",
+  "files.restored": "Restored from trash.",
+  "files.undo": "Undo",
+  "files.retry": "Retry same upload",
+  "files.folders": "Folders",
+  "files.allFolders": "All folders",
+  "files.topLevel": "Top level",
+  "files.caption": "Files",
+  "files.trashCaption": "Files in trash",
+  "files.name": "Name",
+  "files.updated": "Updated",
+  "files.addedBy": "Added by",
+  "files.entered": "{name} (entered)",
+  "files.more": "Load more",
+  "files.empty": "No files here yet.",
+  "files.close": "Close",
+  "files.noLabels": "No labels",
+  "files.inTrash": "In trash",
+  "files.download": "Download",
+  "files.replace": "Replace with a new version",
+  "files.edit": "Rename, move or relabel",
+  "files.trash": "Move to trash",
+  "files.restore": "Restore",
+  "files.save": "Save details",
+  "files.cancel": "Cancel",
+  "files.versions": "Versions",
+  "files.current": "current",
+  "files.downloadVersion": "Download this version",
+  "files.activity": "Activity",
+  "files.conflict": "Someone saved a newer version first.",
+  "files.conflictTitle": "Changed since you downloaded it.",
+  "files.conflictBody": "Download the latest version to compare, or upload yours as a new version anyway. Nothing is lost either way.",
+  "files.downloadLatest": "Download latest",
+  "files.uploadAnyway": "Upload as new version anyway",
+  "files.badType": "That file type is not allowed. Use Excel, CSV, PDF, Word or a photo.",
+  "files.tooLarge": "That file is over 25 MB.",
+  "files.incomplete": "Choose a file and store, and enter your name. Folders and labels use up to 40 characters each.",
+  "files.nameFirst": "Enter your name first.",
+  "files.unconfigured": "File storage isn\u2019t set up yet. Nothing has been uploaded.",
+  "files.noneLinked": "No files linked yet.",
+  "files.saveSource": "Save {name} to Files",
+  "files.importSources": "Source files",
+  "files.action.upload": "Uploaded",
+  "files.action.replace": "New version",
+  "files.action.update": "Details changed",
+  "files.action.trash": "Moved to trash",
+  "files.action.restore": "Restored",
+  "files.error.unauthorized": "Unlock with the manager code to use Files.",
+  "files.error.backend_unconfigured": "File storage isn\u2019t set up yet. Nothing has been uploaded.",
+  "files.error.conflict": "Someone saved a newer version first.",
+  "files.error.invalid": "The server refused that file or its details.",
+  "files.error.unavailable": "Could not reach file storage. Your file was not confirmed; try again."
+};
+
 // ../src/lib/internal-tools/i18n/en.ts
 var en = {
+  ...schedulerScreenEnglish,
+  ...scheduleShellEnglish,
   ...hoursEnglish,
+  ...filesEnglish,
+  ...formsEnglish,
+  ...formsDraftEnglish,
+  ...formsWorkspaceEnglish,
+  "inventoryViews.unknownIds": "Unknown / removed IDs",
+  "inventoryViews.workingCatalog": "Labels: working count\u2019s captured catalog, revision {revision}. Earlier server catalog versions are unavailable; columns join by item ID.",
+  "inventoryViews.unavailableLabels": "The current shared catalog could not be loaded. Saved fields are shown by raw item ID unless a matching-date device catalog is available.",
+  "inventoryViews.navigation": "Inventory views",
+  "inventoryViews.count": "Count",
+  "inventoryViews.orders": "Order checklist",
+  "inventoryViews.catalog": "Catalog",
+  "inventoryViews.history": "History",
+  "inventoryViews.printFull": "Print full report",
+  "inventoryViews.printChecklist": "Print checklist",
+  "inventoryViews.printSaved": "Print saved report",
+  "inventoryViews.manual": "Marked ordered is a manual checklist indication. Checking or saving does not send an order to a supplier.",
+  "inventoryViews.checklistSupplier": "Checklist supplier",
+  "inventoryViews.overrideLabel": "order override",
+  "inventoryViews.sharedCatalog": "Current shared catalog \xB7 revision {revision}",
+  "inventoryViews.editCatalog": "Edit catalog",
+  "inventoryViews.noDifferences": "No item differences from the captured catalog.",
+  "inventoryViews.historyHelp": "Saved-day lookup is read-only and separate from your working count. The lookup covers 14 calendar dates, including its end date.",
+  "inventoryViews.historyEnd": "History end date",
+  "inventoryViews.loadDays": "Load saved days",
+  "inventoryViews.loadingHistory": "Loading saved days\u2026",
+  "inventoryViews.historyFailed": "Saved days could not be loaded. Any displayed results still belong to their original window. Retry loading.",
+  "inventoryViews.window": "Saved days \xB7 {from} \u2013 {to}",
+  "inventoryViews.stale": "The lookup date changed. Displayed results still belong to the window above; load saved days to refresh.",
+  "inventoryViews.empty": "No saved days in this window.",
+  "inventoryViews.savedTime": "Saved {time}",
+  "inventoryViews.savedRecord": "Saved count \xB7 {date}",
+  "inventoryViews.compare": "Compare with working count",
+  "inventoryViews.comparisonHelp": "Working values use this count\u2019s captured catalog. Earlier columns are saved server fields from the working date\u2019s baseline history; browsing another window does not change them. Missing IDs appear as raw IDs.",
+  "inventoryViews.workingSaved": "Working count \xB7 saved count & checklist fields",
+  "inventoryViews.workingDraft": "Working count \xB7 draft on this device",
+  "inventoryViews.deviceLabels": "Labels: validated matching-date device catalog, revision {revision}.",
+  "inventoryViews.currentLabels": "Labels: current shared catalog.",
+  "inventoryViews.noHistoricalCatalog": "The server\u2019s historical catalog version is unavailable. Labels are joined by item ID only; local unsaved counts and skips are never substituted.",
+  "inventoryViews.item": "Item",
+  "inventoryViews.savedInv": "Saved on hand",
+  "inventoryViews.savedOrder": "Saved order",
+  "inventoryViews.yes": "Yes",
+  "inventoryViews.no": "No",
+  "inventoryViews.savedColumn": "Saved server fields",
   "inventoryCount.date": "Count date",
-  "inventoryCount.save": "Save count",
+  "inventoryCount.save": "Save count & checklist",
   "inventoryCount.clear": "Clear count",
   "inventoryCount.clearConfirm": "Clear the counts and device-only skips on this screen? Saved server counts and other dates are unchanged.",
   "inventoryCount.units": "Use the catalog notation shown on each row. Units and pack conversions are not inferred.",
   "inventoryCount.editHelp": "Edit catalog names, suppliers and Use values. Saved counts remain attached to their item IDs. The current counting session keeps its captured catalog for review.",
-  "inventoryCount.deviceOnly": "Progress and skips are device-only. Save count shares the existing count/order fields; it does not share skips or mark the session complete.",
+  "inventoryCount.deviceOnly": "Progress and skips are device-only. Save count & checklist shares on hand, order and manual Marked ordered fields only; it does not share skips or mark the session complete.",
   "inventoryCount.deviceFailed": "Some device copies could not be protected. Keep this page open and download current progress. Unreadable recovery bytes are preserved.",
   "inventoryCount.deviceSaved": "Progress saved on this device.",
   "inventoryCount.devicePending": "Progress is not yet protected on this device.",
@@ -1125,7 +1919,7 @@ var en = {
   "inventoryCount.loadingCatalog": "Loading the counting catalog\u2026",
   "inventoryCount.orderList": "Order list",
   "inventoryCount.noOrders": "Nothing to order yet.",
-  "inventoryCount.ordered": "Ordered",
+  "inventoryCount.ordered": "Marked ordered",
   "inventoryCount.copied": "Order list copied.",
   "inventoryCount.copyFailed": "Could not copy. Select the list and copy it by hand.",
   "inventoryCount.copy": "Copy order list",
@@ -1144,21 +1938,21 @@ var en = {
   "inventoryCount.state.text": "Free-text count",
   "inventoryCount.state.enough": "Enough",
   "inventoryCount.state.skipped": "Skipped on this device",
-  "inventoryCount.saved": "Count fields saved for {date}. Progress and skips remain device-only.",
-  "inventoryCount.olderSaved": "Earlier count fields saved for {date}. Newer input remains on this device; progress and skips were not shared.",
-  "inventoryCount.savedHistoryFailed": "Count fields saved for {date}, but saved-day refresh failed. Current input and device-only progress are retained.",
+  "inventoryCount.saved": "Count & checklist fields saved for {date}. Progress and skips remain device-only; no order was sent to a supplier.",
+  "inventoryCount.olderSaved": "Earlier count & checklist fields saved for {date}. Newer input remains on this device; no order was sent to a supplier.",
+  "inventoryCount.savedHistoryFailed": "Count & checklist fields saved for {date}, but saved-day refresh failed. Current input and device-only progress are retained.",
   "inventoryCount.catalogUnavailable": "The counting catalog is unavailable. Recovered values are retained. Retry loading the source catalog.",
   "inventoryCount.retryLoad": "Retry source load",
   "inventoryCount.recoveryNote": "These device bytes could not be read and were not replaced. Download the original source before repair.",
   "inventoryCount.loadingDay": "Loading saved count fields before starting a new count\u2026",
   "inventoryCount.dayUnavailable": "Saved count fields are unavailable. Retry before starting; recovered device work is retained.",
-  "inventoryCount.olderHistoryFailed": "Earlier count fields saved for {date}, but saved-day refresh failed. Newer input and device-only progress remain on this device.",
+  "inventoryCount.olderHistoryFailed": "Earlier count & checklist fields saved for {date}, but saved-day refresh failed. Newer input and device-only progress remain on this device.",
   "inventoryCount.adopt": "Use reviewed catalog by item ID",
   "inventoryCount.adoptConfirm": "Use the reviewed catalog for this device count? Existing IDs keep their counts, removed IDs stay available for review, and new items increase the total. The previous device snapshot will be archived first.",
   "inventoryCount.retained": "Removed item IDs stay in their captured sections for review. Names never transfer a count to another item.",
   "inventoryCount.archives": "Prior device catalog snapshots",
   "inventoryCount.retainedId": "Retained from the captured catalog \xB7 ID: {id}",
-  "inventoryCount.saveBottom": "Save count fields",
+  "inventoryCount.saveBottom": "Save count & checklist",
   "historyHub.open": "Open shared import history",
   "historyHub.bounds": "Look up one exact sales date or one exact inclusive hours period. This service does not search across periods. Shared history contains reviewed values and output metadata; original uploads are unavailable.",
   "historyHub.kind": "Import kind",
@@ -2106,6 +2900,281 @@ async function saveDirectory(db, store, raw) {
   });
 }
 __name(saveDirectory, "saveDirectory");
+
+// ../src/lib/files.ts
+var FILE_TYPES = {
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xls: "application/vnd.ms-excel",
+  csv: "text/csv",
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  doc: "application/msword",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  heic: "image/heic"
+};
+var MAX_BYTES = 25 * 1024 * 1024;
+var FILE_POLICY_VERSION = "attachments-v1";
+var ACCEPT = Object.keys(FILE_TYPES).map((ext) => `.${ext}`).join(",");
+var CONTROL = /[\u0000-\u001f\u007f]/;
+var LINK_KEYS = {
+  import: /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/,
+  form: /^[A-Za-z0-9_-]{10}$/,
+  writeup: /^[A-Za-z0-9_-]{10}$/,
+  "cash-close": /^(CR2|CR3):\d{4}-\d{2}-\d{2}$/,
+  "inventory-count": /^CR3:\d{4}-\d{2}-\d{2}$/
+};
+function extension(name) {
+  const ext = name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  return ext && ext in FILE_TYPES ? ext : null;
+}
+__name(extension, "extension");
+function mediaType(name) {
+  const ext = extension(name);
+  return ext ? FILE_TYPES[ext] : null;
+}
+__name(mediaType, "mediaType");
+function fileName(value) {
+  if (typeof value !== "string") return null;
+  const name = value.trim();
+  return name && name.length <= 200 && !/[\\/]/.test(name) && !CONTROL.test(name) && extension(name) ? name : null;
+}
+__name(fileName, "fileName");
+function folderPath(value) {
+  if (typeof value !== "string") return null;
+  const parts2 = value.split("/").map((part) => part.trim()).filter(Boolean);
+  if (parts2.length > 5 || parts2.some((part) => part.length > 40 || CONTROL.test(part) || part === "." || part === "..")) return null;
+  return parts2.join("/");
+}
+__name(folderPath, "folderPath");
+function labelsList(value) {
+  if (!Array.isArray(value)) return null;
+  const out = [];
+  for (const raw of value) {
+    if (typeof raw !== "string") return null;
+    const label2 = raw.trim();
+    if (!label2) continue;
+    if (label2.length > 40 || CONTROL.test(label2)) return null;
+    if (!out.some((existing) => existing.toLowerCase() === label2.toLowerCase())) out.push(label2);
+  }
+  return out.length <= 10 ? out : null;
+}
+__name(labelsList, "labelsList");
+function entered(value) {
+  if (typeof value !== "string") return null;
+  const label2 = value.trim();
+  return label2 && label2.length <= 60 && !CONTROL.test(label2) ? label2 : null;
+}
+__name(entered, "entered");
+function validLink(value) {
+  const link = value;
+  return !!link && typeof link === "object" && Object.hasOwn(LINK_KEYS, link.kind) && typeof link.key === "string" && LINK_KEYS[link.kind].test(link.key);
+}
+__name(validLink, "validLink");
+function parseLinkKey(value) {
+  const at = value.indexOf(":");
+  const link = at > 0 ? { kind: value.slice(0, at), key: value.slice(at + 1) } : null;
+  return link && validLink(link) ? link : null;
+}
+__name(parseLinkKey, "parseLinkKey");
+var versionId = /* @__PURE__ */ __name((value) => typeof value === "string" && /^ver_[A-Za-z0-9-]{8,64}$/.test(value) && recordId(value) ? value : null, "versionId");
+function validFileMeta(raw) {
+  const meta = raw;
+  if (!meta || typeof meta !== "object") return null;
+  const name = fileName(meta.name), folder = folderPath(meta.folder ?? ""), labels = labelsList(meta.labels ?? []), addedBy = entered(meta.addedBy);
+  const links = Array.isArray(meta.links) && meta.links.length <= 10 && meta.links.every(validLink) ? meta.links : null;
+  if (!name || folder === null || !labels || !addedBy || !links || !operationId(meta.operationId) || revision(meta.baseRevision) === null || !versionId(meta.versionId) || typeof meta.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(meta.sha256) || !Number.isSafeInteger(meta.size) || meta.size < 0 || meta.size > MAX_BYTES) return null;
+  return {
+    operationId: meta.operationId,
+    baseRevision: meta.baseRevision,
+    versionId: meta.versionId,
+    name,
+    folder,
+    labels,
+    links: links.map((link) => ({ kind: link.kind, key: link.key })),
+    addedBy,
+    sha256: meta.sha256,
+    size: meta.size
+  };
+}
+__name(validFileMeta, "validFileMeta");
+function validFileChange(raw) {
+  const change = raw;
+  if (!change || typeof change !== "object" || !operationId(change.operationId) || revision(change.baseRevision) === null || !entered(change.addedBy)) return null;
+  const base = { operationId: change.operationId, baseRevision: change.baseRevision, addedBy: entered(change.addedBy) };
+  if (change.action === "trash" || change.action === "restore") return { ...base, action: change.action };
+  if (change.action !== "update") return null;
+  const name = fileName(change.name), folder = folderPath(change.folder ?? ""), labels = labelsList(change.labels ?? []);
+  return name && folder !== null && labels ? { ...base, action: "update", name, folder, labels } : null;
+}
+__name(validFileChange, "validFileChange");
+function validFileDoc(raw) {
+  const doc = raw;
+  return !!doc && typeof doc === "object" && fileName(doc.name) === doc.name && folderPath(doc.folder) === doc.folder && JSON.stringify(labelsList(doc.labels)) === JSON.stringify(doc.labels) && Array.isArray(doc.links) && doc.links.every(validLink) && !!versionId(doc.currentVersionId) && (doc.trashedAt === null || typeof doc.trashedAt === "string") && entered(doc.addedBy) === doc.addedBy;
+}
+__name(validFileDoc, "validFileDoc");
+function decodeMeta(value) {
+  if (!value || value.length > 8e3 || !/^[A-Za-z0-9_-]+$/.test(value)) return null;
+  try {
+    const binary = atob(value.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0))));
+  } catch {
+    return null;
+  }
+}
+__name(decodeMeta, "decodeMeta");
+async function sha256Hex(data) {
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+__name(sha256Hex, "sha256Hex");
+
+// src/files.ts
+var columns = "store_id,id,data_json,revision,created_at,updated_at";
+var fail = /* @__PURE__ */ __name((status, code, detail = {}) => ({ ok: false, status, body: apiError(code, detail) }), "fail");
+function envelope2(row) {
+  const data = JSON.parse(row.data_json);
+  if (!validFileDoc(data)) throw new Error("Unsupported file record");
+  return {
+    schemaVersion: 1,
+    family: "attachment",
+    id: row.id,
+    storeId: row.store_id,
+    context: { kind: "undated" },
+    revision: row.revision,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    data
+  };
+}
+__name(envelope2, "envelope");
+async function current(db, store, id) {
+  const row = await db.prepare(`SELECT ${columns} FROM records WHERE store_id=? AND family='attachment' AND id=?`).bind(store, id).first();
+  return row ? envelope2(row) : null;
+}
+__name(current, "current");
+async function acknowledged(db, store, id, action, operation) {
+  const prior = await db.prepare(`SELECT result_json FROM mutation_operations
+    WHERE caller_scope='manager' AND store_id=? AND family='attachment' AND record_id=? AND action=? AND operation_id=?`).bind(store, id, action, operation).first();
+  return prior ? { ok: true, record: JSON.parse(prior.result_json), replayed: true } : null;
+}
+__name(acknowledged, "acknowledged");
+function save(db, store, id, action, base, operation, addedBy, data, projections) {
+  return mutateRecord(
+    db,
+    {
+      storeId: store,
+      family: "attachment",
+      id,
+      context: { kind: "undated" },
+      callerScope: "manager",
+      action,
+      actor: { kind: "entered-label", label: addedBy }
+    },
+    { schemaVersion: 1, baseRevision: base, operationId: operation, data },
+    (value) => validFileDoc(value) ? [] : [{ path: "data", code: "invalid_file" }],
+    projections
+  );
+}
+__name(save, "save");
+async function filesPage(db, query) {
+  const [cursorAt, cursorId] = (query.cursor ?? "").split("|");
+  const result = await db.prepare(`SELECT ${columns} FROM records WHERE family='attachment' AND id LIKE 'doc\\_%' ESCAPE '\\'
+    AND (?1='' OR store_id=?1)
+    AND (CASE WHEN ?2 THEN json_extract(data_json,'$.trashedAt') IS NOT NULL ELSE json_extract(data_json,'$.trashedAt') IS NULL END)
+    AND (?3 IS NULL OR json_extract(data_json,'$.folder')=?3)
+    AND (?4='' OR EXISTS (SELECT 1 FROM json_each(data_json,'$.labels') WHERE lower(value)=lower(?4)))
+    AND (?5='' OR EXISTS (SELECT 1 FROM json_each(data_json,'$.links') WHERE json_extract(value,'$.kind')||':'||json_extract(value,'$.key')=?5))
+    AND (?6='' OR instr(lower(json_extract(data_json,'$.name')),lower(?6))>0)
+    AND (?7='' OR updated_at<?7 OR (updated_at=?7 AND id<?8))
+    ORDER BY updated_at DESC, id DESC LIMIT 51`).bind(query.store ?? "", query.trash ? 1 : 0, query.folder ?? null, query.label ?? "", query.link ?? "", query.q ?? "", cursorAt ?? "", cursorId ?? "").all();
+  const rows = result.results;
+  const facets = await db.prepare(`SELECT DISTINCT json_extract(data_json,'$.folder') AS folder FROM records
+    WHERE family='attachment' AND id LIKE 'doc\\_%' ESCAPE '\\' AND json_extract(data_json,'$.trashedAt') IS NULL ORDER BY folder`).all();
+  const labels = await db.prepare(`SELECT DISTINCT value AS label FROM records, json_each(records.data_json,'$.labels')
+    WHERE records.family='attachment' AND records.id LIKE 'doc\\_%' ESCAPE '\\' AND json_extract(records.data_json,'$.trashedAt') IS NULL ORDER BY lower(value)`).all();
+  const last = rows[49];
+  return {
+    records: rows.slice(0, 50).map(envelope2),
+    nextCursor: rows.length > 50 && last ? `${last.updated_at}|${last.id}` : null,
+    folders: facets.results.map((row) => row.folder),
+    labels: labels.results.map((row) => row.label)
+  };
+}
+__name(filesPage, "filesPage");
+async function fileRecord(db, store, id) {
+  const record = await current(db, store, id);
+  if (!record) return null;
+  const versions = await db.prepare(`SELECT a.id,a.filename,a.media_type,a.byte_size,a.checksum,r.created_at,json_extract(r.data_json,'$.addedBy') AS added_by
+    FROM attachments a JOIN records r ON r.store_id=a.store_id AND r.family='attachment' AND r.id=a.id
+    WHERE a.store_id=? AND a.parent_family='attachment' AND a.parent_id=? AND a.status='available' ORDER BY r.created_at DESC, a.id DESC`).bind(store, id).all();
+  const events = await db.prepare(`SELECT action,actor_json,occurred_at,revision FROM change_events
+    WHERE store_id=? AND family='attachment' AND record_id=? ORDER BY revision DESC`).bind(store, id).all();
+  return {
+    record,
+    versions: versions.results.map((v) => ({ id: v.id, filename: v.filename, mediaType: v.media_type, size: v.byte_size, sha256: v.checksum, createdAt: v.created_at, addedBy: v.added_by })),
+    activity: events.results.map((e) => ({ action: e.action, actor: JSON.parse(e.actor_json).label ?? "", at: e.occurred_at, revision: e.revision }))
+  };
+}
+__name(fileRecord, "fileRecord");
+async function saveFileContent(db, bucket, store, id, meta, bytes) {
+  const action = meta.baseRevision === 0 ? "upload" : "replace";
+  const replay2 = await acknowledged(db, store, id, action, meta.operationId);
+  if (replay2) return replay2;
+  if (bytes.byteLength !== meta.size || await sha256Hex(bytes) !== meta.sha256) return fail(400, "validation_failed", { fields: [{ path: "content", code: "checksum_mismatch" }] });
+  const existing = await current(db, store, id);
+  if ((existing?.revision ?? 0) !== meta.baseRevision) return fail(409, "revision_conflict", { currentRevision: existing?.revision ?? 0 });
+  const data = existing ? { ...existing.data, currentVersionId: meta.versionId } : { name: meta.name, folder: meta.folder, labels: meta.labels, links: meta.links, currentVersionId: meta.versionId, trashedAt: null, addedBy: meta.addedBy };
+  const key2 = `files/${store}/${meta.versionId}`;
+  if (await db.prepare("SELECT 1 FROM attachments WHERE object_key=?").bind(key2).first()) return fail(409, "operation_reused");
+  await bucket.put(key2, bytes, { httpMetadata: { contentType: "application/octet-stream" } });
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const version = JSON.stringify({ kind: "version", document: id, filename: meta.name, size: meta.size, sha256: meta.sha256, addedBy: meta.addedBy });
+  const result = await save(db, store, id, action, meta.baseRevision, meta.operationId, meta.addedBy, data, (guard) => [
+    db.prepare(`INSERT INTO records (store_id,family,id,station_id,schema_version,revision,context_kind,business_date,period_start,period_end,created_at,updated_at,data_json)
+      SELECT ?,'attachment',?,NULL,1,1,'undated',NULL,NULL,NULL,?,?,? WHERE ${guard.sql}`).bind(store, meta.versionId, now, now, version, ...guard.binds),
+    db.prepare(`INSERT INTO attachments (store_id,family,id,parent_family,parent_id,parent_revision,object_key,filename,media_type,byte_size,checksum,status,policy_decision,policy_version)
+      SELECT ?,'attachment',?,'attachment',?,?,?,?,?,?,?,'available','DEC-03',? WHERE ${guard.sql}`).bind(store, meta.versionId, id, meta.baseRevision + 1, key2, meta.name, mediaType(meta.name), meta.size, meta.sha256, FILE_POLICY_VERSION, ...guard.binds)
+  ]);
+  if (!result.ok && result.status === 409) {
+    try {
+      if (!await db.prepare("SELECT 1 FROM attachments WHERE object_key=?").bind(key2).first()) await bucket.delete(key2);
+    } catch {
+    }
+  }
+  return result;
+}
+__name(saveFileContent, "saveFileContent");
+async function changeFile(db, store, id, change) {
+  const replay2 = await acknowledged(db, store, id, change.action, change.operationId);
+  if (replay2) return replay2;
+  const existing = await current(db, store, id);
+  if (!existing) return fail(404, "not_found");
+  if (existing.revision !== change.baseRevision) return fail(409, "revision_conflict", { currentRevision: existing.revision });
+  if (change.action === "trash" === (existing.data.trashedAt !== null) && change.action !== "update") return fail(400, "validation_failed", { fields: [{ path: "action", code: "no_change" }] });
+  const data = change.action === "update" ? { ...existing.data, name: change.name, folder: change.folder, labels: change.labels } : { ...existing.data, trashedAt: change.action === "trash" ? (/* @__PURE__ */ new Date()).toISOString() : null };
+  return save(db, store, id, change.action, change.baseRevision, change.operationId, change.addedBy, data);
+}
+__name(changeFile, "changeFile");
+async function fileContent(db, bucket, store, version) {
+  const row = await db.prepare(`SELECT object_key,filename FROM attachments WHERE store_id=? AND family='attachment' AND id=? AND status='available'`).bind(store, version).first();
+  if (!row) return null;
+  const object4 = await bucket.get(row.object_key);
+  return object4 ? { body: object4.body, filename: row.filename, size: object4.size } : null;
+}
+__name(fileContent, "fileContent");
+function downloadHeaders(filename, size) {
+  const ascii = filename.replace(/[^\x20-\x7e]|["\\]/g, "_");
+  return {
+    "Content-Type": "application/octet-stream",
+    "Content-Length": String(size),
+    "X-Content-Type-Options": "nosniff",
+    "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    "Cache-Control": "no-store"
+  };
+}
+__name(downloadHeaders, "downloadHeaders");
 
 // src/toast.ts
 var TOAST_STORES = ["CR3", "CR2"];
@@ -3463,7 +4532,7 @@ var index_default = {
         headers: {
           ...corsHeaders(request, env),
           "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization, X-File-Meta",
           "Access-Control-Max-Age": "86400"
         }
       });
@@ -3571,6 +4640,60 @@ var index_default = {
         if (!await checkWriteThrottle(env, clientIp(request))) return json({ error: "rate_limited" }, 429, request, env);
         const result = await saveHistory(env.INTERNAL_DB, store, await readBody(request, 1e6));
         return json(result.ok ? { record: result.record, replayed: result.replayed } : result.body, result.ok ? 200 : result.status, request, env, noStore);
+      } catch {
+        return json({ schemaVersion: 1, error: { code: "unavailable" } }, 503, request, env, noStore);
+      }
+    }
+    const filesMatch = path.match(/^\/api\/internal\/files(?:\/(CR2|CR3)\/(?:(doc_[A-Za-z0-9-]{8,64})(\/content)?|versions\/(ver_[A-Za-z0-9-]{8,64})\/content))?$/);
+    if (filesMatch) {
+      const denied = await managerAuthError(request, env);
+      if (denied) return denied;
+      const noStore = { "Cache-Control": "no-store" };
+      if (!env.INTERNAL_DB || !env.ATTACHMENTS) return json({ schemaVersion: 1, error: { code: "backend_unconfigured" } }, 503, request, env, noStore);
+      const [, store, doc, content, version] = filesMatch;
+      const db = env.INTERNAL_DB, bucket = env.ATTACHMENTS;
+      const reply = /* @__PURE__ */ __name((result) => json(result.ok ? { record: result.record, replayed: result.replayed } : result.body, result.ok ? 200 : result.status, request, env, noStore), "reply");
+      try {
+        if (!store && request.method === "GET") {
+          const q = url.searchParams, link = q.get("link") ?? "";
+          if (link && !parseLinkKey(link)) return json({ schemaVersion: 1, error: { code: "validation_failed" } }, 400, request, env, noStore);
+          return json(await filesPage(db, {
+            store: q.get("store") ?? "",
+            folder: q.has("folder") ? q.get("folder") : null,
+            label: q.get("label") ?? "",
+            q: (q.get("q") ?? "").slice(0, 100),
+            trash: q.get("trash") === "1",
+            link,
+            cursor: q.get("cursor") ?? ""
+          }), 200, request, env, noStore);
+        }
+        if (store && version && request.method === "GET") {
+          const file = await fileContent(db, bucket, store, version);
+          if (!file) return json({ schemaVersion: 1, error: { code: "not_found" } }, 404, request, env, noStore);
+          return new Response(file.body, { status: 200, headers: { ...corsHeaders(request, env), ...downloadHeaders(file.filename, file.size) } });
+        }
+        if (store && doc && !content && request.method === "GET") {
+          const found = await fileRecord(db, store, doc);
+          return found ? json(found, 200, request, env, noStore) : json({ schemaVersion: 1, error: { code: "not_found" } }, 404, request, env, noStore);
+        }
+        if (store && doc && (request.method === "PUT" || request.method === "POST")) {
+          if (!await checkWriteThrottle(env, clientIp(request))) return json({ error: "rate_limited" }, 429, request, env, noStore);
+          if (content && request.method === "PUT") {
+            const meta = validFileMeta(decodeMeta(request.headers.get("X-File-Meta")));
+            const length = Number(request.headers.get("Content-Length") ?? NaN);
+            if (!meta || !Number.isSafeInteger(length) || length !== meta.size || length > MAX_BYTES)
+              return json({ schemaVersion: 1, error: { code: "validation_failed" } }, 400, request, env, noStore);
+            const bytes = await request.arrayBuffer();
+            if (bytes.byteLength > MAX_BYTES) return json({ schemaVersion: 1, error: { code: "validation_failed" } }, 400, request, env, noStore);
+            return reply(await saveFileContent(db, bucket, store, doc, meta, bytes));
+          }
+          if (!content && request.method === "POST") {
+            const change = validFileChange(await readBody(request, 2e4));
+            if (!change) return json({ schemaVersion: 1, error: { code: "validation_failed" } }, 400, request, env, noStore);
+            return reply(await changeFile(db, store, doc, change));
+          }
+        }
+        return json({ error: "not_found" }, 404, request, env, noStore);
       } catch {
         return json({ schemaVersion: 1, error: { code: "unavailable" } }, 503, request, env, noStore);
       }
@@ -3688,9 +4811,9 @@ var index_default = {
       const store = inventoryListMatch[1];
       const denied = await managerAuthError(request, env);
       if (denied) return denied;
-      const current = safeParse(await env.SCHEDULES.get(inventoryListKey(store)) ?? "");
+      const current2 = safeParse(await env.SCHEDULES.get(inventoryListKey(store)) ?? "");
       if (request.method === "GET") {
-        const body2 = current ?? { v: 1, rev: 0, sheets: null, updatedAt: null };
+        const body2 = current2 ?? { v: 1, rev: 0, sheets: null, updatedAt: null };
         return json(body2, 200, request, env, { "Cache-Control": "no-store" });
       }
       if (!await checkWriteThrottle(env, clientIp(request))) {
@@ -3704,8 +4827,8 @@ var index_default = {
       }
       const valid = validateInventoryListBody(body);
       if (!valid) return json({ error: "invalid_body" }, 400, request, env);
-      const rev = current?.rev ?? 0;
-      if (valid.baseRev !== rev) return json({ error: "conflict", rev, updatedAt: current?.updatedAt }, 409, request, env);
+      const rev = current2?.rev ?? 0;
+      if (valid.baseRev !== rev) return json({ error: "conflict", rev, updatedAt: current2?.updatedAt }, 409, request, env);
       const doc = { v: 1, rev: rev + 1, sheets: valid.sheets, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
       await env.SCHEDULES.put(inventoryListKey(store), JSON.stringify(doc));
       return json({ rev: doc.rev, updatedAt: doc.updatedAt }, 200, request, env);
@@ -3998,21 +5121,21 @@ var index_default = {
         } catch {
           return json({ error: "not_found" }, 404, request, env);
         }
-        const current = normalizeGoldenDoc(parsed);
-        if (!current) return json({ error: "not_found" }, 404, request, env);
-        if (current.snapshot?.specialHours?.length && !env.INTERNAL_DB) return json({ error: "special_hours_unavailable" }, 503, request, env);
-        if (valid.baseRev !== current.rev) {
-          return json({ error: "conflict", rev: current.rev, updatedAt: current.updatedAt }, 409, request, env);
+        const current2 = normalizeGoldenDoc(parsed);
+        if (!current2) return json({ error: "not_found" }, 404, request, env);
+        if (current2.snapshot?.specialHours?.length && !env.INTERNAL_DB) return json({ error: "special_hours_unavailable" }, 503, request, env);
+        if (valid.baseRev !== current2.rev) {
+          return json({ error: "conflict", rev: current2.rev, updatedAt: current2.updatedAt }, 409, request, env);
         }
-        if (!valid.snapshot && (current.snapshot || await preservedSnapshot(env, restaurant, current, existing))) {
+        if (!valid.snapshot && (current2.snapshot || await preservedSnapshot(env, restaurant, current2, existing))) {
           return json({ error: "snapshot_required" }, 400, request, env);
         }
         const next = {
-          ...current,
+          ...current2,
           week: valid.week,
           visible: valid.visible,
           templateHash,
-          rev: current.rev + 1,
+          rev: current2.rev + 1,
           updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
           ...valid.snapshot ? { snapshot: valid.snapshot } : {}
         };
@@ -4089,9 +5212,9 @@ var index_default = {
         let currentRev = 0;
         let currentUpdatedAt;
         if (existingRaw) {
-          const current = normalizeRosterDoc(safeParse(existingRaw));
-          currentRev = current?.rev ?? 0;
-          currentUpdatedAt = current?.updatedAt;
+          const current2 = normalizeRosterDoc(safeParse(existingRaw));
+          currentRev = current2?.rev ?? 0;
+          currentUpdatedAt = current2?.updatedAt;
         }
         if (valid.baseRev !== currentRev) {
           return json({ error: "conflict", rev: currentRev, updatedAt: currentUpdatedAt }, 409, request, env);
@@ -4135,32 +5258,32 @@ var index_default = {
         } catch {
           return json({ error: "body_too_large" }, 413, request, env);
         }
-        const current = await readStaffDoc(env, restaurant);
-        const currentRev = current?.rev ?? 0;
+        const current2 = await readStaffDoc(env, restaurant);
+        const currentRev = current2?.rev ?? 0;
         const updatedAt = (/* @__PURE__ */ new Date()).toISOString();
         let next;
         if (isSave) {
           const valid = validateRosterBody(body);
           if (!valid) return json({ error: "invalid_body" }, 400, request, env);
           if (valid.baseRev !== currentRev) {
-            return json({ error: "conflict", rev: currentRev, updatedAt: current?.updatedAt }, 409, request, env);
+            return json({ error: "conflict", rev: currentRev, updatedAt: current2?.updatedAt }, 409, request, env);
           }
-          const replaced = { employees: current?.employees ?? null, updatedAt: current?.updatedAt ?? null };
+          const replaced = { employees: current2?.employees ?? null, updatedAt: current2?.updatedAt ?? null };
           next = {
             v: 1,
             rev: currentRev + 1,
             employees: valid.employees,
             updatedAt,
-            history: [replaced, ...current?.history ?? []].slice(0, STAFF_HISTORY_LIMIT)
+            history: [replaced, ...current2?.history ?? []].slice(0, STAFF_HISTORY_LIMIT)
           };
         } else {
           const valid = validateStaffUndoBody(body);
           if (!valid) return json({ error: "invalid_body" }, 400, request, env);
           if (valid.baseRev !== currentRev) {
-            return json({ error: "conflict", rev: currentRev, updatedAt: current?.updatedAt }, 409, request, env);
+            return json({ error: "conflict", rev: currentRev, updatedAt: current2?.updatedAt }, 409, request, env);
           }
-          const [previous, ...older] = current?.history ?? [];
-          if (!current || !previous) return json({ error: "nothing_to_undo", rev: currentRev }, 409, request, env);
+          const [previous, ...older] = current2?.history ?? [];
+          if (!current2 || !previous) return json({ error: "nothing_to_undo", rev: currentRev }, 409, request, env);
           next = { v: 1, rev: currentRev + 1, employees: previous.employees, updatedAt, history: older };
         }
         await env.SCHEDULES.put(staffKey(restaurant), JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });
@@ -4237,9 +5360,9 @@ var index_default = {
         let currentRev = 0;
         let currentUpdatedAt;
         if (existingRaw) {
-          const current = normalizeTemplateDoc(safeParse(existingRaw));
-          currentRev = current?.rev ?? 0;
-          currentUpdatedAt = current?.updatedAt;
+          const current2 = normalizeTemplateDoc(safeParse(existingRaw));
+          currentRev = current2?.rev ?? 0;
+          currentUpdatedAt = current2?.updatedAt;
         }
         if (valid.baseRev !== currentRev) {
           return json({ error: "conflict", rev: currentRev, updatedAt: currentUpdatedAt }, 409, request, env);
@@ -4306,17 +5429,17 @@ var index_default = {
         } catch {
           return json({ error: "not_found" }, 404, request, env);
         }
-        const current = normalizeStoredWeek(parsed);
-        if (!current) return json({ error: "not_found" }, 404, request, env);
-        if (valid.baseRev !== current.rev) {
-          return json({ error: "conflict", rev: current.rev, updatedAt: current.updatedAt }, 409, request, env);
+        const current2 = normalizeStoredWeek(parsed);
+        if (!current2) return json({ error: "not_found" }, 404, request, env);
+        if (valid.baseRev !== current2.rev) {
+          return json({ error: "conflict", rev: current2.rev, updatedAt: current2.updatedAt }, 409, request, env);
         }
         const next = {
-          ...current,
+          ...current2,
           v: 2,
-          ciphertext: valid.ciphertext ?? current.ciphertext,
-          visible: valid.visible ?? current.visible,
-          rev: current.rev + 1,
+          ciphertext: valid.ciphertext ?? current2.ciphertext,
+          visible: valid.visible ?? current2.visible,
+          rev: current2.rev + 1,
           updatedAt: (/* @__PURE__ */ new Date()).toISOString()
         };
         await env.SCHEDULES.put(key2, JSON.stringify(next), { expirationTtl: DOC_TTL_SECONDS });

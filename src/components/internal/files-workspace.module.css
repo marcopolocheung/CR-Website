@@ -1,0 +1,47 @@
+.workspace { max-width: 76rem; margin: 24px 9px 24px 0; }
+.workspace h1 { font-size: 2.5rem; }
+.workspace h2 { font-size: 1.8rem; margin: 0; }
+.workspace h3 { font-size: 1.3rem; margin: 20px 0 8px; }
+.workspace input:not([type=checkbox]), .workspace select { min-height: 48px; border: 1px solid var(--cr-control); border-radius: 0; width: 100%; padding: 8px; font-size: 1rem; min-width: 0; max-width: 100%; background: var(--cr-paper, #fff); }
+.workspace label { display: block; margin-bottom: 8px; font-weight: 600; }
+.workspace button { border-radius: 0; }
+.workspace [hidden] { display: none !important; }
+.workspace :is(button,a,input,select,summary,[tabindex]):focus-visible { outline: 3px solid var(--cr-black); outline-offset: 3px; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.status { min-height: 1.5rem; margin: 12px 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.inline { min-height: 40px; }
+.notice { background: var(--cr-accent-wash); border-left: 3px solid var(--cr-accent-ink); padding: 16px; margin: 16px 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; margin: 16px 0; }
+.filters { flex: 1 1 32rem; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 12px; border: 0; padding: 0; margin: 0; align-items: end; }
+.filters > div { min-width: 0; }
+.check { display: flex !important; gap: 8px; align-items: center; min-height: 48px; margin: 0 !important; }
+.check input { width: 22px; height: 22px; }
+.upload { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); border: 1px solid var(--cr-control); padding: 16px; margin: 16px 0; align-items: end; }
+.upload h2, .upload .hint { grid-column: 1 / -1; }
+.hint { margin: 0; color: var(--cr-muted, inherit); }
+.conflict { border: 2px solid var(--cr-red, #b42318); padding: 16px; margin: 16px 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+.layout { display: grid; grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr); gap: 20px; align-items: start; }
+.folders ul, .versions, .activity { list-style: none; margin: 0; padding: 0; }
+.folders button { width: 100%; min-height: 44px; text-align: left; padding: 8px 12px; background: none; border: 0; border-left: 3px solid transparent; overflow-wrap: anywhere; }
+.folders button[aria-current] { border-left-color: var(--cr-accent-ink); background: var(--cr-accent-wash); font-weight: 700; }
+.list { min-width: 0; overflow-x: auto; }
+.list table { width: 100%; border-collapse: collapse; }
+.list th, .list td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--cr-control); vertical-align: top; overflow-wrap: anywhere; }
+.list tr[aria-selected=true] { background: var(--cr-accent-wash); }
+.open { background: none; border: 0; padding: 0; min-height: 44px; text-align: left; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.folder { display: block; font-size: .85rem; }
+.empty { padding: 16px 0; }
+.detail { border-top: 3px solid var(--cr-black); margin-top: 24px; padding-top: 16px; }
+.detailHead { display: flex; justify-content: space-between; gap: 12px; align-items: start; flex-wrap: wrap; }
+.detailHead h2 { overflow-wrap: anywhere; min-width: 0; }
+.replace { display: inline-flex !important; flex-direction: column; gap: 4px; margin: 0 !important; }
+.versions li, .activity li { padding: 10px 0; border-bottom: 1px solid var(--cr-control); display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .workspace { padding: 16px; }
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .list thead { display: none; }
+  .list tr { display: block; border-bottom: 1px solid var(--cr-control); padding: 8px 0; }
+  .list td { display: block; border: 0; padding: 2px 0; }
+}
+@media (prefers-reduced-motion: reduce) { .workspace * { transition: none !important; } }

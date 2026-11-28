@@ -11,6 +11,8 @@ import { buildScheduleSnapshot, validScheduleSnapshot, type ScheduleSnapshot } f
 import { layoutForPublication, templateHashForSlots } from '../../src/lib/schedule-share'
 import { historyPage, historyRecord, saveHistory } from './import-history'
 import { directoryRecord, saveDirectory } from './import-directory'
+import { changeFile, downloadHeaders, fileContent, fileRecord, filesPage, saveFileContent } from './files'
+import { decodeMeta, MAX_BYTES, parseLinkKey, validFileChange, validFileMeta } from '../../src/lib/files'
 import { fetchToastCash, toastConfigured, ToastError, type ToastStore } from './toast'
 import { fetchToastSales, readCachedSales, salesCacheTtl, salesDateRange, warmToastSales } from './toast-sales'
 import { digitalFormPerson, isDigitalForm, isDigitalFormType, type DigitalFormDoc } from '../../src/lib/digital-forms'
@@ -29,6 +31,8 @@ interface Env {
   SCHEDULES: KVNamespace
   /** Optional additive service binding; absence preserves legacy capabilities. */
   INTERNAL_DB?: LocalBindings['INTERNAL_DB']
+  /** Optional private file bucket; the Files library reports backend_unconfigured without it. */
+  ATTACHMENTS?: LocalBindings['ATTACHMENTS']
   ALLOWED_ORIGIN?: string
   /** Manager write token for the golden schedule. Never shipped to browsers; the manager types it per save. */
   SCHEDULE_WRITE_TOKEN?: string
@@ -1250,7 +1254,7 @@ export default {
         headers: {
           ...corsHeaders(request, env),
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-File-Meta',
           'Access-Control-Max-Age': '86400',
         },
       })
@@ -1360,6 +1364,54 @@ export default {
         const result = await saveHistory(env.INTERNAL_DB,store,await readBody(request,1000000))
         return json(result.ok?{record:result.record,replayed:result.replayed}:result.body,result.ok?200:result.status,request,env,noStore)
       } catch { return json({schemaVersion:1,error:{code:'unavailable'}},503,request,env,noStore) }
+    }
+
+    // Company Files library (DATA-06 / DEC-03-FILES): manager gate, private R2 objects, D1 metadata and history.
+    const filesMatch = path.match(/^\/api\/internal\/files(?:\/(CR2|CR3)\/(?:(doc_[A-Za-z0-9-]{8,64})(\/content)?|versions\/(ver_[A-Za-z0-9-]{8,64})\/content))?$/)
+    if (filesMatch) {
+      const denied = await managerAuthError(request, env)
+      if (denied) return denied
+      const noStore = { 'Cache-Control': 'no-store' }
+      if (!env.INTERNAL_DB || !env.ATTACHMENTS) return json({ schemaVersion: 1, error: { code: 'backend_unconfigured' } }, 503, request, env, noStore)
+      const [, store, doc, content, version] = filesMatch as unknown as [string, 'CR2' | 'CR3' | undefined, string | undefined, string | undefined, string | undefined]
+      const db = env.INTERNAL_DB, bucket = env.ATTACHMENTS
+      const reply = (result: { ok: true; record: unknown; replayed: boolean } | { ok: false; status: number; body: unknown }) =>
+        json(result.ok ? { record: result.record, replayed: result.replayed } : result.body, result.ok ? 200 : result.status, request, env, noStore)
+      try {
+        if (!store && request.method === 'GET') {
+          const q = url.searchParams, link = q.get('link') ?? ''
+          if (link && !parseLinkKey(link)) return json({ schemaVersion: 1, error: { code: 'validation_failed' } }, 400, request, env, noStore)
+          return json(await filesPage(db, { store: q.get('store') ?? '', folder: q.has('folder') ? q.get('folder') : null, label: q.get('label') ?? '',
+            q: (q.get('q') ?? '').slice(0, 100), trash: q.get('trash') === '1', link, cursor: q.get('cursor') ?? '' }), 200, request, env, noStore)
+        }
+        if (store && version && request.method === 'GET') {
+          const file = await fileContent(db, bucket, store, version)
+          if (!file) return json({ schemaVersion: 1, error: { code: 'not_found' } }, 404, request, env, noStore)
+          return new Response(file.body as unknown as ReadableStream, { status: 200, headers: { ...corsHeaders(request, env), ...downloadHeaders(file.filename, file.size) } })
+        }
+        if (store && doc && !content && request.method === 'GET') {
+          const found = await fileRecord(db, store, doc)
+          return found ? json(found, 200, request, env, noStore) : json({ schemaVersion: 1, error: { code: 'not_found' } }, 404, request, env, noStore)
+        }
+        if (store && doc && (request.method === 'PUT' || request.method === 'POST')) {
+          if (!(await checkWriteThrottle(env, clientIp(request)))) return json({ error: 'rate_limited' }, 429, request, env, noStore)
+          if (content && request.method === 'PUT') {
+            const meta = validFileMeta(decodeMeta(request.headers.get('X-File-Meta')))
+            const length = Number(request.headers.get('Content-Length') ?? NaN)
+            if (!meta || !Number.isSafeInteger(length) || length !== meta.size || length > MAX_BYTES)
+              return json({ schemaVersion: 1, error: { code: 'validation_failed' } }, 400, request, env, noStore)
+            const bytes = await request.arrayBuffer()
+            if (bytes.byteLength > MAX_BYTES) return json({ schemaVersion: 1, error: { code: 'validation_failed' } }, 400, request, env, noStore)
+            return reply(await saveFileContent(db, bucket, store, doc, meta, bytes))
+          }
+          if (!content && request.method === 'POST') {
+            const change = validFileChange(await readBody(request, 20000))
+            if (!change) return json({ schemaVersion: 1, error: { code: 'validation_failed' } }, 400, request, env, noStore)
+            return reply(await changeFile(db, store, doc, change))
+          }
+        }
+        return json({ error: 'not_found' }, 404, request, env, noStore)
+      } catch { return json({ schemaVersion: 1, error: { code: 'unavailable' } }, 503, request, env, noStore) }
     }
 
     const directoryMatch = path.match(/^\/api\/internal\/import-directory\/(CR2|CR3)$/)

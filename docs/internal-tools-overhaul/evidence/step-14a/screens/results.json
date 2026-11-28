@@ -1,0 +1,11 @@
+{
+  "groups": [
+    "Upload sends exact bytes with checksum; .html and >25 MB are refused locally with no request; folder/labels normalize",
+    "Store, label, folder and name search filters each narrow the shared CR2 + CR3 library",
+    "Download returns exact bytes; a stale replace shows the named conflict with Download latest and Upload anyway; all three versions remain",
+    "Rename/move, trash, Undo and the trash view each add one activity entry; trashed files keep every version",
+    "Without storage bindings the screen says storage is not set up instead of showing an empty library",
+    "Saving an import uploads nothing; the explicit Save source action stores the exact original file linked to that import in Imports/Hours",
+    "Desktop/tablet/phone and 320px enlarged Spanish reflow without horizontal overflow; keyboard opens upload"
+  ]
+}

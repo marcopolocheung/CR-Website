@@ -1,0 +1,1 @@
+PASS Step10 hub: exact-context pagination, readable metadata, EN/ES/layouts, resume/cancel/checkpoint/quota protection, immutable source, independent workbook/repeats, late reads, failed reload, and no stale reprocess/hash POST across same-code sessions

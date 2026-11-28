@@ -85,26 +85,26 @@ with sync_playwright() as p:
     for path,current in routes:
         visit(page,path)
         expect(page.locator('[data-internal-shell]')).to_be_visible()
-        assert page.locator('[data-shell-chrome] nav a').count()==6
+        assert page.locator('[data-shell-chrome] nav a').count()==7  # Step 14a added Files (owner-approved)
         if current:selected(page,current)
         else:assert page.locator('[data-shell-chrome] [aria-current=page]').count()==0
         assert 'CHINA ROSE' in page.locator('[data-shell-chrome]').first.inner_text()
         expect(page.locator('[data-shell-lock]')).to_be_disabled()
         if current != 'inventory' and '#comparison' not in path:
             assert 'CR3' not in context_line(page).inner_text()
-    record('direct routes', 'Nine route/hash/HTML/slash variants open with six real labelled destinations; current-page state correct; QR/gallery do not falsely select another task; no invented global store')
+    record('direct routes', 'Nine route/hash/HTML/slash variants open with seven real labelled destinations; current-page state correct; QR/gallery do not falsely select another task; no invented global store')
     # Activate every internal destination with native keyboard and pointer links.
     for mode in ('keyboard','pointer'):
         visit(page,'/internal')
-        for item in ('cash','reports','inventory','forms','dashboard'):
+        for item in ('cash','reports','inventory','forms','files','dashboard'):
             if mode=='keyboard':nav(page,item).focus();page.keyboard.press('Enter')
             else:nav(page,item).click()
-            expected = {'cash':'/internal/bookkeeping#cash-out','reports':'/internal/reports','inventory':'/internal/inventory','forms':'/internal/forms','dashboard':'/internal'}[item]
+            expected = {'cash':'/internal/bookkeeping#cash-out','reports':'/internal/reports','inventory':'/internal/inventory','forms':'/internal/forms','files':'/internal/files','dashboard':'/internal'}[item]
             expect(page).to_have_url(re.compile(re.escape(expected)+'$'))
             page.wait_for_load_state('networkidle');expect(page.locator('[data-shell-ready=true]')).to_be_visible();selected(page,item)
             expect(page.locator('h1:visible').first).to_be_visible()
         shot(page,'dashboard-'+mode)
-    record('destinations', 'Cash/Reports/Inventory/Forms/Dashboard navigated by keyboard and mouse with nonblank workspaces; each includes a way home')
+    record('destinations', 'Cash/Reports/Inventory/Forms/Files/Dashboard navigated by keyboard and mouse with nonblank workspaces; each includes a way home')
     # Help is a native modal with Escape/return focus, language stays at the same header location.
     page.get_by_role('button',name='Help',exact=True).click()
     expect(page.get_by_role('dialog')).to_be_visible();page.keyboard.press('Escape')

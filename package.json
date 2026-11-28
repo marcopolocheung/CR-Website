@@ -26,8 +26,10 @@
     "agent:dev": "node --env-file-if-exists=.env.agent --import jiti/register agent/server.ts",
     "agent:start": "node --import jiti/register agent/server.ts",
     "agent:test": "node --import jiti/register --test agent/agent.test.ts agent/service.test.ts",
-    "check": "tsc --noEmit && python3 scripts/check-overhaul-tracker.py && npm run -s scheduler:test && npm run -s cashout:test && npm run -s internal:session:test && npm run -s recovery:test && npm run -s imports:test && npm run -s forms:test && npm run -s scheduler:requests:test && npm run -s agent:test",
-    "check:full": "npm run -s check && npm run -s data:test && npm run -s imports:worker:test && npm run -s scheduler:requests:worker:test && npm run -s scheduler:hours:worker:test",
+    "files:test": "node --import jiti/register --test src/lib/files.test.ts",
+    "files:worker:test": "node --test worker/src/files.test.mjs",
+    "check": "tsc --noEmit && python3 scripts/check-overhaul-tracker.py && npm run -s scheduler:test && npm run -s cashout:test && npm run -s internal:session:test && npm run -s recovery:test && npm run -s imports:test && npm run -s forms:test && npm run -s scheduler:requests:test && npm run -s agent:test && npm run -s files:test",
+    "check:full": "npm run -s check && npm run -s data:test && npm run -s imports:worker:test && npm run -s scheduler:requests:worker:test && npm run -s scheduler:hours:worker:test && npm run -s files:worker:test",
     "scheduler:hours:worker:test": "node --test worker/src/special-hours.test.mjs"
   },
   "dependencies": {

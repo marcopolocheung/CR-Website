@@ -5,11 +5,13 @@ import { formsDraftSpanish } from './forms-drafts'
 import { formsWorkspaceSpanish } from './forms-workspace'
 import { planningSpanish } from './planning'
 import { hoursSpanish } from './special-hours'
+import { filesSpanish } from './files'
 import type en from './en'
 const es: Record<keyof typeof en, string> = {
   ...schedulerScreenSpanish,
   ...scheduleShellSpanish,
   ...hoursSpanish,
+  ...filesSpanish,
   ...formsSpanish,
   ...formsDraftSpanish,
   ...formsWorkspaceSpanish,
