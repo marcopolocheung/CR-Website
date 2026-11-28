@@ -15,7 +15,7 @@ No new type, Worker route/schema/migration, attachment, amendment, signature/app
 | Local implementation | pass | Retained library/editor, strict draft discovery, bilingual sections/review, request/session/identity guards and existing paper renderers. |
 | Local automated checks | pass | `npm run check`: 419 tests; dictionary/contracts: 9; type/build/SEO and tracker checks pass. |
 | Browser visual/task/output verification | pass | New workspace: 14 groups; existing forms list/drafts/compatibility, local Worker digital suite, recovery, shell 11 and session 14 pass with zero page errors/external attempts. Synthetic/local only. |
-| Owner review before Step 14 | pending | Deliver one non-draft PR to main, stop without merging. |
+| Owner review before Step 14 | pending | [PR #203](https://github.com/marcopolocheung/CR-Website/pull/203) is open for review into main; stop without merging. |
 | Backend/policy readiness | outside this slice | Existing fields/APIs remain; staff language, verified signature/approval and wider policy/backend tasks are not advanced. |
 | Physical device/software keyboard/staff acceptance | pending | Browser emulation does not establish these checks. |
 | Release/live-service verification | pending | No deployment, migration or production mutation. |
