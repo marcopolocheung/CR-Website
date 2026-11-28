@@ -142,9 +142,9 @@ with sync_playwright() as p:
             else: link.click()
             expect(page).to_have_url(re.compile(re.escape(args.prefix + href) + '$'))
             if label == 'Schedule':
-                expect(page.locator('#demo-gate-code')).to_be_visible()
-                page.get_by_role('link', name='Internal tools / Herramientas internas', exact=True).click()
-                selected(page, 'dashboard')
+                # Step 14: Schedule opens inside the shared shell; the next pass returns Home via shell navigation.
+                selected(page, 'schedule')
+                expect(page.locator('[data-internal-shell]')).to_have_count(1)
             else:
                 selected(page, label.lower())
                 expect(page.locator('[data-internal-workspace]:visible')).to_have_count(1)
@@ -290,7 +290,7 @@ with sync_playwright() as p:
 assert not errors, errors
 assert not external, external
 sources = [*ROOT.glob('src/components/internal/*.tsx'), *ROOT.glob('src/components/internal/*.css'),
-           *ROOT.glob('src/app/(order-shell)/internal/**/page.tsx'),
+           *ROOT.glob('src/app/(order-shell)/(internal-tools)/internal/**/page.tsx'),
            ROOT / 'src/lib/internal-tools/i18n/en.ts', ROOT / 'src/lib/internal-tools/i18n/es.ts', Path(__file__).resolve()]
 manifest = {'baseCommit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
             'sourceFilesSha256': {str(file.relative_to(ROOT)): hashlib.sha256(file.read_bytes()).hexdigest() for file in sources if file.is_file()},

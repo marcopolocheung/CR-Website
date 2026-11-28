@@ -95,7 +95,9 @@ export default function NavigationProtection({ children }: { children: React.Rea
       }
       const normalized = target.pathname.replace(/\.html$/, '').replace(/\/$/, '')
       const base = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '')
-      if (target.origin === location.origin && (normalized === `${base}/internal` || normalized.startsWith(`${base}/internal/`))) {
+      const retained = normalized === `${base}/internal` || normalized.startsWith(`${base}/internal/`)
+        || normalized === `${base}/scheduler-demo` || normalized.startsWith(`${base}/scheduler-demo/`)
+      if (target.origin === location.origin && retained) {
         event.preventDefault(); event.stopImmediatePropagation()
         if (navigateBack) router.back()
         else router.push(normalized.slice(base.length) + target.search + target.hash)

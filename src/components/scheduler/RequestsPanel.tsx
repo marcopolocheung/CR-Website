@@ -24,10 +24,11 @@ function formatWhen(value: string) {
     : { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 type Attempt = { previous: RequestRecord | null; data: RequestData; preparer: string; operation: string; kind: 'entry' | 'review'; id: string }
-export default function RequestsPanel({ source, employees, weekStart, token, locale, onLocaleChange, onDirtyChange, prefill, onApproved, hideLanguage = false }: {
+export default function RequestsPanel({ source, employees, weekStart, token, locale, onLocaleChange, onDirtyChange, prefill, onApproved, onBusyChange, hideLanguage = false }: {
   source: ScheduleRequestsSource; employees: Employee[]; weekStart: string; token: string; locale: Locale; onLocaleChange: (locale: Locale) => void; onDirtyChange: (dirty: boolean) => void
   prefill?: { id: string; employeeId: string; date: string } | null
   onApproved?: (request: ScheduleRequest) => void
+  onBusyChange?: (busy:boolean)=>void
   hideLanguage?: boolean
 }) {
   const t = (key: TranslationKey, params?: Record<string, string | number>) => translate(locale, key, params)
@@ -55,13 +56,20 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
       setEmployeeId(prefill.employeeId); setStart(prefill.date); setEnd(prefill.date); setKind('time-off')
       setNotice(null)
     } else setNotice('planning.requestDraftKept')
-    requestAnimationFrame(() => document.getElementById('schedule-requests-panel')?.querySelector<HTMLSelectElement>('select')?.focus())
+    requestAnimationFrame(() => root.current?.querySelector<HTMLElement>('[id="schedule-requests-panel"]')?.querySelector<HTMLSelectElement>('select')?.focus())
   }, [prefill])
   const dirty = !!employeeId || !!reason || Object.values(reviewReasons).some(Boolean) || !!attempt
   useEffect(() => { onDirtyChange(dirty); return () => onDirtyChange(false) }, [dirty, onDirtyChange])
+  // Only writes count as scheduler mutations; a reload must not block lock or navigation.
+  const [writing,setWriting]=useState(false)
+  useEffect(()=>{onBusyChange?.(writing);return()=>onBusyChange?.(false)},[writing,onBusyChange])
+  const inFlight=useRef(false)
+  const root=useRef<HTMLElement>(null)
   const requests = source.record?.data.requests ?? []
   function resetEntry() { setEmployeeId(''); setReason(''); setReceived(localTime()); setDraftId(crypto.randomUUID()) }
   async function run(next: Attempt) {
+    if(inFlight.current||!token)return
+    inFlight.current=true;setWriting(true)
     setAttempt(next); setBusy(true); setError(null); setNotice(null); source.invalidate()
     try {
       const saved = await putRequests(source.station, token, next.previous, next.data, next.preparer, next.operation)
@@ -76,7 +84,7 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
       const code = caught instanceof RequestApiError ? caught.code : 'unavailable'
       setError(code === 'conflict' ? 'requests.conflict' : code === 'invalid' ? 'requests.invalid' : code === 'unauthorized' ? 'requests.unauthorized' : 'requests.failed')
       // Retain the exact attempted body and operation ID until retry or an explicit reload resolves it.
-    } finally { if (mounted.current) setBusy(false) }
+    } finally { inFlight.current=false;if (mounted.current) { setBusy(false); setWriting(false) } }
   }
   async function reload() {
     setConfirmReload(false); setBusy(true); setError(null); setNotice(null)
@@ -112,7 +120,7 @@ export default function RequestsPanel({ source, employees, weekStart, token, loc
     void run({ previous: source.record, data, preparer: reviewer.trim(), operation: crypto.randomUUID(), kind: 'review', id: item.id })
   }
   const active = source.phase === 'ready' && !busy && !attempt
-  return <section id="schedule-requests" className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm print:hidden" aria-label={t('requests.title')}>
+  return <section ref={root} id="schedule-requests" className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm print:hidden" aria-label={t('requests.title')}>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <button type="button" className={button} aria-expanded={open} aria-controls="schedule-requests-panel" onClick={() => setOpen(value => !value)}>{t('requests.title')} · {t('requests.waiting', { count: requests.filter(item => item.status === 'pending').length })}</button>
       {!hideLanguage && <div role="group" aria-label={t('requests.language')} className="flex gap-2">{(['en', 'es'] as const).map(language => <button key={language} type="button" className={button} lang={language} aria-pressed={locale === language} onClick={() => { onLocaleChange(language); try { localStorage.setItem(LOCALE_STORAGE_KEY, language) } catch { /* optional preference */ } }}>{language === 'en' ? 'English' : 'Español'}</button>)}</div>}

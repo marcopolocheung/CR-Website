@@ -1,5 +1,7 @@
 'use client'
 
+import { useSchedulerText } from './useSchedulerText'
+
 import { Fragment, useId, useState } from 'react'
 import {
   DAYS,
@@ -29,16 +31,17 @@ export function AvailabilityPresetBar({
   gapSlot?: StaffingSlot
   weekStart?: string
 }) {
+  const text = useSchedulerText()
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {availabilityPresets.map((preset) => (
         <button
-          key={preset.label}
+          key={text(preset.label)}
           type="button"
           className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
           onClick={() => onApply(preset.build())}
         >
-          {preset.label}
+          {text(preset.label)}
         </button>
       ))}
       {gapSlot && (
@@ -47,8 +50,7 @@ export function AvailabilityPresetBar({
           className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
           onClick={() => onApply(gapAvailability(gapSlot))}
         >
-          {weekStart ? formatDayLabel(weekStart, gapSlot.day) : gapSlot.day} {periodLabels[gapSlot.period]} only
-        </button>
+          {weekStart ? formatDayLabel(weekStart, gapSlot.day) : gapSlot.day} {periodLabels[gapSlot.period]}{' '}{text("only")}</button>
       )}
     </div>
   )
@@ -69,6 +71,7 @@ export function AvailabilityGridEditor({
   onToggleCustomControls?: () => void
   presets?: React.ReactNode
 }) {
+  const text = useSchedulerText()
   const [pendingReset, setPendingReset] = useState<{ day: DayOfWeek; period: 'am' | 'pm'; checked: boolean } | null>(null)
   const customControlsId = useId()
   const canCustomize = Boolean(onChange && onToggleCustomControls)
@@ -127,9 +130,9 @@ export function AvailabilityGridEditor({
       {expanded && presets ? presets : null}
       <div className="grid grid-cols-[2.5rem_2rem_2rem_1fr] items-center gap-x-3">
         <span />
-        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">AM</span>
-        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">PM</span>
-        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Hours</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{text("AM")}</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{text("PM")}</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{text("Hours")}</span>
       </div>
       {DAYS.map((day) => {
         const { am, pm } = dayAvailabilityFromRanges(recurringAvailability[day])
@@ -141,7 +144,7 @@ export function AvailabilityGridEditor({
         return (
           <Fragment key={day}>
             <div className="grid grid-cols-[2.5rem_2rem_2rem_1fr] items-center gap-x-3">
-              <span className="text-xs text-zinc-700">{day.slice(0, 3)}</span>
+              <span className="text-xs text-zinc-700">{text(day.slice(0, 3))}</span>
               <label className="flex items-center justify-start">
                 <input type="checkbox" checked={am} onChange={(event) => requestToggle(day, 'am', event.target.checked)} />
               </label>
@@ -149,7 +152,7 @@ export function AvailabilityGridEditor({
                 <input type="checkbox" checked={pm} onChange={(event) => requestToggle(day, 'pm', event.target.checked)} />
               </label>
               <div className="min-w-0 space-y-1">
-                {ranges.length === 0 && <span className="text-xs text-zinc-400">Off</span>}
+                {ranges.length === 0 && <span className="text-xs text-zinc-400">{text("Off")}</span>}
                 {ranges.map((range, index) => (
                   <div key={index} className="flex min-w-0 flex-wrap items-center gap-1">
                     <TimeField
@@ -158,9 +161,7 @@ export function AvailabilityGridEditor({
                       disabled={!onChange}
                       onChange={(totalMinutes) => updateRangeTime(day, index, 'start', minutesToTimeValue(totalMinutes))}
                     />
-                    <span aria-hidden="true" className="text-xs text-zinc-500">
-                      to
-                    </span>
+                    <span aria-hidden="true" className="text-xs text-zinc-500">{text("to")}</span>
                     <TimeField
                       ariaLabel={`${day} availability ${index + 1} end`}
                       value={range.end}
@@ -168,9 +169,7 @@ export function AvailabilityGridEditor({
                       onChange={(totalMinutes) => updateRangeTime(day, index, 'end', minutesToTimeValue(totalMinutes))}
                     />
                     {isSingleCustomRange(range) && (
-                      <span className="rounded border border-sky-200 bg-sky-50 px-1 py-px text-[10px] font-semibold text-sky-900">
-                        Custom
-                      </span>
+                      <span className="rounded border border-sky-200 bg-sky-50 px-1 py-px text-[10px] font-semibold text-sky-900">{text("Custom")}</span>
                     )}
                     {onChange && ranges.length > 1 && (
                       <button
@@ -189,32 +188,24 @@ export function AvailabilityGridEditor({
                     type="button"
                     className="text-[11px] font-semibold text-sky-800 hover:text-sky-900"
                     onClick={() => addRange(day)}
-                  >
-                    + Add hours
-                  </button>
+                  >{text("+ Add hours")}</button>
                 )}
                 {onChange && ranges.length === 0 && (
                   <button
                     type="button"
                     className="text-[11px] font-semibold text-sky-800 hover:text-sky-900"
                     onClick={() => addRange(day)}
-                  >
-                    + Add hours
-                  </button>
+                  >{text("+ Add hours")}</button>
                 )}
               </div>
               {confirming && (
                 <div className="ml-10 mt-1 flex flex-wrap items-center gap-2 rounded border border-amber-300 bg-amber-50 px-2 py-1.5">
-                  <span className="text-[11px] font-medium text-amber-900">
-                    Replace {customLabel || 'custom hours'} with standard halves?
-                  </span>
+                  <span className="text-[11px] font-medium text-amber-900">{text("Replace")}{' '}{customLabel || 'custom hours'}{' '}{text("with standard halves?")}</span>
                   <button
                     type="button"
                     className="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100"
                     onClick={() => setPendingReset(null)}
-                  >
-                    Cancel
-                  </button>
+                  >{text("Cancel")}</button>
                   <button
                     type="button"
                     className="rounded bg-zinc-900 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-zinc-700"
@@ -223,15 +214,11 @@ export function AvailabilityGridEditor({
                       setPendingReset(null)
                       if (pending) onToggle(pending.day, pending.period, pending.checked)
                     }}
-                  >
-                    Use standard
-                  </button>
+                  >{text("Use standard")}</button>
                 </div>
               )}
               {expanded && custom && single && !confirming && (
-                <p className="ml-10 text-[11px] text-zinc-500">
-                  Custom {formatTimeRange(single)} — AM/PM boxes only show overlap; changing them resets to standard halves.
-                </p>
+                <p className="ml-10 text-[11px] text-zinc-500">{text("Custom")}{' '}{formatTimeRange(single)}{' '}{text("— AM/PM boxes only show overlap; changing them resets to standard halves.")}</p>
               )}
             </div>
           </Fragment>
@@ -271,6 +258,7 @@ export function EmployeeForm({
   onAdd: () => void
   onAddCustomRole: (raw: string) => void
 }) {
+  const text = useSchedulerText()
   const saveHint = !draft.name.trim()
     ? 'Add a name to save.'
     : roles.every((role) => !draft.roles[role]) && !draft.newHire
@@ -296,18 +284,16 @@ export function EmployeeForm({
   }
   return (
     <div className="mt-4 rounded border border-zinc-200 bg-zinc-50 p-3">
-      <label className="block text-sm font-medium text-zinc-800">
-        Employee name
-        <input
+      <label className="block text-sm font-medium text-zinc-800">{text("Employee name")}<input
           className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           value={draft.name}
           onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
-          placeholder="Name"
+          placeholder={text("Name")}
         />
       </label>
 
       <fieldset className="mt-3">
-        <legend className="text-sm font-medium text-zinc-800">Positions</legend>
+        <legend className="text-sm font-medium text-zinc-800">{text("Positions")}</legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {roles.map((role) => (
             <label key={role} className="flex items-center gap-2 rounded border border-zinc-200 bg-white px-2 py-2 text-sm text-zinc-700">
@@ -337,8 +323,8 @@ export function EmployeeForm({
                 setCustomRole('')
               }
             }}
-            placeholder="New position (e.g. Sushi Chef)"
-            aria-label="Add a custom position"
+            placeholder={text("New position (e.g. Sushi Chef)")}
+            aria-label={text("Add a custom position")}
           />
           <button
             type="button"
@@ -348,19 +334,14 @@ export function EmployeeForm({
               onAddCustomRole(customRole)
               setCustomRole('')
             }}
-            title="Add any position you need — it becomes available everywhere on this page."
-          >
-            Add position
-          </button>
+            title={text("Add any position you need — it becomes available everywhere on this page.")}
+          >{text("Add position")}</button>
         </div>
       </fieldset>
 
       <fieldset className="mt-3">
-        <legend className="text-sm font-medium text-zinc-800">Availability</legend>
-        <p className="mt-1 text-xs text-zinc-500">
-          Pick AM/PM per day. For 12-7 or 4-7 workers, customize hours then fine-tune per-day. 12-7 spans both halves:
-          keep doubles on if they can take one morning plus one dinner spot the same day.
-        </p>
+        <legend className="text-sm font-medium text-zinc-800">{text("Availability")}</legend>
+        <p className="mt-1 text-xs text-zinc-500">{text("Pick AM/PM per day. For 12-7 or 4-7 workers, customize hours then fine-tune per-day. 12-7 spans both halves: keep doubles on if they can take one morning plus one dinner spot the same day.")}</p>
         <AvailabilityGridEditor
           recurringAvailability={draft.recurringAvailability}
           onToggle={toggleAvailabilityDay}
@@ -378,9 +359,7 @@ export function EmployeeForm({
       </fieldset>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <label className="text-sm font-medium text-zinc-800">
-          Max days (1–7)
-          <input
+        <label className="text-sm font-medium text-zinc-800">{text("Max days (1–7)")}<input
             className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             min={1}
             max={7}
@@ -389,15 +368,13 @@ export function EmployeeForm({
             onChange={(event) => onDraftChange({ ...draft, maxDaysPerWeek: clampMaxDays(Number(event.target.value)) })}
           />
         </label>
-        <label className="text-sm font-medium text-zinc-800">
-          Max hours (optional)
-          <input
+        <label className="text-sm font-medium text-zinc-800">{text("Max hours (optional)")}<input
             className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             min={1}
             max={80}
             type="number"
             inputMode="numeric"
-            placeholder="No limit"
+            placeholder={text("No limit")}
             value={draft.maxHoursPerWeek ?? ''}
             onChange={(event) => onDraftChange({ ...draft, maxHoursPerWeek: parseMaxHours(event.target.value) })}
           />
@@ -407,9 +384,7 @@ export function EmployeeForm({
             type="checkbox"
             checked={draft.allowDoubles}
             onChange={(event) => onDraftChange({ ...draft, allowDoubles: event.target.checked })}
-          />
-          Can work doubles
-        </label>
+          />{text("Can work doubles")}</label>
       </div>
 
       <label className="mt-3 flex items-center gap-2 text-sm font-medium text-zinc-800">
@@ -417,24 +392,20 @@ export function EmployeeForm({
           type="checkbox"
           checked={draft.newHire}
           onChange={(event) => onDraftChange({ ...draft, newHire: event.target.checked })}
-        />
-        New hire (can be placed in any position, still limited by max days)
-      </label>
+        />{text("New hire (can be placed in any position, still limited by max days)")}</label>
 
       <button
         type="button"
         className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
         disabled={!canAddEmployee}
         onClick={onAdd}
-        title={saveHint ?? 'Save this person to the staff list.'}
+        title={text(saveHint ?? 'Save this person to the staff list.')}
         aria-disabled={!canAddEmployee}
       >
-        <Icon name="plus" />
-        Save employee
-      </button>
+        <Icon name="plus" />{text("Save employee")}</button>
       {saveHint && (
         <p className="mt-2 text-xs text-zinc-600" role="note">
-          {saveHint}
+          {text(saveHint)}
         </p>
       )}
     </div>
@@ -456,6 +427,7 @@ export function EmployeeCard({
   onRemove: (employeeId: string) => void
   readOnly?: boolean
 }) {
+  const text = useSchedulerText()
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [customizing, setCustomizing] = useState(false)
   // Union so custom posts already on this person never disappear from their card.
@@ -476,10 +448,10 @@ export function EmployeeCard({
           <div className="min-w-0">
             <div className="truncate font-semibold text-zinc-950">{employee.name}</div>
             <p className="mt-0.5 text-xs text-zinc-600">
-              {availabilitySummary(employee)} · {stat && stat.shifts > 0 ? `${stat.hours.toFixed(1)}h · ${stat.days}d this week` : 'off this week'}
+              {availabilitySummary(employee).split(/(Any day|mornings|dinners|mixed hours|No availability set|Sun|Mon|Tue|Wed|Thu|Fri|Sat)/).map(part=>text(part)).join('')} · {stat && stat.shifts > 0 ? text('{hours}h · {days}d this week',{hours:stat.hours.toFixed(1),days:stat.days}) : text("off this week")}
             </p>
           </div>
-          {!employee.active && <span className="shrink-0 text-xs font-semibold text-zinc-500">Off the list</span>}
+          {!employee.active && <span className="shrink-0 text-xs font-semibold text-zinc-500">{text("Off the list")}</span>}
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {visibleRoles
@@ -490,15 +462,14 @@ export function EmployeeCard({
               </span>
             ))}
           {employee.newHire && (
-            <span className="inline-flex items-center rounded border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-900">New hire</span>
+            <span className="inline-flex items-center rounded border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-900">{text("New hire")}</span>
           )}
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
-          Max {employee.maxDaysPerWeek ?? 7} days{employee.maxHoursPerWeek !== undefined && `, ${employee.maxHoursPerWeek} h`} · {employee.allowDoubles ? `doubles${employee.maxDoublesPerWeek !== undefined ? ` (max ${employee.maxDoublesPerWeek})` : ''}` : 'no doubles'} · Priority {employee.priority ?? DEFAULT_PRIORITY}
+        <p className="mt-2 text-xs text-zinc-500">{text("Max")}{' '}{employee.maxDaysPerWeek ?? 7}{' '}{text("days")}{' '}{employee.maxHoursPerWeek !== undefined && `, ${employee.maxHoursPerWeek} h`} · {employee.allowDoubles ? `doubles${employee.maxDoublesPerWeek !== undefined ? ` (max ${employee.maxDoublesPerWeek})` : ''}` : 'no doubles'}{' '}{text("· Priority")}{' '}{employee.priority ?? DEFAULT_PRIORITY}
           {employee.suspendedFrom && ` · Suspended ${suspensionText(employee)}`}
         </p>
         {(employee.shiftRoles?.length ?? 0) > 0 && (
-          <p className="mt-1 text-xs text-zinc-600">Only as: {shiftRolesText(employee)}</p>
+          <p className="mt-1 text-xs text-zinc-600">{text("Only as:")}{' '}{shiftRolesText(employee)}</p>
         )}
       </div>
     )
@@ -510,7 +481,7 @@ export function EmployeeCard({
         <div className="min-w-0">
           <div className="truncate font-semibold text-zinc-950">{employee.name}</div>
           <p className="mt-0.5 text-xs text-zinc-600">
-            {availabilitySummary(employee)} · {stat && stat.shifts > 0 ? `${stat.hours.toFixed(1)}h · ${stat.days}d this week` : 'off this week'}
+            {availabilitySummary(employee).split(/(Any day|mornings|dinners|mixed hours|No availability set|Sun|Mon|Tue|Wed|Thu|Fri|Sat)/).map(part=>text(part)).join('')} · {stat && stat.shifts > 0 ? text('{hours}h · {days}d this week',{hours:stat.hours.toFixed(1),days:stat.days}) : text("off this week")}
           </p>
         </div>
         <label className="flex shrink-0 items-center gap-2 text-sm text-zinc-700">
@@ -518,41 +489,33 @@ export function EmployeeCard({
             type="checkbox"
             checked={employee.active}
             onChange={(event) => onUpdate(employee.id, { active: event.target.checked })}
-          />
-          Working
-        </label>
+          />{text("Working")}</label>
       </div>
 
       {confirmingRemove ? (
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-red-300 bg-red-50 px-2 py-1.5">
-          <span className="text-xs font-semibold text-red-900">Remove {employee.name} from the staff list?</span>
+          <span className="text-xs font-semibold text-red-900">{text('Remove {name} from the staff list?',{name:employee.name})}</span>
           <button
             type="button"
             className="rounded bg-red-800 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             onClick={() => onRemove(employee.id)}
-          >
-            Yes, remove
-          </button>
+          >{text("Yes, remove")}</button>
           <button
             type="button"
             className="rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             onClick={() => setConfirmingRemove(false)}
-          >
-            Cancel
-          </button>
+          >{text("Cancel")}</button>
         </div>
       ) : (
         <button
           type="button"
           className="mt-2 text-xs font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={() => setConfirmingRemove(true)}
-        >
-          Remove from staff list
-        </button>
+        >{text("Remove from staff list")}</button>
       )}
 
       <fieldset className="mt-2">
-        <legend className="sr-only">Positions {employee.name} can work</legend>
+        <legend className="sr-only">{text('Positions {name} can work',{name:employee.name})}</legend>
         <div className="flex flex-wrap gap-1.5">
           {visibleRoles.map((role) => {
             const checked = employee.roles.includes(role)
@@ -578,15 +541,11 @@ export function EmployeeCard({
 
       {employee.roles.length === 0 && !employee.newHire && (
         <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-800">
-          <Icon name="warning" />
-          No positions picked, so {employee.name} cannot be scheduled.
-        </p>
+          <Icon name="warning" />{text('No positions picked, so {name} cannot be scheduled.',{name:employee.name})}</p>
       )}
 
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <label className="text-sm text-zinc-700">
-          Max days (1–7)
-          <input
+        <label className="text-sm text-zinc-700">{text("Max days (1–7)")}<input
             className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             min={1}
             max={7}
@@ -595,15 +554,13 @@ export function EmployeeCard({
             onChange={(event) => onUpdate(employee.id, { maxDaysPerWeek: clampMaxDays(Number(event.target.value)) })}
           />
         </label>
-        <label className="text-sm text-zinc-700">
-          Max hours
-          <input
+        <label className="text-sm text-zinc-700">{text("Max hours")}<input
             className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             min={1}
             max={80}
             type="number"
             inputMode="numeric"
-            placeholder="No limit"
+            placeholder={text("No limit")}
             value={employee.maxHoursPerWeek ?? ''}
             onChange={(event) => onUpdate(employee.id, { maxHoursPerWeek: parseMaxHours(event.target.value) })}
           />
@@ -613,9 +570,7 @@ export function EmployeeCard({
             type="checkbox"
             checked={employee.allowDoubles}
             onChange={(event) => onUpdate(employee.id, { allowDoubles: event.target.checked })}
-          />
-          Doubles
-        </label>
+          />{text("Doubles")}</label>
       </div>
 
       <label className="mt-2 flex items-center gap-2 text-sm text-zinc-700">
@@ -623,31 +578,25 @@ export function EmployeeCard({
           type="checkbox"
           checked={Boolean(employee.newHire)}
           onChange={(event) => onUpdate(employee.id, { newHire: event.target.checked })}
-        />
-        New hire (any position, still limited by max days)
-      </label>
+        />{text("New hire (any position, still limited by max days)")}</label>
 
-      <label className="mt-3 block text-sm text-zinc-700">
-        Priority
-        <select
+      <label className="mt-3 block text-sm text-zinc-700">{text("Priority")}<select
           className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           value={employee.priority ?? DEFAULT_PRIORITY}
           onChange={(event) => onUpdate(employee.id, { priority: Number(event.target.value) })}
         >
           {[1, 2, 3, 4, 5].map((rank) => (
             <option key={rank} value={rank}>
-              {rank === 1 ? '1 (scheduled first)' : rank === 5 ? '5 (scheduled last)' : rank === DEFAULT_PRIORITY ? `${rank} (normal)` : rank}
+              {rank === 1 ? text('1 (scheduled first)') : rank === 5 ? text('5 (scheduled last)') : rank === DEFAULT_PRIORITY ? text('{rank} (normal)',{rank}) : rank}
             </option>
           ))}
         </select>
       </label>
 
       <fieldset className="mt-3">
-        <legend className="text-sm text-zinc-700">Suspended (not scheduled on these dates)</legend>
+        <legend className="text-sm text-zinc-700">{text("Suspended (not scheduled on these dates)")}</legend>
         <div className="mt-1 grid grid-cols-2 gap-3">
-          <label className="text-xs text-zinc-600">
-            From
-            <input
+          <label className="text-xs text-zinc-600">{text("From")}<input
               type="date"
               className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
               value={employee.suspendedFrom ?? ''}
@@ -658,9 +607,7 @@ export function EmployeeCard({
               }}
             />
           </label>
-          <label className="text-xs text-zinc-600">
-            Through
-            <input
+          <label className="text-xs text-zinc-600">{text("Through")}<input
               type="date"
               className="mt-1 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
               value={employee.suspendedUntil ?? ''}
@@ -675,15 +622,13 @@ export function EmployeeCard({
             type="button"
             className="mt-1 text-xs font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             onClick={() => onUpdate(employee.id, { suspendedFrom: undefined, suspendedUntil: undefined })}
-          >
-            Clear suspension
-          </button>
+          >{text("Clear suspension")}</button>
         )}
       </fieldset>
 
       <ShiftRolesEditor employee={employee} roles={visibleRoles} onUpdate={onUpdate} />
 
-      <Disclosure summary="Edit availability" tone="quiet">
+      <Disclosure summary={text("Edit availability")} tone="quiet">
         <AvailabilityGridEditor
           recurringAvailability={employee.recurringAvailability}
           onToggle={(day, period, checked) => {
@@ -726,6 +671,7 @@ export function ShiftRolesEditor({
   roles: string[]
   onUpdate: (employeeId: string, update: Partial<Employee>) => void
 }) {
+  const text = useSchedulerText()
   const shiftRoles = employee.shiftRoles ?? []
   const [day, setDay] = useState<DayOfWeek>(DAYS[0])
   const [period, setPeriod] = useState<ShiftPeriod>('AM')
@@ -738,45 +684,41 @@ export function ShiftRolesEditor({
   }
 
   return (
-    <Disclosure summary={`Only one position on a shift${shiftRoles.length > 0 ? ` (${shiftRoles.length})` : ''}`} tone="quiet">
-      <p className="text-xs text-zinc-600">
-        On these shifts {employee.name} is only scheduled in the position picked here. Other shifts use every position above.
-      </p>
+    <Disclosure summary={text('Only one position on a shift{count}',{count:shiftRoles.length > 0 ? ` (${shiftRoles.length})` : ''})} tone="quiet">
+      <p className="text-xs text-zinc-600">{text("On these shifts")}{' '}{employee.name}{' '}{text("is only scheduled in the position picked here. Other shifts use every position above.")}</p>
       {shiftRoles.length > 0 && (
         <ul className="mt-2 space-y-1">
           {shiftRoles.map((shiftRole) => (
             <li key={`${shiftRole.day}-${shiftRole.period}`} className="flex items-center justify-between gap-2 rounded bg-zinc-50 px-2 py-1 text-xs">
               <span>
-                {shiftRole.day} {periodLabels[shiftRole.period]} → <span className="font-semibold">{roleLabel(shiftRole.role)}</span>
+                {text(shiftRole.day)} {periodLabels[shiftRole.period]} → <span className="font-semibold">{roleLabel(shiftRole.role)}</span>
               </span>
               <button
                 type="button"
                 className="font-semibold text-red-800 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                 onClick={() => save(shiftRoles.filter((candidate) => candidate !== shiftRole))}
-                aria-label={`Remove ${shiftRole.day} ${periodLabels[shiftRole.period]} rule`}
-              >
-                Remove
-              </button>
+                aria-label={text('Remove {day} {period} rule',{day:text(shiftRole.day),period:periodLabels[shiftRole.period]})}
+              >{text("Remove")}</button>
             </li>
           ))}
         </ul>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <select className={selectClass} aria-label="Day" value={day} onChange={(event) => setDay(event.target.value as DayOfWeek)}>
+        <select className={selectClass} aria-label={text("Day")} value={day} onChange={(event) => setDay(event.target.value as DayOfWeek)}>
           {DAYS.map((candidate) => (
             <option key={candidate} value={candidate}>
-              {candidate}
+              {text(candidate)}
             </option>
           ))}
         </select>
-        <select className={selectClass} aria-label="Shift" value={period} onChange={(event) => setPeriod(event.target.value as ShiftPeriod)}>
+        <select className={selectClass} aria-label={text("Shift")} value={period} onChange={(event) => setPeriod(event.target.value as ShiftPeriod)}>
           {PERIODS.map((candidate) => (
             <option key={candidate} value={candidate}>
               {periodLabels[candidate]}
             </option>
           ))}
         </select>
-        <select className={selectClass} aria-label="Position" value={role} onChange={(event) => setRole(event.target.value)}>
+        <select className={selectClass} aria-label={text("Position")} value={role} onChange={(event) => setRole(event.target.value)}>
           {roles.map((candidate) => (
             <option key={candidate} value={candidate}>
               {roleLabel(candidate)}
@@ -791,7 +733,7 @@ export function ShiftRolesEditor({
             save([...shiftRoles.filter((candidate) => candidate.day !== day || candidate.period !== period), { day, period, role }])
           }
         >
-          {shiftRoles.some((candidate) => candidate.day === day && candidate.period === period) ? 'Replace' : 'Add'}
+          {shiftRoles.some((candidate) => candidate.day === day && candidate.period === period) ? text("Replace") : 'Add'}
         </button>
       </div>
     </Disclosure>

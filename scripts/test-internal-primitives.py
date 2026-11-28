@@ -200,7 +200,7 @@ assert not page_errors, page_errors
 sources = [*ROOT.glob('src/components/internal/ui/*.tsx'), *ROOT.glob('src/components/internal/ui/*.css'),
            ROOT/'src/components/internal/Feedback.tsx', ROOT/'src/components/internal/EntryWorkspace.tsx',
            ROOT/'src/components/internal/InternalLanguage.tsx', ROOT/'src/components/scheduler/ui.tsx',
-           ROOT/'src/app/(order-shell)/internal/ui-gallery/page.tsx', Path(__file__).resolve()]
+           ROOT/'src/app/(order-shell)/(internal-tools)/internal/ui-gallery/page.tsx', Path(__file__).resolve()]
 manifest = {'baseCommit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
             'sourceFilesSha256': {str(f.relative_to(ROOT)): hashlib.sha256(f.read_bytes()).hexdigest() for f in sources}, 'browser': browser_version,
             'base': args.base, 'scenarios': results, 'screenshots': images, 'externalAttempts': blocked, 'apiRequests': api, 'pageErrors': page_errors}

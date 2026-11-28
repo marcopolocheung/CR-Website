@@ -1,9 +1,13 @@
+import { schedulerScreenEnglish } from './scheduler-screen'
+import { scheduleShellEnglish } from './schedule-shell'
 import { formsEnglish } from './forms-entry'
 import { formsDraftEnglish } from './forms-drafts'
 import { formsWorkspaceEnglish } from './forms-workspace'
 import { planningEnglish } from './planning'
 import { hoursEnglish } from './special-hours'
 const en = {
+  ...schedulerScreenEnglish,
+  ...scheduleShellEnglish,
   ...hoursEnglish,
   ...formsEnglish,
   ...formsDraftEnglish,

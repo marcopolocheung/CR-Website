@@ -1,3 +1,4 @@
+import { schedulerRequestJson, type SchedulerRequestScope } from './scheduler-http'
 import { getScheduleApiBase, StoreAuthError, StoreConflictError, StoreRejectedError, StoreUnavailableError } from './schedule-store'
 import { isRosterEmployee, toRosterEmployee } from './employee-store'
 import type { Employee } from './scheduler'
@@ -54,7 +55,7 @@ function parseStaffBody(body: unknown): StaffSnapshot | null {
 export async function fetchStaff(token: string, restaurantId?: string): Promise<StaffSnapshot> {
   const { status, body } = await requestJson(`/api/staff${staffQuery(restaurantId)}`, {
     headers: { Authorization: `Bearer ${token}` },
-  })
+  }, 'manager', token)
   if (status === 401) throw new StoreAuthError()
   if (status === 200) {
     const parsed = parseStaffBody(body)
@@ -71,7 +72,7 @@ export async function verifyStaffPassword(password: string, restaurantId?: strin
   const { status } = await requestJson(`/api/staff/verify${staffQuery(restaurantId)}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${password}` },
-  })
+  }, 'staff')
   if (status === 200) return
   if (status === 401) throw new StoreAuthError()
   if (status === 429) throw new StoreUnavailableError('Too many wrong passwords. Wait a bit and try again.')
@@ -89,7 +90,7 @@ export async function saveStaff(
     method: 'PUT',
     headers: { Authorization: `Bearer ${password}` },
     body: JSON.stringify({ employees: employees.map(toStoredEmployee), baseRev }),
-  })
+  }, 'staff')
   return handleStaffWrite(status, body)
 }
 
@@ -102,7 +103,7 @@ export async function undoStaff(
     method: 'POST',
     headers: { Authorization: `Bearer ${password}` },
     body: JSON.stringify({ baseRev }),
-  })
+  }, 'staff')
   if (status === 409 && body && typeof body === 'object' && (body as { error?: unknown }).error === 'nothing_to_undo') {
     throw new StoreUnavailableError('There is no saved crew change left to undo.')
   }
@@ -129,26 +130,6 @@ function handleStaffWrite(status: number, body: unknown): StaffWriteResult {
   throw new StoreUnavailableError()
 }
 
-async function requestJson(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 10000)
-  try {
-    const response = await fetch(`${getScheduleApiBase()}${path}`, {
-      ...init,
-      cache: 'no-store',
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-    })
-    let body: unknown = null
-    try {
-      body = await response.json()
-    } catch {
-      body = null
-    }
-    return { status: response.status, body }
-  } catch {
-    throw new StoreUnavailableError()
-  } finally {
-    clearTimeout(timer)
-  }
+async function requestJson(path: string, init?: RequestInit, scope: SchedulerRequestScope = 'public', credential?: string): Promise<{ status: number; body: unknown }> {
+  return schedulerRequestJson(`${getScheduleApiBase()}${path}`, init, scope, () => new StoreUnavailableError(), credential)
 }

@@ -1,3 +1,4 @@
+import { captureSchedulerSession, schedulerRequestJson, type SchedulerAuthScope, type SchedulerRequestScope } from './scheduler-http'
 import { DAYS, type WeeklyStaffingTemplate } from './scheduler'
 import { getScheduleApiBase, isGoldenWeekDoc, requireScheduleSnapshots, StoreAuthError, StoreConflictError, StoreRejectedError, StoreUnavailableError, type GoldenWeekDoc } from './schedule-store'
 
@@ -51,14 +52,17 @@ export async function saveTemplate(
   token: string,
   restaurantId?: string,
   weekStart?: string,
+  authScope: SchedulerAuthScope = 'manager',
 ): Promise<{ rev: number; updatedAt: string | null; preservedPublication?: GoldenWeekDoc }> {
+  const check = captureSchedulerSession(authScope, token)
   await requireScheduleSnapshots()
+  check()
   const { status, body } = await requestJson(`/api/template${templateQuery(restaurantId, weekStart)}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ template, baseRev }),
-  })
-  if (status === 401) throw new StoreAuthError()
+  }, authScope, token)
+  if (status === 401 || status === 403) throw new StoreAuthError()
   if (status === 400) throw new StoreRejectedError('The server refused these shift rules. Open Shift rules in Employee settings and fix the spots marked in red.')
   if (status === 503) {
     throw new StoreUnavailableError(
@@ -86,26 +90,6 @@ export function templateFingerprint(template: WeeklyStaffingTemplate): string {
   return JSON.stringify(template)
 }
 
-async function requestJson(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 10000)
-  try {
-    const response = await fetch(`${getScheduleApiBase()}${path}`, {
-      ...init,
-      cache: 'no-store',
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-    })
-    let body: unknown = null
-    try {
-      body = await response.json()
-    } catch {
-      body = null
-    }
-    return { status: response.status, body }
-  } catch {
-    throw new StoreUnavailableError()
-  } finally {
-    clearTimeout(timer)
-  }
+async function requestJson(path: string, init?: RequestInit, scope: SchedulerRequestScope = 'public', credential?: string): Promise<{ status: number; body: unknown }> {
+  return schedulerRequestJson(`${getScheduleApiBase()}${path}`, init, scope, () => new StoreUnavailableError(), credential)
 }

@@ -1,4 +1,5 @@
 export const planningEnglish = {
+  'schedulerPlanning.restoreShift':'Restore generated shift', 'schedulerPlanning.fixes':'{count} to fix', 'schedulerPlanning.mustFix':'Must fix before printing', 'schedulerPlanning.canSkip':'You can skip this warning', 'schedulerPlanning.chooseEmployee':'Choose employee', 'schedulerPlanning.ignore':'Ignore for now', 'schedulerPlanning.noCandidates':'Nobody is free and trained for this spot. Review employee rules or choose a different assignment.', 'schedulerPlanning.excludedCandidates':'Why {count} others cannot cover this', 'schedulerPlanning.noFixes':'No remaining issues to review.', 'schedulerPlanning.showSkipped':'Show {count} skipped', 'schedulerPlanning.generationReport':'Generation report', 'schedulerPlanning.dismiss':'Dismiss', 'schedulerPlanning.generatedChanges':'Changes since generation ({count})',
   'planning.lockPlacement': 'Lock assignment', 'planning.unlockPlacement': 'Unlock assignment',
   'planning.remove': 'Remove from this shift', 'planning.removeHelp': 'They won’t be picked for this position on this shift. Auto-adjust fills the spot.',
   'planning.removed': 'Removed. They won’t be picked for this position on this shift.',
@@ -33,9 +34,9 @@ export const planningEnglish = {
   'planning.schedule': 'Schedule', 'planning.team': 'Team', 'planning.review': 'Review', 'planning.settings': 'Staff & rules',
   'planning.layout': 'Layout', 'planning.current': 'Current', 'planning.classic': 'Classic', 'planning.workspace': 'Planning workspace',
   'planning.auto': 'Auto-adjust', 'planning.autoHelp': 'Keep your placements. Adjust the rest.', 'planning.adjust': 'Adjust schedule',
-  'planning.make': 'Make schedule', 'planning.publish': 'Publish to staff', 'planning.undo': 'Undo', 'planning.busy': 'Adjusting the week…',
+  'planning.make': 'Build week', 'planning.publish': 'Publish to staff', 'planning.undo': 'Undo', 'planning.busy': 'Adjusting the week…',
   'planning.covered': '{filled}/{required} required spots covered · {kept} kept', 'planning.more': 'More actions', 'planning.print': 'Print',
-  'planning.copy': 'Copy last week', 'planning.clear': 'Clear week', 'planning.clearConfirm': 'Clear this week’s assignments?',
+  'planning.copy': 'Copy previous week', 'planning.clear': 'Clear week', 'planning.clearConfirm': 'Clear this week’s assignments?',
   'planning.cancel': 'Cancel', 'planning.month': 'Month & week visibility', 'planning.messages': 'Messages', 'planning.close': 'Close',
   'planning.week': 'The week', 'planning.scroll': 'Scroll weekly schedule', 'planning.open': 'Open', 'planning.optional': 'Optional',
   'planning.needs': 'Needs coverage', 'planning.keep': 'Keep', 'planning.adjusted': 'Adjusted', 'planning.position': 'Position',
@@ -67,6 +68,7 @@ export const planningEnglish = {
 } as const
 
 export const planningSpanish: Record<keyof typeof planningEnglish, string> = {
+  'schedulerPlanning.restoreShift':'Restaurar turno generado', 'schedulerPlanning.fixes':'{count} por corregir', 'schedulerPlanning.mustFix':'Debes corregir antes de imprimir', 'schedulerPlanning.canSkip':'Puedes omitir esta advertencia', 'schedulerPlanning.chooseEmployee':'Elegir empleado', 'schedulerPlanning.ignore':'Omitir por ahora', 'schedulerPlanning.noCandidates':'Nadie está libre y capacitado para este puesto. Revisa las reglas o elige otra asignación.', 'schedulerPlanning.excludedCandidates':'Por qué otros {count} no pueden cubrirlo', 'schedulerPlanning.noFixes':'No quedan problemas por revisar.', 'schedulerPlanning.showSkipped':'Mostrar {count} omitidos', 'schedulerPlanning.generationReport':'Informe de generación', 'schedulerPlanning.dismiss':'Cerrar', 'schedulerPlanning.generatedChanges':'Cambios desde la generación ({count})',
   'planning.lockPlacement': 'Fijar asignación', 'planning.unlockPlacement': 'Liberar asignación',
   'planning.remove': 'Quitar de este turno', 'planning.removeHelp': 'No se elegirá para este puesto en este turno. El ajuste automático llena el lugar.',
   'planning.removed': 'Quitado. No se elegirá para este puesto en este turno.',

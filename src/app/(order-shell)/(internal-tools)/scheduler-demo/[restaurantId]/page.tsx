@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import SchedulerDemo from '@/components/scheduler/SchedulerDemo'
 import { RESTAURANTS, RESTAURANT_IDS, isRestaurantId } from '@/data/restaurants'
 
 export async function generateMetadata({ params }: { params: Promise<{ restaurantId: string }> }): Promise<Metadata> {
@@ -39,5 +38,5 @@ export default async function SchedulerStationPage({ params }: { params: Promise
       </div>
     )
   }
-  return <SchedulerDemo restaurantId={restaurantId} />
+  return null
 }

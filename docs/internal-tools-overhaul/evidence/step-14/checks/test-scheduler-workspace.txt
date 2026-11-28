@@ -1,0 +1,5 @@
+PASS Extensionless/slash/.html routes, direct three views/unknown hash and Sunday week links preserve URLs and issue no mutations; legacy Classic preference is inert
+PASS Build and Copy previous week preserve each working week and URL history without roster/rule/publication writes
+PASS Partial assignments, staff entry, original request and search survive view history, language, other tools, station switching and lock/unlock without writes or credential/draft serialization; reload warns and starts a new locked visit
+PASS A held unauthorized read from a prior access generation cannot revoke a same-code reauthentication
+PASS All four station reports contain independent expected employee/day fields in English from Spanish configuration; 12 view screenshots cover desktop/tablet/phone/320px enlarged Spanish with no page overflow or mutations

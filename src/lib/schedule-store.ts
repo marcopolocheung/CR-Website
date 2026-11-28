@@ -1,3 +1,5 @@
+import { SessionChangedError } from './internal-tools/manager-session'
+import { captureSchedulerSession, schedulerRequestJson, type SchedulerRequestScope } from './scheduler-http'
 import { validScheduleSnapshot, type ScheduleSnapshot } from './schedule-snapshot'
 import { templateHashForSlots } from './schedule-share'
 
@@ -120,15 +122,17 @@ export async function saveGoldenWeek(
   token: string,
   restaurantId?: string,
 ): Promise<{ rev: number; updatedAt: string | null }> {
+  const check = captureSchedulerSession('manager', token)
   if (input.snapshot) await requireScheduleSnapshots()
+  check()
   const suffix = restaurantId ? `?restaurant=${encodeURIComponent(restaurantId)}` : ''
   const { status, body } = await requestJson(`/api/schedule/${weekStart}${suffix}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(input),
-  })
+  }, 'manager', token)
   if (status === 404) throw new StoreNotFoundError()
-  if (status === 401) throw new StoreAuthError()
+  if (status === 401 || status === 403) throw new StoreAuthError()
   if (status === 400) throw new StoreRejectedError('The server refused this week. Reload the page and publish again.')
   if (status === 503) {
     throw new StoreUnavailableError(
@@ -165,9 +169,9 @@ export async function verifyWriteToken(token: string): Promise<void> {
   const { status } = await requestJson('/api/auth/verify', {
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
-  })
+  }, 'verification')
   if (status === 200) return
-  if (status === 401) throw new StoreAuthError()
+  if (status === 401 || status === 403) throw new StoreAuthError()
   if (status === 429) {
     throw new StoreUnavailableError('Too many wrong codes. Wait a bit and try again.')
   }
@@ -189,28 +193,8 @@ export class StoreUnavailableError extends Error {
   }
 }
 
-async function requestJson(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 10000)
-  try {
-    const response = await fetch(`${getScheduleApiBase()}${path}`, {
-      ...init,
-      cache: 'no-store',
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-    })
-    let body: unknown = null
-    try {
-      body = await response.json()
-    } catch {
-      body = null
-    }
-    return { status: response.status, body }
-  } catch {
-    throw new StoreUnavailableError()
-  } finally {
-    clearTimeout(timer)
-  }
+async function requestJson(path: string, init?: RequestInit, scope: SchedulerRequestScope = 'public', credential?: string): Promise<{ status: number; body: unknown }> {
+  return schedulerRequestJson(`${getScheduleApiBase()}${path}`, init, scope, () => new StoreUnavailableError(), credential)
 }
 
 /**
@@ -218,6 +202,7 @@ async function requestJson(path: string, init?: RequestInit): Promise<{ status: 
  * "staff list". Conflicts say to reload because the other person's copy is on the server now.
  */
 export function saveErrorMessage(caught: unknown, what: string): string {
+  if (caught instanceof SessionChangedError) return caught.message
   if (caught instanceof StoreAuthError) return 'That code was not accepted. Check for typos and try again.'
   if (caught instanceof StoreConflictError) return `Someone else saved the ${what} first. Reload the page to see their copy, then try again.`
   if (caught instanceof StoreRejectedError) return caught.message

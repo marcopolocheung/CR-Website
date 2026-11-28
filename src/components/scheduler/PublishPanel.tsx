@@ -1,6 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useSchedulerText } from './useSchedulerText'
+import { useInternalLanguage } from '@/components/internal/InternalLanguage'
+
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildPublishedWeek, publishedWeekFingerprint, templateHashForSlots } from '@/lib/schedule-share'
 import { buildScheduleSnapshot } from '@/lib/schedule-snapshot'
 import type { ScheduleSnapshot } from '@/lib/schedule-snapshot'
@@ -15,7 +18,8 @@ import {
 import type { Employee, ScheduleAssignment, StaffingSlot, WeekStatus } from '@/lib/scheduler'
 import { formatUpdatedAt } from '@/lib/scheduler/time'
 import { validateSchedule } from '@/lib/scheduler/validator'
-import { useManagerCode } from './DemoGate'
+import { useManagerSession } from '@/components/internal/ManagerSession'
+import { managerSession, SessionChangedError } from '@/lib/internal-tools/manager-session'
 
 const scheduleChannelName = 'chinarose-schedule'
 
@@ -45,6 +49,7 @@ export default function PublishPanel({
   onPublished,
   snapshot:providedSnapshot,
   canPublishEmpty=false,
+  onBusyChange,
 }: {
   weekStart: string
   weekLabel: string
@@ -63,8 +68,15 @@ export default function PublishPanel({
   onPublished: (doc: GoldenWeekDoc) => void
   snapshot?:ScheduleSnapshot
   canPublishEmpty?:boolean
+  onBusyChange?:(busy:boolean)=>void
 }) {
-  const managerCode = useManagerCode()
+  const text = useSchedulerText()
+  const { locale } = useInternalLanguage()
+  const session = useManagerSession()
+  const managerCode = session.token
+  const flight=useRef(false)
+  const alive=useRef(true)
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
   const [name, setName] = useState(`Week of ${weekLabel}`)
   const [baseRev, setBaseRev] = useState<number | null>(null)
   const [serverFingerprint, setServerFingerprint] = useState<string | null>(null)
@@ -74,6 +86,7 @@ export default function PublishPanel({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  useEffect(()=>{onBusyChange?.(busy);return()=>onBusyChange?.(false)},[busy,onBusyChange])
   const [scheduleUrl, setScheduleUrl] = useState('')
   const filled = assignments.filter((assignment) => assignment.employeeId).length
   const qualificationViolations = useMemo(
@@ -134,15 +147,20 @@ export default function PublishPanel({
   }, [weekStart, weekLabel, restaurantId])
 
   async function publish() {
-    if (filled === 0 && !canPublishEmpty || busy || qualificationBlocked) return
+    if (!managerCode || flight.current || filled === 0 && !canPublishEmpty || busy || qualificationBlocked) return
+    const current=managerSession.capture(managerCode)
+    flight.current=true
     setBusy(true)
     setError('')
     setNotice('')
     try {
       await requireScheduleSnapshots()
+      current()
       if (!(await onSaveSetup())) return
+      current();if(!alive.current)return
       const templateHash = templateHashForSlots(slots)
       const result = await saveGoldenWeek(weekStart, { week, templateHash, snapshot, visible, baseRev: baseRev ?? 0 }, managerCode, restaurantId)
+      current();if(!alive.current)return
       onPublished({ v: 3, weekStart, rev: result.rev, week, visible, templateHash, snapshot, updatedAt: result.updatedAt ?? new Date().toISOString() })
       setBaseRev(result.rev)
       setServerFingerprint(fingerprint)
@@ -151,6 +169,7 @@ export default function PublishPanel({
       broadcastSave(weekStart, restaurantId)
       setNotice(visible ? 'Published. Staff now see this week.' : 'Saved. This week stays hidden from staff until you turn it on.')
     } catch (caught) {
+      if(!alive.current||caught instanceof SessionChangedError)return
       if (caught instanceof StoreConflictError) {
         setBaseRev(caught.rev)
         setError(
@@ -162,7 +181,8 @@ export default function PublishPanel({
         setError(saveErrorMessage(caught, 'week'))
       }
     } finally {
-      setBusy(false)
+      flight.current=false
+      if(alive.current)setBusy(false)
     }
   }
 
@@ -170,35 +190,29 @@ export default function PublishPanel({
     <section className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm print:hidden">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Publish {weekLabel}{restaurantName ? ` for ${restaurantName}` : ''} to staff</h2>
+          <h2 className="text-lg font-semibold">{text('Publish {week}{station} to staff',{week:weekLabel,station:restaurantName?text(' for {station}',{station:restaurantName}):''})}</h2>
           <p className="mt-1 text-sm text-zinc-600">
-            {filled} filled spot{filled === 1 ? '' : 's'} will be included. Staff see it on the staff schedule page — no links or codes.
-            Last published: {baseRev === null ? 'never' : formatUpdatedAt(serverUpdatedAt)}.
-            {unsavedSetup.length > 0 && <> Your unsaved {unsavedSetup.join(' and ')} will save first.</>}
+            {text('{count} filled spots will be included. Staff see it on the staff schedule page — no links or codes.',{count:filled})}{' '}
+            {text('Last published: {saved}.',{saved:baseRev===null?text('never'):formatUpdatedAt(serverUpdatedAt)})}
+            {unsavedSetup.length > 0 && <>{' '}{text('Your unsaved {parts} will save first.',{parts:unsavedSetup.map(part=>text(part)).join(` ${text('and')} `)})}</>}
           </p>
         </div>
         <button
           type="button"
           className="shrink-0 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           onClick={onClose}
-        >
-          Close
-        </button>
+        >{text("Close")}</button>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-sm font-medium text-zinc-800">
-          What to call it
-          <input
+        <label className="text-sm font-medium text-zinc-800">{text("What to call it")}<input
             className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
         </label>
         <div>
-          <span className="text-sm font-medium text-zinc-800" id="publish-visibility-label">
-            Staff can see this week
-          </span>
+          <span className="text-sm font-medium text-zinc-800" id="publish-visibility-label">{text("Staff can see this week")}</span>
           <div
             className="mt-1 flex gap-2"
             role="group"
@@ -213,9 +227,7 @@ export default function PublishPanel({
               }`}
               aria-pressed={visible}
               onClick={() => onVisibilityChange('on')}
-            >
-              On
-            </button>
+            >{text("On")}</button>
             <button
               type="button"
               className={`flex-1 rounded border px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 ${
@@ -225,9 +237,7 @@ export default function PublishPanel({
               }`}
               aria-pressed={!visible}
               onClick={() => onVisibilityChange('off')}
-            >
-              Off
-            </button>
+            >{text("Off")}</button>
           </div>
         </div>
       </div>
@@ -239,39 +249,39 @@ export default function PublishPanel({
           onClick={publish}
           disabled={busy || loading || !dirty || filled === 0 && !canPublishEmpty || qualificationBlocked}
         >
-          {busy ? 'Publishing…' : baseRev === null ? 'Publish' : 'Publish updates'}
+          {busy ? text("Publishing…") : baseRev === null ? text("Publish") : text("Publish updates")}
         </button>
-        {!dirty && baseRev !== null && <span className="text-sm text-green-800">Staff see the latest version.</span>}
+        {!dirty && baseRev !== null && <span className="text-sm text-green-800">{text("Staff see the latest version.")}</span>}
         {dirty && baseRev !== null && (
-          <span className="text-sm font-medium text-amber-800">You have changes staff cannot see yet.</span>
+          <span className="text-sm font-medium text-amber-800">{text("You have changes staff cannot see yet.")}</span>
         )}
         {baseRev === null && !loading && (
-          <span className="text-sm text-zinc-600">Not on the server yet — publishing creates it.</span>
+          <span className="text-sm text-zinc-600">{text("Not on the server yet — publishing creates it.")}</span>
         )}
       </div>
       {qualificationBlocked && (
         <div role="alert" className="mt-2 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">
-          <p className="font-semibold">Fix these position assignments before publishing:</p>
+          <p className="font-semibold">{text("Fix these position assignments before publishing:")}</p>
           <ul className="mt-1 list-disc pl-5">
-            {qualificationViolations.map((violation) => <li key={violation.slotId}>{violation.message}</li>)}
+            {/* English keeps the validator's day-specific sentence; Spanish adds day and period so rows stay distinguishable. */}
+            {qualificationViolations.map((violation) => { const slot = slots.find(item=>item.id===violation.slotId)
+              return <li key={violation.slotId}>{locale === 'en' ? violation.message : `${employees.find(employee=>employee.id===violation.employeeId)?.name} · ${slot?.day} ${slot?.period} ${slot?.label}: ${text('This employee is not qualified for this position.')}`}</li> })}
           </ul>
         </div>
       )}
-      {filled === 0 && !canPublishEmpty && <p className="mt-2 text-sm text-zinc-600">Make a schedule for this week first.</p>}
-      {loading && <p className="mt-2 text-sm text-zinc-600">Checking what is on the server...</p>}
-      {error && <p className="mt-2 text-sm font-medium text-red-800">{error}</p>}
+      {filled === 0 && !canPublishEmpty && <p className="mt-2 text-sm text-zinc-600">{text("Make a schedule for this week first.")}</p>}
+      {loading && <p className="mt-2 text-sm text-zinc-600">{text("Checking what is on the server...")}</p>}
+      {error && <p className="mt-2 text-sm font-medium text-red-800">{text(error)}</p>}
       {notice && !error && (
         <div className="mt-2 space-y-2">
-          <p className="text-sm font-medium text-green-800">{notice}</p>
+          <p className="text-sm font-medium text-green-800">{text(notice)}</p>
           {visible && scheduleUrl && (
             <div>
               <a
                 href={`sms:?&body=${encodeURIComponent(`Schedule for ${weekLabel} is up: ${scheduleUrl}`)}`}
                 className="inline-flex items-center gap-2 rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-              >
-                Text my contacts
-              </a>
-              <p className="mt-1 text-xs text-zinc-500">Opens your phone&apos;s messaging app with the schedule link ready to send.</p>
+              >{text("Text my contacts")}</a>
+              <p className="mt-1 text-xs text-zinc-500">{text("Opens your phone's messaging app with the schedule link ready to send.")}</p>
             </div>
           )}
         </div>

@@ -31,9 +31,9 @@
 .toolbar > span { color: var(--cr-muted); font-size: 12px; }
 .toggle { display: flex !important; flex-direction: row !important; align-items: center; gap: 10px; font-weight: 600; min-height: 44px; }
 .toggle input { width: 20px; height: 20px; accent-color: var(--cr-accent-ink); flex-shrink: 0; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
-.planning .primary { background: var(--cr-black); color: white; border-color: var(--cr-black); }
-.planning .primary:hover:not(:disabled) { background: #343434; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.planning .primary { background: var(--cr-red); color: white; border-color: var(--cr-red); }
+.planning .primary:hover:not(:disabled) { background: #7f0710; }
 .feedback { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 0; font-size: 13px; }
 .feedback > span { color: var(--cr-muted); }
 .error, .warning { padding: 12px; margin-bottom: 12px !important; border: 1px solid var(--cr-red); border-left-width: 4px; background: #fff5f5; }
@@ -111,3 +111,17 @@
   .board { min-width: 0; grid-template-columns: repeat(7, minmax(0, 1fr)); } .boardScroll { overflow: visible; } .day h3 { font-size: 14px; padding: 4px; }
   .slot { min-height: 0; padding: 4px; break-inside: avoid; } .planning .person { background: white; color: black; border: 0; box-shadow: none; font-size: 11px; padding: 2px; min-height: 0; }
 }
+
+.fixes { display:flex; flex-direction:column; gap:12px; padding-top:16px; border-top:1px solid var(--cr-control); min-width:0; }
+.fixes p,.fixes li { overflow-wrap:anywhere; }
+.fixes:focus { outline:3px solid var(--cr-accent-ink); outline-offset:4px; }
+.blocker { font-weight:600; color:var(--cr-red); }
+.candidates { display:flex; flex-wrap:wrap; gap:8px; }
+.candidates details { flex-basis:100%; min-width:0; }
+.report { margin-top:16px; border-top:1px solid var(--cr-line); }
+.report p { padding:8px 0; overflow-wrap:anywhere; }
+.tableScroll { max-width:100%; overflow-x:auto; }
+.tableScroll table { width:100%; border-collapse:collapse; text-align:left; }
+.tableScroll td,.tableScroll th { padding:8px 12px; border-bottom:1px solid var(--cr-line); }
+.tableScroll td { font-variant-numeric:tabular-nums; }
+.planning :is(button,input,select):focus-visible { outline:3px solid var(--cr-accent-ink); outline-offset:3px; }

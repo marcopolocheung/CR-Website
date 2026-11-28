@@ -1,0 +1,11 @@
+test-scheduler-workspace exit=0 34s
+test-scheduler-views exit=0 14s
+test-scheduler-planning exit=0 26s
+test-schedule-requests exit=0 6s
+test-schedule-snapshots exit=0 5s
+test-internal-shell exit=0 (rerun after approved update)
+test-internal-session exit=0 (rerun after approved update)
+test-internal-home-reports exit=1 (rerun after approved update)
+test-internal-primitives exit=0 9s
+test-scheduling-agent exit=0 9s
+DONE

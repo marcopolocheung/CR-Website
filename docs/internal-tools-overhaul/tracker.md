@@ -16,6 +16,8 @@ The [Step 12a checkpoint](checkpoints/step-12a.md) records the locally implement
 
 The [Step 13 checkpoint](checkpoints/step-13.md) records the forms-library and sectioned-editor frontend slice. The frontend slice is implemented and locally verified; existing FORM-01/02/07 evidence and unresolved FORM-03/UX-07/DEC-07 policy milestones remain separate.
 
+The [Step 14 checkpoint](checkpoints/step-14.md) records the unified manager scheduling workspace: shared shell and manager unlock, one layout with Schedule, Staff & rules and Requests views, visit-long draft retention and the Classic parity matrix. Implemented and verified locally; SCH-03/07/08 statuses are unchanged and no external/live milestone is advanced.
+
 [DEC-03-FILES](tasks/DEC-03-FILES.md) records the owner's 2026-11-27 keep-forever policy for the [company Files library](files-library.md), which makes DATA-06 ready for local implementation in implementation-guide Steps 14a/14b. Wider DEC-03 and all external/live milestones remain pending.
 
 The [Step 11 checkpoint](checkpoints/step-11.md) records locally implemented and verified CR3 counting, filters and device-only progress. INV-01/03/10 remain pending for their wider durable-session, unit and historical-server scope. INV-02's requested global progress/filter/search slice is verified; its broader per-section reporting remains open. No external/live milestone is advanced.
